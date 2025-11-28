@@ -58,17 +58,17 @@ export default function BulkWhatsAppSender() {
   };
 
   useEffect(() => {
-    if (effectiveOrgId) {
+    if (orgId) {
       fetchTemplates();
       fetchContacts();
     }
-  }, [effectiveOrgId]);
+  }, [orgId]);
 
   const fetchTemplates = async () => {
     const { data } = await supabase
       .from("communication_templates")
       .select("*")
-      .eq("org_id", effectiveOrgId)
+      .eq("org_id", orgId)
       .eq("template_type", "whatsapp")
       .eq("status", "approved");
     
@@ -79,7 +79,7 @@ export default function BulkWhatsAppSender() {
     const { data } = await supabase
       .from("contacts")
       .select("id, first_name, last_name, phone, email")
-      .eq("org_id", effectiveOrgId)
+      .eq("org_id", orgId)
       .not("phone", "is", null);
     
     setContacts(data || []);
@@ -177,7 +177,7 @@ export default function BulkWhatsAppSender() {
       const { data: campaign, error: campaignError } = await supabase
         .from("whatsapp_bulk_campaigns")
         .insert([{
-          org_id: effectiveOrgId,
+          org_id: orgId,
           name: sanitizedName,
           template_id: templateId || null,
           message_content: messageContent,
@@ -393,7 +393,7 @@ export default function BulkWhatsAppSender() {
         <VariableMappingStep
           templateVariables={templateVariables}
           identifierType="phone"
-          orgId={effectiveOrgId}
+          orgId={orgId}
           onComplete={handleVariableMappingComplete}
           onBack={() => setStep(1)}
         />

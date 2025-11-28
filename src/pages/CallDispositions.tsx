@@ -109,7 +109,7 @@ export default function CallDispositions() {
     }
 
     subDispositionCrud.create({
-      org_id: effectiveOrgId,
+      org_id: orgId,
       disposition_id: newSubDisposition.dispositionId,
       name: newSubDisposition.name,
       description: newSubDisposition.description,
