@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { DollarSign } from "lucide-react";
 
+import { useLOSPermissions } from "@/hooks/useLOSPermissions";
+
 interface DisbursementFormProps {
   applicationId: string;
 }
@@ -21,6 +23,7 @@ export default function DisbursementForm({ applicationId }: DisbursementFormProp
   const [ifscCode, setIfscCode] = useState("");
   const [bankName, setBankName] = useState("");
   const [paymentMode, setPaymentMode] = useState("neft");
+  const { permissions } = useLOSPermissions();
 
   const { data: sanction } = useQuery({
     queryKey: ["loan-sanction", applicationId],
@@ -87,6 +90,18 @@ export default function DisbursementForm({ applicationId }: DisbursementFormProp
         <CardContent className="p-6">
           <div className="text-center text-muted-foreground">
             Sanction letter must be generated before disbursement
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!permissions.canInitiateDisbursement) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center text-muted-foreground">
+            You don't have permission to initiate disbursements
           </div>
         </CardContent>
       </Card>

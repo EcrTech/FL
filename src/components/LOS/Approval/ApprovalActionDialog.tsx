@@ -16,6 +16,8 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle, XCircle } from "lucide-react";
 
+import { useLOSPermissions } from "@/hooks/useLOSPermissions";
+
 interface ApprovalActionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -37,6 +39,7 @@ export default function ApprovalActionDialog({
   const [approvedAmount, setApprovedAmount] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { permissions } = useLOSPermissions();
 
   const actionMutation = useMutation({
     mutationFn: async () => {
@@ -93,6 +96,36 @@ export default function ApprovalActionDialog({
       });
     },
   });
+
+  if (!permissions.canApproveLoans && action === "approve") {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Permission Denied</DialogTitle>
+          </DialogHeader>
+          <p className="text-muted-foreground">
+            You don't have permission to approve loan applications.
+          </p>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  if (!permissions.canRejectLoans && action === "reject") {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Permission Denied</DialogTitle>
+          </DialogHeader>
+          <p className="text-muted-foreground">
+            You don't have permission to reject loan applications.
+          </p>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
