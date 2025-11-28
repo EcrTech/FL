@@ -17,6 +17,7 @@ import AssessmentDashboard from "@/components/LOS/Assessment/AssessmentDashboard
 import ApprovalActionDialog from "@/components/LOS/Approval/ApprovalActionDialog";
 import ApprovalHistory from "@/components/LOS/Approval/ApprovalHistory";
 import SanctionDashboard from "@/components/LOS/Sanction/SanctionDashboard";
+import DisbursementDashboard from "@/components/LOS/Disbursement/DisbursementDashboard";
 
 const STAGE_LABELS: Record<string, string> = {
   application_login: "Application Login",
@@ -364,12 +365,7 @@ export default function ApplicationDetail() {
           </TabsContent>
 
           <TabsContent value="disbursement">
-            <Card>
-              <CardHeader>
-                <CardTitle>Disbursement</CardTitle>
-                <CardDescription>Coming soon - Disbursement processing</CardDescription>
-              </CardHeader>
-            </Card>
+            <DisbursementDashboard applicationId={application.id} />
           </TabsContent>
         </Tabs>
       </div>
