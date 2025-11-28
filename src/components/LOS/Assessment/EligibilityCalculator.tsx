@@ -1,0 +1,436 @@
+import { useState, useEffect } from "react";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Calculator, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+
+interface EligibilityCalculatorProps {
+  applicationId: string;
+  orgId: string;
+}
+
+const POLICY_RULES = [
+  { key: "age", name: "Age Check", description: "Age between 21-58 years", critical: true },
+  { key: "income", name: "Minimum Income", description: "Net monthly income ≥ ₹25,000", critical: true },
+  { key: "employment", name: "Employment Stability", description: "Min 1 year in current company", critical: false },
+  { key: "credit_score", name: "Credit Score", description: "CIBIL score ≥ 650", critical: true },
+  { key: "foir", name: "FOIR Check", description: "FOIR should be ≤ 50%", critical: true },
+  { key: "existing_loans", name: "Existing Loans", description: "Max 3 active loans", critical: false },
+];
+
+export default function EligibilityCalculator({ applicationId, orgId }: EligibilityCalculatorProps) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const [formData, setFormData] = useState({
+    gross_income: "",
+    net_income: "",
+    total_deductions: "",
+    existing_emi_obligations: "",
+    proposed_emi: "",
+    foir_percentage: "0",
+    max_allowed_foir: "50",
+    eligible_loan_amount: "",
+    recommended_tenure: "",
+    recommended_interest_rate: "12",
+  });
+
+  const [policyChecks, setPolicyChecks] = useState<Record<string, { passed: boolean; details: string }>>({});
+
+  const { data: application } = useQuery({
+    queryKey: ["loan-application-full", applicationId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("loan_applications")
+        .select(`
+          *,
+          loan_applicants(*),
+          loan_employment_details(*),
+          loan_verifications(*)
+        `)
+        .eq("id", applicationId)
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!applicationId,
+  });
+
+  const { data: existingEligibility } = useQuery({
+    queryKey: ["loan-eligibility", applicationId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("loan_eligibility")
+        .select("*")
+        .eq("loan_application_id", applicationId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error && error.code !== "PGRST116") throw error;
+      return data;
+    },
+    enabled: !!applicationId,
+  });
+
+  useEffect(() => {
+    if (existingEligibility) {
+      setFormData({
+        gross_income: existingEligibility.gross_income?.toString() || "",
+        net_income: existingEligibility.net_income?.toString() || "",
+        total_deductions: existingEligibility.total_deductions?.toString() || "",
+        existing_emi_obligations: existingEligibility.existing_emi_obligations?.toString() || "",
+        proposed_emi: existingEligibility.proposed_emi?.toString() || "",
+        foir_percentage: existingEligibility.foir_percentage?.toString() || "0",
+        max_allowed_foir: existingEligibility.max_allowed_foir?.toString() || "50",
+        eligible_loan_amount: existingEligibility.eligible_loan_amount?.toString() || "",
+        recommended_tenure: existingEligibility.recommended_tenure?.toString() || "",
+        recommended_interest_rate: existingEligibility.recommended_interest_rate?.toString() || "12",
+      });
+      setPolicyChecks(existingEligibility.policy_checks as any || {});
+    }
+  }, [existingEligibility]);
+
+  const calculateFOIR = () => {
+    const netIncome = parseFloat(formData.net_income) || 0;
+    const existingEMI = parseFloat(formData.existing_emi_obligations) || 0;
+    const proposedEMI = parseFloat(formData.proposed_emi) || 0;
+
+    if (netIncome === 0) return 0;
+
+    const foir = ((existingEMI + proposedEMI) / netIncome) * 100;
+    return Math.round(foir * 100) / 100;
+  };
+
+  const calculateEligibleAmount = () => {
+    const netIncome = parseFloat(formData.net_income) || 0;
+    const existingEMI = parseFloat(formData.existing_emi_obligations) || 0;
+    const maxFOIR = parseFloat(formData.max_allowed_foir) || 50;
+    const interestRate = parseFloat(formData.recommended_interest_rate) || 12;
+    const tenure = parseInt(formData.recommended_tenure) || 36;
+
+    // Calculate max EMI based on FOIR
+    const maxEMI = (netIncome * maxFOIR / 100) - existingEMI;
+
+    // Calculate loan amount using EMI formula: P = (EMI * n) / (1 + r/12)^n - 1) / (r/12 * (1 + r/12)^n)
+    const monthlyRate = interestRate / 12 / 100;
+    const eligibleAmount = maxEMI * ((Math.pow(1 + monthlyRate, tenure) - 1) / (monthlyRate * Math.pow(1 + monthlyRate, tenure)));
+
+    return Math.round(eligibleAmount);
+  };
+
+  const runPolicyChecks = () => {
+    const checks: Record<string, { passed: boolean; details: string }> = {};
+    const applicant = application?.loan_applicants?.[0];
+    const employment = Array.isArray(application?.loan_employment_details) 
+      ? application?.loan_employment_details[0] 
+      : application?.loan_employment_details;
+    const creditBureau = application?.loan_verifications?.find((v: any) => v.verification_type === "credit_bureau");
+
+    // Age check
+    if (applicant?.dob) {
+      const age = Math.floor((Date.now() - new Date(applicant.dob as string).getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+      checks.age = {
+        passed: age >= 21 && age <= 58,
+        details: `Applicant age: ${age} years`
+      };
+    } else {
+      checks.age = { passed: false, details: "DOB not available" };
+    }
+
+    // Income check
+    const netIncome = parseFloat(formData.net_income) || 0;
+    checks.income = {
+      passed: netIncome >= 25000,
+      details: `Net monthly income: ₹${netIncome.toLocaleString()}`
+    };
+
+    // Employment stability
+    if (employment?.date_of_joining) {
+      const monthsInCompany = Math.floor((Date.now() - new Date(employment.date_of_joining as string).getTime()) / (1000 * 60 * 60 * 24 * 30));
+      checks.employment = {
+        passed: monthsInCompany >= 12,
+        details: `Months in current company: ${monthsInCompany}`
+      };
+    } else {
+      checks.employment = { passed: false, details: "Date of joining not available" };
+    }
+
+    // Credit score
+    const creditScore = (creditBureau?.response_data as any)?.credit_score || 0;
+    checks.credit_score = {
+      passed: creditScore >= 650,
+      details: `CIBIL score: ${creditScore}`
+    };
+
+    // FOIR check
+    const foir = calculateFOIR();
+    checks.foir = {
+      passed: foir <= parseFloat(formData.max_allowed_foir),
+      details: `FOIR: ${foir.toFixed(2)}%`
+    };
+
+    // Existing loans (mock - would need actual data)
+    const activeAccounts = (creditBureau?.response_data as any)?.active_accounts || 0;
+    checks.existing_loans = {
+      passed: activeAccounts <= 3,
+      details: `Active loan accounts: ${activeAccounts}`
+    };
+
+    setPolicyChecks(checks);
+    return checks;
+  };
+
+  const handleCalculate = () => {
+    const foir = calculateFOIR();
+    const eligibleAmount = calculateEligibleAmount();
+    const checks = runPolicyChecks();
+
+    setFormData({
+      ...formData,
+      foir_percentage: foir.toString(),
+      eligible_loan_amount: eligibleAmount.toString(),
+    });
+
+    toast({ title: "Eligibility calculated successfully" });
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const eligibilityData = {
+        loan_application_id: applicationId,
+        calculation_date: new Date().toISOString(),
+        gross_income: parseFloat(formData.gross_income) || 0,
+        net_income: parseFloat(formData.net_income) || 0,
+        total_deductions: parseFloat(formData.total_deductions) || 0,
+        existing_emi_obligations: parseFloat(formData.existing_emi_obligations) || 0,
+        proposed_emi: parseFloat(formData.proposed_emi) || 0,
+        foir_percentage: parseFloat(formData.foir_percentage) || 0,
+        max_allowed_foir: parseFloat(formData.max_allowed_foir) || 50,
+        eligible_loan_amount: parseFloat(formData.eligible_loan_amount) || 0,
+        recommended_tenure: parseInt(formData.recommended_tenure) || null,
+        recommended_interest_rate: parseFloat(formData.recommended_interest_rate) || null,
+        policy_checks: policyChecks,
+        is_eligible: Object.values(policyChecks).filter(c => POLICY_RULES.find(r => r.critical)?.key ? c.passed : true).every(c => c.passed),
+        calculation_details: {
+          foir_formula: "(Existing EMI + Proposed EMI) / Net Income * 100",
+          eligible_amount_formula: "Based on FOIR and tenure"
+        }
+      };
+
+      if (existingEligibility) {
+        const { error } = await supabase
+          .from("loan_eligibility")
+          .update(eligibilityData)
+          .eq("id", existingEligibility.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("loan_eligibility")
+          .insert(eligibilityData);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["loan-eligibility", applicationId] });
+      toast({ title: "Eligibility saved successfully" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to save eligibility",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const allCriticalChecksPassed = POLICY_RULES
+    .filter(rule => rule.critical)
+    .every(rule => policyChecks[rule.key]?.passed);
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Income & Obligations</CardTitle>
+              <CardDescription>Enter applicant's income and existing obligations</CardDescription>
+            </div>
+            <Calculator className="h-5 w-5 text-muted-foreground" />
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div>
+              <Label>Gross Monthly Income (₹)</Label>
+              <Input
+                type="number"
+                value={formData.gross_income}
+                onChange={(e) => setFormData({ ...formData, gross_income: e.target.value })}
+                placeholder="100000"
+              />
+            </div>
+            <div>
+              <Label>Total Deductions (₹)</Label>
+              <Input
+                type="number"
+                value={formData.total_deductions}
+                onChange={(e) => setFormData({ ...formData, total_deductions: e.target.value })}
+                placeholder="25000"
+              />
+            </div>
+            <div>
+              <Label>Net Monthly Income (₹)</Label>
+              <Input
+                type="number"
+                value={formData.net_income}
+                onChange={(e) => setFormData({ ...formData, net_income: e.target.value })}
+                placeholder="75000"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <div>
+              <Label>Existing EMI Obligations (₹)</Label>
+              <Input
+                type="number"
+                value={formData.existing_emi_obligations}
+                onChange={(e) => setFormData({ ...formData, existing_emi_obligations: e.target.value })}
+                placeholder="15000"
+              />
+            </div>
+            <div>
+              <Label>Proposed EMI (₹)</Label>
+              <Input
+                type="number"
+                value={formData.proposed_emi}
+                onChange={(e) => setFormData({ ...formData, proposed_emi: e.target.value })}
+                placeholder="20000"
+              />
+            </div>
+            <div>
+              <Label>Max Allowed FOIR (%)</Label>
+              <Input
+                type="number"
+                value={formData.max_allowed_foir}
+                onChange={(e) => setFormData({ ...formData, max_allowed_foir: e.target.value })}
+                placeholder="50"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <Label>Recommended Tenure (months)</Label>
+              <Input
+                type="number"
+                value={formData.recommended_tenure}
+                onChange={(e) => setFormData({ ...formData, recommended_tenure: e.target.value })}
+                placeholder="36"
+              />
+            </div>
+            <div>
+              <Label>Interest Rate (% p.a.)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={formData.recommended_interest_rate}
+                onChange={(e) => setFormData({ ...formData, recommended_interest_rate: e.target.value })}
+                placeholder="12"
+              />
+            </div>
+          </div>
+
+          <Button onClick={handleCalculate} className="w-full">
+            <Calculator className="mr-2 h-4 w-4" />
+            Calculate Eligibility
+          </Button>
+        </CardContent>
+      </Card>
+
+      {formData.foir_percentage !== "0" && (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle>Calculation Results</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="p-4 bg-muted rounded-lg">
+                  <div className="text-sm text-muted-foreground">FOIR</div>
+                  <div className="text-2xl font-bold">{formData.foir_percentage}%</div>
+                </div>
+                <div className="p-4 bg-muted rounded-lg">
+                  <div className="text-sm text-muted-foreground">Eligible Amount</div>
+                  <div className="text-2xl font-bold">
+                    ₹{parseFloat(formData.eligible_loan_amount).toLocaleString()}
+                  </div>
+                </div>
+                <div className="p-4 bg-muted rounded-lg">
+                  <div className="text-sm text-muted-foreground">Status</div>
+                  <Badge className={allCriticalChecksPassed ? "bg-green-500" : "bg-red-500"}>
+                    {allCriticalChecksPassed ? "Eligible" : "Not Eligible"}
+                  </Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Policy Checks</CardTitle>
+              <CardDescription>Automated policy rule validation</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {POLICY_RULES.map((rule) => {
+                  const check = policyChecks[rule.key];
+                  if (!check) return null;
+
+                  return (
+                    <div
+                      key={rule.key}
+                      className="flex items-center justify-between p-3 border rounded-lg"
+                    >
+                      <div className="flex items-center gap-3">
+                        {check.passed ? (
+                          <CheckCircle className="h-5 w-5 text-green-600" />
+                        ) : (
+                          <XCircle className="h-5 w-5 text-red-600" />
+                        )}
+                        <div>
+                          <div className="font-medium flex items-center gap-2">
+                            {rule.name}
+                            {rule.critical && (
+                              <Badge variant="outline" className="text-xs">Critical</Badge>
+                            )}
+                          </div>
+                          <div className="text-sm text-muted-foreground">{rule.description}</div>
+                        </div>
+                      </div>
+                      <div className="text-sm text-muted-foreground">{check.details}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-end gap-3">
+            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
+              {saveMutation.isPending ? "Saving..." : "Save Assessment"}
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
