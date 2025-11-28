@@ -25,7 +25,6 @@ import {
   FileText,
   List,
   Sliders,
-  ShieldCheck,
   Building2,
   Webhook,
   MessageSquare,
@@ -562,24 +561,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                 </>
               )}
 
-              {canAccessFeature("platform_admin") && (
-                <>
-                  <div className="pt-4 pb-2 section-accent-teal pl-4">
-                    <p className="px-4 text-xs font-semibold uppercase tracking-wider gradient-text-primary">
-                      Platform Admin
-                    </p>
-                  </div>
-                  <Link
-                    to="/platform-admin"
-                    className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
-                    onClick={() => setSidebarOpen(false)}
-                  >
-                    <ShieldCheck size={20} />
-                    <span>Platform Dashboard</span>
-                  </Link>
-                </>
-              )}
-              
               {isAdmin && (
                 <>
                   {(canAccessFeature("connectors") || canAccessFeature("api_keys")) && (
