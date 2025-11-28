@@ -41,10 +41,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useNotification } from "@/hooks/useNotification";
-import { PlatformAdminBanner } from "@/components/PlatformAdminBanner";
 import { OnboardingDialog } from "@/components/Onboarding/OnboardingDialog";
 import { useFeatureAccess } from "@/hooks/useFeatureAccess";
-import SubscriptionStatusBanner from "@/components/Subscription/SubscriptionStatusBanner";
 import { useModuleTracking } from "@/hooks/useModuleTracking";
 import { useTopModules } from "@/hooks/useTopModules";
 import { NotificationBell } from "./NotificationBell";
@@ -61,7 +59,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userName, setUserName] = useState<string>("");
   const [orgLogo, setOrgLogo] = useState<string>("");
-  const [isPlatformAdmin, setIsPlatformAdmin] = useState<boolean>(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [orgName, setOrgName] = useState<string>("");
@@ -85,7 +82,7 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
           .single(),
         supabase
           .from("profiles")
-          .select("first_name, last_name, org_id, is_platform_admin, onboarding_completed")
+          .select("first_name, last_name, org_id, onboarding_completed")
           .eq("id", user.id)
           .single()
       ]);
@@ -96,7 +93,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
 
       if (profileRes.data) {
         setUserName(`${profileRes.data.first_name} ${profileRes.data.last_name}`);
-        setIsPlatformAdmin(profileRes.data.is_platform_admin || false);
         
         // Check if user needs onboarding
         if (!profileRes.data.onboarding_completed && roleRes.data?.role) {
@@ -626,8 +622,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
 
         {/* Main content */}
         <main className="flex-1">
-          <PlatformAdminBanner />
-          <SubscriptionStatusBanner />
           <div className="p-6 lg:p-8">
             {children}
           </div>

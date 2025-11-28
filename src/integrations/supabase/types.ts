@@ -3603,103 +3603,6 @@ export type Database = {
           },
         ]
       }
-      org_feature_access: {
-        Row: {
-          created_at: string | null
-          disabled_at: string | null
-          enabled_at: string | null
-          feature_key: string
-          id: string
-          is_enabled: boolean | null
-          modified_by: string | null
-          notes: string | null
-          org_id: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          disabled_at?: string | null
-          enabled_at?: string | null
-          feature_key: string
-          id?: string
-          is_enabled?: boolean | null
-          modified_by?: string | null
-          notes?: string | null
-          org_id: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          disabled_at?: string | null
-          enabled_at?: string | null
-          feature_key?: string
-          id?: string
-          is_enabled?: boolean | null
-          modified_by?: string | null
-          notes?: string | null
-          org_id?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "org_feature_access_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      org_invites: {
-        Row: {
-          created_at: string
-          email: string | null
-          expires_at: string
-          id: string
-          invite_code: string
-          invited_by: string
-          org_id: string
-          role: Database["public"]["Enums"]["app_role"]
-          updated_at: string
-          used_at: string | null
-          used_by: string | null
-        }
-        Insert: {
-          created_at?: string
-          email?: string | null
-          expires_at: string
-          id?: string
-          invite_code: string
-          invited_by: string
-          org_id: string
-          role?: Database["public"]["Enums"]["app_role"]
-          updated_at?: string
-          used_at?: string | null
-          used_by?: string | null
-        }
-        Update: {
-          created_at?: string
-          email?: string | null
-          expires_at?: string
-          id?: string
-          invite_code?: string
-          invited_by?: string
-          org_id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          updated_at?: string
-          used_at?: string | null
-          used_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "org_invites_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       organization_subscriptions: {
         Row: {
           billing_cycle_start: string
@@ -4228,44 +4131,6 @@ export type Database = {
           },
         ]
       }
-      platform_admin_audit_log: {
-        Row: {
-          action: string
-          admin_id: string
-          created_at: string
-          details: Json | null
-          id: string
-          target_org_id: string | null
-          target_user_id: string | null
-        }
-        Insert: {
-          action: string
-          admin_id: string
-          created_at?: string
-          details?: Json | null
-          id?: string
-          target_org_id?: string | null
-          target_user_id?: string | null
-        }
-        Update: {
-          action?: string
-          admin_id?: string
-          created_at?: string
-          details?: Json | null
-          id?: string
-          target_org_id?: string | null
-          target_user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "platform_admin_audit_log_target_org_id_fkey"
-            columns: ["target_org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       platform_email_sending_list: {
         Row: {
           bounce_count: number
@@ -4319,7 +4184,6 @@ export type Database = {
           first_name: string | null
           id: string
           is_active: boolean
-          is_platform_admin: boolean | null
           last_name: string | null
           onboarding_completed: boolean | null
           org_id: string | null
@@ -4338,7 +4202,6 @@ export type Database = {
           first_name?: string | null
           id: string
           is_active?: boolean
-          is_platform_admin?: boolean | null
           last_name?: string | null
           onboarding_completed?: boolean | null
           org_id?: string | null
@@ -4357,7 +4220,6 @@ export type Database = {
           first_name?: string | null
           id?: string
           is_active?: boolean
-          is_platform_admin?: boolean | null
           last_name?: string | null
           onboarding_completed?: boolean | null
           org_id?: string | null
@@ -5712,7 +5574,6 @@ export type Database = {
           stage_order: number
         }[]
       }
-      get_platform_admin_stats: { Args: never; Returns: Json }
       get_reporting_chain: {
         Args: { p_designation_id: string }
         Returns: {
@@ -5810,7 +5671,6 @@ export type Database = {
         Args: { _feature_key: string; _org_id: string }
         Returns: boolean
       }
-      is_platform_admin: { Args: { _user_id: string }; Returns: boolean }
       is_within_business_hours: {
         Args: { _check_time: string; _org_id: string }
         Returns: boolean

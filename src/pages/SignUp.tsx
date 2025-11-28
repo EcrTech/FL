@@ -115,8 +115,6 @@ export default function SignUp() {
 
         notify.success("Account created!", `Welcome to ${inviteData.organizations.name}`);
       } else {
-        // Create new organization using secure database function
-        
         // Step 1: Create auth user
         console.log("Creating auth user...");
         const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -140,31 +138,6 @@ export default function SignUp() {
         createdUserId = authData.user.id;
         console.log("Auth user created successfully:", createdUserId);
 
-        // Wait for profile trigger to complete
-        await new Promise(resolve => setTimeout(resolve, 3000));
-
-        // Step 2: Create organization and all related data using secure function
-        console.log("Creating organization:", formData.organizationName);
-        const { data: orgId, error: orgError } = await supabase.rpc(
-          "create_organization_for_user",
-          {
-            p_user_id: authData.user.id,
-            p_org_name: formData.organizationName,
-            p_org_slug: formData.organizationSlug,
-          }
-        );
-
-        if (orgError) {
-          console.error("Organization creation error:", orgError);
-          
-          // Cleanup: Delete the auth user we just created
-          console.log("Cleaning up orphaned user account...");
-          await supabase.rpc("cleanup_orphaned_profile", { user_id: createdUserId });
-          
-          throw new Error(orgError.message || "Failed to create organization");
-        }
-
-        console.log("Organization and setup completed successfully! Org ID:", orgId);
         notify.success("Account created!", "Welcome to In-Sync");
       }
 

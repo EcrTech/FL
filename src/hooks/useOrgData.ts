@@ -17,17 +17,17 @@ export function useOrgData<T = any>(
   tableName: string,
   options?: OrgDataOptions
 ): UseQueryResult<T[], Error> {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
 
   return useQuery({
-    queryKey: [tableName, effectiveOrgId, options],
+    queryKey: [tableName, orgId, options],
     queryFn: async () => {
-      if (!effectiveOrgId) throw new Error("No organization context");
+      if (!orgId) throw new Error("No organization context");
 
       let query: any = supabase
         .from(tableName as any)
         .select(options?.select || "*")
-        .eq("org_id", effectiveOrgId);
+        .eq("org_id", orgId);
 
       if (options?.filter) {
         Object.entries(options.filter).forEach(([key, value]) => {
@@ -45,6 +45,6 @@ export function useOrgData<T = any>(
       if (error) throw error;
       return data as T[];
     },
-    enabled: !!effectiveOrgId && (options?.enabled !== false),
+    enabled: !!orgId && (options?.enabled !== false),
   });
 }
