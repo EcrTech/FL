@@ -84,82 +84,82 @@ export function RuleBuilder({ open, onOpenChange, editingRule }: RuleBuilderProp
 
   // Fetch pipeline stages
   const { data: stages } = useQuery({
-    queryKey: ["pipeline_stages", effectiveOrgId],
+    queryKey: ["pipeline_stages", orgId],
     queryFn: async () => {
-      if (!effectiveOrgId) return [];
+      if (!orgId) return [];
       const { data, error } = await supabase
         .from("pipeline_stages")
         .select("*")
-        .eq("org_id", effectiveOrgId)
+        .eq("org_id", orgId)
         .order("stage_order");
       if (error) throw error;
       return data;
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   // Fetch dispositions
   const { data: dispositions } = useQuery({
-    queryKey: ["call_dispositions", effectiveOrgId],
+    queryKey: ["call_dispositions", orgId],
     queryFn: async () => {
-      if (!effectiveOrgId) return [];
+      if (!orgId) return [];
       const { data, error } = await supabase
         .from("call_dispositions")
         .select("*")
-        .eq("org_id", effectiveOrgId)
+        .eq("org_id", orgId)
         .eq("is_active", true);
       if (error) throw error;
       return data;
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   // Fetch custom fields
   const { data: customFields } = useQuery({
-    queryKey: ["custom_fields", effectiveOrgId],
+    queryKey: ["custom_fields", orgId],
     queryFn: async () => {
-      if (!effectiveOrgId) return [];
+      if (!orgId) return [];
       const { data, error } = await supabase
         .from("custom_fields")
         .select("*")
-        .eq("org_id", effectiveOrgId)
+        .eq("org_id", orgId)
         .eq("applies_to_table", "contacts")
         .eq("is_active", true);
       if (error) throw error;
       return data;
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   // Fetch users
   const { data: users } = useQuery({
-    queryKey: ["profiles", effectiveOrgId],
+    queryKey: ["profiles", orgId],
     queryFn: async () => {
-      if (!effectiveOrgId) return [];
+      if (!orgId) return [];
       const { data, error } = await supabase
         .from("profiles")
         .select("id, first_name, last_name")
-        .eq("org_id", effectiveOrgId);
+        .eq("org_id", orgId);
       if (error) throw error;
       return data;
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   // Fetch templates
   const { data: templates } = useQuery({
-    queryKey: ["email_templates", effectiveOrgId],
+    queryKey: ["email_templates", orgId],
     queryFn: async () => {
-      if (!effectiveOrgId) return [];
-      const { data, error } = await supabase
+      if (!orgId) return [];
+      const { data, error} = await supabase
         .from("email_templates")
         .select("*")
-        .eq("org_id", effectiveOrgId)
+        .eq("org_id", orgId)
         .eq("is_active", true);
       if (error) throw error;
       return data;
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   // Load editing rule data
@@ -226,7 +226,7 @@ export function RuleBuilder({ open, onOpenChange, editingRule }: RuleBuilderProp
   // Save rule mutation
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (!effectiveOrgId) throw new Error("No organization selected");
+      if (!orgId) throw new Error("No organization selected");
 
       let triggerConfig = {};
       if (triggerType === "stage_change") {
@@ -260,7 +260,7 @@ export function RuleBuilder({ open, onOpenChange, editingRule }: RuleBuilderProp
       }
 
       const ruleData = {
-        org_id: effectiveOrgId,
+        org_id: orgId,
         name,
         description,
         trigger_type: triggerType,
@@ -841,7 +841,7 @@ export function RuleBuilder({ open, onOpenChange, editingRule }: RuleBuilderProp
           open={showAbTestManager}
           onOpenChange={setShowAbTestManager}
           ruleId={editingRule.id}
-          orgId={effectiveOrgId || ""}
+          orgId={orgId || ""}
         />
       )}
     </Dialog>

@@ -29,29 +29,29 @@ export function SmartSendTimeConfig() {
   const [optimizeEnabled, setOptimizeEnabled] = useState(true);
 
   const { data: patterns, isLoading } = useQuery({
-    queryKey: ['email-engagement-patterns', effectiveOrgId],
+    queryKey: ['email-engagement-patterns', orgId],
     queryFn: async () => {
       // Get org-wide best performing times
       const { data, error } = await supabase
         .from('email_engagement_patterns')
         .select('hour_of_day, day_of_week, engagement_score')
-        .eq('org_id', effectiveOrgId)
+        .eq('org_id', orgId)
         .order('engagement_score', { ascending: false })
         .limit(10);
       
       if (error) throw error;
       return data;
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   const { data: stats } = useQuery({
-    queryKey: ['engagement-pattern-stats', effectiveOrgId],
+    queryKey: ['engagement-pattern-stats', orgId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('email_engagement_patterns')
         .select('engagement_score, open_count, click_count')
-        .eq('org_id', effectiveOrgId);
+        .eq('org_id', orgId);
       
       if (error) throw error;
       
@@ -67,7 +67,7 @@ export function SmartSendTimeConfig() {
         totalClicks,
       };
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   const formatTime = (hour: number) => {

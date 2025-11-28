@@ -37,19 +37,19 @@ export function RuleTestDialog({ open, onOpenChange, rule }: RuleTestDialogProps
 
   // Fetch contacts for testing
   const { data: contacts, isLoading: loadingContacts } = useQuery({
-    queryKey: ["contacts_for_test", effectiveOrgId],
+    queryKey: ["contacts_for_test", orgId],
     queryFn: async () => {
-      if (!effectiveOrgId) return [];
+      if (!orgId) return [];
       const { data, error } = await supabase
         .from("contacts")
         .select("id, first_name, last_name, email")
-        .eq("org_id", effectiveOrgId)
+        .eq("org_id", orgId)
         .limit(100)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
-    enabled: !!effectiveOrgId && open,
+    enabled: !!orgId && open,
   });
 
   // Preview email mutation
@@ -59,7 +59,7 @@ export function RuleTestDialog({ open, onOpenChange, rule }: RuleTestDialogProps
       
       const { data, error } = await supabase.functions.invoke('automation-trigger-handler', {
         body: {
-          orgId: effectiveOrgId,
+          orgId: orgId,
           triggerType: 'test',
           contactId: selectedContactId,
           ruleId: rule.id,
@@ -86,7 +86,7 @@ export function RuleTestDialog({ open, onOpenChange, rule }: RuleTestDialogProps
       
       const { data, error } = await supabase.functions.invoke('automation-trigger-handler', {
         body: {
-          orgId: effectiveOrgId,
+          orgId: orgId,
           triggerType: 'test',
           contactId: selectedContactId,
           ruleId: rule.id,

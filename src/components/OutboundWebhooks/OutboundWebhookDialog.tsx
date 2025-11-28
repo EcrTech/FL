@@ -102,7 +102,7 @@ export const OutboundWebhookDialog = ({
   const saveMutation = useMutation({
     mutationFn: async () => {
       const data = {
-        org_id: effectiveOrgId,
+        org_id: orgId,
         name,
         description,
         webhook_url: webhookUrl,

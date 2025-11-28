@@ -16,16 +16,16 @@ export function AutomationAnalytics({ dateRange = 30 }: AutomationAnalyticsProps
   const { orgId } = useOrgContext();
 
   const { data: trendData, isLoading: trendLoading } = useQuery({
-    queryKey: ["automation_trend", effectiveOrgId, dateRange],
+    queryKey: ["automation_trend", orgId, dateRange],
     queryFn: async () => {
-      if (!effectiveOrgId) return [];
+      if (!orgId) return [];
 
       const startDate = startOfDay(subDays(new Date(), dateRange));
 
       const { data, error } = await supabase
         .from("email_automation_executions")
         .select("created_at, status, sent_at, converted_at")
-        .eq("org_id", effectiveOrgId)
+        .eq("org_id", orgId)
         .gte("created_at", startDate.toISOString());
 
       if (error) throw error;
@@ -48,19 +48,19 @@ export function AutomationAnalytics({ dateRange = 30 }: AutomationAnalyticsProps
         new Date(a.date).getTime() - new Date(b.date).getTime()
       );
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   const { data: rulePerformance, isLoading: ruleLoading } = useQuery({
-    queryKey: ["rule_performance", effectiveOrgId],
+    queryKey: ["rule_performance", orgId],
     queryFn: async () => {
-      if (!effectiveOrgId) return [];
+      if (!orgId) return [];
 
       // Fetch rules with execution counts
       const { data: executions, error } = await supabase
         .from("email_automation_executions")
         .select("rule_id, status, converted_at, email_automation_rules(name)")
-        .eq("org_id", effectiveOrgId);
+        .eq("org_id", orgId);
 
       if (error) throw error;
 
@@ -102,18 +102,18 @@ export function AutomationAnalytics({ dateRange = 30 }: AutomationAnalyticsProps
             : 0,
         }));
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   const { data: triggerStats, isLoading: triggerLoading } = useQuery({
-    queryKey: ["trigger_stats", effectiveOrgId],
+    queryKey: ["trigger_stats", orgId],
     queryFn: async () => {
-      if (!effectiveOrgId) return [];
+      if (!orgId) return [];
 
       const { data, error } = await supabase
         .from("email_automation_executions")
         .select("trigger_type, status, converted_at")
-        .eq("org_id", effectiveOrgId);
+        .eq("org_id", orgId);
 
       if (error) throw error;
 
@@ -134,7 +134,7 @@ export function AutomationAnalytics({ dateRange = 30 }: AutomationAnalyticsProps
         conversionRate: stat.sent > 0 ? Math.round((stat.converted / stat.sent) * 100) : 0,
       }));
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   if (trendLoading || ruleLoading || triggerLoading) {

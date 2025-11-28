@@ -12,37 +12,37 @@ export function AutomationDiagnostics() {
 
   // Get system health checks
   const { data: diagnostics, isLoading } = useQuery({
-    queryKey: ["automation_diagnostics", effectiveOrgId],
+    queryKey: ["automation_diagnostics", orgId],
     queryFn: async () => {
-      if (!effectiveOrgId) return null;
+      if (!orgId) return null;
 
       // Fetch various metrics
       const [rulesResult, executionsResult, templatesResult, businessHoursResult, suppressionResult] = await Promise.all([
         supabase
           .from("email_automation_rules")
           .select("id, name, is_active, total_triggered, total_sent, total_failed")
-          .eq("org_id", effectiveOrgId),
+          .eq("org_id", orgId),
         
         supabase
           .from("email_automation_executions")
           .select("status, created_at")
-          .eq("org_id", effectiveOrgId)
+          .eq("org_id", orgId)
           .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
         
         supabase
           .from("email_templates")
           .select("id, name, is_active")
-          .eq("org_id", effectiveOrgId),
+          .eq("org_id", orgId),
         
         supabase
           .from("org_business_hours")
           .select("*")
-          .eq("org_id", effectiveOrgId),
+          .eq("org_id", orgId),
         
         supabase
           .from("email_suppression_list")
           .select("id")
-          .eq("org_id", effectiveOrgId)
+          .eq("org_id", orgId)
       ]);
 
       const rules = rulesResult.data || [];
@@ -91,7 +91,7 @@ export function AutomationDiagnostics() {
         },
       };
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
     refetchInterval: 30000, // Refresh every 30 seconds
   });
 

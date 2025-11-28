@@ -14,37 +14,37 @@ export default function CampaignAnalyticsTab() {
   const [dateRange, setDateRange] = useState({ from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), to: new Date() });
 
   const { data: emailCampaigns = [], isLoading: emailLoading } = useQuery({
-    queryKey: ['email-campaigns-analytics', effectiveOrgId, dateRange],
+    queryKey: ['email-campaigns-analytics', orgId, dateRange],
     queryFn: async () => {
-      if (!effectiveOrgId) return [];
+      if (!orgId) return [];
       const { data, error } = await supabase
         .from('email_bulk_campaigns')
         .select('*')
-        .eq('org_id', effectiveOrgId)
+        .eq('org_id', orgId)
         .gte('created_at', dateRange.from.toISOString())
         .lte('created_at', dateRange.to.toISOString())
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data || [];
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   const { data: whatsappCampaigns = [], isLoading: whatsappLoading } = useQuery({
-    queryKey: ['whatsapp-campaigns-analytics', effectiveOrgId, dateRange],
+    queryKey: ['whatsapp-campaigns-analytics', orgId, dateRange],
     queryFn: async () => {
-      if (!effectiveOrgId) return [];
+      if (!orgId) return [];
       const { data, error } = await supabase
         .from('whatsapp_bulk_campaigns')
         .select('*')
-        .eq('org_id', effectiveOrgId)
+        .eq('org_id', orgId)
         .gte('created_at', dateRange.from.toISOString())
         .lte('created_at', dateRange.to.toISOString())
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data || [];
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   return (

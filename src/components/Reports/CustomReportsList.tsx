@@ -17,18 +17,18 @@ export const CustomReportsList = ({ onViewReport }: CustomReportsListProps) => {
   const { orgId } = useOrgContext();
 
   const { data: reports, isLoading } = useQuery({
-    queryKey: ['saved-reports', effectiveOrgId],
+    queryKey: ['saved-reports', orgId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('saved_reports')
         .select('*')
-        .eq('org_id', effectiveOrgId)
+        .eq('org_id', orgId)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
       return data;
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   if (isLoading) {
