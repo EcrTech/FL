@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,12 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, User, FileText, CheckCircle, Calculator, ThumbsUp, FileCheck, DollarSign } from "lucide-react";
+import { ArrowLeft, User, FileText, CheckCircle, Calculator, ThumbsUp, FileCheck, DollarSign, XCircle } from "lucide-react";
 import { LoadingState } from "@/components/common/LoadingState";
 import { format } from "date-fns";
 import DocumentUpload from "@/components/LOS/DocumentUpload";
 import VerificationDashboard from "@/components/LOS/VerificationDashboard";
 import AssessmentDashboard from "@/components/LOS/Assessment/AssessmentDashboard";
+import ApprovalActionDialog from "@/components/LOS/Approval/ApprovalActionDialog";
+import ApprovalHistory from "@/components/LOS/Approval/ApprovalHistory";
 
 const STAGE_LABELS: Record<string, string> = {
   application_login: "Application Login",
@@ -20,9 +23,8 @@ const STAGE_LABELS: Record<string, string> = {
   field_verification: "Field Verification",
   credit_assessment: "Credit Assessment",
   approval_pending: "Approval Pending",
-  approved: "Approved",
+  sanctioned: "Sanctioned",
   rejected: "Rejected",
-  sanction_generated: "Sanction Generated",
   disbursement_pending: "Disbursement Pending",
   disbursed: "Disbursed",
   closed: "Closed",
@@ -41,6 +43,17 @@ export default function ApplicationDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { orgId } = useOrgContext();
+  const [approvalAction, setApprovalAction] = useState<"approve" | "reject" | null>(null);
+
+  const { data: userData } = useQuery({
+    queryKey: ["current-user"],
+    queryFn: async () => {
+      const response = await supabase.auth.getUser();
+      return response.data;
+    },
+  });
+  
+  const user = userData?.user;
 
   const { data: application, isLoading } = useQuery({
     queryKey: ["loan-application", id, orgId],
@@ -312,13 +325,37 @@ export default function ApplicationDetail() {
             <AssessmentDashboard applicationId={application.id} orgId={orgId} />
           </TabsContent>
 
-          <TabsContent value="approval">
-            <Card>
-              <CardHeader>
-                <CardTitle>Approval Workflow</CardTitle>
-                <CardDescription>Coming soon - Approval queue</CardDescription>
-              </CardHeader>
-            </Card>
+          <TabsContent value="approval" className="space-y-6">
+            {application.current_stage === "approval_pending" && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Approval Actions</CardTitle>
+                  <CardDescription>
+                    Review and take action on this loan application
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex gap-4">
+                    <Button
+                      variant="default"
+                      onClick={() => setApprovalAction("approve")}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Approve Application
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={() => setApprovalAction("reject")}
+                    >
+                      <XCircle className="h-4 w-4 mr-2" />
+                      Reject Application
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <ApprovalHistory applicationId={id!} />
           </TabsContent>
 
           <TabsContent value="sanction">
@@ -340,6 +377,17 @@ export default function ApplicationDetail() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {approvalAction && orgId && user && (
+        <ApprovalActionDialog
+          open={!!approvalAction}
+          onOpenChange={() => setApprovalAction(null)}
+          applicationId={id!}
+          action={approvalAction}
+          orgId={orgId}
+          userId={user.id}
+        />
+      )}
     </DashboardLayout>
   );
 }
