@@ -54,6 +54,8 @@ import Inventory from "./pages/Inventory";
 import ApiKeys from "./pages/ApiKeys";
 import OutboundWebhooks from "./pages/OutboundWebhooks";
 import Tasks from "./pages/Tasks";
+import Applications from "./pages/LOS/Applications";
+import NewApplication from "./pages/LOS/NewApplication";
 import ProtectedRoute from "./components/Auth/ProtectedRoute";
 
 const App = () => (
@@ -317,6 +319,18 @@ const App = () => (
           <Route path="/tasks" element={
             <ProtectedRoute>
               <Tasks />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/los/applications" element={
+            <ProtectedRoute>
+              <Applications />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/los/applications/new" element={
+            <ProtectedRoute>
+              <NewApplication />
             </ProtectedRoute>
           } />
           
