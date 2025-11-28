@@ -48,12 +48,12 @@ export default function PipelineStages() {
       return;
     }
 
-    if (!effectiveOrgId) return;
+    if (!orgId) return;
 
     const maxOrder = Math.max(...stages.map(s => s.stage_order), 0);
 
     await create({
-      org_id: effectiveOrgId,
+      org_id: orgId,
       name: newStage.name,
       description: newStage.description,
       stage_order: maxOrder + 1,

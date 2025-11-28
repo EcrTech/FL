@@ -91,7 +91,7 @@ export default function ReportBuilder() {
                   onChange={setComponents}
                   dataSource={selectedDataSource}
                   parameters={parameters}
-                  orgId={effectiveOrgId!}
+                  orgId={orgId!}
                 />
               )}
             </Card>
@@ -123,7 +123,7 @@ export default function ReportBuilder() {
               components,
             },
           }}
-          orgId={effectiveOrgId!}
+          orgId={orgId!}
           onSaved={() => {
             notify.success("Success", "Report saved successfully");
           }}

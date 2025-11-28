@@ -51,12 +51,12 @@ export default function RedefineDataRepository() {
 
   // Fetch total count for pagination
   const { data: totalCount } = useQuery({
-    queryKey: ["redefine-repository-count", effectiveOrgId, searchQuery, filters],
+    queryKey: ["redefine-repository-count", orgId, searchQuery, filters],
     queryFn: async () => {
       let query = supabase
         .from("redefine_data_repository")
         .select("*", { count: "exact", head: true })
-        .eq("org_id", effectiveOrgId!);
+        .eq("org_id", orgId!);
 
       if (searchQuery) {
         query = query.or(
@@ -84,12 +84,12 @@ export default function RedefineDataRepository() {
       if (error) throw error;
       return count || 0;
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   // Fetch repository data with pagination
   const { data: records, isLoading, refetch } = useQuery({
-    queryKey: ["redefine-repository", effectiveOrgId, searchQuery, filters, currentPage],
+    queryKey: ["redefine-repository", orgId, searchQuery, filters, currentPage],
     queryFn: async () => {
       const from = (currentPage - 1) * pageSize;
       const to = from + pageSize - 1;
@@ -97,7 +97,7 @@ export default function RedefineDataRepository() {
       let query = supabase
         .from("redefine_data_repository")
         .select("*")
-        .eq("org_id", effectiveOrgId!)
+        .eq("org_id", orgId!)
         .order("created_at", { ascending: false })
         .range(from, to);
 
@@ -127,7 +127,7 @@ export default function RedefineDataRepository() {
       if (error) throw error;
       return data;
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   const totalPages = Math.ceil((totalCount || 0) / pageSize);
@@ -136,12 +136,12 @@ export default function RedefineDataRepository() {
 
   // Fetch stats
   const { data: stats } = useQuery({
-    queryKey: ["redefine-repository-stats", effectiveOrgId],
+    queryKey: ["redefine-repository-stats", orgId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("redefine_data_repository")
         .select("company_name, industry_type, created_at")
-        .eq("org_id", effectiveOrgId!);
+        .eq("org_id", orgId!);
 
       if (error) throw error;
 
@@ -160,7 +160,7 @@ export default function RedefineDataRepository() {
         recordsThisMonth: thisMonth,
       };
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   const handleExport = () => {
@@ -460,7 +460,7 @@ export default function RedefineDataRepository() {
         open={showAddDialog}
         onOpenChange={handleCloseDialog}
         record={selectedRecord}
-        orgId={effectiveOrgId!}
+        orgId={orgId!}
       />
       </div>
     </DashboardLayout>

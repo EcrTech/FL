@@ -30,12 +30,12 @@ export default function Inventory() {
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
 
   const { data: inventory, isLoading, refetch } = useQuery({
-    queryKey: ["inventory", effectiveOrgId, search],
+    queryKey: ["inventory", orgId, search],
     queryFn: async () => {
       let query = supabase
         .from("inventory_items")
         .select("*")
-        .eq("org_id", effectiveOrgId)
+        .eq("org_id", orgId)
         .order("created_at", { ascending: false });
 
       if (search) {
@@ -46,16 +46,16 @@ export default function Inventory() {
       if (error) throw error;
       return data;
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   const { data: stats } = useQuery({
-    queryKey: ["inventory-stats", effectiveOrgId],
+    queryKey: ["inventory-stats", orgId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("inventory_items")
         .select("available_qty")
-        .eq("org_id", effectiveOrgId);
+        .eq("org_id", orgId);
 
       if (error) throw error;
 
@@ -68,7 +68,7 @@ export default function Inventory() {
 
       return { totalItems, totalQty, lowStock };
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   const handleExport = () => {
@@ -278,7 +278,7 @@ export default function Inventory() {
         open={showAddDialog}
         onOpenChange={handleCloseDialog}
         item={selectedItem}
-        orgId={effectiveOrgId}
+        orgId={orgId}
       />
     </DashboardLayout>
   );

@@ -137,7 +137,7 @@ export default function Forms() {
       return;
     }
 
-    if (!effectiveOrgId) return;
+    if (!orgId) return;
 
     try {
       let formId: string;
@@ -163,7 +163,7 @@ export default function Forms() {
         const { data: newForm, error: insertError } = await supabase
           .from("forms")
           .insert([{
-            org_id: effectiveOrgId,
+            org_id: orgId,
             name: dialog.formData.name,
             description: dialog.formData.description,
             is_active: dialog.formData.is_active,

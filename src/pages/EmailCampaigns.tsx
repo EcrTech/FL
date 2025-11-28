@@ -35,7 +35,7 @@ const EmailCampaigns = () => {
     const { data, error } = await supabase
       .from("email_bulk_campaigns")
       .select("*")
-      .eq("org_id", effectiveOrgId)
+      .eq("org_id", orgId)
       .order("created_at", { ascending: false });
 
     if (error) throw error;
@@ -43,18 +43,18 @@ const EmailCampaigns = () => {
   };
 
   const { data: campaigns = [], isLoading, refetch } = useQuery({
-    queryKey: ['email-campaigns', effectiveOrgId],
+    queryKey: ['email-campaigns', orgId],
     queryFn: fetchCampaigns,
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   // Realtime subscription using standardized hook
   useRealtimeSync({
     table: 'email_bulk_campaigns',
-    filter: `org_id=eq.${effectiveOrgId}`,
+    filter: `org_id=eq.${orgId}`,
     onUpdate: refetch,
     onInsert: refetch,
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   const handleExport = () => {
