@@ -12,6 +12,7 @@ import { LoadingState } from "@/components/common/LoadingState";
 import { format } from "date-fns";
 import DocumentUpload from "@/components/LOS/DocumentUpload";
 import VerificationDashboard from "@/components/LOS/VerificationDashboard";
+import AssessmentDashboard from "@/components/LOS/Assessment/AssessmentDashboard";
 
 const STAGE_LABELS: Record<string, string> = {
   application_login: "Application Login",
@@ -308,12 +309,7 @@ export default function ApplicationDetail() {
           </TabsContent>
 
           <TabsContent value="assessment">
-            <Card>
-              <CardHeader>
-                <CardTitle>Credit Assessment</CardTitle>
-                <CardDescription>Coming soon - Eligibility calculation</CardDescription>
-              </CardHeader>
-            </Card>
+            <AssessmentDashboard applicationId={application.id} orgId={orgId} />
           </TabsContent>
 
           <TabsContent value="approval">
