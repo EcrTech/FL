@@ -17,9 +17,12 @@ import {
 } from "lucide-react";
 import { LoadingState } from "@/components/common/LoadingState";
 
+import { useLOSPermissions } from "@/hooks/useLOSPermissions";
+
 export default function LOSDashboard() {
   const { orgId } = useOrgContext();
   const navigate = useNavigate();
+  const { permissions } = useLOSPermissions();
 
   const { data: stats, isLoading } = useQuery({
     queryKey: ["los-stats", orgId],
@@ -146,10 +149,12 @@ export default function LOSDashboard() {
               Loan Origination System overview and statistics
             </p>
           </div>
-          <Button onClick={() => navigate("/los/applications/new")}>
-            <FileText className="h-4 w-4 mr-2" />
-            New Application
-          </Button>
+          {permissions.canCreateApplication && (
+            <Button onClick={() => navigate("/los/applications/new")}>
+              <FileText className="h-4 w-4 mr-2" />
+              New Application
+            </Button>
+          )}
         </div>
 
         {/* Stats Grid */}
@@ -307,30 +312,36 @@ export default function LOSDashboard() {
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 md:grid-cols-3">
-              <Button
-                variant="outline"
-                className="h-auto py-4 flex-col gap-2"
-                onClick={() => navigate("/los/applications/new")}
-              >
-                <FileText className="h-6 w-6" />
-                <span>New Application</span>
-              </Button>
-              <Button
-                variant="outline"
-                className="h-auto py-4 flex-col gap-2"
-                onClick={() => navigate("/los/approval-queue")}
-              >
-                <AlertCircle className="h-6 w-6" />
-                <span>Approval Queue</span>
-              </Button>
-              <Button
-                variant="outline"
-                className="h-auto py-4 flex-col gap-2"
-                onClick={() => navigate("/los/applications")}
-              >
-                <Users className="h-6 w-6" />
-                <span>All Applications</span>
-              </Button>
+              {permissions.canCreateApplication && (
+                <Button
+                  variant="outline"
+                  className="h-auto py-4 flex-col gap-2"
+                  onClick={() => navigate("/los/applications/new")}
+                >
+                  <FileText className="h-6 w-6" />
+                  <span>New Application</span>
+                </Button>
+              )}
+              {permissions.canApproveLoans && (
+                <Button
+                  variant="outline"
+                  className="h-auto py-4 flex-col gap-2"
+                  onClick={() => navigate("/los/approval-queue")}
+                >
+                  <AlertCircle className="h-6 w-6" />
+                  <span>Approval Queue</span>
+                </Button>
+              )}
+              {permissions.canViewApplications && (
+                <Button
+                  variant="outline"
+                  className="h-auto py-4 flex-col gap-2"
+                  onClick={() => navigate("/los/applications")}
+                >
+                  <Users className="h-6 w-6" />
+                  <span>All Applications</span>
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>

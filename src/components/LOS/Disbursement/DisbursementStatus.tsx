@@ -11,6 +11,8 @@ import { useState } from "react";
 import { CheckCircle, XCircle, Clock, Building2 } from "lucide-react";
 import { format } from "date-fns";
 
+import { useLOSPermissions } from "@/hooks/useLOSPermissions";
+
 interface DisbursementStatusProps {
   applicationId: string;
 }
@@ -21,6 +23,7 @@ export default function DisbursementStatus({ applicationId }: DisbursementStatus
   const [utrNumber, setUtrNumber] = useState("");
   const [failureReason, setFailureReason] = useState("");
   const [showUpdateForm, setShowUpdateForm] = useState(false);
+  const { permissions } = useLOSPermissions();
 
   const { data: disbursement } = useQuery({
     queryKey: ["loan-disbursements", applicationId],
@@ -167,7 +170,7 @@ export default function DisbursementStatus({ applicationId }: DisbursementStatus
             </div>
           )}
 
-          {disbursement.status === "pending" && !showUpdateForm && (
+          {disbursement.status === "pending" && !showUpdateForm && permissions.canUpdateDisbursementStatus && (
             <div className="flex gap-4">
               <Button onClick={() => setShowUpdateForm(true)}>
                 Update Status

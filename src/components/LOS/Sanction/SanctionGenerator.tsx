@@ -10,6 +10,8 @@ import { useToast } from "@/hooks/use-toast";
 import { FileText, Download } from "lucide-react";
 import { format } from "date-fns";
 
+import { useLOSPermissions } from "@/hooks/useLOSPermissions";
+
 interface SanctionGeneratorProps {
   applicationId: string;
   orgId: string;
@@ -21,6 +23,7 @@ export default function SanctionGenerator({ applicationId, orgId }: SanctionGene
   const [interestRate, setInterestRate] = useState("");
   const [processingFee, setProcessingFee] = useState("");
   const [terms, setTerms] = useState("");
+  const { permissions } = useLOSPermissions();
 
   const { data: application } = useQuery({
     queryKey: ["loan-application-basic", applicationId],
@@ -122,6 +125,18 @@ export default function SanctionGenerator({ applicationId, orgId }: SanctionGene
         <CardContent className="p-6">
           <div className="text-center text-muted-foreground">
             Application must be approved before generating sanction letter
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!permissions.canGenerateSanction) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center text-muted-foreground">
+            You don't have permission to generate sanction letters
           </div>
         </CardContent>
       </Card>

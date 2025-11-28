@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrgContext } from "@/hooks/useOrgContext";
+import { useLOSPermissions } from "@/hooks/useLOSPermissions";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,6 +60,7 @@ const STATUS_COLORS: Record<string, string> = {
 export default function Applications() {
   const navigate = useNavigate();
   const { orgId } = useOrgContext();
+  const { permissions } = useLOSPermissions();
   const [searchQuery, setSearchQuery] = useState("");
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -149,10 +151,12 @@ export default function Applications() {
               Manage and track all loan applications
             </p>
           </div>
-          <Button onClick={() => navigate("/los/applications/new")}>
-            <Plus className="mr-2 h-4 w-4" />
-            New Application
-          </Button>
+          {permissions.canCreateApplication && (
+            <Button onClick={() => navigate("/los/applications/new")}>
+              <Plus className="mr-2 h-4 w-4" />
+              New Application
+            </Button>
+          )}
         </div>
 
         {/* Stats Cards */}
