@@ -37,7 +37,7 @@ interface Profile {
 export default function Teams() {
   const navigate = useNavigate();
   const notify = useNotification();
-  const { effectiveOrgId, isLoading: isOrgLoading } = useOrgContext();
+  const { orgId, isLoading: isOrgLoading } = useOrgContext();
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   
   const dialog = useDialogState({

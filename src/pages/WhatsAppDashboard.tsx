@@ -34,7 +34,7 @@ interface WhatsAppMessage {
 }
 
 const WhatsAppDashboard = () => {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const notify = useNotification();
 
   // Fetch messages using useOrgData for automatic caching

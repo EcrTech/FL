@@ -24,7 +24,7 @@ interface Button {
 export default function TemplateBuilder() {
   const navigate = useNavigate();
   const notify = useNotification();
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   
   const [loading, setLoading] = useState(false);
   const [templateName, setTemplateName] = useState("");

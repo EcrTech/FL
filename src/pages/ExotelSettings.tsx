@@ -12,7 +12,7 @@ import { useOrgContext } from "@/hooks/useOrgContext";
 
 export default function ExotelSettings() {
   const notify = useNotification();
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);

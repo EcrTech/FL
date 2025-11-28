@@ -13,7 +13,7 @@ import { reportDataSources } from "@/config/reportDataSources";
 import { useNotification } from "@/hooks/useNotification";
 
 export default function SavedReports() {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const navigate = useNavigate();
   const notify = useNotification();
 

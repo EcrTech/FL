@@ -29,7 +29,7 @@ interface QueueJob {
 }
 
 const QueueStatus = () => {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const notify = useNotification();
   const [loading, setLoading] = useState(true);
   const [jobs, setJobs] = useState<QueueJob[]>([]);

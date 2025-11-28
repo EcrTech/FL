@@ -33,7 +33,7 @@ export interface Filter {
 
 const PipelineAdvancedSearch = () => {
   const navigate = useNavigate();
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const { success: showSuccess, error: showError } = useNotification();
   const [fields, setFields] = useState<SearchableField[]>([]);
   const [filters, setFilters] = useState<Filter[]>([{ id: '1', fieldId: '', operator: '', value: '' }]);

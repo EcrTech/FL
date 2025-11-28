@@ -50,7 +50,7 @@ interface FormData {
 }
 
 export default function Forms() {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const notification = useNotification();
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);

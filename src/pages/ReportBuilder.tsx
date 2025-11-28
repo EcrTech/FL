@@ -15,7 +15,7 @@ import { useOrgContext } from "@/hooks/useOrgContext";
 import { useNotification } from "@/hooks/useNotification";
 
 export default function ReportBuilder() {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const notify = useNotification();
   const navigate = useNavigate();
   

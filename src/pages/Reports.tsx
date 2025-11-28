@@ -37,7 +37,7 @@ export default function Reports() {
   const [dateRange, setDateRange] = useState<"week" | "month" | "quarter">("month");
   const [activeTab, setActiveTab] = useState<string>("campaigns");
   const notify = useNotification();
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
 
   // Load and persist tab from localStorage and URL hash
   useEffect(() => {

@@ -23,7 +23,7 @@ interface PipelineStage {
 }
 
 export default function PipelineStages() {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const notify = useNotification();
   const inlineEdit = useInlineEdit<PipelineStage>();
   

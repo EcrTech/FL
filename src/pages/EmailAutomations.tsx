@@ -36,7 +36,7 @@ import { ApprovalQueueManager } from "@/components/EmailAutomation/ApprovalQueue
 import { AdvancedReporting } from "@/components/EmailAutomation/AdvancedReporting";
 
 export default function EmailAutomations() {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const notify = useNotification();
   const queryClient = useQueryClient();
   const [isRuleBuilderOpen, setIsRuleBuilderOpen] = useState(false);
