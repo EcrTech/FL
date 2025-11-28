@@ -16,6 +16,7 @@ import VerificationDashboard from "@/components/LOS/VerificationDashboard";
 import AssessmentDashboard from "@/components/LOS/Assessment/AssessmentDashboard";
 import ApprovalActionDialog from "@/components/LOS/Approval/ApprovalActionDialog";
 import ApprovalHistory from "@/components/LOS/Approval/ApprovalHistory";
+import SanctionDashboard from "@/components/LOS/Sanction/SanctionDashboard";
 
 const STAGE_LABELS: Record<string, string> = {
   application_login: "Application Login",
@@ -359,12 +360,7 @@ export default function ApplicationDetail() {
           </TabsContent>
 
           <TabsContent value="sanction">
-            <Card>
-              <CardHeader>
-                <CardTitle>Sanction Letter</CardTitle>
-                <CardDescription>Coming soon - Sanction generation</CardDescription>
-              </CardHeader>
-            </Card>
+            <SanctionDashboard applicationId={application.id} orgId={orgId} />
           </TabsContent>
 
           <TabsContent value="disbursement">
