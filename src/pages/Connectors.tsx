@@ -47,7 +47,7 @@ interface Connector {
 }
 
 export default function Connectors() {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const notify = useNotification();
   const [connectors, setConnectors] = useState<Connector[]>([]);
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
@@ -70,20 +70,20 @@ export default function Connectors() {
   });
 
   useEffect(() => {
-    if (effectiveOrgId) {
+    if (orgId) {
       fetchConnectors();
       fetchCustomFields();
     }
-  }, [effectiveOrgId]);
+  }, [orgId]);
 
   const fetchConnectors = async () => {
-    if (!effectiveOrgId) return;
+    if (!orgId) return;
     
     try {
       const { data: connectorsData, error: connectorsError } = await supabase
         .from("forms")
         .select("*")
-        .eq("org_id", effectiveOrgId)
+        .eq("org_id", orgId)
         .eq("connector_type", "webhook")
         .order("created_at", { ascending: false });
 

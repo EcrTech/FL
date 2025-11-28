@@ -107,17 +107,17 @@ export default function Users() {
   );
 
   useEffect(() => {
-    if (effectiveOrgId) {
+    if (orgId) {
       fetchUsers();
     }
-  }, [effectiveOrgId]);
+  }, [orgId]);
 
   const canManageUsers = () => {
-    return isPlatformAdmin || isAdmin || isSuperAdmin;
+    return isAdmin || isSuperAdmin;
   };
 
   const fetchUsers = async () => {
-    if (!effectiveOrgId) return;
+    if (!orgId) return;
     
     try {
       const { data, error } = await supabase
@@ -128,7 +128,7 @@ export default function Users() {
           role,
           is_active
         `)
-        .eq("org_id", effectiveOrgId)
+        .eq("org_id", orgId)
         .eq("is_active", true)
         .order("created_at", { ascending: false });
 
@@ -184,7 +184,7 @@ export default function Users() {
     e.preventDefault();
     console.log('[Users] handleSubmit called', { isEditing: dialog.isEditing, formData: dialog.formData });
     
-    if (!effectiveOrgId) {
+    if (!orgId) {
       notification.error("Error", "Organization context not available");
       return;
     }

@@ -153,7 +153,7 @@ function SortableFieldCard({ field, onEdit, onDelete }: SortableFieldCardProps) 
 }
 
 export default function CustomFields() {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const notify = useNotification();
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -201,7 +201,7 @@ export default function CustomFields() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!effectiveOrgId) return;
+    if (!orgId) return;
     
     // Validate required fields
     if (!dialog.formData.field_label?.trim()) {
@@ -234,7 +234,7 @@ export default function CustomFields() {
         }
         
         fieldData.field_name = fieldName;
-        fieldData.org_id = effectiveOrgId;
+        fieldData.org_id = orgId;
       }
       // For editing, don't update field_name as it's the internal identifier
 
