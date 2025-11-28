@@ -56,6 +56,8 @@ import OutboundWebhooks from "./pages/OutboundWebhooks";
 import Tasks from "./pages/Tasks";
 import Applications from "./pages/LOS/Applications";
 import NewApplication from "./pages/LOS/NewApplication";
+import ApplicationDetail from "./pages/LOS/ApplicationDetail";
+import ApprovalQueuePage from "./pages/LOS/ApprovalQueue";
 import ProtectedRoute from "./components/Auth/ProtectedRoute";
 
 const App = () => (
@@ -331,6 +333,18 @@ const App = () => (
           <Route path="/los/applications/new" element={
             <ProtectedRoute>
               <NewApplication />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/los/applications/:id" element={
+            <ProtectedRoute>
+              <ApplicationDetail />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/los/approval-queue" element={
+            <ProtectedRoute>
+              <ApprovalQueuePage />
             </ProtectedRoute>
           } />
           
