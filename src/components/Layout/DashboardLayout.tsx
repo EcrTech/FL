@@ -312,15 +312,37 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                 </Link>
               )}
 
-              {/* Operations Section */}
+              {/* Sales & Operations Section */}
               {showOperationsSection && (
                 <div className="pt-4 pb-2 section-accent-teal pl-4">
                   <p className="px-4 text-xs font-semibold uppercase tracking-wider gradient-text-primary">
-                    Operations
+                    Sales & Operations
                   </p>
                 </div>
               )}
               
+              {canAccessFeature("contacts") && (
+                <Link
+                  to="/contacts"
+                  className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <Contact size={20} />
+                  <span>Contacts</span>
+                </Link>
+              )}
+
+              {canAccessFeature("pipeline_stages") && (
+                <Link
+                  to="/pipeline"
+                  className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <GitBranch size={20} />
+                  <span>Pipeline</span>
+                </Link>
+              )}
+
               <Link
                 to="/los/applications"
                 className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
@@ -339,27 +361,14 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                 <span>Approval Queue</span>
               </Link>
 
-              {canAccessFeature("pipeline_stages") && (
-                <Link
-                  to="/pipeline"
-                  className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <GitBranch size={20} />
-                  <span>Pipeline</span>
-                </Link>
-              )}
-              
-              {canAccessFeature("contacts") && (
-                <Link
-                  to="/contacts"
-                  className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <Contact size={20} />
-                  <span>Contacts</span>
-                </Link>
-              )}
+              <Link
+                to="/tasks"
+                className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                onClick={() => setSidebarOpen(false)}
+              >
+                <CheckSquare size={20} />
+                <span>Tasks</span>
+              </Link>
 
               {canAccessFeature("communications") && (
                 <Link
@@ -393,15 +402,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                   <span>Inventory</span>
                 </Link>
               )}
-
-              <Link
-                to="/tasks"
-                className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
-                onClick={() => setSidebarOpen(false)}
-              >
-                <CheckSquare size={20} />
-                <span>Tasks</span>
-              </Link>
 
               {showManagementSection && (
                 <>
@@ -469,9 +469,20 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                   {showAdminMainSection && (
                     <div className="pt-4 pb-2 section-accent-teal pl-4">
                       <p className="px-4 text-xs font-semibold uppercase tracking-wider gradient-text-primary">
-                        Admin
+                        Configuration
                       </p>
                     </div>
+                  )}
+                  
+                  {canAccessFeature("organization_settings") && (
+                    <Link
+                      to="/admin"
+                      className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                      onClick={() => setSidebarOpen(false)}
+                    >
+                      <Building2 size={20} />
+                      <span>Organization Settings</span>
+                    </Link>
                   )}
                   
                   {canAccessFeature("pipeline_stages") && (
@@ -482,17 +493,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                     >
                       <Layers size={20} />
                       <span>Pipeline Stages</span>
-                    </Link>
-                  )}
-                  
-                  {canAccessFeature("calling") && (
-                    <Link
-                      to="/admin/call-dispositions"
-                      className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
-                      onClick={() => setSidebarOpen(false)}
-                    >
-                      <PhoneCall size={20} />
-                      <span>Call Dispositions</span>
                     </Link>
                   )}
                   
@@ -518,21 +518,21 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                     </Link>
                   )}
                   
-                  {canAccessFeature("organization_settings") && (
+                  {canAccessFeature("calling") && (
                     <Link
-                      to="/admin"
+                      to="/admin/call-dispositions"
                       className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
                       onClick={() => setSidebarOpen(false)}
                     >
-                      <Building2 size={20} />
-                      <span>Organization Settings</span>
+                      <PhoneCall size={20} />
+                      <span>Call Dispositions</span>
                     </Link>
                   )}
                   
                   {showAdminCommunicationSection && (
                     <div className="pt-4 pb-2 section-accent-teal pl-4">
                       <p className="px-4 text-xs font-semibold uppercase tracking-wider gradient-text-primary">
-                        Communication
+                        Communication Setup
                       </p>
                     </div>
                   )}
@@ -566,7 +566,7 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                   {(canAccessFeature("connectors") || canAccessFeature("api_keys")) && (
                     <div className="pt-4 pb-2 section-accent-teal pl-4">
                       <p className="px-4 text-xs font-semibold uppercase tracking-wider gradient-text-primary">
-                        Connectors
+                        Integration & APIs
                       </p>
                     </div>
                   )}
