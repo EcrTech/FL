@@ -45,8 +45,7 @@ export default function SanctionGenerator({ applicationId, orgId }: SanctionGene
         .eq("approval_status", "approved")
         .order("created_at", { ascending: false })
         .limit(1)
-        .single();
-      if (error && error.code !== "PGRST116") throw error;
+        .maybeSingle();
       return data;
     },
   });
@@ -58,8 +57,7 @@ export default function SanctionGenerator({ applicationId, orgId }: SanctionGene
         .from("loan_sanctions")
         .select("*")
         .eq("loan_application_id", applicationId)
-        .single();
-      if (error && error.code !== "PGRST116") throw error;
+        .maybeSingle();
       return data;
     },
   });

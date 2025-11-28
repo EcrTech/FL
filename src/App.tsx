@@ -58,6 +58,7 @@ import Applications from "./pages/LOS/Applications";
 import NewApplication from "./pages/LOS/NewApplication";
 import ApplicationDetail from "./pages/LOS/ApplicationDetail";
 import ApprovalQueuePage from "./pages/LOS/ApprovalQueue";
+import LOSDashboard from "./pages/LOS/Dashboard";
 import ProtectedRoute from "./components/Auth/ProtectedRoute";
 
 const App = () => (
@@ -321,6 +322,12 @@ const App = () => (
           <Route path="/tasks" element={
             <ProtectedRoute>
               <Tasks />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/los/dashboard" element={
+            <ProtectedRoute>
+              <LOSDashboard />
             </ProtectedRoute>
           } />
           

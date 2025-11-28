@@ -16,8 +16,7 @@ export default function SanctionDashboard({ applicationId, orgId }: SanctionDash
         .from("loan_sanctions")
         .select("*")
         .eq("loan_application_id", applicationId)
-        .single();
-      if (error && error.code !== "PGRST116") throw error;
+        .maybeSingle();
       return data;
     },
   });

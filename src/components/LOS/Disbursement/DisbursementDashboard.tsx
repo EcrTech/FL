@@ -17,8 +17,7 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
         .eq("loan_application_id", applicationId)
         .order("created_at", { ascending: false })
         .limit(1)
-        .single();
-      if (error && error.code !== "PGRST116") throw error;
+        .maybeSingle();
       return data;
     },
   });
