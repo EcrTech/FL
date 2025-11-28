@@ -149,7 +149,7 @@ export default function TemplateBuilder() {
 
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${effectiveOrgId}/${Date.now()}.${fileExt}`;
+      const fileName = `${orgId}/${Date.now()}.${fileExt}`;
       const filePath = `template-media/${fileName}`;
 
       const { error: uploadError } = await supabase.storage

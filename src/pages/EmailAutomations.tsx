@@ -50,9 +50,9 @@ export default function EmailAutomations() {
 
   // Fetch automation rules
   const { data: rules, isLoading, refetch } = useQuery({
-    queryKey: ["email_automation_rules", effectiveOrgId],
+    queryKey: ["email_automation_rules", orgId],
     queryFn: async () => {
-      if (!effectiveOrgId) return [];
+      if (!orgId) return [];
       
       const { data, error } = await supabase
         .from("email_automation_rules")
@@ -60,25 +60,25 @@ export default function EmailAutomations() {
           *,
           email_templates(name, subject)
         `)
-        .eq("org_id", effectiveOrgId)
+        .eq("org_id", orgId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
       return data;
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   // Fetch execution stats
   const { data: stats } = useQuery({
-    queryKey: ["automation_stats", effectiveOrgId],
+    queryKey: ["automation_stats", orgId],
     queryFn: async () => {
-      if (!effectiveOrgId) return null;
+      if (!orgId) return null;
 
       const { data, error } = await supabase
         .from("email_automation_executions")
         .select("status", { count: "exact" })
-        .eq("org_id", effectiveOrgId);
+        .eq("org_id", orgId);
 
       if (error) throw error;
 
@@ -89,7 +89,7 @@ export default function EmailAutomations() {
 
       return { total, sent, failed, successRate };
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   // Toggle rule active status
@@ -491,12 +491,12 @@ export default function EmailAutomations() {
         rule={testingRule}
       />
 
-      {dependencyRuleId && effectiveOrgId && (
+      {dependencyRuleId && orgId && (
         <RuleDependencyManager
           open={dependencyManagerOpen}
           onOpenChange={setDependencyManagerOpen}
           ruleId={dependencyRuleId}
-          orgId={effectiveOrgId}
+          orgId={orgId}
         />
       )}
     </div>

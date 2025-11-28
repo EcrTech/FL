@@ -46,19 +46,19 @@ const OutboundWebhooks = () => {
 
   // Fetch webhooks
   const { data: webhooks = [], isLoading } = useQuery({
-    queryKey: ["outbound-webhooks", effectiveOrgId],
+    queryKey: ["outbound-webhooks", orgId],
     queryFn: async () => {
-      if (!effectiveOrgId) return [];
+      if (!orgId) return [];
       const { data, error } = await supabase
         .from("outbound_webhooks")
         .select("*")
-        .eq("org_id", effectiveOrgId)
+        .eq("org_id", orgId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
       return data;
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   // Toggle webhook active status
@@ -106,7 +106,7 @@ const OutboundWebhooks = () => {
     mutationFn: async (webhookId: string) => {
       const { data, error } = await supabase.functions.invoke("outbound-webhook-handler", {
         body: {
-          orgId: effectiveOrgId,
+          orgId: orgId,
           triggerEvent: "test",
           triggerData: {
             test: true,

@@ -35,10 +35,10 @@ const QueueStatus = () => {
   const [jobs, setJobs] = useState<QueueJob[]>([]);
 
   useEffect(() => {
-    if (effectiveOrgId) {
+    if (orgId) {
       fetchJobs();
     }
-  }, [effectiveOrgId]);
+  }, [orgId]);
 
   const fetchJobs = async () => {
     try {
@@ -67,7 +67,7 @@ const QueueStatus = () => {
     onUpdate: fetchJobs,
     onInsert: fetchJobs,
     onDelete: fetchJobs,
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   const handleCancel = async (jobId: string) => {

@@ -47,7 +47,7 @@ const WhatsAppDashboard = () => {
         sent_by_profile:profiles!sent_by (first_name, last_name)
       `,
       orderBy: { column: 'sent_at', ascending: false },
-      enabled: !!effectiveOrgId,
+      enabled: !!orgId,
     }
   );
 

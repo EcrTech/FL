@@ -72,37 +72,37 @@ export default function Reports() {
 
   // Optimized sales reports query - single database call instead of N+1
   const { data: salesReports = [], isLoading: salesLoading } = useQuery({
-    queryKey: ['sales-reports', dateRange, effectiveOrgId],
+    queryKey: ['sales-reports', dateRange, orgId],
     queryFn: async () => {
-      if (!effectiveOrgId) return [];
+      if (!orgId) return [];
       
       const { data, error } = await supabase.rpc('get_sales_performance_report', {
-        p_org_id: effectiveOrgId,
+        p_org_id: orgId,
         p_start_date: getStartDate().toISOString(),
       });
 
       if (error) throw error;
       return data || [];
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
   });
 
   // Optimized pipeline reports query - single database call instead of N+1
   const { data: pipelineReports = [], isLoading: pipelineLoading } = useQuery({
-    queryKey: ['pipeline-reports', effectiveOrgId],
+    queryKey: ['pipeline-reports', orgId],
     queryFn: async () => {
-      if (!effectiveOrgId) return [];
+      if (!orgId) return [];
       
       const { data, error } = await supabase.rpc('get_pipeline_performance_report', {
-        p_org_id: effectiveOrgId,
+        p_org_id: orgId,
       });
 
       if (error) throw error;
       return data || [];
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
   });

@@ -367,7 +367,7 @@ export default function Users() {
       expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiry
 
       const { error } = await supabase
-        .from("org_invites")
+        .from("org_invites" as any)
         .insert([{
           org_id: orgId,
           invited_by: user?.id,
@@ -375,7 +375,7 @@ export default function Users() {
           email: email || null,
           role: role,
           expires_at: expiresAt.toISOString(),
-        }] as any);
+        }]);
 
       if (error) throw error;
 

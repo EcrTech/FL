@@ -23,23 +23,23 @@ export default function WhatsAppCampaigns() {
     const { data } = await supabase
       .from("whatsapp_bulk_campaigns")
       .select("*")
-      .eq("org_id", effectiveOrgId)
+      .eq("org_id", orgId)
       .order("created_at", { ascending: false });
     
     return data || [];
   };
 
   const { data: campaigns = [], isLoading, refetch } = useQuery({
-    queryKey: ['whatsapp-campaigns', effectiveOrgId],
+    queryKey: ['whatsapp-campaigns', orgId],
     queryFn: fetchCampaigns,
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   // Realtime subscription for campaign updates
   useRealtimeSync({
     table: 'whatsapp_bulk_campaigns',
-    filter: `org_id=eq.${effectiveOrgId}`,
-    enabled: !!effectiveOrgId,
+    filter: `org_id=eq.${orgId}`,
+    enabled: !!orgId,
     onUpdate: () => refetch(),
     onInsert: () => refetch(),
   });

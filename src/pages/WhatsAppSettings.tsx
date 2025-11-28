@@ -36,18 +36,18 @@ const WhatsAppSettings = () => {
   const [templateCount, setTemplateCount] = useState(0);
 
   useEffect(() => {
-    if (effectiveOrgId) {
+    if (orgId) {
       fetchSettings();
       fetchTemplateCount();
     }
-  }, [effectiveOrgId]);
+  }, [orgId]);
 
   const fetchSettings = async () => {
     try {
       const { data, error } = await supabase
         .from("whatsapp_settings")
         .select("*")
-        .eq("org_id", effectiveOrgId)
+        .eq("org_id", orgId)
         .maybeSingle();
 
       if (error) throw error;
@@ -68,7 +68,7 @@ const WhatsAppSettings = () => {
       const { count } = await supabase
         .from("communication_templates")
         .select("*", { count: "exact", head: true })
-        .eq("org_id", effectiveOrgId)
+        .eq("org_id", orgId)
         .eq("template_type", "whatsapp");
 
       setTemplateCount(count || 0);
@@ -89,7 +89,7 @@ const WhatsAppSettings = () => {
         .from("whatsapp_settings")
         .upsert({
           ...settings,
-          org_id: effectiveOrgId,
+          org_id: orgId,
         });
 
       if (error) throw error;

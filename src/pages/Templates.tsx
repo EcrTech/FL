@@ -73,34 +73,34 @@ const Templates = () => {
   });
 
   const { data: whatsappTemplates = [], isLoading: loadingWhatsApp } = useQuery({
-    queryKey: ['whatsapp-templates', effectiveOrgId],
+    queryKey: ['whatsapp-templates', orgId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("communication_templates")
         .select("*")
-        .eq("org_id", effectiveOrgId)
+        .eq("org_id", orgId)
         .order("template_name");
 
       if (error) throw error;
       return (data || []) as unknown as WhatsAppTemplate[];
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   const { data: emailTemplates = [], isLoading: loadingEmail, refetch: refetchEmailTemplates } = useQuery({
-    queryKey: ['email-templates', effectiveOrgId],
+    queryKey: ['email-templates', orgId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("email_templates")
         .select("*")
-        .eq("org_id", effectiveOrgId)
+        .eq("org_id", orgId)
         .eq("is_active", true)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
       return data || [];
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   const loading = loadingWhatsApp || loadingEmail;

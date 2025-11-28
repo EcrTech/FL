@@ -65,15 +65,15 @@ export default function Teams() {
   });
 
   useEffect(() => {
-    if (!isOrgLoading && !effectiveOrgId) {
+    if (!isOrgLoading && !orgId) {
       navigate('/');
     }
-  }, [effectiveOrgId, isOrgLoading, navigate]);
+  }, [orgId, isOrgLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!effectiveOrgId) {
+    if (!orgId) {
       notify.error("Error", "Organization context is required");
       return;
     }
@@ -84,7 +84,7 @@ export default function Teams() {
     }
 
     const teamData = {
-      org_id: effectiveOrgId,
+      org_id: orgId,
       name: dialog.formData.name,
       description: dialog.formData.description || null,
       manager_id: dialog.formData.manager_id || null,

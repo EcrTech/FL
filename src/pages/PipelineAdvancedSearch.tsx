@@ -48,18 +48,18 @@ const PipelineAdvancedSearch = () => {
 
   // Fetch pipeline stages
   const { data: pipelineStages } = useQuery({
-    queryKey: ['pipeline-stages', effectiveOrgId],
+    queryKey: ['pipeline-stages', orgId],
     queryFn: async () => {
-      if (!effectiveOrgId) return [];
+      if (!orgId) return [];
       const { data, error } = await supabase
         .from('pipeline_stages')
         .select('id, name')
-        .eq('org_id', effectiveOrgId)
+        .eq('org_id', orgId)
         .order('stage_order');
       if (error) throw error;
       return data;
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   // Create a mapping of stage names to IDs for filtering
@@ -74,7 +74,7 @@ const PipelineAdvancedSearch = () => {
   // Load available fields
   useEffect(() => {
     const loadFields = async () => {
-      if (!effectiveOrgId) return;
+      if (!orgId) return;
 
       setIsLoading(true);
       try {
@@ -108,7 +108,7 @@ const PipelineAdvancedSearch = () => {
         const { data: customFields } = await supabase
           .from('custom_fields')
           .select('*')
-          .eq('org_id', effectiveOrgId)
+          .eq('org_id', orgId)
           .eq('is_active', true)
           .order('field_order');
 
@@ -132,7 +132,7 @@ const PipelineAdvancedSearch = () => {
     };
 
     loadFields();
-  }, [effectiveOrgId, pipelineStages]);
+  }, [orgId, pipelineStages]);
 
   const addFilter = () => {
     setFilters([...filters, { id: Date.now().toString(), fieldId: '', operator: '', value: '' }]);
@@ -154,7 +154,7 @@ const PipelineAdvancedSearch = () => {
   };
 
   const executeSearch = async () => {
-    if (!effectiveOrgId) {
+    if (!orgId) {
       showError('Organization context not found');
       return;
     }
@@ -175,7 +175,7 @@ const PipelineAdvancedSearch = () => {
   };
 
   const performSearch = async () => {
-    if (!effectiveOrgId) return;
+    if (!orgId) return;
 
     const validFilters = filters.filter(f => f.fieldId && f.operator && (
       f.operator === 'is_empty' || f.operator === 'is_not_empty' || f.value
@@ -195,7 +195,7 @@ const PipelineAdvancedSearch = () => {
             color
           )
         `, { count: 'exact' })
-        .eq('org_id', effectiveOrgId)
+        .eq('org_id', orgId)
         .range(offset, offset + pagination.pageSize - 1);
 
       // Apply standard field filters to query
@@ -338,7 +338,7 @@ const PipelineAdvancedSearch = () => {
   };
 
   const handleExport = async () => {
-    if (!effectiveOrgId || !hasSearched) {
+    if (!orgId || !hasSearched) {
       showError('Please perform a search first');
       return;
     }
@@ -366,7 +366,7 @@ const PipelineAdvancedSearch = () => {
               color
             )
           `, { count: 'exact' })
-          .eq('org_id', effectiveOrgId);
+          .eq('org_id', orgId);
 
         // Apply all standard field filters
         for (const filter of validFilters) {
@@ -603,7 +603,7 @@ const PipelineAdvancedSearch = () => {
       isInitialMount.current = false;
       return;
     }
-    if (hasSearched && effectiveOrgId) {
+    if (hasSearched && orgId) {
       performSearch();
     }
   }, [pagination.currentPage, pagination.pageSize]);

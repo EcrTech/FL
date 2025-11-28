@@ -29,17 +29,17 @@ export default function ExotelSettings() {
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/exotel-webhook`;
 
   useEffect(() => {
-    if (effectiveOrgId) {
+    if (orgId) {
       fetchSettings();
     }
-  }, [effectiveOrgId]);
+  }, [orgId]);
 
   const fetchSettings = async () => {
     try {
-      const { data, error } = await supabase
+      const { data, error} = await supabase
         .from('exotel_settings')
         .select('*')
-        .eq('org_id', effectiveOrgId)
+        .eq('org_id', orgId)
         .single();
 
       if (error && error.code !== 'PGRST116') throw error;
@@ -74,7 +74,7 @@ export default function ExotelSettings() {
       const { error } = await supabase
         .from('exotel_settings')
         .upsert({
-          org_id: effectiveOrgId,
+          org_id: orgId,
           ...settings,
         });
 
