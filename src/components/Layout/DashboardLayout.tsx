@@ -270,6 +270,16 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                 </Link>
               )}
 
+              {/* LOS Dashboard */}
+              <Link
+                to="/los/dashboard"
+                className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                onClick={() => setSidebarOpen(false)}
+              >
+                <Activity size={20} />
+                <span>LOS Dashboard</span>
+              </Link>
+
               {(canAccessFeature("analytics") || canAccessFeature("campaigns_email") || canAccessFeature("campaigns_whatsapp") || canAccessFeature("ai_insights")) && (
                 <Link
                   to="/reports"
@@ -320,7 +330,16 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                 <FileText size={20} />
                 <span>Loan Applications</span>
               </Link>
-              
+
+              <Link
+                to="/los/approval-queue"
+                className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                onClick={() => setSidebarOpen(false)}
+              >
+                <List size={20} />
+                <span>Approval Queue</span>
+              </Link>
+
               {canAccessFeature("pipeline_stages") && (
                 <Link
                   to="/pipeline"
