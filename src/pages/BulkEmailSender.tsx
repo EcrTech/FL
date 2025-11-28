@@ -39,7 +39,7 @@ interface Template {
 const BulkEmailSender = () => {
   const navigate = useNavigate();
   const notify = useNotification();
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -92,7 +92,7 @@ const BulkEmailSender = () => {
   };
 
   const fetchContacts = async () => {
-    if (!effectiveOrgId || effectiveOrgId === "null") {
+    if (!orgId || orgId === "null") {
       console.log("No valid org_id available");
       return;
     }
@@ -101,7 +101,7 @@ const BulkEmailSender = () => {
       const { data, error } = await supabase
         .from("contacts")
         .select("id, first_name, last_name, email, company, phone")
-        .eq("org_id", effectiveOrgId)
+        .eq("org_id", orgId)
         .not("email", "is", null)
         .order("created_at", { ascending: false });
 

@@ -23,13 +23,13 @@ import {
 } from "@/components/ui/dialog";
 
 export function ApprovalQueueManager() {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const queryClient = useQueryClient();
   const [reviewingApproval, setReviewingApproval] = useState<any>(null);
   const [reviewNotes, setReviewNotes] = useState("");
 
   const { data: pendingApprovals, isLoading } = useQuery({
-    queryKey: ['automation-approvals', effectiveOrgId, 'pending'],
+    queryKey: ['automation-approvals', orgId, 'pending'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('automation_approvals')
@@ -41,7 +41,7 @@ export function ApprovalQueueManager() {
             contact:contacts(first_name, last_name, email)
           )
         `)
-        .eq('org_id', effectiveOrgId)
+        .eq('org_id', orgId)
         .eq('status', 'pending')
         .order('requested_at', { ascending: true });
       
@@ -84,16 +84,16 @@ export function ApprovalQueueManager() {
 
       return approvals;
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   const { data: recentApprovals } = useQuery({
-    queryKey: ['automation-approvals', effectiveOrgId, 'recent'],
+    queryKey: ['automation-approvals', orgId, 'recent'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('automation_approvals')
         .select('*')
-        .eq('org_id', effectiveOrgId)
+        .eq('org_id', orgId)
         .in('status', ['approved', 'rejected'])
         .order('reviewed_at', { ascending: false })
         .limit(20);
@@ -127,7 +127,7 @@ export function ApprovalQueueManager() {
 
       return approvals;
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   const reviewMutation = useMutation({

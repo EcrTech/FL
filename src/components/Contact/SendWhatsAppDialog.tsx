@@ -37,7 +37,7 @@ export function SendWhatsAppDialog({
   phoneNumber,
   onMessageSent,
 }: SendWhatsAppDialogProps) {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const notify = useNotification();
   const [sending, setSending] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -51,17 +51,17 @@ export function SendWhatsAppDialog({
   const [scheduledAt, setScheduledAt] = useState<Date | null>(null);
 
   useEffect(() => {
-    if (open && effectiveOrgId) {
+    if (open && orgId) {
       fetchTemplates();
     }
-  }, [open, effectiveOrgId]);
+  }, [open, orgId]);
 
   const fetchTemplates = async () => {
     try {
       const { data, error } = await supabase
         .from("communication_templates")
         .select("id, template_name, content, variables")
-        .eq("org_id", effectiveOrgId)
+        .eq("org_id", orgId)
         .eq("template_type", "whatsapp")
         .eq("status", "approved")
         .order("template_name");
@@ -137,7 +137,7 @@ export function SendWhatsAppDialog({
         const { error } = await supabase
           .from("whatsapp_messages")
           .insert([{
-            org_id: effectiveOrgId,
+            org_id: orgId,
             contact_id: contactId,
             phone_number: phoneNumber.replace(/[^\d]/g, ""),
             message_content: messageContent,

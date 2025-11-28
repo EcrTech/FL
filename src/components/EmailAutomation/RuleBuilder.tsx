@@ -34,7 +34,7 @@ interface RuleBuilderProps {
 type TriggerType = "stage_change" | "disposition_set" | "activity_logged" | "field_updated" | "inactivity" | "time_based" | "assignment_changed" | "email_engagement" | "lead_score_change" | "tag_assigned" | "form_submitted";
 
 export function RuleBuilder({ open, onOpenChange, editingRule }: RuleBuilderProps) {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const notify = useNotification();
   const queryClient = useQueryClient();
 

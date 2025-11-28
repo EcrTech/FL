@@ -22,33 +22,33 @@ import {
 } from "@/components/ui/table";
 
 export function AdvancedReporting() {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const [dateRange, setDateRange] = useState(30);
   const [selectedRuleId, setSelectedRuleId] = useState<string>("all");
 
   const { data: rules } = useQuery({
-    queryKey: ['email-automation-rules', effectiveOrgId],
+    queryKey: ['email-automation-rules', orgId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('email_automation_rules')
         .select('id, name')
-        .eq('org_id', effectiveOrgId)
+        .eq('org_id', orgId)
         .eq('is_active', true)
         .order('name');
       
       if (error) throw error;
       return data;
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   const { data: dailyPerformance, isLoading } = useQuery({
-    queryKey: ['automation-performance-daily', effectiveOrgId, selectedRuleId, dateRange],
+    queryKey: ['automation-performance-daily', orgId, selectedRuleId, dateRange],
     queryFn: async () => {
       let query = supabase
         .from('automation_performance_daily')
         .select('*')
-        .eq('org_id', effectiveOrgId)
+        .eq('org_id', orgId)
         .gte('report_date', new Date(Date.now() - dateRange * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
         .order('report_date', { ascending: false });
 
@@ -60,7 +60,7 @@ export function AdvancedReporting() {
       if (error) throw error;
       return data;
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   const aggregatedStats = dailyPerformance?.reduce(

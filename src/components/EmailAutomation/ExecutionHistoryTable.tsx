@@ -30,7 +30,7 @@ interface ExecutionHistoryTableProps {
 }
 
 export function ExecutionHistoryTable({ ruleId, limit = 50 }: ExecutionHistoryTableProps) {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
 

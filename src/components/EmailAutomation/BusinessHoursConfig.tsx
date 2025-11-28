@@ -43,7 +43,7 @@ interface BusinessHour {
 }
 
 export function BusinessHoursConfig() {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const notify = useNotification();
   const queryClient = useQueryClient();
   const [timezone, setTimezone] = useState("UTC");

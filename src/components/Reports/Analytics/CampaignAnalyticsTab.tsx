@@ -10,7 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export default function CampaignAnalyticsTab() {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const [dateRange, setDateRange] = useState({ from: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), to: new Date() });
 
   const { data: emailCampaigns = [], isLoading: emailLoading } = useQuery({

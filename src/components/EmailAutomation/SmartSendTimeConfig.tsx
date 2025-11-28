@@ -25,7 +25,7 @@ const DAYS_OF_WEEK = [
 ];
 
 export function SmartSendTimeConfig() {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const [optimizeEnabled, setOptimizeEnabled] = useState(true);
 
   const { data: patterns, isLoading } = useQuery({

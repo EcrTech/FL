@@ -12,7 +12,7 @@ export default function AIChatInterface() {
   const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; content: string }>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const notify = useNotification();
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
 
   const handleSend = async () => {
     if (!message.trim()) return;

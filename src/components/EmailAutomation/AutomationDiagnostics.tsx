@@ -8,7 +8,7 @@ import { AlertCircle, CheckCircle2, Clock, Mail, Settings, Users } from "lucide-
 import { format } from "date-fns";
 
 export function AutomationDiagnostics() {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
 
   // Get system health checks
   const { data: diagnostics, isLoading } = useQuery({

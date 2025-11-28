@@ -23,7 +23,7 @@ import { format } from "date-fns";
 
 export default function BulkWhatsAppSender() {
   const navigate = useNavigate();
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const notify = useNotification();
   
   const [step, setStep] = useState(1);

@@ -11,7 +11,7 @@ import { Save, Info } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export function SendLimitsConfig() {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const queryClient = useQueryClient();
   const [maxEmailsPerDay, setMaxEmailsPerDay] = useState<number>(3);
 

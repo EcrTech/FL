@@ -534,7 +534,7 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                 </>
               )}
 
-              {isPlatformAdmin && canAccessFeature("platform_admin") && (
+              {canAccessFeature("platform_admin") && (
                 <>
                   <div className="pt-4 pb-2 section-accent-teal pl-4">
                     <p className="px-4 text-xs font-semibold uppercase tracking-wider gradient-text-primary">

@@ -91,7 +91,7 @@ export default function Users() {
     hardDelete: false,
   });
   
-  const { effectiveOrgId, isPlatformAdmin } = useOrgContext();
+  const { orgId } = useOrgContext();
   const { isAdmin, isSuperAdmin } = useUserRole();
   const notification = useNotification();
   const dialog = useDialogState<UserFormData>(initialFormData);
