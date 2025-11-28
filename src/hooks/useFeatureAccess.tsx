@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useOrgContext } from "./useOrgContext";
 
 interface FeatureAccess {
   isFeatureEnabled: (featureKey: string) => boolean;
@@ -9,24 +8,11 @@ interface FeatureAccess {
   loading: boolean;
 }
 
+/**
+ * Feature access hook for single-tenant application
+ * In single-tenant mode, features are enabled by default but designation permissions still apply
+ */
 export const useFeatureAccess = (): FeatureAccess => {
-  const { effectiveOrgId, isPlatformAdmin } = useOrgContext();
-
-  // Fetch org feature access
-  const { data: orgFeatures, isLoading: orgLoading } = useQuery({
-    queryKey: ["org-feature-access", effectiveOrgId],
-    queryFn: async () => {
-      if (!effectiveOrgId) return [];
-      const { data, error } = await supabase
-        .from("org_feature_access")
-        .select("*")
-        .eq("org_id", effectiveOrgId);
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!effectiveOrgId,
-  });
-
   // Fetch user's designation
   const { data: userProfile, isLoading: profileLoading } = useQuery({
     queryKey: ["user-designation"],
@@ -59,29 +45,14 @@ export const useFeatureAccess = (): FeatureAccess => {
   });
 
   const isFeatureEnabled = (featureKey: string): boolean => {
-    // Platform admins bypass all restrictions
-    if (isPlatformAdmin) return true;
-    
-    // Check org-level feature access
-    const orgFeature = orgFeatures?.find(f => f.feature_key === featureKey);
-    
-    // If no org feature record exists, check if it's in the default allowed list
-    const defaultAllowedFeatures = ['dashboard']; // Only dashboard is always accessible
-    if (!orgFeature) {
-      return defaultAllowedFeatures.includes(featureKey);
-    }
-    
-    // Otherwise, use the org's setting
-    return orgFeature.is_enabled;
+    // In single-tenant mode, all features are enabled at org level
+    return true;
   };
 
   const hasPermission = (
     featureKey: string,
     permission: 'view' | 'create' | 'edit' | 'delete'
   ): boolean => {
-    // Platform admins bypass all restrictions
-    if (isPlatformAdmin) return true;
-    
     // Check designation-level permissions
     const designationPermission = designationPermissions?.find(
       p => p.feature_key === featureKey
@@ -107,6 +78,6 @@ export const useFeatureAccess = (): FeatureAccess => {
     isFeatureEnabled,
     hasPermission,
     canAccessFeature,
-    loading: orgLoading || profileLoading || permissionsLoading,
+    loading: profileLoading || permissionsLoading,
   };
 };
