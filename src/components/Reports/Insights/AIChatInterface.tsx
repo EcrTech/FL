@@ -24,7 +24,7 @@ export default function AIChatInterface() {
 
     try {
       const { data, error } = await supabase.functions.invoke('chat-campaign-assistant', {
-        body: { query: userMessage, orgId: effectiveOrgId }
+        body: { query: userMessage, orgId: orgId }
       });
 
       if (error) throw error;

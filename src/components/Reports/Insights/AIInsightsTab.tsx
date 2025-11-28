@@ -21,14 +21,14 @@ export default function AIInsightsTab() {
 
   // Fetch AI insights
   const { data: aiInsights = [], isLoading, refetch } = useQuery({
-    queryKey: ['campaign-insights', effectiveOrgId],
+    queryKey: ['campaign-insights', orgId],
     queryFn: async () => {
-      if (!effectiveOrgId) return [];
+      if (!orgId) return [];
       
       const { data, error } = await supabase
         .from('campaign_insights')
         .select('*')
-        .eq('org_id', effectiveOrgId)
+        .eq('org_id', orgId)
         .eq('status', 'active')
         .order('priority', { ascending: true })
         .order('created_at', { ascending: false });
@@ -36,7 +36,7 @@ export default function AIInsightsTab() {
       if (error) throw error;
       return data || [];
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   // Separate and filter insights
@@ -55,16 +55,16 @@ export default function AIInsightsTab() {
 
   // Fetch pipeline metrics
   const { data: pipelineMetrics = [], isLoading: pipelineLoading } = useQuery({
-    queryKey: ['pipeline-metrics', effectiveOrgId],
+    queryKey: ['pipeline-metrics', orgId],
     queryFn: async () => {
-      if (!effectiveOrgId) return [];
+      if (!orgId) return [];
       
       const [stagesRes, contactsRes, movementsRes] = await Promise.all([
-        supabase.from('pipeline_stages').select('*').eq('org_id', effectiveOrgId).order('stage_order'),
-        supabase.from('contacts').select('id, pipeline_stage_id').eq('org_id', effectiveOrgId),
+        supabase.from('pipeline_stages').select('*').eq('org_id', orgId).order('stage_order'),
+        supabase.from('contacts').select('id, pipeline_stage_id').eq('org_id', orgId),
         supabase.from('pipeline_movement_history')
           .select('*')
-          .eq('org_id', effectiveOrgId)
+          .eq('org_id', orgId)
           .gte('moved_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
       ]);
 
@@ -97,7 +97,7 @@ export default function AIInsightsTab() {
         };
       });
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   const handleRefreshInsights = async () => {

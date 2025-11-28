@@ -46,13 +46,13 @@ export function SuppressionListManager() {
   const [bulkEmails, setBulkEmails] = useState("");
 
   const { data: suppressionList, isLoading } = useQuery({
-    queryKey: ["suppression_list", effectiveOrgId],
+    queryKey: ["suppression_list", orgId],
     queryFn: async () => {
-      if (!effectiveOrgId) return [];
+      if (!orgId) return [];
       const { data, error } = await supabase
         .from("email_suppression_list")
         .select("*")
-        .eq("org_id", effectiveOrgId)
+        .eq("org_id", orgId)
         .order("suppressed_at", { ascending: false });
       if (error) throw error;
 
@@ -74,7 +74,7 @@ export function SuppressionListManager() {
         };
       });
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   const addMutation = useMutation({
@@ -87,9 +87,9 @@ export function SuppressionListManager() {
       reason: string;
       notes: string;
     }) => {
-      if (!effectiveOrgId) throw new Error("No org ID");
+      if (!orgId) throw new Error("No org ID");
       const { error } = await supabase.from("email_suppression_list").insert({
-        org_id: effectiveOrgId,
+        org_id: orgId,
         email: email.toLowerCase().trim(),
         reason,
         notes,
@@ -111,11 +111,11 @@ export function SuppressionListManager() {
 
   const bulkAddMutation = useMutation({
     mutationFn: async (emails: string[]) => {
-      if (!effectiveOrgId) throw new Error("No org ID");
+      if (!orgId) throw new Error("No org ID");
       const userId = (await supabase.auth.getUser()).data.user?.id;
       const { error } = await supabase.from("email_suppression_list").insert(
         emails.map((email) => ({
-          org_id: effectiveOrgId,
+          org_id: orgId,
           email: email.toLowerCase().trim(),
           reason: "manual",
           suppressed_by: userId,

@@ -16,14 +16,14 @@ export function SendLimitsConfig() {
   const [maxEmailsPerDay, setMaxEmailsPerDay] = useState<number>(3);
 
   const { data: orgSettings, isLoading } = useQuery({
-    queryKey: ['org-email-settings', effectiveOrgId],
+    queryKey: ['org-email-settings', orgId],
     queryFn: async () => {
-      if (!effectiveOrgId) throw new Error('No organization selected');
+      if (!orgId) throw new Error('No organization selected');
       
       const { data, error } = await supabase
         .from('organizations')
         .select('max_automation_emails_per_day')
-        .eq('id', effectiveOrgId)
+        .eq('id', orgId)
         .single();
       
       if (error) throw error;
@@ -34,17 +34,17 @@ export function SendLimitsConfig() {
       
       return data;
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   const updateMutation = useMutation({
     mutationFn: async (maxEmails: number) => {
-      if (!effectiveOrgId) throw new Error('No organization selected');
+      if (!orgId) throw new Error('No organization selected');
       
       const { error } = await supabase
         .from('organizations')
         .update({ max_automation_emails_per_day: maxEmails })
-        .eq('id', effectiveOrgId);
+        .eq('id', orgId);
       
       if (error) throw error;
     },

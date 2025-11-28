@@ -49,35 +49,35 @@ export function BusinessHoursConfig() {
   const [timezone, setTimezone] = useState("UTC");
 
   const { data: businessHours, isLoading } = useQuery({
-    queryKey: ["business_hours", effectiveOrgId],
+    queryKey: ["business_hours", orgId],
     queryFn: async () => {
-      if (!effectiveOrgId) return [];
+      if (!orgId) return [];
       const { data, error } = await supabase
         .from("org_business_hours")
         .select("*")
-        .eq("org_id", effectiveOrgId)
+        .eq("org_id", orgId)
         .order("day_of_week");
       if (error) throw error;
       if (data.length > 0) setTimezone(data[0].timezone);
       return data;
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   const saveMutation = useMutation({
     mutationFn: async (hours: BusinessHour[]) => {
-      if (!effectiveOrgId) throw new Error("No org ID");
+      if (!orgId) throw new Error("No org ID");
 
       // Delete existing hours
       await supabase
         .from("org_business_hours")
         .delete()
-        .eq("org_id", effectiveOrgId);
+        .eq("org_id", orgId);
 
       // Insert new hours
       const { error } = await supabase.from("org_business_hours").insert(
         hours.map((h) => ({
-          org_id: effectiveOrgId,
+          org_id: orgId,
           day_of_week: h.day_of_week,
           start_time: h.start_time,
           end_time: h.end_time,

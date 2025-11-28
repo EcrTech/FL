@@ -15,12 +15,12 @@ export default function AgentPerformanceTab() {
   });
 
   const { data: agentPerformance = [], isLoading } = useQuery({
-    queryKey: ['agent-call-performance', effectiveOrgId, dateRange],
+    queryKey: ['agent-call-performance', orgId, dateRange],
     queryFn: async () => {
-      if (!effectiveOrgId) return [];
+      if (!orgId) return [];
       
       const { data, error } = await supabase.rpc('get_agent_call_performance_report' as any, {
-        p_org_id: effectiveOrgId,
+        p_org_id: orgId,
         p_start_date: dateRange.from.toISOString(),
         p_end_date: dateRange.to.toISOString(),
       });
@@ -28,7 +28,7 @@ export default function AgentPerformanceTab() {
       if (error) throw error;
       return (data as any[]) || [];
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   return (

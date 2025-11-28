@@ -35,9 +35,9 @@ export function ExecutionHistoryTable({ ruleId, limit = 50 }: ExecutionHistoryTa
   const [searchQuery, setSearchQuery] = useState("");
 
   const { data: executions, isLoading } = useQuery({
-    queryKey: ["automation_executions", effectiveOrgId, ruleId, statusFilter],
+    queryKey: ["automation_executions", orgId, ruleId, statusFilter],
     queryFn: async () => {
-      if (!effectiveOrgId) return [];
+      if (!orgId) return [];
 
       let query = supabase
         .from("email_automation_executions")
@@ -47,7 +47,7 @@ export function ExecutionHistoryTable({ ruleId, limit = 50 }: ExecutionHistoryTa
           contacts(first_name, last_name, email),
           email_conversations(id, subject, status)
         `)
-        .eq("org_id", effectiveOrgId)
+        .eq("org_id", orgId)
         .order("created_at", { ascending: false })
         .limit(limit);
 
@@ -63,7 +63,7 @@ export function ExecutionHistoryTable({ ruleId, limit = 50 }: ExecutionHistoryTa
       if (error) throw error;
       return data;
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   const filteredExecutions = executions?.filter((exec) => {
