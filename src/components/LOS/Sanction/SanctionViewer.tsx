@@ -18,8 +18,7 @@ export default function SanctionViewer({ applicationId }: SanctionViewerProps) {
         .from("loan_sanctions")
         .select("*")
         .eq("loan_application_id", applicationId)
-        .single();
-      if (error && error.code !== "PGRST116") throw error;
+        .maybeSingle();
       return data;
     },
   });

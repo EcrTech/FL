@@ -29,7 +29,7 @@ export default function DisbursementForm({ applicationId }: DisbursementFormProp
         .from("loan_sanctions")
         .select("*")
         .eq("loan_application_id", applicationId)
-        .single();
+        .maybeSingle();
       if (error) throw error;
       return data;
     },

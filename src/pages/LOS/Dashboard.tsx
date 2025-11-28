@@ -1,0 +1,340 @@
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useOrgContext } from "@/hooks/useOrgContext";
+import DashboardLayout from "@/components/Layout/DashboardLayout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { useNavigate } from "react-router-dom";
+import {
+  FileText,
+  CheckCircle,
+  Clock,
+  TrendingUp,
+  DollarSign,
+  Users,
+  AlertCircle,
+} from "lucide-react";
+import { LoadingState } from "@/components/common/LoadingState";
+
+export default function LOSDashboard() {
+  const { orgId } = useOrgContext();
+  const navigate = useNavigate();
+
+  const { data: stats, isLoading } = useQuery({
+    queryKey: ["los-stats", orgId],
+    queryFn: async () => {
+      // Total applications
+      const { count: totalApps } = await supabase
+        .from("loan_applications")
+        .select("*", { count: "exact", head: true })
+        .eq("org_id", orgId);
+
+      // Pending approval
+      const { count: pendingApproval } = await supabase
+        .from("loan_applications")
+        .select("*", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .eq("current_stage", "approval_pending");
+
+      // Disbursed
+      const { count: disbursed } = await supabase
+        .from("loan_applications")
+        .select("*", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .eq("current_stage", "disbursed");
+
+      // In progress
+      const { count: inProgress } = await supabase
+        .from("loan_applications")
+        .select("*", { count: "exact", head: true })
+        .eq("org_id", orgId)
+        .in("current_stage", [
+          "document_collection",
+          "field_verification",
+          "credit_assessment",
+        ]);
+
+      // Total sanctioned amount
+      const { data: sanctions } = await supabase
+        .from("loan_sanctions")
+        .select("sanctioned_amount")
+        .eq("status", "active");
+
+      const totalSanctioned = sanctions?.reduce(
+        (sum, s) => sum + s.sanctioned_amount,
+        0
+      ) || 0;
+
+      // Total disbursed amount
+      const { data: disbursements } = await supabase
+        .from("loan_disbursements")
+        .select("disbursement_amount")
+        .eq("status", "completed");
+
+      const totalDisbursedAmount = disbursements?.reduce(
+        (sum, d) => sum + d.disbursement_amount,
+        0
+      ) || 0;
+
+      return {
+        totalApps: totalApps || 0,
+        pendingApproval: pendingApproval || 0,
+        disbursed: disbursed || 0,
+        inProgress: inProgress || 0,
+        totalSanctioned,
+        totalDisbursedAmount,
+      };
+    },
+    enabled: !!orgId,
+  });
+
+  const { data: recentApplications } = useQuery({
+    queryKey: ["recent-applications", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("loan_applications")
+        .select(`
+          *,
+          loan_applicants(first_name, last_name)
+        `)
+        .eq("org_id", orgId)
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!orgId,
+  });
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const STAGE_LABELS: Record<string, string> = {
+    application_login: "Application Login",
+    document_collection: "Document Collection",
+    field_verification: "Field Verification",
+    credit_assessment: "Credit Assessment",
+    approval_pending: "Approval Pending",
+    sanctioned: "Sanctioned",
+    rejected: "Rejected",
+    disbursement_pending: "Disbursement Pending",
+    disbursed: "Disbursed",
+  };
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <LoadingState message="Loading dashboard..." />
+      </DashboardLayout>
+    );
+  }
+
+  return (
+    <DashboardLayout>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">LOS Dashboard</h1>
+            <p className="text-muted-foreground">
+              Loan Origination System overview and statistics
+            </p>
+          </div>
+          <Button onClick={() => navigate("/los/applications/new")}>
+            <FileText className="h-4 w-4 mr-2" />
+            New Application
+          </Button>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Total Applications
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{stats?.totalApps || 0}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Clock className="h-4 w-4 text-yellow-600" />
+                Pending Approval
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-yellow-600">
+                {stats?.pendingApproval || 0}
+              </div>
+              <Button
+                variant="link"
+                className="p-0 h-auto mt-2"
+                onClick={() => navigate("/los/approval-queue")}
+              >
+                View Queue →
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-blue-600" />
+                In Progress
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-blue-600">
+                {stats?.inProgress || 0}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                Disbursed
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-green-600">
+                {stats?.disbursed || 0}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Financial Stats */}
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                Total Sanctioned Amount
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-primary">
+                {formatCurrency(stats?.totalSanctioned || 0)}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-green-600" />
+                Total Disbursed Amount
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">
+                {formatCurrency(stats?.totalDisbursedAmount || 0)}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Recent Applications */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Recent Applications</CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate("/los/applications")}
+              >
+                View All
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {recentApplications && recentApplications.length > 0 ? (
+              <div className="space-y-4">
+                {recentApplications.map((app: any) => {
+                  const applicant = app.loan_applicants?.[0];
+                  return (
+                    <div
+                      key={app.id}
+                      className="flex items-center justify-between p-4 border rounded-lg hover:border-primary transition-colors cursor-pointer"
+                      onClick={() => navigate(`/los/applications/${app.id}`)}
+                    >
+                      <div className="space-y-1">
+                        <div className="font-medium">
+                          {app.application_number}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {applicant?.first_name} {applicant?.last_name || ""}
+                        </div>
+                      </div>
+                      <div className="text-right space-y-1">
+                        <div className="font-medium">
+                          {formatCurrency(app.requested_amount)}
+                        </div>
+                        <Badge variant="outline">
+                          {STAGE_LABELS[app.current_stage] || app.current_stage}
+                        </Badge>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No applications yet
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Quick Actions */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Quick Actions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-3">
+              <Button
+                variant="outline"
+                className="h-auto py-4 flex-col gap-2"
+                onClick={() => navigate("/los/applications/new")}
+              >
+                <FileText className="h-6 w-6" />
+                <span>New Application</span>
+              </Button>
+              <Button
+                variant="outline"
+                className="h-auto py-4 flex-col gap-2"
+                onClick={() => navigate("/los/approval-queue")}
+              >
+                <AlertCircle className="h-6 w-6" />
+                <span>Approval Queue</span>
+              </Button>
+              <Button
+                variant="outline"
+                className="h-auto py-4 flex-col gap-2"
+                onClick={() => navigate("/los/applications")}
+              >
+                <Users className="h-6 w-6" />
+                <span>All Applications</span>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </DashboardLayout>
+  );
+}
