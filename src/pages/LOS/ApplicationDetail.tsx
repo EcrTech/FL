@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, User, FileText, CheckCircle, Calculator, ThumbsUp, FileCheck, DollarSign, XCircle } from "lucide-react";
+import { ArrowLeft, User, FileText, CheckCircle, Calculator, ThumbsUp, FileCheck, DollarSign, XCircle, CreditCard } from "lucide-react";
 import { LoadingState } from "@/components/common/LoadingState";
 import { format } from "date-fns";
 import DocumentUpload from "@/components/LOS/DocumentUpload";
@@ -18,6 +18,7 @@ import ApprovalActionDialog from "@/components/LOS/Approval/ApprovalActionDialog
 import ApprovalHistory from "@/components/LOS/Approval/ApprovalHistory";
 import SanctionDashboard from "@/components/LOS/Sanction/SanctionDashboard";
 import DisbursementDashboard from "@/components/LOS/Disbursement/DisbursementDashboard";
+import EMIDashboard from "@/components/LOS/EMI/EMIDashboard";
 
 const STAGE_LABELS: Record<string, string> = {
   application_login: "Application Login",
@@ -187,7 +188,7 @@ export default function ApplicationDetail() {
 
         {/* Tabs */}
         <Tabs defaultValue="application" className="w-full">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-8">
             <TabsTrigger value="application">
               <User className="h-4 w-4 mr-2" />
               Application
@@ -215,6 +216,10 @@ export default function ApplicationDetail() {
             <TabsTrigger value="disbursement">
               <DollarSign className="h-4 w-4 mr-2" />
               Disbursement
+            </TabsTrigger>
+            <TabsTrigger value="emi">
+              <CreditCard className="h-4 w-4 mr-2" />
+              EMI
             </TabsTrigger>
           </TabsList>
 
@@ -366,6 +371,10 @@ export default function ApplicationDetail() {
 
           <TabsContent value="disbursement">
             <DisbursementDashboard applicationId={application.id} />
+          </TabsContent>
+
+          <TabsContent value="emi">
+            <EMIDashboard applicationId={application.id} />
           </TabsContent>
         </Tabs>
       </div>

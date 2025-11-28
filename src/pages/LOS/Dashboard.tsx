@@ -80,6 +80,19 @@ export default function LOSDashboard() {
         0
       ) || 0;
 
+      // EMI Stats
+      const today = new Date().toISOString().split("T")[0];
+      
+      const { count: pendingEMIs } = await supabase
+        .from("loan_repayment_schedule")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "pending");
+
+      const { count: overdueEMIs } = await supabase
+        .from("loan_repayment_schedule")
+        .select("*", { count: "exact", head: true })
+        .or(`status.eq.overdue,and(status.eq.pending,due_date.lt.${today})`);
+
       return {
         totalApps: totalApps || 0,
         pendingApproval: pendingApproval || 0,
@@ -87,6 +100,8 @@ export default function LOSDashboard() {
         inProgress: inProgress || 0,
         totalSanctioned,
         totalDisbursedAmount,
+        pendingEMIs: pendingEMIs || 0,
+        overdueEMIs: overdueEMIs || 0,
       };
     },
     enabled: !!orgId,
@@ -222,7 +237,7 @@ export default function LOSDashboard() {
         </div>
 
         {/* Financial Stats */}
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -247,6 +262,34 @@ export default function LOSDashboard() {
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
                 {formatCurrency(stats?.totalDisbursedAmount || 0)}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Clock className="h-4 w-4 text-blue-600" />
+                Pending EMIs
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-600">
+                {stats?.pendingEMIs || 0}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                Overdue EMIs
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">
+                {stats?.overdueEMIs || 0}
               </div>
             </CardContent>
           </Card>

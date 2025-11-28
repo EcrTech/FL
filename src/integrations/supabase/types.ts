@@ -4349,6 +4349,85 @@ export type Database = {
           },
         ]
       }
+      loan_payments: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          interest_paid: number
+          late_fee_paid: number | null
+          loan_application_id: string
+          notes: string | null
+          org_id: string
+          payment_amount: number
+          payment_date: string
+          payment_method: string
+          payment_number: string
+          principal_paid: number
+          schedule_id: string | null
+          transaction_reference: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          interest_paid: number
+          late_fee_paid?: number | null
+          loan_application_id: string
+          notes?: string | null
+          org_id: string
+          payment_amount: number
+          payment_date: string
+          payment_method: string
+          payment_number: string
+          principal_paid: number
+          schedule_id?: string | null
+          transaction_reference?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          interest_paid?: number
+          late_fee_paid?: number | null
+          loan_application_id?: string
+          notes?: string | null
+          org_id?: string
+          payment_amount?: number
+          payment_date?: string
+          payment_method?: string
+          payment_number?: string
+          principal_paid?: number
+          schedule_id?: string | null
+          transaction_reference?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loan_payments_loan_application_id_fkey"
+            columns: ["loan_application_id"]
+            isOneToOne: false
+            referencedRelation: "loan_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_payments_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_payments_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "loan_repayment_schedule"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       loan_policy_rules: {
         Row: {
           created_at: string
@@ -4467,6 +4546,85 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      loan_repayment_schedule: {
+        Row: {
+          amount_paid: number | null
+          created_at: string | null
+          due_date: string
+          emi_number: number
+          id: string
+          interest_amount: number
+          late_fee: number | null
+          loan_application_id: string
+          org_id: string
+          outstanding_principal: number
+          payment_date: string | null
+          principal_amount: number
+          sanction_id: string
+          status: string
+          total_emi: number
+          updated_at: string | null
+        }
+        Insert: {
+          amount_paid?: number | null
+          created_at?: string | null
+          due_date: string
+          emi_number: number
+          id?: string
+          interest_amount: number
+          late_fee?: number | null
+          loan_application_id: string
+          org_id: string
+          outstanding_principal: number
+          payment_date?: string | null
+          principal_amount: number
+          sanction_id: string
+          status?: string
+          total_emi: number
+          updated_at?: string | null
+        }
+        Update: {
+          amount_paid?: number | null
+          created_at?: string | null
+          due_date?: string
+          emi_number?: number
+          id?: string
+          interest_amount?: number
+          late_fee?: number | null
+          loan_application_id?: string
+          org_id?: string
+          outstanding_principal?: number
+          payment_date?: string | null
+          principal_amount?: number
+          sanction_id?: string
+          status?: string
+          total_emi?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loan_repayment_schedule_loan_application_id_fkey"
+            columns: ["loan_application_id"]
+            isOneToOne: false
+            referencedRelation: "loan_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_repayment_schedule_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_repayment_schedule_sanction_id_fkey"
+            columns: ["sanction_id"]
+            isOneToOne: false
+            referencedRelation: "loan_sanctions"
             referencedColumns: ["id"]
           },
         ]

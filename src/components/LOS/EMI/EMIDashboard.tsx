@@ -1,0 +1,280 @@
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useOrgContext } from "@/hooks/useOrgContext";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { AlertCircle, Calendar, CheckCircle, Clock, TrendingUp } from "lucide-react";
+import { LoadingState } from "@/components/common/LoadingState";
+import EMIScheduleGenerator from "./EMIScheduleGenerator";
+import EMIScheduleTable from "./EMIScheduleTable";
+import PaymentHistoryTable from "./PaymentHistoryTable";
+
+interface EMIDashboardProps {
+  applicationId: string;
+}
+
+export default function EMIDashboard({ applicationId }: EMIDashboardProps) {
+  const { orgId } = useOrgContext();
+
+  const { data: application } = useQuery({
+    queryKey: ["loan-application-basic", applicationId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("loan_applications")
+        .select("interest_rate, tenure_months")
+        .eq("id", applicationId)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: sanction } = useQuery({
+    queryKey: ["loan-sanction", applicationId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("loan_sanctions")
+        .select("*")
+        .eq("loan_application_id", applicationId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: disbursement } = useQuery({
+    queryKey: ["loan-disbursement", applicationId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("loan_disbursements")
+        .select("*")
+        .eq("loan_application_id", applicationId)
+        .eq("status", "completed")
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: emiStats, isLoading } = useQuery({
+    queryKey: ["emi-stats", applicationId, orgId],
+    queryFn: async () => {
+      const today = new Date().toISOString().split("T")[0];
+
+      // Total EMIs
+      const { count: totalEMIs } = await supabase
+        .from("loan_repayment_schedule")
+        .select("*", { count: "exact", head: true })
+        .eq("loan_application_id", applicationId)
+        .eq("org_id", orgId);
+
+      // Paid EMIs
+      const { count: paidEMIs } = await supabase
+        .from("loan_repayment_schedule")
+        .select("*", { count: "exact", head: true })
+        .eq("loan_application_id", applicationId)
+        .eq("org_id", orgId)
+        .eq("status", "paid");
+
+      // Pending EMIs
+      const { count: pendingEMIs } = await supabase
+        .from("loan_repayment_schedule")
+        .select("*", { count: "exact", head: true })
+        .eq("loan_application_id", applicationId)
+        .eq("org_id", orgId)
+        .eq("status", "pending");
+
+      // Overdue EMIs
+      const { count: overdueEMIs } = await supabase
+        .from("loan_repayment_schedule")
+        .select("*", { count: "exact", head: true })
+        .eq("loan_application_id", applicationId)
+        .eq("org_id", orgId)
+        .or("status.eq.overdue,and(status.eq.pending,due_date.lt." + today + ")");
+
+      // Next EMI
+      const { data: nextEMI } = await supabase
+        .from("loan_repayment_schedule")
+        .select("*")
+        .eq("loan_application_id", applicationId)
+        .eq("org_id", orgId)
+        .in("status", ["pending", "overdue"])
+        .order("due_date", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      // Total amounts
+      const { data: scheduleData } = await supabase
+        .from("loan_repayment_schedule")
+        .select("total_emi, amount_paid")
+        .eq("loan_application_id", applicationId)
+        .eq("org_id", orgId);
+
+      const totalAmount = scheduleData?.reduce((sum, item) => sum + item.total_emi, 0) || 0;
+      const amountPaid = scheduleData?.reduce((sum, item) => sum + item.amount_paid, 0) || 0;
+
+      return {
+        totalEMIs: totalEMIs || 0,
+        paidEMIs: paidEMIs || 0,
+        pendingEMIs: pendingEMIs || 0,
+        overdueEMIs: overdueEMIs || 0,
+        nextEMI,
+        totalAmount,
+        amountPaid,
+        balanceAmount: totalAmount - amountPaid,
+      };
+    },
+    enabled: !!applicationId && !!orgId,
+  });
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  if (!sanction || !disbursement || !application) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center text-muted-foreground">
+            EMI tracking will be available after loan disbursement
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const sanctionWithAppData = {
+    ...sanction,
+    interest_rate: application.interest_rate,
+    tenure_months: application.tenure_months,
+  };
+
+  if (isLoading) {
+    return <LoadingState message="Loading EMI dashboard..." />;
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Stats Cards */}
+      {emiStats && emiStats.totalEMIs > 0 && (
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                Paid EMIs
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-green-600">
+                {emiStats.paidEMIs}
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                of {emiStats.totalEMIs} installments
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Clock className="h-4 w-4 text-blue-600" />
+                Pending EMIs
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-blue-600">
+                {emiStats.pendingEMIs}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                Overdue EMIs
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-red-600">
+                {emiStats.overdueEMIs}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                Balance Amount
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-600">
+                {formatCurrency(emiStats.balanceAmount)}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Next EMI Alert */}
+      {emiStats?.nextEMI && (
+        <Card className="border-primary">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Next EMI Due
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <div className="text-sm text-muted-foreground">
+                  EMI #{emiStats.nextEMI.emi_number}
+                </div>
+                <div className="text-2xl font-bold">
+                  {formatCurrency(emiStats.nextEMI.total_emi)}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Due on {formatDate(emiStats.nextEMI.due_date)}
+                </div>
+              </div>
+              {emiStats.nextEMI.status === "overdue" && (
+                <Badge variant="destructive">Overdue</Badge>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Generate or View Schedule */}
+      {emiStats && emiStats.totalEMIs === 0 ? (
+        <EMIScheduleGenerator
+          applicationId={applicationId}
+          sanction={sanctionWithAppData}
+          disbursement={disbursement}
+        />
+      ) : (
+        <>
+          <EMIScheduleTable applicationId={applicationId} />
+          <PaymentHistoryTable applicationId={applicationId} />
+        </>
+      )}
+    </div>
+  );
+}
