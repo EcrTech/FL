@@ -30,7 +30,7 @@ interface RuleTestDialogProps {
 }
 
 export function RuleTestDialog({ open, onOpenChange, rule }: RuleTestDialogProps) {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const notify = useNotification();
   const [selectedContactId, setSelectedContactId] = useState("");
   const [previewData, setPreviewData] = useState<any>(null);

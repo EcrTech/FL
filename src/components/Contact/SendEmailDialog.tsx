@@ -28,7 +28,7 @@ export function SendEmailDialog({
   onEmailSent,
 }: SendEmailDialogProps) {
   const notify = useNotification();
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const [loading, setLoading] = useState(false);
   const [recipientEmail, setRecipientEmail] = useState("");
   const [subject, setSubject] = useState("");

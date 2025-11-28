@@ -32,7 +32,7 @@ interface CallSubDisposition {
 }
 
 export default function CallDispositions() {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const notify = useNotification();
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -89,7 +89,7 @@ export default function CallDispositions() {
     }
 
     dispositionCrud.create({
-      org_id: effectiveOrgId,
+      org_id: orgId,
       name: newDisposition.name,
       description: newDisposition.description,
       category: newDisposition.category,

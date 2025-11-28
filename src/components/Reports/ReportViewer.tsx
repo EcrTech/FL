@@ -15,7 +15,7 @@ interface ReportViewerProps {
 }
 
 export const ReportViewer = ({ reportId, open, onClose }: ReportViewerProps) => {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const { data: report, isLoading } = useQuery({
     queryKey: ['report', reportId],
     queryFn: async () => {

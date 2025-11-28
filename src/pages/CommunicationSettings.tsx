@@ -18,7 +18,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 // WhatsApp Settings Component
 function WhatsAppSettingsTab() {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const notify = useNotification();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -365,7 +365,7 @@ function EmailSettingsTab() {
 // Exotel Settings Component
 function ExotelSettingsTab() {
   const notify = useNotification();
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);

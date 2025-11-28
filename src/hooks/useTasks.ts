@@ -11,7 +11,7 @@ interface UseTasksOptions {
 }
 
 export function useTasks(options: UseTasksOptions = {}) {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const { filter = "all", status, limit, offset = 0 } = options;
 
   return useQuery({

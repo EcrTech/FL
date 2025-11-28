@@ -59,7 +59,7 @@ interface Campaign {
 }
 
 export default function Communications() {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const navigate = useNavigate();
   const notify = useNotification();
   const [conversations, setConversations] = useState<ConversationItem[]>([]);

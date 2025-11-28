@@ -36,7 +36,7 @@ export const OutboundWebhookDialog = ({
   onOpenChange,
   webhook,
 }: OutboundWebhookDialogProps) => {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const notify = useNotification();
   const queryClient = useQueryClient();
 

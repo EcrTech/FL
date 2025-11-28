@@ -14,7 +14,7 @@ interface CustomReportsListProps {
 
 export const CustomReportsList = ({ onViewReport }: CustomReportsListProps) => {
   const navigate = useNavigate();
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
 
   const { data: reports, isLoading } = useQuery({
     queryKey: ['saved-reports', effectiveOrgId],

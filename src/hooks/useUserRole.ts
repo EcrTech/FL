@@ -13,12 +13,12 @@ interface UserRoleResult {
  * Uses server-side verification through user_roles table
  */
 export function useUserRole(): UserRoleResult {
-  const { effectiveOrgId, isLoading: orgLoading } = useOrgContext();
+  const { orgId, isLoading: orgLoading } = useOrgContext();
 
   const { data, isLoading } = useQuery({
-    queryKey: ["userRole", effectiveOrgId],
+    queryKey: ["userRole", orgId],
     queryFn: async () => {
-      if (!effectiveOrgId) {
+      if (!orgId) {
         return { isAdmin: false, isSuperAdmin: false };
       }
 
@@ -31,7 +31,7 @@ export function useUserRole(): UserRoleResult {
         .from("user_roles")
         .select("role")
         .eq("user_id", user.id)
-        .eq("org_id", effectiveOrgId)
+        .eq("org_id", orgId)
         .in("role", ["admin", "super_admin"]);
 
       if (error) {
@@ -44,7 +44,7 @@ export function useUserRole(): UserRoleResult {
 
       return { isAdmin, isSuperAdmin };
     },
-    enabled: !!effectiveOrgId && !orgLoading,
+    enabled: !!orgId && !orgLoading,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 

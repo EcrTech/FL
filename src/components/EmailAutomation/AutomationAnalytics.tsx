@@ -13,7 +13,7 @@ interface AutomationAnalyticsProps {
 }
 
 export function AutomationAnalytics({ dateRange = 30 }: AutomationAnalyticsProps) {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
 
   const { data: trendData, isLoading: trendLoading } = useQuery({
     queryKey: ["automation_trend", effectiveOrgId, dateRange],

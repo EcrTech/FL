@@ -13,7 +13,7 @@ import { useNotification } from "@/hooks/useNotification";
 import { useState } from "react";
 
 export default function AIInsightsTab() {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const notify = useNotification();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [chatExpanded, setChatExpanded] = useState(false);

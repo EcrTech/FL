@@ -23,7 +23,7 @@ interface EmailTemplateDialogProps {
 
 export const EmailTemplateDialog = ({ open, onOpenChange, template, onSuccess }: EmailTemplateDialogProps) => {
   const notify = useNotification();
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const emailEditorRef = useRef<EditorRef>(null);
 
   const [templateName, setTemplateName] = useState(template?.name || "");

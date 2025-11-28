@@ -26,7 +26,7 @@ interface UserSelectorProps {
 }
 
 export function UserSelector({ selectedUserId, onChange, label = "Assign To" }: UserSelectorProps) {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
 

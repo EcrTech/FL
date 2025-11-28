@@ -6,7 +6,7 @@ import { useOrgContext } from "./useOrgContext";
 export function useTaskMutations() {
   const notify = useNotification();
   const queryClient = useQueryClient();
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
 
   const createTask = useMutation({
     mutationFn: async (data: {

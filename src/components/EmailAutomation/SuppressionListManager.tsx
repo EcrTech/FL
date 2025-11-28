@@ -36,7 +36,7 @@ import { Ban, Plus, Trash2, Upload } from "lucide-react";
 import { format } from "date-fns";
 
 export function SuppressionListManager() {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const notify = useNotification();
   const queryClient = useQueryClient();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);

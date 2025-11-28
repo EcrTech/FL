@@ -23,7 +23,7 @@ interface Notification {
 
 export function useNotifications() {
   const queryClient = useQueryClient();
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
 
   // Fetch notifications
   const { data: notifications = [], isLoading } = useQuery<Notification[]>({

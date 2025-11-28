@@ -29,7 +29,7 @@ interface RuleTemplatesGalleryProps {
 }
 
 export function RuleTemplatesGallery({ onSelectTemplate }: RuleTemplatesGalleryProps) {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
