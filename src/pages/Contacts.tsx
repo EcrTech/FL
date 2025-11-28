@@ -58,7 +58,7 @@ interface User {
 }
 
 export default function Contacts() {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [pipelineStages, setPipelineStages] = useState<PipelineStage[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -87,8 +87,8 @@ export default function Contacts() {
   });
 
   useEffect(() => {
-    if (effectiveOrgId) {
-      console.log('[Contacts] effectiveOrgId changed to:', effectiveOrgId);
+    if (orgId) {
+      console.log('[Contacts] orgId changed to:', orgId);
       setLoading(true);
       setContacts([]);
       pagination.reset();
@@ -96,13 +96,13 @@ export default function Contacts() {
       fetchPipelineStages();
       fetchUsers();
     }
-  }, [effectiveOrgId]);
+  }, [orgId]);
   
   // Listen for org context changes
   useEffect(() => {
     const handleOrgChange = () => {
       console.log('[Contacts] Org context changed event received');
-      if (effectiveOrgId) {
+      if (orgId) {
         setLoading(true);
         setContacts([]);
         pagination.reset();
@@ -114,17 +114,17 @@ export default function Contacts() {
 
     window.addEventListener("orgContextChange", handleOrgChange);
     return () => window.removeEventListener("orgContextChange", handleOrgChange);
-  }, [effectiveOrgId]);
+  }, [orgId]);
 
   // Fetch contacts when pagination changes
   useEffect(() => {
-    if (effectiveOrgId) {
+    if (orgId) {
       fetchContacts();
     }
   }, [pagination.currentPage, pagination.pageSize]);
 
   const fetchContacts = async () => {
-    if (!effectiveOrgId) return;
+    if (!orgId) return;
     
     try {
       const offset = (pagination.currentPage - 1) * pagination.pageSize;
@@ -138,7 +138,7 @@ export default function Contacts() {
             color
           )
         `, { count: 'exact' })
-        .eq("org_id", effectiveOrgId)
+        .eq("org_id", orgId)
         .order("created_at", { ascending: false })
         .range(offset, offset + pagination.pageSize - 1);
 
@@ -425,7 +425,7 @@ Jane,Smith,jane.smith@example.com,+0987654321,Tech Inc,CEO,contacted,Referral`;
         </div>
 
         <TabsContent value="all" className="space-y-6">
-          {effectiveOrgId && <ActiveUploadProgress orgId={effectiveOrgId} />}
+          {orgId && <ActiveUploadProgress orgId={orgId} />}
           
           <div className="space-y-6">
             <div className="flex gap-2">
