@@ -11,6 +11,7 @@ import { ArrowLeft, User, FileText, CheckCircle, Calculator, ThumbsUp, FileCheck
 import { LoadingState } from "@/components/common/LoadingState";
 import { format } from "date-fns";
 import DocumentUpload from "@/components/LOS/DocumentUpload";
+import VerificationDashboard from "@/components/LOS/VerificationDashboard";
 
 const STAGE_LABELS: Record<string, string> = {
   application_login: "Application Login",
@@ -303,12 +304,7 @@ export default function ApplicationDetail() {
           </TabsContent>
 
           <TabsContent value="verification">
-            <Card>
-              <CardHeader>
-                <CardTitle>Verification</CardTitle>
-                <CardDescription>Coming soon - Verification dashboard</CardDescription>
-              </CardHeader>
-            </Card>
+            <VerificationDashboard applicationId={application.id} orgId={orgId} />
           </TabsContent>
 
           <TabsContent value="assessment">
