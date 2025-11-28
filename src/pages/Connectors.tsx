@@ -126,13 +126,13 @@ export default function Connectors() {
   };
 
   const fetchCustomFields = async () => {
-    if (!effectiveOrgId) return;
+    if (!orgId) return;
     
     try {
       const { data, error } = await supabase
         .from("custom_fields")
         .select("id, field_name, field_label, field_type, is_active, applies_to_table")
-        .eq("org_id", effectiveOrgId)
+        .eq("org_id", orgId)
         .eq("is_active", true)
         .order("field_order");
 
@@ -146,7 +146,7 @@ export default function Connectors() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!effectiveOrgId) return;
+    if (!orgId) return;
 
     setLoading(true);
 
@@ -168,7 +168,7 @@ export default function Connectors() {
         const { data, error: insertError } = await supabase
           .from("forms")
           .insert([{
-            org_id: effectiveOrgId,
+            org_id: orgId,
             name: dialog.formData.name,
             description: dialog.formData.description,
             is_active: dialog.formData.is_active,

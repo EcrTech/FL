@@ -40,21 +40,21 @@ interface ActivityData {
 const COLORS = ['#01B8AA', '#168980', '#8AD4EB', '#F2C80F', '#A66999', '#FE9666', '#FD625E'];
 
 export default function Dashboard() {
-  const { effectiveOrgId, isLoading: orgLoading } = useOrgContext();
+  const { orgId, isLoading: orgLoading } = useOrgContext();
   const queryClient = useQueryClient();
 
   // Fetch optimized dashboard stats using database function
   const { data: rawStats, isLoading: statsLoading, refetch: refetchStats } = useQuery<any>({
-    queryKey: ["dashboard-stats", effectiveOrgId],
+    queryKey: ["dashboard-stats", orgId],
     queryFn: async () => {
-      if (!effectiveOrgId) throw new Error("No organization context");
+      if (!orgId) throw new Error("No organization context");
       
       console.log('=== DASHBOARD QUERY START ===');
-      console.log('[Dashboard] effectiveOrgId:', effectiveOrgId);
-      console.log('[Dashboard] Calling get_dashboard_stats with p_org_id:', effectiveOrgId);
+      console.log('[Dashboard] orgId:', orgId);
+      console.log('[Dashboard] Calling get_dashboard_stats with p_org_id:', orgId);
       
       const { data, error } = await supabase.rpc("get_dashboard_stats", {
-        p_org_id: effectiveOrgId,
+        p_org_id: orgId,
       });
       
       console.log('[Dashboard] RPC call completed');
@@ -65,7 +65,7 @@ export default function Dashboard() {
       if (error) throw error;
       return data;
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
     staleTime: 0, // Never use stale data - always refetch when org changes
     refetchOnMount: 'always', // Always refetch when component mounts
   });
