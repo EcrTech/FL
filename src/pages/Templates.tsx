@@ -39,7 +39,7 @@ interface EmailTemplate {
 }
 
 const Templates = () => {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const notify = useNotification();
   const [syncing, setSyncing] = useState(false);
   const [queuedJobId, setQueuedJobId] = useState<string | null>(null);

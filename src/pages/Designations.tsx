@@ -43,7 +43,7 @@ const ROLES = [
 ];
 
 export default function Designations() {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const notify = useNotification();
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -78,12 +78,12 @@ export default function Designations() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!effectiveOrgId) return;
+    if (!orgId) return;
     
     setIsSubmitting(true);
     try {
       const designationPayload = {
-        org_id: effectiveOrgId,
+        org_id: orgId,
         name: dialog.formData.name,
         description: dialog.formData.description,
         role: dialog.formData.role,
@@ -116,7 +116,7 @@ export default function Designations() {
         const { error: hierError } = await supabase
           .from("reporting_hierarchy" as any)
           .upsert({
-            org_id: effectiveOrgId,
+            org_id: orgId,
             designation_id: designationId,
             reports_to_designation_id: dialog.formData.reports_to,
           });

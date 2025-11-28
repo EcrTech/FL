@@ -29,7 +29,7 @@ interface Campaign {
 const EmailCampaigns = () => {
   const navigate = useNavigate();
   const notify = useNotification();
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
 
   const fetchCampaigns = async () => {
     const { data, error } = await supabase

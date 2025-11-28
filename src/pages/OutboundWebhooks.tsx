@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const OutboundWebhooks = () => {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const notify = useNotification();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);

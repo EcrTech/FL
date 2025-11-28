@@ -72,49 +72,49 @@ export default function Dashboard() {
 
   // Fetch pipeline distribution
   const { data: pipelineRaw = [], isLoading: pipelineLoading, refetch: refetchPipeline } = useQuery({
-    queryKey: ["pipeline-distribution", effectiveOrgId],
+    queryKey: ["pipeline-distribution", orgId],
     queryFn: async () => {
-      if (!effectiveOrgId) throw new Error("No organization context");
+      if (!orgId) throw new Error("No organization context");
       const { data, error } = await supabase.rpc("get_pipeline_distribution", {
-        p_org_id: effectiveOrgId,
+        p_org_id: orgId,
       });
       if (error) throw error;
       return data || [];
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
     staleTime: 0,
     refetchOnMount: 'always',
   });
 
   // Fetch activity trends
   const { data: activityRaw = [], isLoading: activitiesLoading, refetch: refetchActivity } = useQuery({
-    queryKey: ["activity-trends", effectiveOrgId],
+    queryKey: ["activity-trends", orgId],
     queryFn: async () => {
-      if (!effectiveOrgId) throw new Error("No organization context");
+      if (!orgId) throw new Error("No organization context");
       const { data, error } = await supabase.rpc("get_activity_trends", {
-        p_org_id: effectiveOrgId,
+        p_org_id: orgId,
         p_days: 7,
       });
       if (error) throw error;
       return data || [];
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
     staleTime: 0,
     refetchOnMount: 'always',
   });
 
   // Fetch demo stats for this month
   const { data: demoStats } = useQuery({
-    queryKey: ["demo-stats", effectiveOrgId],
+    queryKey: ["demo-stats", orgId],
     queryFn: async () => {
-      if (!effectiveOrgId) throw new Error("No organization context");
+      if (!orgId) throw new Error("No organization context");
       const { data, error } = await supabase.rpc("get_demo_stats_this_month", {
-        p_org_id: effectiveOrgId,
+        p_org_id: orgId,
       });
       if (error) throw error;
       return data?.[0] || { demos_done: 0, demos_upcoming: 0 };
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
     staleTime: 0,
     refetchOnMount: 'always',
   });
@@ -134,10 +134,10 @@ export default function Dashboard() {
     return () => window.removeEventListener("orgContextChange", handleOrgChange);
   }, [queryClient]);
 
-  // Watch for effectiveOrgId changes and remove old queries
+  // Watch for orgId changes and remove old queries
   useEffect(() => {
-    if (effectiveOrgId) {
-      console.log('[Dashboard] effectiveOrgId changed to:', effectiveOrgId);
+    if (orgId) {
+      console.log('[Dashboard] orgId changed to:', orgId);
       // Remove queries for other orgs to prevent stale data
       queryClient.removeQueries({ 
         predicate: (query) => {
@@ -146,12 +146,12 @@ export default function Dashboard() {
             (queryKey[0] === 'dashboard-stats' || 
              queryKey[0] === 'pipeline-distribution' || 
              queryKey[0] === 'activity-trends') &&
-            queryKey[1] !== effectiveOrgId
+            queryKey[1] !== orgId
           );
         }
       });
     }
-  }, [effectiveOrgId, queryClient]);
+  }, [orgId, queryClient]);
 
   // Fetch tasks for analytics
   const { data: tasksData } = useTasks({ filter: "assigned_to_me" });
@@ -244,7 +244,7 @@ export default function Dashboard() {
     }));
   }, [activityRaw]);
 
-  if (!effectiveOrgId || loading) {
+  if (!orgId || loading) {
     return (
       <DashboardLayout>
         <LoadingState message="Loading dashboard data..." />

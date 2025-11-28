@@ -23,7 +23,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 export default function Inventory() {
   const notify = useNotification();
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const [search, setSearch] = useState("");
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [selectedItem, setSelectedItem] = useState<any>(null);

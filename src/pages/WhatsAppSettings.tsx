@@ -21,7 +21,7 @@ interface WhatsAppSettings {
 }
 
 const WhatsAppSettings = () => {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const notify = useNotification();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);

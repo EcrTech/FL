@@ -16,7 +16,7 @@ import { useEffect } from "react";
 
 export default function WhatsAppCampaigns() {
   const navigate = useNavigate();
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const notify = useNotification();
 
   const fetchCampaigns = async () => {

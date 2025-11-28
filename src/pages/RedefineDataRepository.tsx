@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/pagination";
 
 export default function RedefineDataRepository() {
-  const { effectiveOrgId } = useOrgContext();
+  const { orgId } = useOrgContext();
   const notify = useNotification();
   const [searchQuery, setSearchQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
