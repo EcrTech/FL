@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNotification } from "@/hooks/useNotification";
 import { 
   ArrowLeft, Mail, Phone as PhoneIcon, Building, MapPin, Calendar,
-  Edit, Plus, MessageSquare, PhoneCall, Video, FileText, Linkedin, MessageCircle, Sparkles
+  Edit, Plus, MessageSquare, PhoneCall, Video, FileText, Linkedin, MessageCircle
 } from "lucide-react";
 import { CustomerJourney } from "@/components/Contact/CustomerJourney";
 import { LogActivityDialog } from "@/components/Contact/LogActivityDialog";
@@ -80,7 +80,6 @@ export default function ContactDetail() {
   const [isWhatsAppOpen, setIsWhatsAppOpen] = useState(false);
   const [isEmailOpen, setIsEmailOpen] = useState(false);
   const [activityType, setActivityType] = useState<string>("note");
-  const [enriching, setEnriching] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -144,32 +143,6 @@ export default function ContactDetail() {
     fetchContact();
   };
 
-  const handleEnrichContact = async () => {
-    if (!id) return;
-    setEnriching(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('enrich-contact', {
-        body: { contactId: id },
-      });
-
-      if (error) throw error;
-
-      if (data.error) {
-        notify.error("Enrichment failed", data.error);
-      } else {
-        notify.success(
-          "Contact enriched successfully",
-          `Updated ${data.fieldsEnriched} fields`
-        );
-        fetchContact(); // Refresh contact data
-      }
-    } catch (error: any) {
-      notify.error("Enrichment failed", error.message);
-    } finally {
-      setEnriching(false);
-    }
-  };
-
   if (loading) {
     return (
       <DashboardLayout>
@@ -204,14 +177,6 @@ export default function ContactDetail() {
             </div>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <Button 
-              variant="outline" 
-              onClick={handleEnrichContact}
-              disabled={enriching || !contact.email}
-            >
-              <Sparkles className="mr-2 h-4 w-4" />
-              {enriching ? "Enriching..." : "Enrich with Apollo"}
-            </Button>
             <Button variant="outline" onClick={() => setIsEditOpen(true)}>
               <Edit className="mr-2 h-4 w-4" />
               Edit

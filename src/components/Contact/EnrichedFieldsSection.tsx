@@ -53,7 +53,7 @@ export function EnrichedFieldsSection({ contact }: EnrichedFieldsSectionProps) {
         <div className="flex items-center justify-between">
           <div>
             <CardTitle className="flex items-center gap-2">
-              Apollo Enriched Data
+              Enriched Data
               {contact.enrichment_status === "enriched" && (
                 <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
                   Verified

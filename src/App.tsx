@@ -38,7 +38,6 @@ import BulkWhatsAppSender from "./pages/BulkWhatsAppSender";
 import EmailSettings from "./pages/EmailSettings";
 import WhatsAppCampaigns from "./pages/WhatsAppCampaigns";
 import WhatsAppCampaignDetail from "./pages/WhatsAppCampaignDetail";
-import ApolloSettings from "./pages/ApolloSettings";
 import QueueStatus from "./pages/QueueStatus";
 import Communications from "./pages/Communications";
 import BulkEmailSender from "./pages/BulkEmailSender";
@@ -50,11 +49,9 @@ import CampaignOverview from "./pages/Campaigns/CampaignOverview";
 import AIInsightsDashboard from "./pages/Campaigns/AIInsightsDashboard";
 import Documentation from "./pages/Documentation";
 import RedefineDataRepository from "./pages/RedefineDataRepository";
-import Subscriptions from "./pages/Subscriptions";
 import CommunicationSettings from "./pages/CommunicationSettings";
 import Inventory from "./pages/Inventory";
 import ApiKeys from "./pages/ApiKeys";
-import GoogleCalendarCallback from "./pages/GoogleCalendarCallback";
 import OutboundWebhooks from "./pages/OutboundWebhooks";
 import Tasks from "./pages/Tasks";
 import ProtectedRoute from "./components/Auth/ProtectedRoute";
@@ -70,7 +67,6 @@ const App = () => (
           <Route path="/signup" element={<SignUp />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/form/:formId" element={<PublicForm />} />
-          <Route path="/google-calendar-callback" element={<GoogleCalendarCallback />} />
           
           <Route path="/dashboard" element={
             <ProtectedRoute>
@@ -339,18 +335,6 @@ const App = () => (
           <Route path="/reports/saved" element={
             <ProtectedRoute>
               <SavedReports />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/platform-admin/subscriptions" element={
-            <ProtectedRoute>
-              <Subscriptions />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/apollo-settings" element={
-            <ProtectedRoute requiredRole="admin">
-              <ApolloSettings />
             </ProtectedRoute>
           } />
           

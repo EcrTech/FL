@@ -247,64 +247,9 @@ export function LogActivityDialog({
             console.error('Failed to add participants:', participantsError);
           }
         }
-        
-        // Generate Google Meet link if requested
-        let meetLinkGenerated = false;
-        if (meetingConfig.generateMeetLink && participants.length > 0) {
-          // Check if Google Calendar is connected
-          const { data: tokens } = await supabase
-            .from('google_oauth_tokens')
-            .select('id')
-            .eq('org_id', profile.org_id)
-            .maybeSingle();
-
-          if (!tokens) {
-            notify.info("Google Calendar Not Connected", "Meeting created without Google Meet link. Connect Google Calendar in Admin Settings to enable.");
-          } else {
-            try {
-              const { data: meetData, error: meetError } = await supabase.functions.invoke('create-google-meet', {
-                body: {
-                  activityId: activity.id,
-                  orgId: profile.org_id,
-                  title: formData.subject || 'Meeting',
-                  description: formData.description || '',
-                  startTime: meetingConfig.scheduledAt?.toISOString() || new Date().toISOString(),
-                  durationMinutes: meetingConfig.duration,
-                  participants: participants.map(p => ({ email: p.email, name: p.name }))
-                }
-              });
-              
-              if (meetError) {
-                console.error('Failed to create Google Meet link:', meetError);
-                notify.info('Partial Success', 'Meeting created but Google Meet link generation failed.');
-              } else if (meetData?.meetLink) {
-                // Update activity with meet link
-                await supabase
-                  .from('contact_activities')
-                  .update({
-                    meeting_link: meetData.meetLink,
-                    google_calendar_event_id: meetData.eventId
-                  })
-                  .eq('id', activity.id);
-                
-                meetLinkGenerated = true;
-                
-                // Send invitations
-                await supabase.functions.invoke('send-meeting-invitation', {
-                  body: { activityId: activity.id }
-                });
-              }
-            } catch (meetError: any) {
-              console.error('Google Meet error:', meetError);
-              notify.info('Partial Success', 'Meeting created but Google Meet link generation failed.');
-            }
-          }
-        }
       }
 
-      const description = formData.activity_type === 'meeting' && meetingConfig.generateMeetLink && meetLinkGenerated
-        ? "Meeting created and invitations sent"
-        : formData.activity_type === 'meeting'
+      const description = formData.activity_type === 'meeting'
         ? "Meeting created successfully"
         : "Activity has been logged successfully";
       
