@@ -32,13 +32,13 @@ export function UserSelector({ selectedUserId, onChange, label = "Assign To" }: 
 
   useEffect(() => {
     const fetchUsers = async () => {
-      if (!effectiveOrgId) return;
+      if (!orgId) return;
 
       setLoading(true);
       const { data, error } = await supabase
         .from("profiles")
         .select("id, first_name, last_name, email")
-        .eq("org_id", effectiveOrgId)
+        .eq("org_id", orgId)
         .order("first_name");
 
       if (!error && data) {
@@ -48,7 +48,7 @@ export function UserSelector({ selectedUserId, onChange, label = "Assign To" }: 
     };
 
     fetchUsers();
-  }, [effectiveOrgId]);
+  }, [orgId]);
 
   if (loading) {
     return (

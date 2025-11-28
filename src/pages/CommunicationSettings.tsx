@@ -32,19 +32,19 @@ function WhatsAppSettingsTab() {
   const [templateCount, setTemplateCount] = useState(0);
 
   useEffect(() => {
-    if (effectiveOrgId) {
+    if (orgId) {
       fetchSettings();
       fetchTemplateCount();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveOrgId]);
+  }, [orgId]);
 
   const fetchSettings = async () => {
     try {
       const { data, error } = await supabase
         .from("whatsapp_settings")
         .select("*")
-        .eq("org_id", effectiveOrgId)
+        .eq("org_id", orgId)
         .single();
 
       if (error && error.code !== 'PGRST116') throw error;
@@ -70,7 +70,7 @@ function WhatsAppSettingsTab() {
       const result = await supabase
         .from("communication_templates")
         .select("*", { count: 'exact', head: true })
-        .eq("org_id", effectiveOrgId)
+        .eq("org_id", orgId)
         .eq("channel", "whatsapp");
 
       setTemplateCount(result.count || 0);
@@ -85,7 +85,7 @@ function WhatsAppSettingsTab() {
       const { error } = await supabase
         .from("whatsapp_settings")
         .upsert({
-          org_id: effectiveOrgId,
+          org_id: orgId,
           ...settings,
         });
 
@@ -382,18 +382,18 @@ function ExotelSettingsTab() {
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/exotel-webhook`;
 
   useEffect(() => {
-    if (effectiveOrgId) {
+    if (orgId) {
       fetchSettings();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveOrgId]);
+  }, [orgId]);
 
   const fetchSettings = async () => {
     try {
       const { data, error } = await supabase
         .from('exotel_settings')
         .select('*')
-        .eq('org_id', effectiveOrgId)
+        .eq('org_id', orgId)
         .single();
 
       if (error && error.code !== 'PGRST116') throw error;
@@ -422,7 +422,7 @@ function ExotelSettingsTab() {
       const { error } = await supabase
         .from('exotel_settings')
         .upsert({
-          org_id: effectiveOrgId,
+          org_id: orgId,
           ...settings,
         });
 

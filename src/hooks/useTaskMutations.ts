@@ -22,7 +22,7 @@ export function useTaskMutations() {
       const { error } = await supabase.from("tasks").insert([
         {
           ...data,
-          org_id: effectiveOrgId,
+          org_id: orgId,
           assigned_by: user.id,
         },
       ]);

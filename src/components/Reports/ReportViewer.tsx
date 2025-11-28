@@ -69,7 +69,7 @@ export const ReportViewer = ({ reportId, open, onClose }: ReportViewerProps) => 
               parameters={(report.configuration as any)?.parameters || {}}
               dataSource={report.data_source}
               onChange={() => {}}
-              orgId={effectiveOrgId || ''}
+              orgId={orgId || ''}
             />
           </div>
         ) : (

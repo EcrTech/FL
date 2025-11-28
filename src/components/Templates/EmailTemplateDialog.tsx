@@ -62,7 +62,7 @@ export const EmailTemplateDialog = ({ open, onOpenChange, template, onSuccess }:
           subject: subject.trim(),
           design_json: design,
           html_content: html,
-          org_id: effectiveOrgId,
+          org_id: orgId,
         };
 
         if (template?.id) {

@@ -27,7 +27,7 @@ export function useNotifications() {
 
   // Fetch notifications
   const { data: notifications = [], isLoading } = useQuery<Notification[]>({
-    queryKey: ["notifications", effectiveOrgId],
+    queryKey: ["notifications", orgId],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
@@ -42,7 +42,7 @@ export function useNotifications() {
       if (error) throw error;
       return (data || []) as unknown as Notification[];
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   // Count unread notifications
@@ -100,7 +100,7 @@ export function useNotifications() {
     onUpdate: () => {
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   return {

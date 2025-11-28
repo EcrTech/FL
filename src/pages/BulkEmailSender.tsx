@@ -67,10 +67,10 @@ const BulkEmailSender = () => {
   useEffect(() => {
     fetchTemplates();
     fetchContacts();
-  }, [effectiveOrgId]);
+  }, [orgId]);
 
   const fetchTemplates = async () => {
-    if (!effectiveOrgId || effectiveOrgId === "null") {
+    if (!orgId || orgId === "null") {
       console.log("No valid org_id available");
       return;
     }
@@ -79,7 +79,7 @@ const BulkEmailSender = () => {
       const { data, error } = await supabase
         .from("email_templates")
         .select("*")
-        .eq("org_id", effectiveOrgId)
+        .eq("org_id", orgId)
         .eq("is_active", true)
         .order("created_at", { ascending: false });
 
@@ -214,7 +214,7 @@ const BulkEmailSender = () => {
           pending_count: finalRecipients.length,
           status: sendImmediately ? "sending" : "scheduled",
           scheduled_at: sendImmediately ? null : scheduledAt?.toISOString(),
-          org_id: effectiveOrgId,
+          org_id: orgId,
           created_by: session.session?.user.id,
           started_at: sendImmediately ? new Date().toISOString() : null,
           variable_mappings: variableMappings as any,
@@ -428,7 +428,7 @@ const BulkEmailSender = () => {
           <VariableMappingStep
             templateVariables={templateVariables}
             identifierType="email"
-            orgId={effectiveOrgId}
+            orgId={orgId}
             onComplete={handleVariableMappingComplete}
             onBack={() => setStep(1)}
           />

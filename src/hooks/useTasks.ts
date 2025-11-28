@@ -15,9 +15,9 @@ export function useTasks(options: UseTasksOptions = {}) {
   const { filter = "all", status, limit, offset = 0 } = options;
 
   return useQuery({
-    queryKey: ["tasks", effectiveOrgId, filter, status, limit, offset],
+    queryKey: ["tasks", orgId, filter, status, limit, offset],
     queryFn: async () => {
-      if (!effectiveOrgId) throw new Error("No organization context");
+      if (!orgId) throw new Error("No organization context");
 
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
@@ -29,7 +29,7 @@ export function useTasks(options: UseTasksOptions = {}) {
           assignee:assigned_to(id, first_name, last_name, email),
           creator:assigned_by(id, first_name, last_name, email)
         `)
-        .eq("org_id", effectiveOrgId);
+        .eq("org_id", orgId);
 
       // Apply filter
       if (filter === "assigned_to_me") {
@@ -47,7 +47,7 @@ export function useTasks(options: UseTasksOptions = {}) {
       const countQuery = supabase
         .from("tasks")
         .select("*", { count: "exact", head: true })
-        .eq("org_id", effectiveOrgId);
+        .eq("org_id", orgId);
 
       if (filter === "assigned_to_me") {
         countQuery.eq("assigned_to", user.id);
@@ -92,6 +92,6 @@ export function useTasks(options: UseTasksOptions = {}) {
         totalCount: count || 0,
       };
     },
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 }
