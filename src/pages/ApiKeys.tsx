@@ -1052,15 +1052,9 @@ Response:
     "services_enabled": {
       "calling": true,
       "whatsapp": true,
-      "email": true,
-      "apollo": false
+      "email": true
     },
     "max_automation_emails_per_day": 1000,
-    "apollo_config": {
-      "api_key": null,
-      "enabled": false,
-      "daily_credit_limit": 0
-    },
     "created_at": "2025-01-10T08:00:00Z",
     "updated_at": "2025-10-15T12:30:00Z"
   }
@@ -1103,15 +1097,11 @@ Response:
                   </div>
                   <div className="border-l-4 border-primary pl-4 py-2 bg-muted/30">
                     <p className="font-mono text-[14px] font-bold text-foreground">services_enabled</p>
-                    <p className="text-[15px] text-foreground leading-relaxed mt-1">Object showing which services are enabled (calling, WhatsApp, email, Apollo)</p>
+                    <p className="text-[15px] text-foreground leading-relaxed mt-1">Object showing which services are enabled (calling, WhatsApp, email)</p>
                   </div>
                   <div className="border-l-4 border-primary pl-4 py-2 bg-muted/30">
                     <p className="font-mono text-[14px] font-bold text-foreground">max_automation_emails_per_day</p>
                     <p className="text-[15px] text-foreground leading-relaxed mt-1">Daily limit for automated email campaigns</p>
-                  </div>
-                  <div className="border-l-4 border-primary pl-4 py-2 bg-muted/30">
-                    <p className="font-mono text-[14px] font-bold text-foreground">apollo_config</p>
-                    <p className="text-[15px] text-foreground leading-relaxed mt-1">Apollo.io integration settings and credit limits</p>
                   </div>
                 </div>
 
@@ -1226,8 +1216,7 @@ useEffect(() => {
                       <tr className="bg-muted/20"><td className="border border-border px-4 py-2 font-mono text-xs">subscription_active</td><td className="border border-border px-4 py-2">boolean</td><td className="border border-border px-4 py-2 text-muted-foreground">No</td><td className="border border-border px-4 py-2">Subscription status</td></tr>
                       <tr><td className="border border-border px-4 py-2 font-mono text-xs">services_enabled</td><td className="border border-border px-4 py-2">boolean</td><td className="border border-border px-4 py-2 text-muted-foreground">No</td><td className="border border-border px-4 py-2">Services activation flag</td></tr>
                       <tr className="bg-muted/20"><td className="border border-border px-4 py-2 font-mono text-xs">max_automation_emails_per_day</td><td className="border border-border px-4 py-2">integer</td><td className="border border-border px-4 py-2 text-muted-foreground">No</td><td className="border border-border px-4 py-2">Daily email limit</td></tr>
-                      <tr><td className="border border-border px-4 py-2 font-mono text-xs">apollo_config</td><td className="border border-border px-4 py-2">json</td><td className="border border-border px-4 py-2 text-muted-foreground">No</td><td className="border border-border px-4 py-2">Apollo integration settings</td></tr>
-                      <tr className="bg-muted/20"><td className="border border-border px-4 py-2 font-mono text-xs">created_at</td><td className="border border-border px-4 py-2">timestamp</td><td className="border border-border px-4 py-2 text-accent font-semibold">Yes</td><td className="border border-border px-4 py-2">Creation timestamp</td></tr>
+                      <tr><td className="border border-border px-4 py-2 font-mono text-xs">created_at</td><td className="border border-border px-4 py-2">timestamp</td><td className="border border-border px-4 py-2 text-accent font-semibold">Yes</td><td className="border border-border px-4 py-2">Creation timestamp</td></tr>
                       <tr><td className="border border-border px-4 py-2 font-mono text-xs">updated_at</td><td className="border border-border px-4 py-2">timestamp</td><td className="border border-border px-4 py-2 text-accent font-semibold">Yes</td><td className="border border-border px-4 py-2">Last update timestamp</td></tr>
                     </tbody>
                   </table>
@@ -1256,10 +1245,6 @@ useEffect(() => {
         "subscription_active": true,
         "services_enabled": true,
         "max_automation_emails_per_day": 1000,
-        "apollo_config": {
-          "enrich_on_create": false,
-          "auto_enrich_enabled": false
-        },
         "created_at": "2025-01-10T08:00:00Z",
         "updated_at": "2025-11-10T12:30:00Z"
       },
@@ -1281,7 +1266,6 @@ useEffect(() => {
         "subscription_active": true,
         "services_enabled": true,
         "max_automation_emails_per_day": 500,
-        "apollo_config": null,
         "created_at": "2025-02-15T10:00:00Z",
         "updated_at": "2025-11-08T14:20:00Z"
       }
@@ -1331,8 +1315,8 @@ useEffect(() => {
                       <tr><td className="border border-border px-4 py-2 font-mono text-xs">website</td><td className="border border-border px-4 py-2">string | null</td><td className="border border-border px-4 py-2 text-muted-foreground">No</td><td className="border border-border px-4 py-2">Website URL</td></tr>
                       <tr className="bg-muted/20"><td className="border border-border px-4 py-2 font-mono text-xs">notes</td><td className="border border-border px-4 py-2">text | null</td><td className="border border-border px-4 py-2 text-muted-foreground">No</td><td className="border border-border px-4 py-2">Internal notes</td></tr>
                       <tr><td className="border border-border px-4 py-2 font-mono text-xs">source</td><td className="border border-border px-4 py-2">string | null</td><td className="border border-border px-4 py-2 text-muted-foreground">No</td><td className="border border-border px-4 py-2">Lead source</td></tr>
-                      <tr className="bg-muted/20"><td className="border border-border px-4 py-2 font-mono text-xs">enrichment_status</td><td className="border border-border px-4 py-2">string | null</td><td className="border border-border px-4 py-2 text-muted-foreground">No</td><td className="border border-border px-4 py-2">Apollo enrichment status</td></tr>
-                      <tr><td className="border border-border px-4 py-2 font-mono text-xs">last_enriched_at</td><td className="border border-border px-4 py-2">timestamp | null</td><td className="border border-border px-4 py-2 text-muted-foreground">No</td><td className="border border-border px-4 py-2">Last enrichment date</td></tr>
+                      <tr className="bg-muted/20"><td className="border border-border px-4 py-2 font-mono text-xs">enrichment_status</td><td className="border border-border px-4 py-2">string | null</td><td className="border border-border px-4 py-2 text-muted-foreground">No</td><td className="border border-border px-4 py-2">Data enrichment status</td></tr>
+                      <tr><td className="border border-border px-4 py-2 font-mono text-xs">last_enriched_at</td><td className="border border-border px-4 py-2">timestamp | null</td><td className="border border-border px-4 py-2 text-muted-foreground">No</td><td className="border border-border px-4 py-2">Last data enrichment date</td></tr>
                       <tr className="bg-muted/20"><td className="border border-border px-4 py-2 font-mono text-xs">organization_name</td><td className="border border-border px-4 py-2">string | null</td><td className="border border-border px-4 py-2 text-muted-foreground">No</td><td className="border border-border px-4 py-2">Organization name (enriched)</td></tr>
                       <tr><td className="border border-border px-4 py-2 font-mono text-xs">created_at</td><td className="border border-border px-4 py-2">timestamp</td><td className="border border-border px-4 py-2 text-accent font-semibold">Yes</td><td className="border border-border px-4 py-2">Creation timestamp</td></tr>
                       <tr className="bg-muted/20"><td className="border border-border px-4 py-2 font-mono text-xs">updated_at</td><td className="border border-border px-4 py-2">timestamp</td><td className="border border-border px-4 py-2 text-accent font-semibold">Yes</td><td className="border border-border px-4 py-2">Last update timestamp</td></tr>

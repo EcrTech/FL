@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useNotification } from "@/hooks/useNotification";
 import { Building2, Palette, Users, Upload } from "lucide-react";
-import GoogleCalendarSettings from "@/components/Settings/GoogleCalendarSettings";
 
 export default function TechAdmin() {
   const notify = useNotification();
@@ -330,8 +329,6 @@ export default function TechAdmin() {
             </Button>
           </CardContent>
         </Card>
-
-        <GoogleCalendarSettings />
       </div>
     </DashboardLayout>
   );

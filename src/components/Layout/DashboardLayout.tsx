@@ -525,15 +525,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                     </Link>
                   )}
                   
-                  <Link
-                    to="/apollo-settings"
-                    className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
-                    onClick={() => setSidebarOpen(false)}
-                  >
-                    <Settings size={20} />
-                    <span>Apollo Settings</span>
-                  </Link>
-                  
                   {canAccessFeature("templates") && (
                     <Link
                       to="/templates"
@@ -561,14 +552,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                   >
                     <ShieldCheck size={20} />
                     <span>Platform Dashboard</span>
-                  </Link>
-                  <Link
-                    to="/platform-admin/subscriptions"
-                    className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
-                    onClick={() => setSidebarOpen(false)}
-                  >
-                    <CreditCard size={20} />
-                    <span>Subscriptions</span>
                   </Link>
                 </>
               )}
@@ -613,17 +596,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                     >
                       <Key size={20} />
                       <span>API Keys</span>
-                    </Link>
-                  )}
-                  
-                  {userRole === "admin" && (
-                    <Link
-                      to="/apollo-settings"
-                      className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
-                      onClick={() => setSidebarOpen(false)}
-                    >
-                      <Sparkles size={20} />
-                      <span>Apollo Settings</span>
                     </Link>
                   )}
                 </>
