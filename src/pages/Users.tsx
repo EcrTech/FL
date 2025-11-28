@@ -354,7 +354,7 @@ export default function Users() {
   };
 
   const generateInviteLink = async (role: string, email?: string) => {
-    if (!effectiveOrgId) {
+    if (!orgId) {
       notification.error("Error", "Organization context not available");
       return;
     }
@@ -369,7 +369,7 @@ export default function Users() {
       const { error } = await supabase
         .from("org_invites")
         .insert([{
-          org_id: effectiveOrgId,
+          org_id: orgId,
           invited_by: user?.id,
           invite_code: inviteCode,
           email: email || null,
@@ -766,10 +766,10 @@ export default function Users() {
                               onClick={() => setDeleteConfirm({ open: true, userId: user.user_id, roleId: user.id, hardDelete: false })}
                               title="Deactivate user in this organization"
                             >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                            {(isPlatformAdmin || isSuperAdmin) && (
-                              <Button
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                          {isSuperAdmin && (
+                            <Button
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => setDeleteConfirm({ open: true, userId: user.user_id, roleId: user.id, hardDelete: true })}

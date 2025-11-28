@@ -154,13 +154,13 @@ export default function Contacts() {
   };
 
   const fetchPipelineStages = async () => {
-    if (!effectiveOrgId) return;
+    if (!orgId) return;
     
     try {
       const { data, error } = await supabase
         .from("pipeline_stages")
         .select("id, name")
-        .eq("org_id", effectiveOrgId)
+        .eq("org_id", orgId)
         .eq("is_active", true)
         .order("stage_order");
 
@@ -172,13 +172,13 @@ export default function Contacts() {
   };
 
   const fetchUsers = async () => {
-    if (!effectiveOrgId) return;
+    if (!orgId) return;
     
     try {
       const { data, error } = await supabase
         .from("profiles")
         .select("id, first_name, last_name")
-        .eq("org_id", effectiveOrgId);
+        .eq("org_id", orgId);
 
       if (error) throw error;
       setUsers(data || []);
@@ -730,23 +730,23 @@ Jane,Smith,jane.smith@example.com,+0987654321,Tech Inc,CEO,contacted,Referral`;
       </TabsContent>
 
       <TabsContent value="uploads" className="space-y-4">
-        {effectiveOrgId && (
+        {orgId && (
           <>
-            <ActiveUploadProgress orgId={effectiveOrgId} />
+            <ActiveUploadProgress orgId={orgId} />
             <div>
               <h3 className="text-lg font-semibold mb-4">Recent Uploads</h3>
-              <UploadHistoryTable orgId={effectiveOrgId} />
+              <UploadHistoryTable orgId={orgId} />
             </div>
           </>
         )}
       </TabsContent>
     </Tabs>
 
-    {effectiveOrgId && (
+    {orgId && (
       <BulkUploadDialog
         open={showBulkUpload}
         onOpenChange={setShowBulkUpload}
-        orgId={effectiveOrgId}
+        orgId={orgId}
         onUploadStarted={() => {
           fetchContacts();
         }}

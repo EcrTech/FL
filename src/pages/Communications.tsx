@@ -74,22 +74,22 @@ export default function Communications() {
   const [mainTab, setMainTab] = useState<string>("conversations");
 
   useEffect(() => {
-    if (effectiveOrgId) {
+    if (orgId) {
       fetchConversations();
       subscribeToUpdates();
     }
-  }, [effectiveOrgId]);
+  }, [orgId]);
 
   useEffect(() => {
     filterConversations();
   }, [conversations, channelFilter, searchQuery]);
 
   const fetchConversations = async () => {
-    if (!effectiveOrgId) return;
+    if (!orgId) return;
 
     try {
       const { data, error } = await supabase.rpc('get_unified_inbox', {
-        p_org_id: effectiveOrgId,
+        p_org_id: orgId,
         p_limit: 100,
       });
 
@@ -128,7 +128,7 @@ export default function Communications() {
           event: 'INSERT',
           schema: 'public',
           table: 'whatsapp_messages',
-          filter: `org_id=eq.${effectiveOrgId}`,
+          filter: `org_id=eq.${orgId}`,
         },
         () => {
           fetchConversations();
@@ -147,7 +147,7 @@ export default function Communications() {
           event: 'INSERT',
           schema: 'public',
           table: 'email_conversations',
-          filter: `org_id=eq.${effectiveOrgId}`,
+          filter: `org_id=eq.${orgId}`,
         },
         () => {
           fetchConversations();
@@ -209,7 +209,7 @@ export default function Communications() {
   };
 
   const handleSendMessage = async () => {
-    if (!activeConversation || !replyText.trim() || !effectiveOrgId) return;
+    if (!activeConversation || !replyText.trim() || !orgId) return;
 
     setSending(true);
     try {
@@ -257,7 +257,7 @@ export default function Communications() {
     const { data, error } = await supabase
       .from("email_bulk_campaigns")
       .select("*")
-      .eq("org_id", effectiveOrgId)
+      .eq("org_id", orgId)
       .order("created_at", { ascending: false });
 
     if (error) throw error;
@@ -265,17 +265,17 @@ export default function Communications() {
   };
 
   const { data: campaigns = [], isLoading: campaignsLoading, refetch: refetchCampaigns } = useQuery({
-    queryKey: ['email-campaigns', effectiveOrgId],
+    queryKey: ['email-campaigns', orgId],
     queryFn: fetchCampaigns,
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   useRealtimeSync({
     table: 'email_bulk_campaigns',
-    filter: `org_id=eq.${effectiveOrgId}`,
+    filter: `org_id=eq.${orgId}`,
     onUpdate: refetchCampaigns,
     onInsert: refetchCampaigns,
-    enabled: !!effectiveOrgId,
+    enabled: !!orgId,
   });
 
   const handleExportCampaigns = () => {
@@ -529,7 +529,7 @@ export default function Communications() {
             </div>
           </TabsContent>
 
-          <TabsContent value="campaigns" className="h-full m-0 p-6 overflow-auto">
+          <TabsContent value="campaigns" className="p-6">
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
