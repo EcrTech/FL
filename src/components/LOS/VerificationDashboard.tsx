@@ -11,6 +11,8 @@ import AadhaarVerificationDialog from "./Verification/AadhaarVerificationDialog"
 import EmploymentVerificationDialog from "./Verification/EmploymentVerificationDialog";
 import BankAnalysisDialog from "./Verification/BankAnalysisDialog";
 import CreditBureauDialog from "./Verification/CreditBureauDialog";
+import { VideoKYCDialog } from "./Verification/VideoKYCDialog";
+import BankAccountVerificationDialog from "./Verification/BankAccountVerificationDialog";
 
 interface VerificationDashboardProps {
   applicationId: string;
@@ -18,6 +20,12 @@ interface VerificationDashboardProps {
 }
 
 const VERIFICATION_TYPES = [
+  { 
+    type: "video_kyc", 
+    name: "Video KYC", 
+    description: "Live video verification session",
+    category: "identity"
+  },
   { 
     type: "pan", 
     name: "PAN Verification", 
@@ -29,6 +37,12 @@ const VERIFICATION_TYPES = [
     name: "Aadhaar Verification", 
     description: "Verify Aadhaar details via UIDAI",
     category: "identity"
+  },
+  { 
+    type: "bank_account", 
+    name: "Bank Account Verification", 
+    description: "Verify bank account via penny drop",
+    category: "financial"
   },
   { 
     type: "employment", 
@@ -241,6 +255,20 @@ export default function VerificationDashboard({ applicationId, orgId }: Verifica
       </div>
 
       {/* Verification Dialogs */}
+      {selectedVerification?.type === "video_kyc" && (
+        <VideoKYCDialog
+          open={true}
+          onOpenChange={(open) => !open && setSelectedVerification(null)}
+          applicationId={applicationId}
+          orgId={orgId}
+          applicant={primaryApplicant}
+          onVerificationComplete={() => {
+            queryClient.invalidateQueries({ queryKey: ["loan-verifications", applicationId] });
+            setSelectedVerification(null);
+          }}
+        />
+      )}
+
       {selectedVerification?.type === "pan" && (
         <PANVerificationDialog
           open={true}
@@ -254,6 +282,17 @@ export default function VerificationDashboard({ applicationId, orgId }: Verifica
 
       {selectedVerification?.type === "aadhaar" && (
         <AadhaarVerificationDialog
+          open={true}
+          onClose={() => setSelectedVerification(null)}
+          applicationId={applicationId}
+          orgId={orgId}
+          applicant={primaryApplicant}
+          existingVerification={selectedVerification.data}
+        />
+      )}
+
+      {selectedVerification?.type === "bank_account" && (
+        <BankAccountVerificationDialog
           open={true}
           onClose={() => setSelectedVerification(null)}
           applicationId={applicationId}
