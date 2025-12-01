@@ -379,7 +379,7 @@ export default function Users() {
 
       if (error) throw error;
 
-      const link = `https://crm.in-sync.co.in/signup?invite=${inviteCode}`;
+      const link = `https://los.junoon.app/signup?invite=${inviteCode}`;
       setInviteLink(link);
       setIsInviteDialogOpen(true);
 

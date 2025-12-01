@@ -31,7 +31,7 @@ const Documentation = () => {
         <div className="container py-6">
           <h1 className="text-3xl font-bold">Technical Documentation</h1>
           <p className="text-muted-foreground mt-2">
-            Complete technical reference for the CRM system
+            Complete technical reference for the Loan Origination System
           </p>
         </div>
       </div>
@@ -84,8 +84,8 @@ const SystemOverview = () => (
     <div>
       <h2 className="text-2xl font-bold mb-4">System Overview</h2>
       <p className="text-muted-foreground mb-6">
-        A comprehensive multi-tenant CRM platform built with React, TypeScript, and Supabase,
-        designed for sales teams to manage contacts, communications, and campaigns.
+        A Loan Origination System (LOS) built with React, TypeScript, and Supabase,
+        designed for loan processing, approvals, verifications, disbursements, and EMI management.
       </p>
     </div>
 
@@ -149,7 +149,7 @@ const SystemOverview = () => (
           },
           {
             title: "User Management",
-            desc: "Multi-tenant organization structure with role-based access control, teams, designations, and reporting hierarchy.",
+            desc: "Organization structure with role-based access control, teams, designations, and reporting hierarchy.",
             lines: "~2,400 LOC"
           },
           {
@@ -173,7 +173,7 @@ const SystemOverview = () => (
       <h3 className="text-xl font-semibold mb-4">Key Features</h3>
       <div className="grid grid-cols-2 gap-3">
         {[
-          "Multi-tenant architecture",
+          "Loan application management",
           "Role-based access control",
           "Real-time data sync",
           "Custom field system",
@@ -255,7 +255,7 @@ const Architecture = () => (
           </p>
           <ul className="text-sm space-y-1 text-muted-foreground">
             <li>• PostgreSQL 15+ with PostGIS extensions</li>
-            <li>• Row Level Security (RLS) for multi-tenant data isolation</li>
+            <li>• Row Level Security (RLS) for organization data isolation</li>
             <li>• Database functions and triggers for business logic</li>
             <li>• Realtime subscriptions via PostgreSQL LISTEN/NOTIFY</li>
             <li>• Storage buckets for file management</li>
@@ -385,7 +385,7 @@ const DatabaseSchema = () => (
     <div>
       <h2 className="text-2xl font-bold mb-4">Database Schema</h2>
       <p className="text-muted-foreground mb-6">
-        PostgreSQL database with 50+ tables organized around multi-tenant architecture
+        PostgreSQL database with 50+ tables for loan origination and management
       </p>
     </div>
 

@@ -238,7 +238,7 @@ export function OnboardingDialog({ open, userRole, onComplete }: OnboardingDialo
           <div className="flex items-center gap-2 mb-2">
             <Sparkles className="h-5 w-5 text-primary" />
             <DialogTitle className="text-2xl">
-              {currentStep === 0 ? "Welcome to In-Sync!" : currentStepData.title}
+              {currentStep === 0 ? "Welcome to Junoon LOS!" : currentStepData.title}
             </DialogTitle>
           </div>
           <DialogDescription className="text-base">

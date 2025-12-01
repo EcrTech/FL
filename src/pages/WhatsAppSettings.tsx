@@ -190,7 +190,7 @@ const WhatsAppSettings = () => {
                 <Input
                   id="app-name"
                   type="text"
-                  placeholder="InSync"
+                  placeholder="Junoon LOS"
                   value={settings.app_name}
                   onChange={(e) =>
                     setSettings({ ...settings, app_name: e.target.value })

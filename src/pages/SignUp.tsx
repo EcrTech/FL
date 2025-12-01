@@ -65,7 +65,7 @@ export default function SignUp() {
 
       console.log("Auth user created successfully:", authData.user.id);
 
-      notify.success("Account created!", "Welcome to In-Sync");
+      notify.success("Account created!", "Welcome to Junoon LOS");
       navigate("/los/dashboard");
     } catch (error: any) {
       console.error("Signup error:", error);
@@ -78,7 +78,7 @@ export default function SignUp() {
   return (
     <AuthLayout 
       title="Create your account" 
-      subtitle="Start your journey with In-Sync"
+      subtitle="Start your journey with Junoon LOS"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">

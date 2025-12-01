@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
     }
 
     const fromEmail = `noreply@${emailSettings.sending_domain}`;
-    const fromName = 'In-Sync Meetings';
+    const fromName = 'Junoon LOS Meetings';
 
     // Format date and time
     const scheduledDate = new Date(activity.scheduled_at || Date.now());

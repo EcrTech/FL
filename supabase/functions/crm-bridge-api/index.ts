@@ -186,7 +186,7 @@ Deno.serve(async (req) => {
     return response;
 
   } catch (error) {
-    console.error('CRM Bridge API error:', error);
+    console.error('LOS Bridge API error:', error);
     const responseTime = Date.now() - startTime;
     return errorResponse(error instanceof Error ? error.message : 'Internal server error', 500, requestId);
   }

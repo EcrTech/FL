@@ -167,7 +167,7 @@ const OutboundWebhooks = () => {
           <div>
             <h1 className="text-3xl font-bold">Outbound Webhooks</h1>
             <p className="text-muted-foreground mt-1">
-              Send real-time data to external systems when events occur in your CRM
+              Send real-time data to external systems when events occur in your LOS
             </p>
           </div>
           <Button onClick={handleCreate}>

@@ -168,7 +168,7 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
         {orgLogo ? (
           <img src={orgLogo} alt="Organization Logo" className="h-12 object-contain" />
         ) : (
-          <h1 className="text-xl font-bold text-primary">In-Sync</h1>
+          <h1 className="text-xl font-bold text-primary">Junoon LOS</h1>
         )}
         <div className="flex items-center gap-2">
           <QuickDial />
@@ -199,7 +199,7 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
               {orgLogo ? (
                 <img src={orgLogo} alt="Organization Logo" className="h-16 object-contain mb-3" />
               ) : (
-                <h1 className="text-2xl font-bold gradient-text-primary">In-Sync</h1>
+                <h1 className="text-2xl font-bold gradient-text-primary">Junoon LOS</h1>
               )}
               <p className="text-sm text-muted-foreground text-center">{userName}</p>
               <div className="mt-4 w-full">

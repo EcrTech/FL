@@ -187,7 +187,7 @@ export function VariableMappingStep({
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="crm" id={`${tv.variable}-crm`} />
                     <Label htmlFor={`${tv.variable}-crm`} className="flex-1 flex items-center gap-2">
-                      <span>CRM Field</span>
+                      <span>Contact Field</span>
                       {mappings[tv.variable]?.source === 'crm' && (
                         <Select
                           value={mappings[tv.variable]?.field || ''}
@@ -301,7 +301,7 @@ export function VariableMappingStep({
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="crm" id={`${tv.variable}-crm`} />
                     <Label htmlFor={`${tv.variable}-crm`} className="flex-1 flex items-center gap-2">
-                      <span>CRM Field</span>
+                      <span>Contact Field</span>
                       {mappings[tv.variable]?.source === 'crm' && (
                         <Select
                           value={mappings[tv.variable]?.field || ''}
@@ -398,7 +398,7 @@ export function VariableMappingStep({
             <div>
               <h3 className="font-semibold">CSV Upload for Promotional Lists</h3>
               <p className="text-sm text-muted-foreground">
-                Upload custom recipient lists without adding them to your CRM
+                Upload custom recipient lists without adding them to your system
               </p>
             </div>
             <Button variant="outline" size="sm" onClick={downloadTemplate}>
@@ -410,7 +410,7 @@ export function VariableMappingStep({
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription className="text-sm">
-              <strong>Note:</strong> Recipients from CSV uploads will be used for this campaign only and will NOT be added to your CRM contacts. Perfect for promotional campaigns to external lists.
+              <strong>Note:</strong> Recipients from CSV uploads will be used for this campaign only and will NOT be added to your contact list. Perfect for promotional campaigns to external lists.
             </AlertDescription>
           </Alert>
 
