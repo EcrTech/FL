@@ -39,7 +39,7 @@ serve(async (req) => {
     // Get requesting user's profile and role
     const { data: requestingProfile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('org_id, is_platform_admin')
+      .select('org_id')
       .eq('id', user.id)
       .single();
 
@@ -51,24 +51,19 @@ serve(async (req) => {
       });
     }
 
-    // Allow either org admins/super_admins OR platform admins
-    if (!requestingProfile.is_platform_admin) {
-      const { data: userRole, error: roleError } = await supabaseAdmin
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .eq('org_id', requestingProfile.org_id)
-        .single();
+    // Check if user has admin or super_admin role
+    const { data: userRole, error: roleError } = await supabaseAdmin
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .single();
 
-      if (roleError || !userRole || !['admin', 'super_admin'].includes(userRole.role)) {
-        console.error('Role check failed for org admin:', roleError, userRole);
-        return new Response(JSON.stringify({ error: 'Insufficient permissions' }), {
-          status: 403,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-    } else {
-      console.log('Platform admin authorized for manage-user:', { user_id: user.id });
+    if (roleError || !userRole || !['admin', 'super_admin'].includes(userRole.role)) {
+      console.error('Role check failed:', roleError, userRole);
+      return new Response(JSON.stringify({ error: 'Insufficient permissions. Admin or super_admin role required.' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const requestingUserOrgId = requestingProfile.org_id;
