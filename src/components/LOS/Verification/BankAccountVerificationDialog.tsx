@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
-interface PANVerificationDialogProps {
+interface BankAccountVerificationDialogProps {
   open: boolean;
   onClose: () => void;
   applicationId: string;
@@ -19,23 +19,25 @@ interface PANVerificationDialogProps {
   existingVerification?: any;
 }
 
-export default function PANVerificationDialog({
+export default function BankAccountVerificationDialog({
   open,
   onClose,
   applicationId,
   orgId,
   applicant,
   existingVerification,
-}: PANVerificationDialogProps) {
+}: BankAccountVerificationDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const [formData, setFormData] = useState({
-    pan_number: existingVerification?.request_data?.pan_number || applicant?.pan_number || "",
-    name_on_pan: existingVerification?.response_data?.name_on_pan || "",
-    pan_status: existingVerification?.response_data?.pan_status || "valid",
-    name_match_result: existingVerification?.response_data?.name_match_result || "exact",
-    status: existingVerification?.status || "success",
+    account_number: existingVerification?.request_data?.account_number || "",
+    ifsc_code: existingVerification?.request_data?.ifsc_code || "",
+    account_holder_name: existingVerification?.response_data?.account_holder_name || "",
+    bank_name: existingVerification?.response_data?.bank_name || "",
+    branch_name: existingVerification?.response_data?.branch_name || "",
+    verify_type: "pennyless",
+    status: existingVerification?.status || "pending",
     remarks: existingVerification?.remarks || "",
   });
 
@@ -61,22 +63,24 @@ export default function PANVerificationDialog({
     },
   });
 
-  // Verify PAN via Sandbox API
+  // Verify Bank Account via Sandbox API
   const verifyMutation = useMutation({
     mutationFn: async () => {
       if (!accessToken) {
         throw new Error("Not authenticated. Please authenticate first.");
       }
-      if (!formData.pan_number || formData.pan_number.length !== 10) {
-        throw new Error("Please enter a valid 10-character PAN number");
+      if (!formData.account_number || !formData.ifsc_code) {
+        throw new Error("Please enter account number and IFSC code");
       }
 
-      const { data, error } = await supabase.functions.invoke('sandbox-pan-verify', {
+      const { data, error } = await supabase.functions.invoke('sandbox-bank-verify', {
         body: {
-          panNumber: formData.pan_number,
+          accountNumber: formData.account_number,
+          ifscCode: formData.ifsc_code,
           applicationId,
           orgId,
           accessToken,
+          verifyType: formData.verify_type,
         },
       });
 
@@ -85,14 +89,15 @@ export default function PANVerificationDialog({
     },
     onSuccess: (data) => {
       toast({
-        title: "PAN Verified",
-        description: "PAN details have been verified successfully",
+        title: "Bank Account Verified",
+        description: "Bank account details verified successfully",
       });
       // Update form with verified data
       setFormData(prev => ({
         ...prev,
-        name_on_pan: data.data.name || prev.name_on_pan,
-        pan_status: data.data.status || prev.pan_status,
+        account_holder_name: data.data.account_holder_name || prev.account_holder_name,
+        bank_name: data.data.bank_name || prev.bank_name,
+        branch_name: data.data.branch_name || prev.branch_name,
         status: data.verification_status,
       }));
       queryClient.invalidateQueries({ queryKey: ["loan-verifications", applicationId] });
@@ -101,7 +106,7 @@ export default function PANVerificationDialog({
       toast({
         variant: "destructive",
         title: "Verification Failed",
-        description: error.message || "Failed to verify PAN",
+        description: error.message || "Failed to verify bank account",
       });
     },
   });
@@ -111,14 +116,18 @@ export default function PANVerificationDialog({
       const verificationData = {
         loan_application_id: applicationId,
         applicant_id: applicant?.id,
-        verification_type: "pan",
-        verification_source: "nsdl",
+        verification_type: "bank_account",
+        verification_source: "sandbox",
         status: formData.status,
-        request_data: { pan_number: formData.pan_number },
+        request_data: {
+          account_number: formData.account_number,
+          ifsc_code: formData.ifsc_code,
+          verify_type: formData.verify_type,
+        },
         response_data: {
-          name_on_pan: formData.name_on_pan,
-          pan_status: formData.pan_status,
-          name_match_result: formData.name_match_result,
+          account_holder_name: formData.account_holder_name,
+          bank_name: formData.bank_name,
+          branch_name: formData.branch_name,
         },
         remarks: formData.remarks,
         verified_at: new Date().toISOString(),
@@ -139,7 +148,7 @@ export default function PANVerificationDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["loan-verifications", applicationId] });
-      toast({ title: "PAN verification saved successfully" });
+      toast({ title: "Bank account verification saved successfully" });
       onClose();
     },
     onError: (error: any) => {
@@ -155,14 +164,14 @@ export default function PANVerificationDialog({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>PAN Verification</DialogTitle>
+          <DialogTitle>Bank Account Verification</DialogTitle>
           <DialogDescription>
-            Manual entry for PAN card verification results
+            Verify bank account details via Sandbox API
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Authentication and API Verification Actions */}
+          {/* Authentication and Verification Actions */}
           <div className="space-y-2">
             {!accessToken ? (
               <Button
@@ -177,23 +186,47 @@ export default function PANVerificationDialog({
             ) : (
               <>
                 <div>
-                  <Label>PAN Number</Label>
+                  <Label>Verification Type</Label>
+                  <Select 
+                    value={formData.verify_type} 
+                    onValueChange={(value) => setFormData({ ...formData, verify_type: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pennyless">Penny-less Verification</SelectItem>
+                      <SelectItem value="pennydrop">Penny Drop Verification</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label>Account Number</Label>
                   <Input
-                    value={formData.pan_number}
-                    onChange={(e) => setFormData({ ...formData, pan_number: e.target.value.toUpperCase().slice(0, 10) })}
-                    placeholder="ABCDE1234F"
-                    maxLength={10}
+                    value={formData.account_number}
+                    onChange={(e) => setFormData({ ...formData, account_number: e.target.value })}
+                    placeholder="Enter account number"
                   />
                 </div>
-                
+
+                <div>
+                  <Label>IFSC Code</Label>
+                  <Input
+                    value={formData.ifsc_code}
+                    onChange={(e) => setFormData({ ...formData, ifsc_code: e.target.value.toUpperCase() })}
+                    placeholder="Enter IFSC code"
+                  />
+                </div>
+
                 <Button
                   onClick={() => verifyMutation.mutate()}
-                  disabled={!formData.pan_number || verifyMutation.isPending}
+                  disabled={!formData.account_number || !formData.ifsc_code || verifyMutation.isPending}
                   variant="default"
                   className="w-full"
                 >
                   {verifyMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Verify PAN via API
+                  Verify via API
                 </Button>
               </>
             )}
@@ -204,50 +237,30 @@ export default function PANVerificationDialog({
           </div>
 
           <div>
-            <Label>PAN Number</Label>
+            <Label>Account Holder Name</Label>
             <Input
-              value={formData.pan_number}
-              onChange={(e) => setFormData({ ...formData, pan_number: e.target.value.toUpperCase() })}
-              placeholder="ABCDE1234F"
-              maxLength={10}
+              value={formData.account_holder_name}
+              onChange={(e) => setFormData({ ...formData, account_holder_name: e.target.value })}
+              placeholder="As per bank records"
             />
           </div>
 
           <div>
-            <Label>Name on PAN</Label>
+            <Label>Bank Name</Label>
             <Input
-              value={formData.name_on_pan}
-              onChange={(e) => setFormData({ ...formData, name_on_pan: e.target.value })}
-              placeholder="Full name as per PAN"
+              value={formData.bank_name}
+              onChange={(e) => setFormData({ ...formData, bank_name: e.target.value })}
+              placeholder="Bank name"
             />
           </div>
 
           <div>
-            <Label>PAN Status</Label>
-            <Select value={formData.pan_status} onValueChange={(value) => setFormData({ ...formData, pan_status: value })}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="valid">Valid</SelectItem>
-                <SelectItem value="invalid">Invalid</SelectItem>
-                <SelectItem value="not_found">Not Found</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <Label>Name Match Result</Label>
-            <Select value={formData.name_match_result} onValueChange={(value) => setFormData({ ...formData, name_match_result: value })}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="exact">Exact Match</SelectItem>
-                <SelectItem value="partial">Partial Match</SelectItem>
-                <SelectItem value="no_match">No Match</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label>Branch Name</Label>
+            <Input
+              value={formData.branch_name}
+              onChange={(e) => setFormData({ ...formData, branch_name: e.target.value })}
+              placeholder="Branch name"
+            />
           </div>
 
           <div>
@@ -259,7 +272,7 @@ export default function PANVerificationDialog({
               <SelectContent>
                 <SelectItem value="success">Success</SelectItem>
                 <SelectItem value="failed">Failed</SelectItem>
-                <SelectItem value="in_progress">In Progress</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
               </SelectContent>
             </Select>
           </div>
