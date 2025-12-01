@@ -124,10 +124,11 @@ serve(async (req) => {
         });
       }
 
-      // Update profile with all fields
+      // Upsert profile so that a row definitely exists for FK constraints
       const { error: profileUpdateError } = await supabaseAdmin
         .from('profiles')
-        .update({
+        .upsert({
+          id: newUser.user.id,
           first_name,
           last_name,
           org_id: requestingUserOrgId,
@@ -137,8 +138,7 @@ serve(async (req) => {
           whatsapp_enabled: whatsapp_enabled || false,
           email_enabled: email_enabled || false,
           sms_enabled: sms_enabled || false,
-        })
-        .eq('id', newUser.user.id);
+        }, { onConflict: 'id' });
 
       if (profileUpdateError) {
         console.error('Error updating profile:', profileUpdateError);
