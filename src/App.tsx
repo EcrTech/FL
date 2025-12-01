@@ -6,7 +6,7 @@ import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
-import TechAdmin from "./pages/TechAdmin";
+
 import ReportBuilder from "./pages/ReportBuilder";
 import SavedReports from "./pages/SavedReports";
 import PipelineStages from "./pages/PipelineStages";
@@ -129,11 +129,6 @@ const App = () => (
             </ProtectedRoute>
           } />
           
-          <Route path="/admin" element={
-            <ProtectedRoute requiredRole="admin">
-              <TechAdmin />
-            </ProtectedRoute>
-          } />
           
           <Route path="/admin/pipeline-stages" element={
             <ProtectedRoute requiredRole="admin">
