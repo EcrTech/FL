@@ -2,6 +2,7 @@ import { ReactNode, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import logo from "@/assets/logo.png";
 import {
   LayoutDashboard,
   Settings,
@@ -154,11 +155,7 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
     <div className="min-h-screen bg-background">
       {/* Mobile header */}
       <div className="lg:hidden bg-card border-b border-border px-4 py-3 flex items-center justify-between">
-        {orgLogo ? (
-          <img src={orgLogo} alt="Organization Logo" className="h-12 object-contain" />
-        ) : (
-          <h1 className="text-xl font-bold text-primary">Junoon LOS</h1>
-        )}
+        <img src={orgLogo || logo} alt="Logo" className="h-12 object-contain" />
         <div className="flex items-center gap-2">
           <QuickDial />
           <NotificationBell />
@@ -185,12 +182,8 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
           <div className="h-full lg:h-screen flex flex-col overflow-y-auto">
             {/* Logo */}
             <div className="p-6 border-b border-border flex flex-col items-center bg-gradient-to-br from-primary/5 to-transparent">
-              {orgLogo ? (
-                <img src={orgLogo} alt="Organization Logo" className="h-16 object-contain mb-3" />
-              ) : (
-                <h1 className="text-2xl font-bold gradient-text-primary">Junoon LOS</h1>
-              )}
-              <p className="text-sm text-muted-foreground text-center">{userName}</p>
+              <img src={orgLogo || logo} alt="Logo" className="h-16 object-contain mb-3" />
+              <p className="text-sm font-medium text-foreground text-center">{userName}</p>
               <div className="mt-4 w-full">
                 <QuickDial />
               </div>
