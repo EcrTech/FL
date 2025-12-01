@@ -9,8 +9,6 @@ import Dashboard from "./pages/Dashboard";
 
 import ReportBuilder from "./pages/ReportBuilder";
 import SavedReports from "./pages/SavedReports";
-import PipelineStages from "./pages/PipelineStages";
-import CallDispositions from "./pages/CallDispositions";
 import Users from "./pages/Users";
 import Teams from "./pages/Teams";
 import Contacts from "./pages/Contacts";
@@ -21,8 +19,6 @@ import Reports from "./pages/Reports";
 import ApprovalMatrix from "./pages/ApprovalMatrix";
 import Designations from "./pages/Designations";
 import OrgChart from "./pages/OrgChart";
-import CustomFields from "./pages/CustomFields";
-import Forms from "./pages/Forms";
 import Connectors from "./pages/Connectors";
 import CallingDashboard from "./pages/CallingDashboard";
 import CallLogs from "./pages/CallLogs";
@@ -130,17 +126,6 @@ const App = () => (
           } />
           
           
-          <Route path="/admin/pipeline-stages" element={
-            <ProtectedRoute requiredRole="admin">
-              <PipelineStages />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/admin/call-dispositions" element={
-            <ProtectedRoute requiredRole="admin">
-              <CallDispositions />
-            </ProtectedRoute>
-          } />
           
           <Route path="/admin/approval-matrix" element={
             <ProtectedRoute requiredRole="admin">
@@ -154,17 +139,6 @@ const App = () => (
             </ProtectedRoute>
           } />
           
-          <Route path="/admin/custom-fields" element={
-            <ProtectedRoute requiredRole="admin">
-              <CustomFields />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/admin/forms" element={
-            <ProtectedRoute requiredRole="admin">
-              <Forms />
-            </ProtectedRoute>
-          } />
           
           <Route path="/admin/connectors" element={
             <ProtectedRoute requiredRole="admin">
