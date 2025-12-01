@@ -441,8 +441,8 @@ const BulkEmailSender = () => {
               <CardTitle>Step 2: Select Recipients</CardTitle>
               <p className="text-sm text-muted-foreground">
                 {csvData 
-                  ? `Using ${csvData.rows.length} recipients from CSV upload (promotional list - not added to CRM)` 
-                  : `${selectedContacts.size} of ${contacts.length} contacts selected from CRM`}
+                  ? `Using ${csvData.rows.length} recipients from CSV upload (promotional list - not added to system)` 
+                  : `${selectedContacts.size} of ${contacts.length} contacts selected`}
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -454,7 +454,7 @@ const BulkEmailSender = () => {
                       <div>
                         <h3 className="font-semibold">CSV List Uploaded</h3>
                         <p className="text-sm text-muted-foreground">
-                          {csvData.rows.length} recipients • These contacts will NOT be added to your CRM
+                          {csvData.rows.length} recipients • These contacts will NOT be added to your system
                         </p>
                       </div>
                       <Button 
@@ -465,7 +465,7 @@ const BulkEmailSender = () => {
                           setVariableMappings({});
                         }}
                       >
-                        Clear & Use CRM Contacts
+                        Clear & Use System Contacts
                       </Button>
                     </div>
                     <div className="text-xs text-muted-foreground mt-2">
@@ -495,7 +495,7 @@ const BulkEmailSender = () => {
                   </div>
                 </div>
               ) : (
-                // CRM Selection Mode
+                // System Selection Mode
                 <>
                   <div className="flex items-center space-x-2">
                     <Checkbox
@@ -580,7 +580,7 @@ const BulkEmailSender = () => {
                   </p>
                   {csvData && (
                     <p className="text-sm text-muted-foreground mt-1">
-                      ℹ️ These recipients will NOT be added to your CRM
+                      ℹ️ These recipients will NOT be added to your system
                     </p>
                   )}
                 </div>

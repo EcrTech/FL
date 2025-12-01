@@ -236,7 +236,7 @@ export default function ApiKeys() {
         <div>
           <h1 className="text-3xl font-bold">API Keys</h1>
           <p className="text-muted-foreground mt-1">
-            Manage secure API access to your CRM data
+            Manage secure API access to your LOS data
           </p>
         </div>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
@@ -250,7 +250,7 @@ export default function ApiKeys() {
             <DialogHeader>
               <DialogTitle>Create New API Key</DialogTitle>
               <DialogDescription>
-                Generate a new API key for external access to your CRM data
+                Generate a new API key for external access to your LOS data
               </DialogDescription>
             </DialogHeader>
 
@@ -503,7 +503,7 @@ export default function ApiKeys() {
                 <div>
                   <CardTitle>API Documentation</CardTitle>
                   <CardDescription>
-                    Learn how to use the CRM Bridge API
+                    Learn how to use the LOS Bridge API
                   </CardDescription>
                 </div>
                 <Button
@@ -1554,7 +1554,7 @@ useEffect(() => {
                 {/* MEDIUM PRIORITY SCHEMAS - PHASE 1 */}
                 <div className="bg-primary/5 border-l-4 border-primary p-6 mb-8 mt-12 rounded-r-lg">
                   <h4 className="text-xl font-bold mb-2 text-foreground">Phase 1: Medium Priority Schemas</h4>
-                  <p className="text-[14px] text-muted-foreground">Required for full CRM functionality and workflow management</p>
+                  <p className="text-[14px] text-muted-foreground">Required for full LOS functionality and workflow management</p>
                 </div>
 
                 {/* GET /pipeline-stages */}
@@ -1746,7 +1746,7 @@ useEffect(() => {
         "contact_id": "123e4567-e89b-12d3-a456-426614174000",
         "activity_type": "meeting",
         "subject": "Product Demo",
-        "description": "Demo of CRM features",
+        "description": "Demo of LOS features",
         "scheduled_at": "2025-11-15T14:00:00Z",
         "completed_at": null,
         "duration_minutes": 60,
@@ -2253,7 +2253,7 @@ Content-Type: application/json
               </div>
             </div>
           ) : (
-            // Default CRM Bridge API Documentation
+            // Default LOS Bridge API Documentation
             <div className="space-y-6">
               <div>
                 <h3 className="text-lg font-semibold mb-2">Authentication</h3>

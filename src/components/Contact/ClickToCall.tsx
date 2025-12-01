@@ -98,7 +98,7 @@ export const ClickToCall = ({ contactId, phoneNumber, contactName }: ClickToCall
           setDuration(0);
           notify.info(
             'Call Session Timeout',
-            'Call session timed out in CRM. Check call logs for actual call details.'
+            'Call session timed out in system. Check call logs for actual call details.'
           );
           clearInterval(interval);
         }

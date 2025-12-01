@@ -21,9 +21,9 @@ serve(async (req) => {
 
     // Handle search query - filter contacts based on criteria
     if (searchQuery && contacts) {
-      const searchSystemPrompt = `You are a CRM search assistant. Your task is to filter contacts based on natural language search queries that map to CRM fields.
+      const searchSystemPrompt = `You are a LOS search assistant. Your task is to filter contacts based on natural language search queries that map to contact fields.
 
-Available CRM fields:
+Available contact fields:
 - first_name, last_name: Contact name
 - company: Company name
 - job_title: Job title/designation
@@ -46,7 +46,7 @@ Examples:
 - "designation Manager" -> Match job_title containing "Manager"
 - "company in Mumbai" -> Match city = "Mumbai"
 - "designation Manager, company in Mumbai" -> Match both conditions
-- "age 30-40" -> You cannot filter by age as it's not a CRM field, return empty array
+- "age 30-40" -> You cannot filter by age as it's not a contact field, return empty array
 - "source LinkedIn" -> Match source = "LinkedIn"`;
 
       const contactsSummary = contacts.map((c: any) => ({

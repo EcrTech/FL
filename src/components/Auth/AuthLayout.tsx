@@ -25,8 +25,8 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
           <div className="relative inline-block mx-auto mb-6">
             <img 
               src={logo} 
-              alt="In-Sync Logo" 
-              className="w-[168px] h-[168px] object-contain transition-all duration-500 hover:scale-105 relative z-10" 
+              alt="Junoon LOS Logo" 
+              className="w-[168px] h-[168px] object-contain transition-all duration-500 hover:scale-105 relative z-10"
               style={{ 
                 filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.15)) brightness(1.05)',
               }} 
@@ -48,7 +48,7 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
         </div>
         
         <p className="text-center text-sm text-muted-foreground mt-8">
-          © 2025 In-Sync. All rights reserved.
+          © 2025 Junoon LOS. All rights reserved.
         </p>
       </div>
     </div>

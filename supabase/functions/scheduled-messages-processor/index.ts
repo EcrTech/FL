@@ -290,7 +290,7 @@ Deno.serve(async (req) => {
                   'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                  from: 'In-Sync Reminders <noreply@in-sync.co.in>',
+                  from: 'Junoon LOS Reminders <noreply@junoon.app>',
                   to: recipient.email,
                   subject: `Reminder: ${activity.activity_type} in 30 minutes - ${activity.subject || 'Activity'}`,
                   html: emailHtml

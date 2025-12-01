@@ -219,7 +219,7 @@ export default function BulkWhatsAppSender() {
           };
         });
       } else {
-        // Use selected contacts from CRM
+        // Use selected contacts from system
         const selectedContactsList = contacts.filter(c => selectedContacts.has(c.id));
         const uniqueContacts = selectedContactsList.filter((contact, index, self) => 
           self.findIndex(c => c.phone === contact.phone) === index
@@ -405,8 +405,8 @@ export default function BulkWhatsAppSender() {
             <CardTitle>Select Recipients</CardTitle>
             <CardDescription>
               {csvData 
-                ? `Using ${csvData.rows.length} recipients from CSV upload (promotional list - not added to CRM)`
-                : 'Choose contacts from your CRM or upload a CSV file for promotional campaigns'}
+                ? `Using ${csvData.rows.length} recipients from CSV upload (promotional list - not added to system)`
+                : 'Choose contacts from your system or upload a CSV file for promotional campaigns'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -418,7 +418,7 @@ export default function BulkWhatsAppSender() {
                     <div>
                       <h3 className="font-semibold">CSV List Uploaded</h3>
                       <p className="text-sm text-muted-foreground">
-                        {csvData.rows.length} recipients • These contacts will NOT be added to your CRM
+                        {csvData.rows.length} recipients • These contacts will NOT be added to your system
                       </p>
                     </div>
                     <Button 
@@ -429,7 +429,7 @@ export default function BulkWhatsAppSender() {
                         setVariableMappings({});
                       }}
                     >
-                      Clear & Use CRM Contacts
+                      Clear & Use System Contacts
                     </Button>
                   </div>
                   <div className="text-xs text-muted-foreground mt-2">
@@ -459,7 +459,7 @@ export default function BulkWhatsAppSender() {
                 </div>
               </div>
             ) : (
-              // CRM Selection Mode
+              // System Selection Mode
               <>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
@@ -560,12 +560,12 @@ export default function BulkWhatsAppSender() {
               )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Data Source:</span>
-                <span className="font-medium">{csvData ? 'CSV Upload' : 'CRM Contacts'}</span>
+                <span className="font-medium">{csvData ? 'CSV Upload' : 'System Contacts'}</span>
               </div>
               {csvData && (
                 <div className="bg-muted p-3 rounded-lg">
                   <p className="text-sm text-muted-foreground">
-                    ℹ️ Recipients from CSV will be used for this campaign only and will NOT be added to your CRM
+                    ℹ️ Recipients from CSV will be used for this campaign only and will NOT be added to your system
                   </p>
                 </div>
               )}

@@ -350,7 +350,7 @@ export function WebhookConfig({
         <CardHeader>
           <CardTitle className="text-base">Field Mappings</CardTitle>
           <CardDescription>
-            Map incoming webhook fields to your CRM fields
+            Map incoming webhook fields to your LOS fields
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
