@@ -67,12 +67,11 @@ export default function ApplicationDetail() {
           *,
           contacts(first_name, last_name, email, phone),
           assigned_profile:profiles!assigned_to(first_name, last_name),
-          loan_applicants(*),
-          loan_employment_details(*)
+          loan_applicants(*)
         `)
         .eq("id", id)
         .eq("org_id", orgId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       return data;
@@ -107,9 +106,6 @@ export default function ApplicationDetail() {
   }
 
   const primaryApplicant = application.loan_applicants?.[0];
-  const employment = Array.isArray(application.loan_employment_details) 
-    ? application.loan_employment_details[0] 
-    : application.loan_employment_details;
 
   return (
     <DashboardLayout>
@@ -270,54 +266,6 @@ export default function ApplicationDetail() {
                 )}
               </CardContent>
             </Card>
-
-            {employment && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Employment Details</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">Employer Name</label>
-                      <p className="text-sm">{(employment.employer_name as string) || "N/A"}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">Designation</label>
-                      <p className="text-sm">{(employment.designation as string) || "N/A"}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">Date of Joining</label>
-                      <p className="text-sm">
-                        {employment.date_of_joining
-                          ? format(new Date(employment.date_of_joining as string), "MMM dd, yyyy")
-                          : "N/A"}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">Total Experience</label>
-                      <p className="text-sm">{(employment.total_experience as number) || "N/A"} years</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">Gross Monthly Salary</label>
-                      <p className="text-sm">
-                        {employment.gross_monthly_salary
-                          ? formatCurrency(employment.gross_monthly_salary as number)
-                          : "N/A"}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">Net Monthly Salary</label>
-                      <p className="text-sm">
-                        {employment.net_monthly_salary
-                          ? formatCurrency(employment.net_monthly_salary as number)
-                          : "N/A"}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </TabsContent>
 
           <TabsContent value="documents">
