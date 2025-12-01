@@ -301,16 +301,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                 </Link>
               )}
 
-              {canAccessFeature("documentation") && (
-                <Link
-                  to="/documentation"
-                  className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <FileText size={20} />
-                  <span>Documentation</span>
-                </Link>
-              )}
 
               {/* Sales & Operations Section */}
               {showOperationsSection && (
@@ -593,16 +583,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                     </Link>
                   )}
                   
-                  {canAccessFeature("api_keys") && (
-                    <Link
-                      to="/admin/api-keys"
-                      className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
-                      onClick={() => setSidebarOpen(false)}
-                    >
-                      <Key size={20} />
-                      <span>API Keys</span>
-                    </Link>
-                  )}
                 </>
               )}
             </nav>

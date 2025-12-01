@@ -46,11 +46,9 @@ import EmailAutomations from "./pages/EmailAutomations";
 import EmailAutomationSettings from "./pages/EmailAutomationSettings";
 import CampaignOverview from "./pages/Campaigns/CampaignOverview";
 import AIInsightsDashboard from "./pages/Campaigns/AIInsightsDashboard";
-import Documentation from "./pages/Documentation";
 import RedefineDataRepository from "./pages/RedefineDataRepository";
 import CommunicationSettings from "./pages/CommunicationSettings";
 import Inventory from "./pages/Inventory";
-import ApiKeys from "./pages/ApiKeys";
 import OutboundWebhooks from "./pages/OutboundWebhooks";
 import Tasks from "./pages/Tasks";
 import Applications from "./pages/LOS/Applications";
@@ -179,11 +177,6 @@ const App = () => (
             </ProtectedRoute>
           } />
           
-          <Route path="/admin/api-keys" element={
-            <ProtectedRoute requiredRole="admin">
-              <ApiKeys />
-            </ProtectedRoute>
-          } />
           
           <Route path="/admin/outbound-webhooks" element={
             <ProtectedRoute requiredRole="admin">
@@ -299,11 +292,6 @@ const App = () => (
             </ProtectedRoute>
           } />
           
-          <Route path="/documentation" element={
-            <ProtectedRoute>
-              <Documentation />
-            </ProtectedRoute>
-          } />
           
           <Route path="/redefine-repository" element={
             <ProtectedRoute>
