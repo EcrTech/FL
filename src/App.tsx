@@ -18,7 +18,6 @@ import PipelineAdvancedSearch from "./pages/PipelineAdvancedSearch";
 import Reports from "./pages/Reports";
 import ApprovalMatrix from "./pages/ApprovalMatrix";
 import Designations from "./pages/Designations";
-import OrgChart from "./pages/OrgChart";
 import Connectors from "./pages/Connectors";
 import CallingDashboard from "./pages/CallingDashboard";
 import CallLogs from "./pages/CallLogs";
@@ -43,7 +42,6 @@ import EmailAutomationSettings from "./pages/EmailAutomationSettings";
 import CampaignOverview from "./pages/Campaigns/CampaignOverview";
 import AIInsightsDashboard from "./pages/Campaigns/AIInsightsDashboard";
 import RedefineDataRepository from "./pages/RedefineDataRepository";
-import CommunicationSettings from "./pages/CommunicationSettings";
 import Inventory from "./pages/Inventory";
 import OutboundWebhooks from "./pages/OutboundWebhooks";
 import Tasks from "./pages/Tasks";
@@ -150,18 +148,6 @@ const App = () => (
           <Route path="/admin/outbound-webhooks" element={
             <ProtectedRoute requiredRole="admin">
               <OutboundWebhooks />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/org-chart" element={
-            <ProtectedRoute>
-              <OrgChart />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/admin/communication-settings" element={
-            <ProtectedRoute requiredRole="admin">
-              <CommunicationSettings />
             </ProtectedRoute>
           } />
           
