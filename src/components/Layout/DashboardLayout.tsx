@@ -143,16 +143,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
     canAccessFeature("templates")
   );
   
-  const showAdminMainSection = isAdmin && (
-    canAccessFeature("organization_settings") || 
-    canAccessFeature("pipeline_stages") || 
-    canAccessFeature("calling") || 
-    canAccessFeature("approval_matrix") ||
-    canAccessFeature("designations") || 
-    canAccessFeature("custom_fields") || 
-    canAccessFeature("forms")
-  );
-  
   const showManagementSection = isManager && (
     canAccessFeature("users") || 
     canAccessFeature("teams") || 
@@ -456,59 +446,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
 
               {isAdmin && (
                 <>
-                  {showAdminMainSection && (
-                    <div className="pt-4 pb-2 section-accent-teal pl-4">
-                      <p className="px-4 text-xs font-semibold uppercase tracking-wider gradient-text-primary">
-                        Configuration
-                      </p>
-                    </div>
-                  )}
-                  
-                  
-                  {canAccessFeature("pipeline_stages") && (
-                    <Link
-                      to="/admin/pipeline-stages"
-                      className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
-                      onClick={() => setSidebarOpen(false)}
-                    >
-                      <Layers size={20} />
-                      <span>Pipeline Stages</span>
-                    </Link>
-                  )}
-                  
-                  {canAccessFeature("custom_fields") && (
-                    <Link
-                      to="/admin/custom-fields"
-                      className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
-                      onClick={() => setSidebarOpen(false)}
-                    >
-                      <Sliders size={20} />
-                      <span>Custom Fields</span>
-                    </Link>
-                  )}
-                  
-                  {canAccessFeature("forms") && (
-                    <Link
-                      to="/admin/forms"
-                      className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
-                      onClick={() => setSidebarOpen(false)}
-                    >
-                      <FileText size={20} />
-                      <span>Forms</span>
-                    </Link>
-                  )}
-                  
-                  {canAccessFeature("calling") && (
-                    <Link
-                      to="/admin/call-dispositions"
-                      className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
-                      onClick={() => setSidebarOpen(false)}
-                    >
-                      <PhoneCall size={20} />
-                      <span>Call Dispositions</span>
-                    </Link>
-                  )}
-                  
                   {showAdminCommunicationSection && (
                     <div className="pt-4 pb-2 section-accent-teal pl-4">
                       <p className="px-4 text-xs font-semibold uppercase tracking-wider gradient-text-primary">
