@@ -147,8 +147,7 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
     canAccessFeature("users") || 
     canAccessFeature("teams") || 
     canAccessFeature("designations") || 
-    canAccessFeature("approval_matrix") ||
-    canAccessFeature("org_chart")
+    canAccessFeature("approval_matrix")
   );
 
   return (
@@ -430,16 +429,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                       <span>Approval Matrix</span>
                     </Link>
                   )}
-                  {canAccessFeature("org_chart") && (
-                    <Link
-                      to="/org-chart"
-                      className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
-                      onClick={() => setSidebarOpen(false)}
-                    >
-                      <Network size={20} />
-                      <span>Org Chart</span>
-                    </Link>
-                  )}
                 </>
               )}
 
@@ -452,17 +441,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                         Communication Setup
                       </p>
                     </div>
-                  )}
-                  
-                  {(canAccessFeature("campaigns_whatsapp") || canAccessFeature("email_settings") || canAccessFeature("calling")) && (
-                    <Link
-                      to="/admin/communication-settings"
-                      className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
-                      onClick={() => setSidebarOpen(false)}
-                    >
-                      <Settings size={20} />
-                      <span>Communication Settings</span>
-                    </Link>
                   )}
                   
                   {canAccessFeature("templates") && (
