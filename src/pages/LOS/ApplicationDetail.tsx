@@ -87,6 +87,22 @@ export default function ApplicationDetail() {
     }).format(amount);
   };
 
+  const formatAddress = (address: any) => {
+    if (!address) return "N/A";
+    if (typeof address === "string") return address;
+    
+    // If address is an object with structured fields
+    const parts = [
+      address.line1,
+      address.line2,
+      address.city,
+      address.state,
+      address.pincode
+    ].filter(Boolean);
+    
+    return parts.length > 0 ? parts.join(", ") : "N/A";
+  };
+
   if (isLoading) {
     return (
       <DashboardLayout>
@@ -260,7 +276,7 @@ export default function ApplicationDetail() {
                     </div>
                     <div className="md:col-span-2">
                       <label className="text-sm font-medium text-muted-foreground">Current Address</label>
-                      <p className="text-sm">{(primaryApplicant.current_address as string) || "N/A"}</p>
+                      <p className="text-sm">{formatAddress(primaryApplicant.current_address)}</p>
                     </div>
                   </div>
                 )}
