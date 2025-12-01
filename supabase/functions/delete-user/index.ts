@@ -80,8 +80,6 @@ Deno.serve(async (req) => {
     await supabaseClient.from('contact_activities').delete().eq('created_by', userId)
     await supabaseClient.from('contacts').delete().eq('created_by', userId)
     await supabaseClient.from('contacts').delete().eq('assigned_to', userId)
-    await supabaseClient.from('org_invites').delete().eq('invited_by', userId)
-    await supabaseClient.from('org_invites').delete().eq('used_by', userId)
     await supabaseClient.from('team_members').delete().eq('user_id', userId)
     await supabaseClient.from('teams').delete().eq('manager_id', userId)
     await supabaseClient.from('profiles').delete().eq('id', userId)

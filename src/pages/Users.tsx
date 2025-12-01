@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, Mail, Phone, MessageSquare, PhoneCall, Link as LinkIcon, Copy } from "lucide-react";
+import { Plus, Pencil, Trash2, Mail, Phone, MessageSquare, PhoneCall } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useOrgContext } from "@/hooks/useOrgContext";
 import { useDialogState } from "@/hooks/useDialogState";
@@ -82,8 +82,6 @@ const initialFormData: UserFormData = {
 export default function Users() {
   const [users, setUsers] = useState<UserRole[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
-  const [inviteLink, setInviteLink] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; userId: string; roleId: string; hardDelete: boolean }>({
     open: false,
     userId: "",
@@ -353,46 +351,6 @@ export default function Users() {
     });
   };
 
-  const generateInviteLink = async (role: string, email?: string) => {
-    if (!orgId) {
-      notification.error("Error", "Organization context not available");
-      return;
-    }
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-
-      const inviteCode = crypto.randomUUID();
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiry
-
-      const { error } = await supabase
-        .from("org_invites" as any)
-        .insert([{
-          org_id: orgId,
-          invited_by: user?.id,
-          invite_code: inviteCode,
-          email: email || null,
-          role: role,
-          expires_at: expiresAt.toISOString(),
-        }]);
-
-      if (error) throw error;
-
-      const link = `https://los.junoon.app/signup?invite=${inviteCode}`;
-      setInviteLink(link);
-      setIsInviteDialogOpen(true);
-
-      notification.success("Invite link generated", "Share this link with the person you want to invite");
-    } catch (error: any) {
-      notification.error("Error", error.message);
-    }
-  };
-
-  const copyInviteLink = () => {
-    navigator.clipboard.writeText(inviteLink);
-    notification.success("Copied!", "Invite link copied to clipboard");
-  };
 
   const getRoleBadgeColor = (role: string) => {
     const colors: Record<string, string> = {
@@ -425,53 +383,6 @@ export default function Users() {
           </div>
           {canManageUsers() && (
             <div className="flex gap-2">
-              <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline">
-                    <LinkIcon className="mr-2 h-4 w-4" />
-                    Generate Invite Link
-                  </Button>
-                </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Generate Invite Link</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Select Role</Label>
-                    <Select onValueChange={(role) => generateInviteLink(role)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Choose a role" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="sales_agent">Sales Agent</SelectItem>
-                        <SelectItem value="sales_manager">Sales Manager</SelectItem>
-                        <SelectItem value="support_agent">Support Agent</SelectItem>
-                        <SelectItem value="support_manager">Support Manager</SelectItem>
-                        <SelectItem value="analyst">Analyst</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  {inviteLink && (
-                    <div className="space-y-2">
-                      <Label>Invite Link</Label>
-                      <div className="flex gap-2">
-                        <Input value={inviteLink} readOnly />
-                        <Button onClick={copyInviteLink} size="icon" variant="outline">
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        This link expires in 7 days
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </DialogContent>
-              </Dialog>
-
               <Dialog open={dialog.isOpen} onOpenChange={(open) => (open ? dialog.openDialog() : dialog.closeDialog())}>
                 <DialogTrigger asChild>
                   <Button>

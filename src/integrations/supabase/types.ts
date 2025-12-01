@@ -6738,10 +6738,6 @@ export type Database = {
         Args: { _org_id: string }
         Returns: undefined
       }
-      create_organization_for_user: {
-        Args: { p_org_name: string; p_org_slug: string; p_user_id: string }
-        Returns: string
-      }
       deduct_from_wallet: {
         Args: {
           _amount: number
@@ -6764,7 +6760,6 @@ export type Database = {
         Returns: boolean
       }
       generate_loan_application_number: { Args: never; Returns: string }
-      generate_unique_slug: { Args: { base_slug: string }; Returns: string }
       generate_webhook_token: { Args: never; Returns: string }
       get_active_pricing: {
         Args: never
