@@ -49,7 +49,7 @@ export default function SignUp() {
         email: formData.email,
         password: formData.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/dashboard`,
+          emailRedirectTo: `${window.location.origin}/los/dashboard`,
           data: {
             first_name: formData.firstName,
             last_name: formData.lastName,
@@ -66,7 +66,7 @@ export default function SignUp() {
       console.log("Auth user created successfully:", authData.user.id);
 
       notify.success("Account created!", "Welcome to In-Sync");
-      navigate("/dashboard");
+      navigate("/los/dashboard");
     } catch (error: any) {
       console.error("Signup error:", error);
       notify.error("Sign up failed", error);

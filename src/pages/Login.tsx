@@ -26,8 +26,8 @@ export default function Login() {
       if (!mounted) return;
       console.log("Login - Auth state change:", event, session ? "Session exists" : "No session");
       if (event === 'SIGNED_IN' && session) {
-        console.log("Login - User signed in, redirecting to dashboard");
-        navigate("/dashboard", { replace: true });
+        console.log("Login - User signed in, redirecting to LOS dashboard");
+        navigate("/los/dashboard", { replace: true });
       }
     });
 
@@ -36,8 +36,8 @@ export default function Login() {
       if (!mounted) return;
       console.log("Login - Initial session check:", session ? "Session exists" : "No session");
       if (session) {
-        console.log("Login - Redirecting to dashboard");
-        navigate("/dashboard", { replace: true });
+        console.log("Login - Redirecting to LOS dashboard");
+        navigate("/los/dashboard", { replace: true });
       }
     });
 
