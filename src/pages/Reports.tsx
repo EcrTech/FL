@@ -3,18 +3,20 @@ import { supabase } from "@/integrations/supabase/client";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, Calendar, Plus, Phone, Target, TrendingUp, Users } from "lucide-react";
+import { Download, CalendarIcon, Phone, Target, TrendingUp } from "lucide-react";
 import { useNotification } from "@/hooks/useNotification";
 import { useNavigate } from "react-router-dom";
 import { useOrgContext } from "@/hooks/useOrgContext";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import CampaignAnalyticsTab from "@/components/Reports/Analytics/CampaignAnalyticsTab";
-
 import CallingDashboardTab from "@/components/Reports/CallingDashboard/CallingDashboardTab";
+import { format, subDays } from "date-fns";
+import { cn } from "@/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 
 interface SalesReport {
   user_name: string;
@@ -34,8 +36,9 @@ interface PipelineReport {
 
 export default function Reports() {
   const navigate = useNavigate();
-  const [dateRange, setDateRange] = useState<"week" | "month" | "quarter">("month");
-  const [activeTab, setActiveTab] = useState<string>("calling");
+  const [fromDate, setFromDate] = useState<Date>(subDays(new Date(), 30));
+  const [toDate, setToDate] = useState<Date>(new Date());
+  const [activeTab, setActiveTab] = useState<string>("sales");
   const notify = useNotification();
   const { orgId } = useOrgContext();
 
@@ -56,29 +59,15 @@ export default function Reports() {
     window.location.hash = activeTab;
   }, [activeTab]);
 
-  // Calculate date range
-  const getStartDate = () => {
-    const now = new Date();
-    const startDate = new Date();
-    if (dateRange === "week") {
-      startDate.setDate(now.getDate() - 7);
-    } else if (dateRange === "month") {
-      startDate.setMonth(now.getMonth() - 1);
-    } else {
-      startDate.setMonth(now.getMonth() - 3);
-    }
-    return startDate;
-  };
-
   // Optimized sales reports query - single database call instead of N+1
   const { data: salesReports = [], isLoading: salesLoading } = useQuery({
-    queryKey: ['sales-reports', dateRange, orgId],
+    queryKey: ['sales-reports', fromDate, toDate, orgId],
     queryFn: async () => {
       if (!orgId) return [];
       
       const { data, error } = await supabase.rpc('get_sales_performance_report', {
         p_org_id: orgId,
-        p_start_date: getStartDate().toISOString(),
+        p_start_date: fromDate.toISOString(),
       });
 
       if (error) throw error;
@@ -121,58 +110,89 @@ export default function Reports() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${filename}_${dateRange}.csv`;
+    a.download = `${filename}_${format(fromDate, 'yyyy-MM-dd')}_to_${format(toDate, 'yyyy-MM-dd')}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
 
-    notify.success("Export successful", `Report exported as ${filename}_${dateRange}.csv`);
+    notify.success("Export successful", `Report exported as ${filename}.csv`);
   };
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Dashboard</h1>
+            <h1 className="text-3xl font-bold">Sales Dashboard</h1>
             <p className="text-muted-foreground mt-1">
-              Unified view of calls performance, campaigns, and sales analytics
+              Unified view of sales performance, campaigns, and call analytics
             </p>
           </div>
-          <Select value={dateRange} onValueChange={(value: any) => setDateRange(value)}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="week">Last Week</SelectItem>
-              <SelectItem value="month">Last Month</SelectItem>
-              <SelectItem value="quarter">Last Quarter</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-[140px] justify-start text-left font-normal",
+                    !fromDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {fromDate ? format(fromDate, "dd MMM yyyy") : "From"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={fromDate}
+                  onSelect={(date) => date && setFromDate(date)}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
+            <span className="text-muted-foreground">to</span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-[140px] justify-start text-left font-normal",
+                    !toDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {toDate ? format(toDate, "dd MMM yyyy") : "To"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={toDate}
+                  onSelect={(date) => date && setToDate(date)}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="calling">
-              <Phone className="h-4 w-4 mr-2" />
-              Calls Performance
+            <TabsTrigger value="sales">
+              <Target className="h-4 w-4 mr-2" />
+              Sales Performance
             </TabsTrigger>
             <TabsTrigger value="campaigns">
               <TrendingUp className="h-4 w-4 mr-2" />
               Campaign Analytics
             </TabsTrigger>
-            <TabsTrigger value="sales">
-              <Target className="h-4 w-4 mr-2" />
-              Sales Performance
+            <TabsTrigger value="calling">
+              <Phone className="h-4 w-4 mr-2" />
+              Calls Performance
             </TabsTrigger>
           </TabsList>
-
-          <TabsContent value="calling" className="space-y-4">
-            <CallingDashboardTab />
-          </TabsContent>
-
-          <TabsContent value="campaigns" className="space-y-4">
-            <CampaignAnalyticsTab />
-          </TabsContent>
 
           <TabsContent value="sales" className="space-y-4">
             <div className="space-y-6">
@@ -381,6 +401,14 @@ export default function Reports() {
         </Tabs>
       </div>
     </TabsContent>
+
+          <TabsContent value="campaigns" className="space-y-4">
+            <CampaignAnalyticsTab />
+          </TabsContent>
+
+          <TabsContent value="calling" className="space-y-4">
+            <CallingDashboardTab />
+          </TabsContent>
   </Tabs>
       </div>
     </DashboardLayout>
