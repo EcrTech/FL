@@ -1,0 +1,351 @@
+import { createClient } from 'npm:@supabase/supabase-js@2.58.0';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+interface RateLimitEntry {
+  count: number;
+  firstRequest: number;
+}
+
+// In-memory rate limiting (resets on function cold start)
+const rateLimitMap = new Map<string, RateLimitEntry>();
+const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+const MAX_REQUESTS_PER_WINDOW = 3;
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  
+  if (!entry) {
+    rateLimitMap.set(ip, { count: 1, firstRequest: now });
+    return true;
+  }
+  
+  if (now - entry.firstRequest > RATE_LIMIT_WINDOW_MS) {
+    rateLimitMap.set(ip, { count: 1, firstRequest: now });
+    return true;
+  }
+  
+  if (entry.count >= MAX_REQUESTS_PER_WINDOW) {
+    return false;
+  }
+  
+  entry.count++;
+  return true;
+}
+
+function validatePAN(pan: string): boolean {
+  return /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(pan?.toUpperCase() || '');
+}
+
+function validateAadhaar(aadhaar: string): boolean {
+  return /^[0-9]{12}$/.test(aadhaar?.replace(/\s/g, '') || '');
+}
+
+function validatePhone(phone: string): boolean {
+  return /^[6-9][0-9]{9}$/.test(phone?.replace(/\s/g, '') || '');
+}
+
+function validateEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email || '');
+}
+
+function generateApplicationNumber(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const random = String(Math.floor(Math.random() * 99999)).padStart(5, '0');
+  return `LA-${year}${month}-${random}`;
+}
+
+Deno.serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Get client IP for rate limiting
+    const clientIP = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 
+                     req.headers.get('cf-connecting-ip') || 
+                     'unknown';
+
+    console.log(`[submit-loan-application] Request from IP: ${clientIP}`);
+
+    // Check rate limit
+    if (!checkRateLimit(clientIP)) {
+      console.log(`[submit-loan-application] Rate limit exceeded for IP: ${clientIP}`);
+      return new Response(
+        JSON.stringify({ error: 'Too many requests. Please try again in a few minutes.' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const body = await req.json();
+    console.log(`[submit-loan-application] Processing application for slug: ${body.formSlug}`);
+
+    // Bot detection - check honeypot field
+    if (body.honeypot) {
+      console.log('[submit-loan-application] Bot detected via honeypot');
+      return new Response(
+        JSON.stringify({ error: 'Invalid submission' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Bot detection - check form fill time (minimum 5 seconds)
+    const formStartTime = body.formStartTime;
+    if (formStartTime && Date.now() - formStartTime < 5000) {
+      console.log('[submit-loan-application] Bot detected via timing');
+      return new Response(
+        JSON.stringify({ error: 'Please take your time filling the form' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate form slug and get form config
+    const { data: formConfig, error: formError } = await supabase
+      .from('loan_application_forms')
+      .select('*')
+      .eq('slug', body.formSlug)
+      .eq('is_active', true)
+      .single();
+
+    if (formError || !formConfig) {
+      console.log(`[submit-loan-application] Form not found: ${body.formSlug}`);
+      return new Response(
+        JSON.stringify({ error: 'Application form not found or inactive' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate required fields
+    const errors: string[] = [];
+
+    // Personal details validation
+    if (!body.personalDetails?.fullName?.trim()) {
+      errors.push('Full name is required');
+    }
+    if (!validatePAN(body.personalDetails?.panNumber)) {
+      errors.push('Invalid PAN number format');
+    }
+    if (!validateAadhaar(body.personalDetails?.aadhaarNumber)) {
+      errors.push('Invalid Aadhaar number format');
+    }
+    if (!validatePhone(body.personalDetails?.mobile)) {
+      errors.push('Invalid mobile number format');
+    }
+    if (!validateEmail(body.personalDetails?.email)) {
+      errors.push('Invalid email format');
+    }
+
+    // Loan details validation
+    const loanAmount = parseFloat(body.loanDetails?.amount);
+    if (isNaN(loanAmount) || loanAmount < 10000 || loanAmount > 5000000) {
+      errors.push('Loan amount must be between ₹10,000 and ₹50,00,000');
+    }
+
+    if (!body.loanDetails?.tenure || body.loanDetails.tenure < 6 || body.loanDetails.tenure > 84) {
+      errors.push('Tenure must be between 6 and 84 months');
+    }
+
+    // Address validation
+    if (!body.addressDetails?.currentAddress?.addressLine1?.trim()) {
+      errors.push('Current address is required');
+    }
+    if (!body.addressDetails?.currentAddress?.city?.trim()) {
+      errors.push('City is required');
+    }
+    if (!body.addressDetails?.currentAddress?.pincode?.trim()) {
+      errors.push('Pincode is required');
+    }
+
+    // Employment validation
+    if (!body.employmentDetails?.employerName?.trim()) {
+      errors.push('Employer name is required');
+    }
+    if (!body.employmentDetails?.grossSalary || body.employmentDetails.grossSalary <= 0) {
+      errors.push('Gross salary is required');
+    }
+
+    if (errors.length > 0) {
+      console.log(`[submit-loan-application] Validation errors:`, errors);
+      return new Response(
+        JSON.stringify({ error: 'Validation failed', details: errors }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Generate application number
+    const applicationNumber = generateApplicationNumber();
+    console.log(`[submit-loan-application] Generated application number: ${applicationNumber}`);
+
+    // Upload documents to storage
+    const uploadedDocuments: Array<{ type: string; path: string; name: string }> = [];
+    
+    if (body.documents && Array.isArray(body.documents)) {
+      for (const doc of body.documents) {
+        if (doc.base64 && doc.name && doc.type) {
+          try {
+            // Decode base64
+            const base64Data = doc.base64.split(',')[1] || doc.base64;
+            const binaryData = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+            
+            // Generate unique filename
+            const ext = doc.name.split('.').pop() || 'pdf';
+            const fileName = `${formConfig.org_id}/${applicationNumber}/${doc.type}_${Date.now()}.${ext}`;
+            
+            const { error: uploadError } = await supabase.storage
+              .from('loan-documents')
+              .upload(fileName, binaryData, {
+                contentType: doc.mimeType || 'application/octet-stream',
+                upsert: false
+              });
+
+            if (uploadError) {
+              console.error(`[submit-loan-application] Upload error for ${doc.type}:`, uploadError);
+            } else {
+              uploadedDocuments.push({
+                type: doc.type,
+                path: fileName,
+                name: doc.name
+              });
+              console.log(`[submit-loan-application] Uploaded document: ${fileName}`);
+            }
+          } catch (uploadErr) {
+            console.error(`[submit-loan-application] Document upload failed:`, uploadErr);
+          }
+        }
+      }
+    }
+
+    // Create loan application
+    const { data: application, error: appError } = await supabase
+      .from('loan_applications')
+      .insert({
+        org_id: formConfig.org_id,
+        form_id: formConfig.id,
+        application_number: applicationNumber,
+        product_type: formConfig.product_type,
+        loan_amount: loanAmount,
+        tenure_months: body.loanDetails.tenure,
+        status: 'pending',
+        source: 'public_form',
+        latitude: body.geolocation?.latitude || null,
+        longitude: body.geolocation?.longitude || null,
+        geolocation_accuracy: body.geolocation?.accuracy || null,
+        submitted_from_ip: clientIP
+      })
+      .select()
+      .single();
+
+    if (appError) {
+      console.error('[submit-loan-application] Application creation error:', appError);
+      throw new Error('Failed to create application');
+    }
+
+    console.log(`[submit-loan-application] Created application: ${application.id}`);
+
+    // Parse name into first/last
+    const nameParts = body.personalDetails.fullName.trim().split(' ');
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+
+    // Create applicant record
+    const { error: applicantError } = await supabase
+      .from('loan_applicants')
+      .insert({
+        application_id: application.id,
+        org_id: formConfig.org_id,
+        applicant_type: 'primary',
+        first_name: firstName,
+        last_name: lastName,
+        date_of_birth: body.personalDetails.dob || null,
+        gender: body.personalDetails.gender || null,
+        marital_status: body.personalDetails.maritalStatus || null,
+        pan_number: body.personalDetails.panNumber?.toUpperCase(),
+        aadhaar_number: body.personalDetails.aadhaarNumber?.replace(/\s/g, ''),
+        mobile_number: body.personalDetails.mobile,
+        email: body.personalDetails.email,
+        father_name: body.personalDetails.fatherName || null,
+        current_address_line1: body.addressDetails.currentAddress.addressLine1,
+        current_address_line2: body.addressDetails.currentAddress.addressLine2 || null,
+        current_city: body.addressDetails.currentAddress.city,
+        current_state: body.addressDetails.currentAddress.state || null,
+        current_pincode: body.addressDetails.currentAddress.pincode,
+        current_residence_type: body.addressDetails.residenceType || null,
+        permanent_address_line1: body.addressDetails.permanentAddress?.addressLine1 || body.addressDetails.currentAddress.addressLine1,
+        permanent_address_line2: body.addressDetails.permanentAddress?.addressLine2 || body.addressDetails.currentAddress.addressLine2,
+        permanent_city: body.addressDetails.permanentAddress?.city || body.addressDetails.currentAddress.city,
+        permanent_state: body.addressDetails.permanentAddress?.state || body.addressDetails.currentAddress.state,
+        permanent_pincode: body.addressDetails.permanentAddress?.pincode || body.addressDetails.currentAddress.pincode
+      });
+
+    if (applicantError) {
+      console.error('[submit-loan-application] Applicant creation error:', applicantError);
+    }
+
+    // Create employment record
+    const { error: employmentError } = await supabase
+      .from('loan_employment_details')
+      .insert({
+        application_id: application.id,
+        org_id: formConfig.org_id,
+        employment_type: body.employmentDetails.employmentType || 'salaried',
+        employer_name: body.employmentDetails.employerName,
+        employer_type: body.employmentDetails.employerType || null,
+        designation: body.employmentDetails.designation || null,
+        gross_monthly_salary: body.employmentDetails.grossSalary,
+        net_monthly_salary: body.employmentDetails.netSalary || null,
+        salary_bank_name: body.employmentDetails.bankName || null,
+        salary_account_number: body.employmentDetails.accountNumber || null
+      });
+
+    if (employmentError) {
+      console.error('[submit-loan-application] Employment creation error:', employmentError);
+    }
+
+    // Create document records
+    for (const doc of uploadedDocuments) {
+      const { error: docError } = await supabase
+        .from('loan_documents')
+        .insert({
+          application_id: application.id,
+          org_id: formConfig.org_id,
+          document_type: doc.type,
+          file_name: doc.name,
+          file_path: doc.path,
+          verification_status: 'pending'
+        });
+
+      if (docError) {
+        console.error(`[submit-loan-application] Document record error for ${doc.type}:`, docError);
+      }
+    }
+
+    console.log(`[submit-loan-application] Application ${applicationNumber} submitted successfully`);
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        applicationNumber,
+        message: 'Your loan application has been submitted successfully!'
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
+  } catch (error) {
+    console.error('[submit-loan-application] Error:', error);
+    return new Response(
+      JSON.stringify({ error: 'An unexpected error occurred. Please try again.' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});

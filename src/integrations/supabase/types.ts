@@ -3421,6 +3421,56 @@ export type Database = {
           },
         ]
       }
+      loan_application_forms: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          form_settings: Json | null
+          id: string
+          is_active: boolean | null
+          name: string
+          org_id: string
+          product_type: string
+          required_documents: Json | null
+          slug: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          form_settings?: Json | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          org_id: string
+          product_type?: string
+          required_documents?: Json | null
+          slug: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          form_settings?: Json | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          org_id?: string
+          product_type?: string
+          required_documents?: Json | null
+          slug?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loan_application_forms_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       loan_applications: {
         Row: {
           application_number: string
@@ -3430,13 +3480,19 @@ export type Database = {
           created_at: string
           created_by: string | null
           current_stage: string
+          form_id: string | null
+          geolocation_accuracy: number | null
           id: string
           interest_rate: number | null
+          latitude: number | null
+          longitude: number | null
           org_id: string
           previous_stage: string | null
           product_type: string
           requested_amount: number
+          source: string | null
           status: string
+          submitted_from_ip: string | null
           tenure_months: number
           updated_at: string
         }
@@ -3448,13 +3504,19 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           current_stage?: string
+          form_id?: string | null
+          geolocation_accuracy?: number | null
           id?: string
           interest_rate?: number | null
+          latitude?: number | null
+          longitude?: number | null
           org_id: string
           previous_stage?: string | null
           product_type?: string
           requested_amount: number
+          source?: string | null
           status?: string
+          submitted_from_ip?: string | null
           tenure_months: number
           updated_at?: string
         }
@@ -3466,13 +3528,19 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           current_stage?: string
+          form_id?: string | null
+          geolocation_accuracy?: number | null
           id?: string
           interest_rate?: number | null
+          latitude?: number | null
+          longitude?: number | null
           org_id?: string
           previous_stage?: string | null
           product_type?: string
           requested_amount?: number
+          source?: string | null
           status?: string
+          submitted_from_ip?: string | null
           tenure_months?: number
           updated_at?: string
         }
@@ -3503,6 +3571,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_applications_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "loan_application_forms"
             referencedColumns: ["id"]
           },
           {
