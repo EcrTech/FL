@@ -6,14 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, Calendar, Plus, Phone, Target, TrendingUp, Brain, Users } from "lucide-react";
+import { Download, Calendar, Plus, Phone, Target, TrendingUp, Users } from "lucide-react";
 import { useNotification } from "@/hooks/useNotification";
 import { useNavigate } from "react-router-dom";
 import { useOrgContext } from "@/hooks/useOrgContext";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import CampaignAnalyticsTab from "@/components/Reports/Analytics/CampaignAnalyticsTab";
-import AIInsightsTab from "@/components/Reports/Insights/AIInsightsTab";
+
 import CallingDashboardTab from "@/components/Reports/CallingDashboard/CallingDashboardTab";
 
 interface SalesReport {
@@ -35,7 +35,7 @@ interface PipelineReport {
 export default function Reports() {
   const navigate = useNavigate();
   const [dateRange, setDateRange] = useState<"week" | "month" | "quarter">("month");
-  const [activeTab, setActiveTab] = useState<string>("campaigns");
+  const [activeTab, setActiveTab] = useState<string>("calling");
   const notify = useNotification();
   const { orgId } = useOrgContext();
 
@@ -133,9 +133,9 @@ export default function Reports() {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold">Analytics & Insights Hub</h1>
+            <h1 className="text-3xl font-bold">Dashboard</h1>
             <p className="text-muted-foreground mt-1">
-              Unified view of campaigns, AI insights, agent performance, and sales analytics
+              Unified view of calls performance, campaigns, and sales analytics
             </p>
           </div>
           <Select value={dateRange} onValueChange={(value: any) => setDateRange(value)}>
@@ -151,18 +151,14 @@ export default function Reports() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="calling">
+              <Phone className="h-4 w-4 mr-2" />
+              Calls Performance
+            </TabsTrigger>
             <TabsTrigger value="campaigns">
               <TrendingUp className="h-4 w-4 mr-2" />
               Campaign Analytics
-            </TabsTrigger>
-            <TabsTrigger value="insights">
-              <Brain className="h-4 w-4 mr-2" />
-              AI Insights
-            </TabsTrigger>
-            <TabsTrigger value="calling">
-              <Phone className="h-4 w-4 mr-2" />
-              Calling Dashboard
             </TabsTrigger>
             <TabsTrigger value="sales">
               <Target className="h-4 w-4 mr-2" />
@@ -170,16 +166,12 @@ export default function Reports() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="campaigns" className="space-y-4">
-            <CampaignAnalyticsTab />
-          </TabsContent>
-
-          <TabsContent value="insights" className="space-y-4">
-            <AIInsightsTab />
-          </TabsContent>
-
           <TabsContent value="calling" className="space-y-4">
             <CallingDashboardTab />
+          </TabsContent>
+
+          <TabsContent value="campaigns" className="space-y-4">
+            <CampaignAnalyticsTab />
           </TabsContent>
 
           <TabsContent value="sales" className="space-y-4">
