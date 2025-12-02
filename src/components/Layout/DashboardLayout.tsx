@@ -44,7 +44,6 @@ import { useNotification } from "@/hooks/useNotification";
 import { OnboardingDialog } from "@/components/Onboarding/OnboardingDialog";
 import { useFeatureAccess } from "@/hooks/useFeatureAccess";
 import { useModuleTracking } from "@/hooks/useModuleTracking";
-import { useTopModules } from "@/hooks/useTopModules";
 import { NotificationBell } from "./NotificationBell";
 import { QuickDial } from "@/components/Contact/QuickDial";
 
@@ -64,9 +63,8 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
   const [orgName, setOrgName] = useState<string>("");
   const { canAccessFeature, loading: featureAccessLoading } = useFeatureAccess();
   
-  // Track module usage and get top modules
+  // Track module usage
   useModuleTracking();
-  const { data: topModules = [] } = useTopModules(6);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -191,46 +189,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
 
             {/* Navigation */}
             <nav className="flex-1 p-4 space-y-2">
-              {/* Quick Access - Dynamic based on user usage */}
-              {topModules.length > 0 && (
-                <>
-                  <div className="pb-2 section-accent-teal pl-4">
-                    <p className="px-4 text-xs font-semibold uppercase tracking-wider gradient-text-primary">
-                      Quick Access
-                    </p>
-                  </div>
-                  
-                  {topModules.map((module) => {
-                    const IconComponent = {
-                      LayoutDashboard,
-                      Contact,
-                      GitBranch,
-                      FileText,
-                      Mail,
-                      MessageCircle,
-                      MessageSquare,
-                      BarChart3,
-                      Users,
-                      Package,
-                      Phone,
-                      Key,
-                    }[module.module_icon] || FileText;
-
-                    return (
-                      <Link
-                        key={module.module_key}
-                        to={module.module_path}
-                        onClick={() => setSidebarOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
-                      >
-                        <IconComponent size={20} />
-                        <span>{module.module_name}</span>
-                      </Link>
-                    );
-                  })}
-                </>
-              )}
-
               {/* Dashboards & Reports Section */}
               {showDashboardsSection && (
                 <div className="pb-2 section-accent-teal pl-4">
