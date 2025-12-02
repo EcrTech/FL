@@ -250,6 +250,10 @@ export default function PipelineBoard() {
       notify.error("First name required", "Please enter a first name");
       return;
     }
+    if (!newLead.phone.trim()) {
+      notify.error("Phone required", "Please enter a phone number");
+      return;
+    }
     createLeadMutation.mutate(newLead);
   };
 
@@ -369,7 +373,7 @@ export default function PipelineBoard() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Company</TableHead>
-                  <TableHead>Contact Info</TableHead>
+                  <TableHead>Phone</TableHead>
                   <TableHead>Pipeline Stage</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -393,10 +397,7 @@ export default function PipelineBoard() {
                       </TableCell>
                       <TableCell>{contact.company || '-'}</TableCell>
                       <TableCell>
-                        <div className="space-y-1">
-                          {contact.email && <p className="text-sm">{contact.email}</p>}
-                          {contact.phone && <p className="text-sm text-muted-foreground">{contact.phone}</p>}
-                        </div>
+                        <p className="text-sm">{contact.phone || '-'}</p>
                       </TableCell>
                       <TableCell>
                         {stage ? (
@@ -497,12 +498,13 @@ export default function PipelineBoard() {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone</Label>
+              <Label htmlFor="phone">Phone *</Label>
               <Input
                 id="phone"
                 value={newLead.phone}
                 onChange={(e) => setNewLead(prev => ({ ...prev, phone: e.target.value }))}
                 placeholder="+91 98765 43210"
+                required
               />
             </div>
             
