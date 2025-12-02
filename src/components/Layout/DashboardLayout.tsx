@@ -215,7 +215,7 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                   onClick={() => setSidebarOpen(false)}
                 >
                   <TrendingUp size={20} />
-                  <span>Analytics & Insights</span>
+                  <span>Sales Dashboard</span>
                 </Link>
               )}
 
