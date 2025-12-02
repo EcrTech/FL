@@ -1508,7 +1508,7 @@ export type Database = {
           organization_keywords: string[] | null
           organization_name: string | null
           person_locations: Json | null
-          phone: string | null
+          phone: string
           phone_numbers: Json | null
           photo_url: string | null
           pipeline_stage_id: string | null
@@ -1556,7 +1556,7 @@ export type Database = {
           organization_keywords?: string[] | null
           organization_name?: string | null
           person_locations?: Json | null
-          phone?: string | null
+          phone: string
           phone_numbers?: Json | null
           photo_url?: string | null
           pipeline_stage_id?: string | null
@@ -1604,7 +1604,7 @@ export type Database = {
           organization_keywords?: string[] | null
           organization_name?: string | null
           person_locations?: Json | null
-          phone?: string | null
+          phone?: string
           phone_numbers?: Json | null
           photo_url?: string | null
           pipeline_stage_id?: string | null
