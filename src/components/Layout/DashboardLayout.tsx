@@ -311,7 +311,7 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                   onClick={() => setSidebarOpen(false)}
                 >
                   <GitBranch size={20} />
-                  <span>Pipeline</span>
+                  <span>Leads</span>
                 </Link>
               )}
 
