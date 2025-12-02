@@ -34,10 +34,11 @@ interface ReportingRelation {
 }
 
 const ROLES = [
-  { value: "sales_rep", label: "Sales Rep" },
-  { value: "support_rep", label: "Support Rep" },
+  { value: "sales_agent", label: "Sales Agent" },
+  { value: "support_agent", label: "Support Agent" },
   { value: "sales_manager", label: "Sales Manager" },
   { value: "support_manager", label: "Support Manager" },
+  { value: "analyst", label: "Analyst" },
   { value: "admin", label: "Admin" },
   { value: "super_admin", label: "Super Admin" },
 ];
