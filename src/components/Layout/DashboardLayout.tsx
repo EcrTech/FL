@@ -198,17 +198,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                 </div>
               )}
               
-              {canAccessFeature("dashboard") && (
-                <Link
-                  to="/dashboard"
-                  className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <LayoutDashboard size={20} />
-                  <span>Dashboard</span>
-                </Link>
-              )}
-
               {/* LOS Dashboard */}
               <Link
                 to="/los/dashboard"
