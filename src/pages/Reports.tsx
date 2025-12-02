@@ -212,7 +212,7 @@ export default function Reports() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
-                  <CardTitle>Sales Performance by User</CardTitle>
+                  <CardTitle>Sales Performance</CardTitle>
                   <CardDescription>Individual performance metrics</CardDescription>
                 </div>
                 <Button
