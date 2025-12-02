@@ -39,14 +39,22 @@ interface Contact {
   status?: string | null;
 }
 
+interface Filters {
+  name: string;
+  company: string;
+  phone: string;
+  pipelineStage: string;
+}
+
 const STAGE_FILTERS = ["all", "Lead", "Application", "Sanction", "Disbursed", "Collection"];
 
 export default function PipelineBoard() {
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [allContacts, setAllContacts] = useState<Contact[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
-  const [stageFilter, setStageFilter] = useState("all");
+  const [filters, setFilters] = useState<Filters>({
+    name: "",
+    company: "",
+    phone: "",
+    pipelineStage: "all"
+  });
   const [callingContactId, setCallingContactId] = useState<string | null>(null);
   const [showNewLeadDialog, setShowNewLeadDialog] = useState(false);
   const [newLead, setNewLead] = useState({
@@ -80,7 +88,7 @@ export default function PipelineBoard() {
   });
 
   const { data: contactsData, isLoading: contactsLoading } = useQuery({
-    queryKey: ['leads-contacts', stageFilter, tablePagination.currentPage, tablePagination.pageSize, stagesData],
+    queryKey: ['leads-contacts', filters, tablePagination.currentPage, tablePagination.pageSize, stagesData],
     queryFn: async () => {
       const offset = (tablePagination.currentPage - 1) * tablePagination.pageSize;
       
@@ -89,9 +97,24 @@ export default function PipelineBoard() {
         .select("id, first_name, last_name, email, phone, company, pipeline_stage_id, job_title, source, status, created_at", { count: 'exact' })
         .order("created_at", { ascending: false });
       
-      // Apply stage filter
-      if (stageFilter !== "all" && stagesData) {
-        const stage = stagesData.find(s => s.name === stageFilter);
+      // Apply name filter (searches first_name and last_name)
+      if (filters.name.trim()) {
+        query = query.or(`first_name.ilike.%${filters.name.trim()}%,last_name.ilike.%${filters.name.trim()}%`);
+      }
+      
+      // Apply company filter
+      if (filters.company.trim()) {
+        query = query.ilike("company", `%${filters.company.trim()}%`);
+      }
+      
+      // Apply phone filter
+      if (filters.phone.trim()) {
+        query = query.ilike("phone", `%${filters.phone.trim()}%`);
+      }
+      
+      // Apply pipeline stage filter
+      if (filters.pipelineStage !== "all" && stagesData) {
+        const stage = stagesData.find(s => s.name === filters.pipelineStage);
         if (stage) {
           query = query.eq("pipeline_stage_id", stage.id);
         }
@@ -150,18 +173,17 @@ export default function PipelineBoard() {
 
   useEffect(() => {
     if (contactsData) {
-      setContacts(contactsData.data);
-      setAllContacts(contactsData.data);
       tablePagination.setTotalRecords(contactsData.count);
     }
   }, [contactsData]);
 
-  // Reset to page 1 when stage filter changes
+  // Reset to page 1 when filters change
   useEffect(() => {
     tablePagination.setPage(1);
-  }, [stageFilter]);
+  }, [filters]);
 
   const stages = stagesData || [];
+  const contacts = contactsData?.data || [];
   const loading = !stagesData || contactsLoading;
 
   const handleCall = async (contact: Contact, e?: React.MouseEvent) => {
@@ -208,40 +230,17 @@ export default function PipelineBoard() {
     }
   };
 
-  const handleAiSearch = async () => {
-    if (!searchQuery.trim()) {
-      setContacts(allContacts);
-      return;
-    }
-
-    setIsSearching(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('analyze-lead', {
-        body: { 
-          searchQuery: searchQuery.trim(),
-          contacts: allContacts
-        }
-      });
-
-      if (error) throw error;
-      if (data.error) throw new Error(data.error);
-
-      const filteredContactIds = data.filteredContactIds || [];
-      const filtered = allContacts.filter(c => filteredContactIds.includes(c.id));
-      setContacts(filtered);
-      
-      notify.success("Search complete", `Found ${filtered.length} matching leads`);
-    } catch (error: any) {
-      notify.error("Search failed", error);
-      setContacts(allContacts);
-    } finally {
-      setIsSearching(false);
-    }
+  const handleFilterChange = (key: keyof Filters, value: string) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
   };
 
-  const handleClearSearch = () => {
-    setSearchQuery("");
-    setContacts(allContacts);
+  const handleClearFilters = () => {
+    setFilters({
+      name: "",
+      company: "",
+      phone: "",
+      pipelineStage: "all"
+    });
   };
 
   const handleCreateLead = (e: React.FormEvent) => {
@@ -256,6 +255,8 @@ export default function PipelineBoard() {
     }
     createLeadMutation.mutate(newLead);
   };
+
+  const hasActiveFilters = filters.name || filters.company || filters.phone || filters.pipelineStage !== "all";
 
   if (loading) {
     return (
@@ -286,7 +287,7 @@ export default function PipelineBoard() {
         </div>
 
         {/* Stage Filter Tabs */}
-        <Tabs value={stageFilter} onValueChange={setStageFilter} className="w-full">
+        <Tabs value={filters.pipelineStage} onValueChange={(value) => handleFilterChange("pipelineStage", value)} className="w-full">
           <TabsList className="flex-wrap h-auto gap-1">
             {STAGE_FILTERS.map((stage) => (
               <TabsTrigger key={stage} value={stage} className="capitalize">
@@ -296,66 +297,70 @@ export default function PipelineBoard() {
           </TabsList>
         </Tabs>
 
-        {/* AI Search Bar */}
+        {/* Filter Bar */}
         <Card>
           <CardContent className="pt-6">
-            <div className="flex gap-2">
-              <div className="flex-1">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="filter-name" className="text-xs text-muted-foreground">Name</Label>
                 <Input
-                  placeholder="Search leads using AI (e.g., 'designation Manager, company in Mumbai, age 30-40')"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !isSearching) {
-                      handleAiSearch();
-                    }
-                  }}
-                  disabled={isSearching}
+                  id="filter-name"
+                  placeholder="Search by name..."
+                  value={filters.name}
+                  onChange={(e) => handleFilterChange("name", e.target.value)}
                 />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Search by: designation, company, location (city/state/country), source, or combine criteria
-                </p>
               </div>
-              <Button 
-                onClick={handleAiSearch}
-                disabled={isSearching || !searchQuery.trim()}
-              >
-                {isSearching ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Searching...
-                  </>
-                ) : (
-                  <>
-                    <Search className="h-4 w-4 mr-2" />
-                    AI Search
-                  </>
-                )}
-              </Button>
-              {searchQuery && (
-                <Button 
-                  variant="outline" 
-                  onClick={handleClearSearch}
-                  disabled={isSearching}
+              <div className="space-y-1">
+                <Label htmlFor="filter-company" className="text-xs text-muted-foreground">Company</Label>
+                <Input
+                  id="filter-company"
+                  placeholder="Search by company..."
+                  value={filters.company}
+                  onChange={(e) => handleFilterChange("company", e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="filter-phone" className="text-xs text-muted-foreground">Phone</Label>
+                <Input
+                  id="filter-phone"
+                  placeholder="Search by phone..."
+                  value={filters.phone}
+                  onChange={(e) => handleFilterChange("phone", e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="filter-stage" className="text-xs text-muted-foreground">Pipeline Stage</Label>
+                <Select
+                  value={filters.pipelineStage}
+                  onValueChange={(value) => handleFilterChange("pipelineStage", value)}
                 >
-                  Clear
-                </Button>
-              )}
+                  <SelectTrigger id="filter-stage">
+                    <SelectValue placeholder="All Stages" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Stages</SelectItem>
+                    {stages.map((stage) => (
+                      <SelectItem key={stage.id} value={stage.name}>
+                        {stage.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             
-            {/* Active Filter Indicator */}
-            {searchQuery && contacts.length !== allContacts.length && (
-              <div className="mt-3 flex items-center gap-2">
+            {hasActiveFilters && (
+              <div className="mt-4 flex items-center gap-2">
                 <Badge variant="secondary" className="text-sm">
-                  Showing {contacts.length} of {allContacts.length} leads
+                  {contactsData?.count || 0} results
                 </Badge>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={handleClearSearch}
+                  onClick={handleClearFilters}
                   className="h-6 text-xs"
                 >
-                  Remove filter
+                  Clear filters
                 </Button>
               </div>
             )}
