@@ -142,7 +142,7 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
     canAccessFeature("templates")
   );
   
-  const showManagementSection = isManager && (
+  const showManagementSection = isAdmin && (
     canAccessFeature("users") || 
     canAccessFeature("teams") || 
     canAccessFeature("designations") || 
