@@ -275,10 +275,6 @@ export default function PipelineBoard() {
             <p className="text-muted-foreground">View and manage your leads</p>
           </div>
           <div className="flex gap-2">
-            <Button onClick={() => setShowNewLeadDialog(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              New Lead
-            </Button>
             <Button onClick={() => navigate('/pipeline/advanced-search')} variant="outline">
               <Search className="h-4 w-4 mr-2" />
               Advanced Search
