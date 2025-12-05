@@ -234,9 +234,10 @@ Deno.serve(async (req) => {
         form_id: formConfig.id,
         application_number: applicationNumber,
         product_type: formConfig.product_type,
-        loan_amount: loanAmount,
+        requested_amount: loanAmount,
         tenure_months: body.loanDetails.tenure,
-        status: 'pending',
+        current_stage: 'application_login',
+        status: 'in_progress',
         source: 'public_form',
         latitude: body.geolocation?.latitude || null,
         longitude: body.geolocation?.longitude || null,
@@ -259,57 +260,63 @@ Deno.serve(async (req) => {
     const lastName = nameParts.slice(1).join(' ') || '';
 
     // Create applicant record
-    const { error: applicantError } = await supabase
+    const { data: applicant, error: applicantError } = await supabase
       .from('loan_applicants')
       .insert({
-        application_id: application.id,
-        org_id: formConfig.org_id,
+        loan_application_id: application.id,
         applicant_type: 'primary',
         first_name: firstName,
         last_name: lastName,
-        date_of_birth: body.personalDetails.dob || null,
+        dob: body.personalDetails.dob || null,
         gender: body.personalDetails.gender || null,
         marital_status: body.personalDetails.maritalStatus || null,
         pan_number: body.personalDetails.panNumber?.toUpperCase(),
         aadhaar_number: body.personalDetails.aadhaarNumber?.replace(/\s/g, ''),
-        mobile_number: body.personalDetails.mobile,
+        mobile: body.personalDetails.mobile,
         email: body.personalDetails.email,
         father_name: body.personalDetails.fatherName || null,
-        current_address_line1: body.addressDetails.currentAddress.addressLine1,
-        current_address_line2: body.addressDetails.currentAddress.addressLine2 || null,
-        current_city: body.addressDetails.currentAddress.city,
-        current_state: body.addressDetails.currentAddress.state || null,
-        current_pincode: body.addressDetails.currentAddress.pincode,
-        current_residence_type: body.addressDetails.residenceType || null,
-        permanent_address_line1: body.addressDetails.permanentAddress?.addressLine1 || body.addressDetails.currentAddress.addressLine1,
-        permanent_address_line2: body.addressDetails.permanentAddress?.addressLine2 || body.addressDetails.currentAddress.addressLine2,
-        permanent_city: body.addressDetails.permanentAddress?.city || body.addressDetails.currentAddress.city,
-        permanent_state: body.addressDetails.permanentAddress?.state || body.addressDetails.currentAddress.state,
-        permanent_pincode: body.addressDetails.permanentAddress?.pincode || body.addressDetails.currentAddress.pincode
-      });
+        current_address: {
+          line1: body.addressDetails.currentAddress.addressLine1,
+          line2: body.addressDetails.currentAddress.addressLine2 || '',
+          city: body.addressDetails.currentAddress.city,
+          state: body.addressDetails.currentAddress.state || '',
+          pincode: body.addressDetails.currentAddress.pincode
+        },
+        permanent_address: {
+          line1: body.addressDetails.permanentAddress?.addressLine1 || body.addressDetails.currentAddress.addressLine1,
+          line2: body.addressDetails.permanentAddress?.addressLine2 || body.addressDetails.currentAddress.addressLine2 || '',
+          city: body.addressDetails.permanentAddress?.city || body.addressDetails.currentAddress.city,
+          state: body.addressDetails.permanentAddress?.state || body.addressDetails.currentAddress.state || '',
+          pincode: body.addressDetails.permanentAddress?.pincode || body.addressDetails.currentAddress.pincode
+        },
+        residence_type: body.addressDetails.residenceType || null
+      })
+      .select()
+      .single();
 
     if (applicantError) {
       console.error('[submit-loan-application] Applicant creation error:', applicantError);
     }
 
-    // Create employment record
-    const { error: employmentError } = await supabase
-      .from('loan_employment_details')
-      .insert({
-        application_id: application.id,
-        org_id: formConfig.org_id,
-        employment_type: body.employmentDetails.employmentType || 'salaried',
-        employer_name: body.employmentDetails.employerName,
-        employer_type: body.employmentDetails.employerType || null,
-        designation: body.employmentDetails.designation || null,
-        gross_monthly_salary: body.employmentDetails.grossSalary,
-        net_monthly_salary: body.employmentDetails.netSalary || null,
-        salary_bank_name: body.employmentDetails.bankName || null,
-        salary_account_number: body.employmentDetails.accountNumber || null
-      });
+    // Create employment record (only if applicant was created successfully)
+    if (applicant) {
+      const { error: employmentError } = await supabase
+        .from('loan_employment_details')
+        .insert({
+          applicant_id: applicant.id,
+          employment_type: body.employmentDetails.employmentType || 'salaried',
+          employer_name: body.employmentDetails.employerName,
+          employer_type: body.employmentDetails.employerType || null,
+          designation: body.employmentDetails.designation || null,
+          gross_monthly_salary: body.employmentDetails.grossSalary,
+          net_monthly_salary: body.employmentDetails.netSalary || null,
+          salary_bank_name: body.employmentDetails.bankName || null,
+          salary_account_number: body.employmentDetails.accountNumber || null
+        });
 
-    if (employmentError) {
-      console.error('[submit-loan-application] Employment creation error:', employmentError);
+      if (employmentError) {
+        console.error('[submit-loan-application] Employment creation error:', employmentError);
+      }
     }
 
     // Create document records
@@ -317,8 +324,8 @@ Deno.serve(async (req) => {
       const { error: docError } = await supabase
         .from('loan_documents')
         .insert({
-          application_id: application.id,
-          org_id: formConfig.org_id,
+          loan_application_id: application.id,
+          applicant_id: applicant?.id || null,
           document_type: doc.type,
           file_name: doc.name,
           file_path: doc.path,
