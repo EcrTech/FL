@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,22 +17,29 @@ serve(async (req) => {
       throw new Error('Token is required');
     }
 
+    console.log('Creating meeting with token (first 20 chars):', token.substring(0, 20) + '...');
+
     // Create meeting room via VideoSDK API
+    // VideoSDK expects the JWT token directly in Authorization header
     const response = await fetch('https://api.videosdk.live/v2/rooms', {
       method: 'POST',
       headers: {
-        'Authorization': token,
+        'Authorization': `${token}`,
         'Content-Type': 'application/json'
-      }
+      },
+      body: JSON.stringify({})
     });
 
+    const responseText = await response.text();
+    console.log('VideoSDK API response status:', response.status);
+    console.log('VideoSDK API response:', responseText);
+
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('VideoSDK API error:', response.status, errorText);
-      throw new Error(`Failed to create meeting: ${errorText}`);
+      console.error('VideoSDK API error:', response.status, responseText);
+      throw new Error(`Failed to create meeting: ${responseText}`);
     }
 
-    const data = await response.json();
+    const data = JSON.parse(responseText);
     console.log('Created VideoSDK meeting:', data.roomId);
 
     return new Response(

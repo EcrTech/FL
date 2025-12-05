@@ -15,8 +15,11 @@ serve(async (req) => {
     const VIDEOSDK_SECRET = Deno.env.get('VIDEOSDK_SECRET');
 
     if (!VIDEOSDK_API_KEY || !VIDEOSDK_SECRET) {
+      console.error('Missing VideoSDK credentials - API_KEY present:', !!VIDEOSDK_API_KEY, 'SECRET present:', !!VIDEOSDK_SECRET);
       throw new Error('VideoSDK credentials not configured');
     }
+
+    console.log('Generating token with API key (first 10 chars):', VIDEOSDK_API_KEY.substring(0, 10) + '...');
 
     // Generate JWT token for VideoSDK authentication
     const jwt = await import("https://deno.land/x/djwt@v3.0.2/mod.ts");
