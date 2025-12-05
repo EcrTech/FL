@@ -8,13 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, User, FileText, CheckCircle, Calculator, ThumbsUp, FileCheck, DollarSign, XCircle, CreditCard } from "lucide-react";
+import { ArrowLeft, User, FileText, Calculator, ThumbsUp, FileCheck, DollarSign, XCircle, CreditCard, CheckCircle } from "lucide-react";
 import { LoadingState } from "@/components/common/LoadingState";
 import { format } from "date-fns";
 import DocumentUpload from "@/components/LOS/DocumentUpload";
 import DocumentDataVerification from "@/components/LOS/DocumentDataVerification";
 import IncomeSummary from "@/components/LOS/IncomeSummary";
-import VerificationDashboard from "@/components/LOS/VerificationDashboard";
 import AssessmentDashboard from "@/components/LOS/Assessment/AssessmentDashboard";
 import ApprovalActionDialog from "@/components/LOS/Approval/ApprovalActionDialog";
 import ApprovalHistory from "@/components/LOS/Approval/ApprovalHistory";
@@ -81,6 +80,20 @@ export default function ApplicationDetail() {
     enabled: !!id && !!orgId,
   });
 
+  // Fetch parsed document data
+  const { data: documents = [] } = useQuery({
+    queryKey: ["loan-documents", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("loan_documents")
+        .select("*")
+        .eq("loan_application_id", id);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
@@ -93,7 +106,6 @@ export default function ApplicationDetail() {
     if (!address) return "N/A";
     if (typeof address === "string") return address;
     
-    // If address is an object with structured fields
     const parts = [
       address.line1,
       address.line2,
@@ -104,6 +116,15 @@ export default function ApplicationDetail() {
     
     return parts.length > 0 ? parts.join(", ") : "N/A";
   };
+
+  // Get parsed data from documents
+  const getParsedData = (docType: string) => {
+    const doc = documents.find((d) => d.document_type === docType);
+    return doc?.ocr_data as Record<string, any> | null;
+  };
+
+  const panData = getParsedData("pan_card");
+  const aadhaarData = getParsedData("aadhaar_card");
 
   if (isLoading || isOrgLoading) {
     return (
@@ -124,6 +145,7 @@ export default function ApplicationDetail() {
   }
 
   const primaryApplicant = application.loan_applicants?.[0];
+  const tenureDays = application.tenure_months * 30;
 
   return (
     <DashboardLayout>
@@ -169,7 +191,7 @@ export default function ApplicationDetail() {
               <CardTitle className="text-sm font-medium">Tenure</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{application.tenure_months} months</div>
+              <div className="text-2xl font-bold">{tenureDays} days</div>
             </CardContent>
           </Card>
 
@@ -202,7 +224,7 @@ export default function ApplicationDetail() {
 
         {/* Tabs */}
         <Tabs defaultValue="application" className="w-full">
-          <TabsList className="grid w-full grid-cols-8">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="application">
               <User className="h-4 w-4 mr-2" />
               Application
@@ -210,10 +232,6 @@ export default function ApplicationDetail() {
             <TabsTrigger value="documents">
               <FileText className="h-4 w-4 mr-2" />
               Documents
-            </TabsTrigger>
-            <TabsTrigger value="verification">
-              <CheckCircle className="h-4 w-4 mr-2" />
-              Verification
             </TabsTrigger>
             <TabsTrigger value="assessment">
               <Calculator className="h-4 w-4 mr-2" />
@@ -238,6 +256,7 @@ export default function ApplicationDetail() {
           </TabsList>
 
           <TabsContent value="application" className="space-y-4">
+            {/* Applicant Details Card */}
             <Card>
               <CardHeader>
                 <CardTitle>Applicant Details</CardTitle>
@@ -284,16 +303,112 @@ export default function ApplicationDetail() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Parsed Document Data Card */}
+            {(panData || aadhaarData) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    Verified Document Data
+                    <Badge className="bg-green-500/10 text-green-600 border-green-500/20">AI Parsed</Badge>
+                  </CardTitle>
+                  <CardDescription>Information extracted from uploaded documents</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-6 md:grid-cols-2">
+                    {/* PAN Card Data */}
+                    {panData && !panData.parse_error && (
+                      <div className="space-y-3 p-4 rounded-lg bg-muted/50">
+                        <h4 className="font-medium text-sm flex items-center gap-2">
+                          <FileText className="h-4 w-4" />
+                          PAN Card
+                        </h4>
+                        <div className="grid gap-2 text-sm">
+                          {panData.name && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Name</span>
+                              <span className="font-medium">{panData.name}</span>
+                            </div>
+                          )}
+                          {panData.pan_number && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">PAN</span>
+                              <span className="font-mono font-medium">{panData.pan_number}</span>
+                            </div>
+                          )}
+                          {panData.father_name && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Father's Name</span>
+                              <span className="font-medium">{panData.father_name}</span>
+                            </div>
+                          )}
+                          {panData.dob && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">DOB</span>
+                              <span className="font-medium">
+                                {format(new Date(panData.dob), "MMM dd, yyyy")}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Aadhaar Card Data */}
+                    {aadhaarData && !aadhaarData.parse_error && (
+                      <div className="space-y-3 p-4 rounded-lg bg-muted/50">
+                        <h4 className="font-medium text-sm flex items-center gap-2">
+                          <FileText className="h-4 w-4" />
+                          Aadhaar Card
+                        </h4>
+                        <div className="grid gap-2 text-sm">
+                          {aadhaarData.name && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Name</span>
+                              <span className="font-medium">{aadhaarData.name}</span>
+                            </div>
+                          )}
+                          {aadhaarData.aadhaar_number && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Aadhaar</span>
+                              <span className="font-mono font-medium">{aadhaarData.aadhaar_number}</span>
+                            </div>
+                          )}
+                          {aadhaarData.gender && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Gender</span>
+                              <span className="font-medium">{aadhaarData.gender}</span>
+                            </div>
+                          )}
+                          {aadhaarData.dob && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">DOB</span>
+                              <span className="font-medium">
+                                {format(new Date(aadhaarData.dob), "MMM dd, yyyy")}
+                              </span>
+                            </div>
+                          )}
+                          {aadhaarData.address && (
+                            <div className="flex flex-col gap-1">
+                              <span className="text-muted-foreground">Address</span>
+                              <span className="font-medium text-xs">{aadhaarData.address}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Document Data Verification */}
+            <DocumentDataVerification applicationId={application.id} />
           </TabsContent>
 
           <TabsContent value="documents" className="space-y-6">
             <DocumentUpload applicationId={application.id} orgId={orgId} />
-            <DocumentDataVerification applicationId={application.id} />
             <IncomeSummary applicationId={application.id} orgId={orgId} />
-          </TabsContent>
-
-          <TabsContent value="verification">
-            <VerificationDashboard applicationId={application.id} orgId={orgId} />
           </TabsContent>
 
           <TabsContent value="assessment">
