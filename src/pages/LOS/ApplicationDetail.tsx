@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, User, FileText, Calculator, ThumbsUp, FileCheck, DollarSign, XCircle, CreditCard, CheckCircle } from "lucide-react";
+import { ArrowLeft, User, FileText, Calculator, FileCheck, DollarSign, XCircle, CreditCard, CheckCircle } from "lucide-react";
 import { LoadingState } from "@/components/common/LoadingState";
 import { format } from "date-fns";
 import DocumentUpload from "@/components/LOS/DocumentUpload";
@@ -224,7 +224,7 @@ export default function ApplicationDetail() {
 
         {/* Tabs */}
         <Tabs defaultValue="application" className="w-full">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="application">
               <User className="h-4 w-4 mr-2" />
               Application
@@ -235,11 +235,7 @@ export default function ApplicationDetail() {
             </TabsTrigger>
             <TabsTrigger value="assessment">
               <Calculator className="h-4 w-4 mr-2" />
-              Assessment
-            </TabsTrigger>
-            <TabsTrigger value="approval">
-              <ThumbsUp className="h-4 w-4 mr-2" />
-              Approval
+              Assessment & Approval
             </TabsTrigger>
             <TabsTrigger value="sanction">
               <FileCheck className="h-4 w-4 mr-2" />
@@ -411,11 +407,10 @@ export default function ApplicationDetail() {
             <IncomeSummary applicationId={application.id} orgId={orgId} />
           </TabsContent>
 
-          <TabsContent value="assessment">
+          <TabsContent value="assessment" className="space-y-6">
             <AssessmentDashboard applicationId={application.id} orgId={orgId} />
-          </TabsContent>
-
-          <TabsContent value="approval" className="space-y-6">
+            
+            {/* Approval Actions - Only shown when stage is approval_pending */}
             {application.current_stage === "approval_pending" && (
               <Card>
                 <CardHeader>
@@ -445,6 +440,7 @@ export default function ApplicationDetail() {
               </Card>
             )}
 
+            {/* Approval History - Always shown */}
             <ApprovalHistory applicationId={id!} />
           </TabsContent>
 
