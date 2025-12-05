@@ -260,12 +260,12 @@ export default function NewApplication() {
         </div>
 
         <Tabs value={currentTab} onValueChange={setCurrentTab}>
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="basic">Basic Details</TabsTrigger>
-            <TabsTrigger value="applicant">Applicant</TabsTrigger>
-            <TabsTrigger value="address">Address</TabsTrigger>
-            <TabsTrigger value="employment">Employment</TabsTrigger>
-            <TabsTrigger value="references">References</TabsTrigger>
+          <TabsList className="flex flex-row w-full h-auto flex-wrap gap-1">
+            <TabsTrigger value="basic" className="flex-1">Basic Details</TabsTrigger>
+            <TabsTrigger value="applicant" className="flex-1">Applicant</TabsTrigger>
+            <TabsTrigger value="address" className="flex-1">Address</TabsTrigger>
+            <TabsTrigger value="employment" className="flex-1">Employment</TabsTrigger>
+            <TabsTrigger value="references" className="flex-1">References</TabsTrigger>
           </TabsList>
 
           {/* Basic Details Tab */}
