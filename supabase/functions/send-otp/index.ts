@@ -106,14 +106,63 @@ serve(async (req) => {
         to: [target],
         subject: "Your Verification Code",
         html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #333;">Email Verification</h2>
-            <p>Your verification code is:</p>
-            <div style="background-color: #f4f4f4; padding: 20px; text-align: center; margin: 20px 0;">
-              <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #333;">${otp}</span>
+          <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f9fafb; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+            <!-- Header -->
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
+              <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 600;">LeadFlow CRM</h1>
+              <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 14px;">Secure Verification</p>
             </div>
-            <p style="color: #666;">This code will expire in 10 minutes.</p>
-            <p style="color: #999; font-size: 12px;">If you didn't request this code, please ignore this email.</p>
+            
+            <!-- Main Content -->
+            <div style="background-color: white; padding: 40px 30px;">
+              <h2 style="color: #1f2937; margin: 0 0 10px 0; font-size: 24px; font-weight: 600;">Verify Your Email Address</h2>
+              <p style="color: #6b7280; margin: 0 0 30px 0; font-size: 16px; line-height: 1.6;">
+                Please use the verification code below to confirm your email address. This helps us keep your account secure.
+              </p>
+              
+              <!-- OTP Code Box -->
+              <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); 
+                          border-radius: 16px; padding: 35px; text-align: center; margin: 25px 0;
+                          border: 2px dashed #cbd5e1;">
+                <p style="color: #64748b; font-size: 14px; margin: 0 0 15px 0; text-transform: uppercase; letter-spacing: 1px;">Your verification code</p>
+                <div style="font-size: 44px; font-weight: bold; letter-spacing: 14px; 
+                            color: #1e293b; font-family: 'Courier New', Courier, monospace;
+                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                            -webkit-background-clip: text;
+                            -webkit-text-fill-color: transparent;
+                            background-clip: text;">
+                  ${otp}
+                </div>
+              </div>
+              
+              <!-- Timer Notice -->
+              <div style="text-align: center; margin: 30px 0;">
+                <span style="background-color: #fef3c7; color: #92400e; padding: 10px 20px; 
+                             border-radius: 25px; font-size: 14px; font-weight: 500;
+                             display: inline-block;">
+                  ⏱️ Code expires in 10 minutes
+                </span>
+              </div>
+              
+              <!-- Security Notice -->
+              <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; 
+                          padding: 16px 20px; margin-top: 30px; border-radius: 0 8px 8px 0;">
+                <p style="color: #1e40af; margin: 0; font-size: 14px; line-height: 1.5;">
+                  🔒 <strong>Security Notice:</strong> Never share this code with anyone. 
+                  Our team will never ask for your verification code via phone or email.
+                </p>
+              </div>
+            </div>
+            
+            <!-- Footer -->
+            <div style="background-color: #f8fafc; padding: 25px 30px; text-align: center; border-top: 1px solid #e2e8f0;">
+              <p style="color: #94a3b8; font-size: 13px; margin: 0 0 8px 0;">
+                If you didn't request this code, you can safely ignore this email.
+              </p>
+              <p style="color: #94a3b8; font-size: 12px; margin: 0;">
+                © ${new Date().getFullYear()} LeadFlow CRM. All rights reserved.
+              </p>
+            </div>
           </div>
         `,
       });
