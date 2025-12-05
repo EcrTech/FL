@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useNotification } from "@/hooks/useNotification";
-import { Phone as PhoneIcon, Plus, X, Star } from "lucide-react";
+import { Phone as PhoneIcon, Plus, X, Star, CheckCircle } from "lucide-react";
+import VerificationButton from "./VerificationButton";
 
 interface ContactPhone {
   id: string;
@@ -18,9 +19,17 @@ interface ContactPhonesProps {
   contactId: string;
   orgId: string;
   readOnly?: boolean;
+  phoneVerified?: boolean;
+  onVerificationChange?: () => void;
 }
 
-export function ContactPhones({ contactId, orgId, readOnly = false }: ContactPhonesProps) {
+export function ContactPhones({ 
+  contactId, 
+  orgId, 
+  readOnly = false,
+  phoneVerified = false,
+  onVerificationChange
+}: ContactPhonesProps) {
   const notify = useNotification();
   const [phones, setPhones] = useState<ContactPhone[]>([]);
   const [newPhone, setNewPhone] = useState({ phone: "", phone_type: "mobile" });
@@ -83,13 +92,11 @@ export function ContactPhones({ contactId, orgId, readOnly = false }: ContactPho
   };
 
   const setPrimary = async (id: string) => {
-    // First, unset all primary flags
     await supabase
       .from("contact_phones")
       .update({ is_primary: false })
       .eq("contact_id", contactId);
 
-    // Set the selected phone as primary
     const { error } = await supabase
       .from("contact_phones")
       .update({ is_primary: true })
@@ -127,6 +134,17 @@ export function ContactPhones({ contactId, orgId, readOnly = false }: ContactPho
             {item.is_primary && (
               <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
             )}
+            {item.is_primary && (
+              <VerificationButton
+                type="mobile"
+                target={item.phone}
+                contactId={contactId}
+                orgId={orgId}
+                isVerified={phoneVerified}
+                onVerified={onVerificationChange}
+                compact
+              />
+            )}
           </div>
         ))}
       </div>
@@ -143,7 +161,18 @@ export function ContactPhones({ contactId, orgId, readOnly = false }: ContactPho
               {item.phone_type}
             </Badge>
             {item.is_primary ? (
-              <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />
+              <>
+                <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />
+                <VerificationButton
+                  type="mobile"
+                  target={item.phone}
+                  contactId={contactId}
+                  orgId={orgId}
+                  isVerified={phoneVerified}
+                  onVerified={onVerificationChange}
+                  compact
+                />
+              </>
             ) : (
               <Button
                 size="icon"

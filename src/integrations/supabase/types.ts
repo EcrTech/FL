@@ -1487,6 +1487,8 @@ export type Database = {
           departments: string[] | null
           education: Json | null
           email: string | null
+          email_verified: boolean | null
+          email_verified_at: string | null
           employment_history: Json | null
           enrichment_status: string | null
           facebook_url: string | null
@@ -1510,6 +1512,8 @@ export type Database = {
           person_locations: Json | null
           phone: string
           phone_numbers: Json | null
+          phone_verified: boolean | null
+          phone_verified_at: string | null
           photo_url: string | null
           pipeline_stage_id: string | null
           postal_code: string | null
@@ -1535,6 +1539,8 @@ export type Database = {
           departments?: string[] | null
           education?: Json | null
           email?: string | null
+          email_verified?: boolean | null
+          email_verified_at?: string | null
           employment_history?: Json | null
           enrichment_status?: string | null
           facebook_url?: string | null
@@ -1558,6 +1564,8 @@ export type Database = {
           person_locations?: Json | null
           phone: string
           phone_numbers?: Json | null
+          phone_verified?: boolean | null
+          phone_verified_at?: string | null
           photo_url?: string | null
           pipeline_stage_id?: string | null
           postal_code?: string | null
@@ -1583,6 +1591,8 @@ export type Database = {
           departments?: string[] | null
           education?: Json | null
           email?: string | null
+          email_verified?: boolean | null
+          email_verified_at?: string | null
           employment_history?: Json | null
           enrichment_status?: string | null
           facebook_url?: string | null
@@ -1606,6 +1616,8 @@ export type Database = {
           person_locations?: Json | null
           phone?: string
           phone_numbers?: Json | null
+          phone_verified?: boolean | null
+          phone_verified_at?: string | null
           photo_url?: string | null
           pipeline_stage_id?: string | null
           postal_code?: string | null
@@ -5187,6 +5199,73 @@ export type Database = {
         }
         Relationships: []
       }
+      otp_verifications: {
+        Row: {
+          attempts: number
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          id: string
+          max_attempts: number
+          org_id: string
+          otp_code: string
+          target: string
+          verification_type: string
+          verified_at: string | null
+        }
+        Insert: {
+          attempts?: number
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          expires_at: string
+          id?: string
+          max_attempts?: number
+          org_id: string
+          otp_code: string
+          target: string
+          verification_type: string
+          verified_at?: string | null
+        }
+        Update: {
+          attempts?: number
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          max_attempts?: number
+          org_id?: string
+          otp_code?: string
+          target?: string
+          verification_type?: string
+          verified_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "otp_verifications_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "otp_verifications_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_with_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "otp_verifications_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       outbound_webhook_logs: {
         Row: {
           error_message: string | null
@@ -6907,6 +6986,7 @@ export type Database = {
         Returns: boolean
       }
       check_inactive_contacts: { Args: never; Returns: undefined }
+      cleanup_expired_otps: { Args: never; Returns: undefined }
       cleanup_orphaned_profile: {
         Args: { user_id: string }
         Returns: undefined

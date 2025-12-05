@@ -2,11 +2,11 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useNotification } from "@/hooks/useNotification";
-import { Mail, Plus, X, Star } from "lucide-react";
+import { Mail, Plus, X, Star, CheckCircle } from "lucide-react";
+import VerificationButton from "./VerificationButton";
 
 interface ContactEmail {
   id: string;
@@ -19,9 +19,17 @@ interface ContactEmailsProps {
   contactId: string;
   orgId: string;
   readOnly?: boolean;
+  emailVerified?: boolean;
+  onVerificationChange?: () => void;
 }
 
-export function ContactEmails({ contactId, orgId, readOnly = false }: ContactEmailsProps) {
+export function ContactEmails({ 
+  contactId, 
+  orgId, 
+  readOnly = false, 
+  emailVerified = false,
+  onVerificationChange 
+}: ContactEmailsProps) {
   const notify = useNotification();
   const [emails, setEmails] = useState<ContactEmail[]>([]);
   const [newEmail, setNewEmail] = useState({ email: "", email_type: "work" });
@@ -84,13 +92,11 @@ export function ContactEmails({ contactId, orgId, readOnly = false }: ContactEma
   };
 
   const setPrimary = async (id: string) => {
-    // First, unset all primary flags
     await supabase
       .from("contact_emails")
       .update({ is_primary: false })
       .eq("contact_id", contactId);
 
-    // Set the selected email as primary
     const { error } = await supabase
       .from("contact_emails")
       .update({ is_primary: true })
@@ -111,6 +117,9 @@ export function ContactEmails({ contactId, orgId, readOnly = false }: ContactEma
     return colors[type] || "bg-gray-500";
   };
 
+  // Get primary email for verification
+  const primaryEmail = emails.find(e => e.is_primary) || emails[0];
+
   if (readOnly) {
     return (
       <div className="space-y-2">
@@ -125,6 +134,17 @@ export function ContactEmails({ contactId, orgId, readOnly = false }: ContactEma
             </Badge>
             {item.is_primary && (
               <Star className="h-3 w-3 fill-yellow-500 text-yellow-500" />
+            )}
+            {item.is_primary && (
+              <VerificationButton
+                type="email"
+                target={item.email}
+                contactId={contactId}
+                orgId={orgId}
+                isVerified={emailVerified}
+                onVerified={onVerificationChange}
+                compact
+              />
             )}
           </div>
         ))}
@@ -142,7 +162,18 @@ export function ContactEmails({ contactId, orgId, readOnly = false }: ContactEma
               {item.email_type}
             </Badge>
             {item.is_primary ? (
-              <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />
+              <>
+                <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />
+                <VerificationButton
+                  type="email"
+                  target={item.email}
+                  contactId={contactId}
+                  orgId={orgId}
+                  isVerified={emailVerified}
+                  onVerified={onVerificationChange}
+                  compact
+                />
+              </>
             ) : (
               <Button
                 size="icon"
