@@ -79,8 +79,8 @@ export default function DocumentUpload({ applicationId, orgId }: DocumentUploadP
   const uploadMutation = useMutation({
     mutationFn: async ({ docType, file }: { docType: string; file: File }) => {
       const fileExt = file.name.split(".").pop();
-      const fileName = `${applicationId}/${docType}_${Date.now()}.${fileExt}`;
-      const filePath = `loan-documents/${fileName}`;
+      // Path structure: {orgId}/{applicationId}/{docType}_{timestamp}.{ext}
+      const filePath = `${orgId}/${applicationId}/${docType}_${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from("loan-documents")
