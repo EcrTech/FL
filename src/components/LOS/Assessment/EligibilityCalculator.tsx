@@ -50,8 +50,10 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
         .from("loan_applications")
         .select(`
           *,
-          loan_applicants(*),
-          loan_employment_details(*),
+          loan_applicants(
+            *,
+            loan_employment_details(*)
+          ),
           loan_verifications(*)
         `)
         .eq("id", applicationId)
@@ -128,10 +130,8 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
 
   const runPolicyChecks = () => {
     const checks: Record<string, { passed: boolean; details: string }> = {};
-    const applicant = application?.loan_applicants?.[0];
-    const employment = Array.isArray(application?.loan_employment_details) 
-      ? application?.loan_employment_details[0] 
-      : application?.loan_employment_details;
+    const applicant = application?.loan_applicants?.[0] as any;
+    const employment = applicant?.loan_employment_details?.[0] || applicant?.loan_employment_details;
     const creditBureau = application?.loan_verifications?.find((v: any) => v.verification_type === "credit_bureau");
 
     // Age check
