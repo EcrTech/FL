@@ -45,7 +45,7 @@ const STATUS_COLORS: Record<string, string> = {
 export default function ApplicationDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { orgId } = useOrgContext();
+  const { orgId, isLoading: isOrgLoading } = useOrgContext();
   const [approvalAction, setApprovalAction] = useState<"approve" | "reject" | null>(null);
 
   const { data: userData } = useQuery({
@@ -103,7 +103,7 @@ export default function ApplicationDetail() {
     return parts.length > 0 ? parts.join(", ") : "N/A";
   };
 
-  if (isLoading) {
+  if (isLoading || isOrgLoading) {
     return (
       <DashboardLayout>
         <LoadingState message="Loading application..." />
