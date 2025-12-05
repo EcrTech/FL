@@ -72,6 +72,16 @@ export default function NewApplication() {
     salary_mode: "",
     salary_bank_name: "",
     salary_account_number: "",
+    
+    // References
+    reference1_name: "",
+    reference1_email: "",
+    reference1_phone: "",
+    reference1_address: "",
+    reference2_name: "",
+    reference2_email: "",
+    reference2_phone: "",
+    reference2_address: "",
   });
 
   const updateField = (field: string, value: any) => {
@@ -215,7 +225,7 @@ export default function NewApplication() {
     createApplicationMutation.mutate();
   };
 
-  const tabOrder = ["basic", "applicant", "address", "employment"];
+  const tabOrder = ["basic", "applicant", "address", "employment", "references"];
   const currentIndex = tabOrder.indexOf(currentTab);
 
   const goToNextTab = () => {
@@ -250,11 +260,12 @@ export default function NewApplication() {
         </div>
 
         <Tabs value={currentTab} onValueChange={setCurrentTab}>
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="basic">Basic Details</TabsTrigger>
             <TabsTrigger value="applicant">Applicant</TabsTrigger>
             <TabsTrigger value="address">Address</TabsTrigger>
             <TabsTrigger value="employment">Employment</TabsTrigger>
+            <TabsTrigger value="references">References</TabsTrigger>
           </TabsList>
 
           {/* Basic Details Tab */}
@@ -813,6 +824,111 @@ export default function NewApplication() {
                       id="salary_account_number"
                       value={formData.salary_account_number}
                       onChange={(e) => updateField("salary_account_number", e.target.value)}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* References Tab */}
+          <TabsContent value="references">
+            <Card>
+              <CardHeader>
+                <CardTitle>References</CardTitle>
+                <CardDescription>
+                  Provide two personal or professional references
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Reference 1 */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold">Reference 1</h3>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="reference1_name">Name *</Label>
+                      <Input
+                        id="reference1_name"
+                        value={formData.reference1_name}
+                        onChange={(e) => updateField("reference1_name", e.target.value)}
+                        placeholder="Full name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="reference1_phone">Phone *</Label>
+                      <Input
+                        id="reference1_phone"
+                        type="tel"
+                        value={formData.reference1_phone}
+                        onChange={(e) => updateField("reference1_phone", e.target.value)}
+                        maxLength={10}
+                        placeholder="Mobile number"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="reference1_email">Email</Label>
+                    <Input
+                      id="reference1_email"
+                      type="email"
+                      value={formData.reference1_email}
+                      onChange={(e) => updateField("reference1_email", e.target.value)}
+                      placeholder="Email address"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="reference1_address">Address</Label>
+                    <Input
+                      id="reference1_address"
+                      value={formData.reference1_address}
+                      onChange={(e) => updateField("reference1_address", e.target.value)}
+                      placeholder="Full address"
+                    />
+                  </div>
+                </div>
+
+                {/* Reference 2 */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold">Reference 2</h3>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="reference2_name">Name *</Label>
+                      <Input
+                        id="reference2_name"
+                        value={formData.reference2_name}
+                        onChange={(e) => updateField("reference2_name", e.target.value)}
+                        placeholder="Full name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="reference2_phone">Phone *</Label>
+                      <Input
+                        id="reference2_phone"
+                        type="tel"
+                        value={formData.reference2_phone}
+                        onChange={(e) => updateField("reference2_phone", e.target.value)}
+                        maxLength={10}
+                        placeholder="Mobile number"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="reference2_email">Email</Label>
+                    <Input
+                      id="reference2_email"
+                      type="email"
+                      value={formData.reference2_email}
+                      onChange={(e) => updateField("reference2_email", e.target.value)}
+                      placeholder="Email address"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="reference2_address">Address</Label>
+                    <Input
+                      id="reference2_address"
+                      value={formData.reference2_address}
+                      onChange={(e) => updateField("reference2_address", e.target.value)}
+                      placeholder="Full address"
                     />
                   </div>
                 </div>
