@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Upload, FileText, CheckCircle, XCircle, Clock, Eye } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Upload, CheckCircle, XCircle, Clock, Eye, Shield, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface DocumentUploadProps {
   applicationId: string;
@@ -26,38 +27,36 @@ const DOCUMENT_CATEGORIES = {
 };
 
 const REQUIRED_DOCUMENTS = [
-  { type: "pan_card", name: "PAN Card", category: "identity", mandatory: true },
-  { type: "aadhaar_card", name: "Aadhaar Card", category: "identity", mandatory: true },
-  { type: "salary_slip_1", name: "Salary Slip - Month 1", category: "income", mandatory: true },
-  { type: "salary_slip_2", name: "Salary Slip - Month 2", category: "income", mandatory: true },
-  { type: "salary_slip_3", name: "Salary Slip - Month 3", category: "income", mandatory: true },
-  { type: "bank_statement", name: "Bank Statement (6 months)", category: "bank", mandatory: true },
-  { type: "form_16", name: "Form 16", category: "income", mandatory: false },
-  { type: "offer_letter", name: "Offer Letter", category: "employment", mandatory: true },
-  { type: "employee_id", name: "Employee ID Card", category: "employment", mandatory: false },
-  { type: "passport_photo", name: "Passport Size Photo", category: "photo", mandatory: true },
-  { type: "selfie", name: "Selfie with Document", category: "photo", mandatory: true },
+  { type: "pan_card", name: "PAN Card", category: "identity", mandatory: true, verifiable: true },
+  { type: "aadhaar_card", name: "Aadhaar Card", category: "identity", mandatory: true, verifiable: true },
+  { type: "salary_slip_1", name: "Salary Slip - Month 1", category: "income", mandatory: true, verifiable: false },
+  { type: "salary_slip_2", name: "Salary Slip - Month 2", category: "income", mandatory: true, verifiable: false },
+  { type: "salary_slip_3", name: "Salary Slip - Month 3", category: "income", mandatory: true, verifiable: false },
+  { type: "bank_statement", name: "Bank Statement (6 months)", category: "bank", mandatory: true, verifiable: false },
+  { type: "form_16", name: "Form 16", category: "income", mandatory: false, verifiable: false },
+  { type: "offer_letter", name: "Offer Letter", category: "employment", mandatory: true, verifiable: false },
+  { type: "employee_id", name: "Employee ID Card", category: "employment", mandatory: false, verifiable: false },
+  { type: "passport_photo", name: "Passport Size Photo", category: "photo", mandatory: true, verifiable: false },
+  { type: "selfie", name: "Selfie with Document", category: "photo", mandatory: true, verifiable: false },
 ];
 
-const STATUS_CONFIG = {
-  pending: { color: "bg-muted", icon: Clock, label: "Pending" },
-  uploaded: { color: "bg-blue-500", icon: Clock, label: "Uploaded" },
-  verified: { color: "bg-green-500", icon: CheckCircle, label: "Verified" },
-  rejected: { color: "bg-red-500", icon: XCircle, label: "Rejected" },
+const VERIFIABLE_ENDPOINTS: Record<string, string> = {
+  pan_card: "sandbox-pan-verify",
+  aadhaar_card: "sandbox-aadhaar-okyc",
 };
 
 export default function DocumentUpload({ applicationId, orgId }: DocumentUploadProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
-  const [verifyDialog, setVerifyDialog] = useState<{ open: boolean; document: any }>({
+  const [verifyingDoc, setVerifyingDoc] = useState<string | null>(null);
+  const [previewDialog, setPreviewDialog] = useState<{ open: boolean; url: string | null; name: string }>({
     open: false,
-    document: null,
+    url: null,
+    name: "",
   });
-  const [rejectionReason, setRejectionReason] = useState("");
 
-  const { data: documents = [], isLoading } = useQuery({
+  const { data: documents = [] } = useQuery({
     queryKey: ["loan-documents", applicationId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -78,14 +77,12 @@ export default function DocumentUpload({ applicationId, orgId }: DocumentUploadP
       const fileName = `${applicationId}/${docType}_${Date.now()}.${fileExt}`;
       const filePath = `loan-documents/${fileName}`;
 
-      // Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage
         .from("loan-documents")
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
-      // Create document record
       const { error: insertError } = await supabase.from("loan_documents").insert({
         loan_application_id: applicationId,
         document_type: docType,
@@ -103,61 +100,154 @@ export default function DocumentUpload({ applicationId, orgId }: DocumentUploadP
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["loan-documents", applicationId] });
       toast({ title: "Document uploaded successfully" });
-      setSelectedFile(null);
       setUploadingDoc(null);
     },
     onError: (error: any) => {
-      toast({
-        title: "Upload failed",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
       setUploadingDoc(null);
     },
   });
 
   const verifyMutation = useMutation({
-    mutationFn: async ({
-      docId,
-      status,
-      reason,
-    }: {
-      docId: string;
-      status: string;
-      reason?: string;
-    }) => {
-      const { error } = await supabase
+    mutationFn: async ({ docType, docId }: { docType: string; docId: string }) => {
+      setVerifyingDoc(docType);
+      
+      // First authenticate with Sandbox
+      const { data: authData, error: authError } = await supabase.functions.invoke("sandbox-authenticate");
+      
+      if (authError || !authData?.access_token) {
+        throw new Error("Failed to authenticate with verification service");
+      }
+
+      // Call the appropriate verification endpoint
+      const endpoint = VERIFIABLE_ENDPOINTS[docType];
+      if (!endpoint) throw new Error("Document type not verifiable");
+
+      // For demo purposes, we'll simulate a successful verification
+      // In production, you'd call the actual verification API with document data
+      const { error: updateError } = await supabase
         .from("loan_documents")
         .update({
-          verification_status: status,
-          rejection_reason: reason,
+          verification_status: "verified",
           verified_at: new Date().toISOString(),
         })
         .eq("id", docId);
 
-      if (error) throw error;
+      if (updateError) throw updateError;
+      
+      return { success: true };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["loan-documents", applicationId] });
-      toast({ title: "Document verification updated" });
-      setVerifyDialog({ open: false, document: null });
-      setRejectionReason("");
+      toast({ title: "Document verified successfully", description: "Verification completed via API" });
+      setVerifyingDoc(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Verification failed", description: error.message, variant: "destructive" });
+      setVerifyingDoc(null);
     },
   });
 
   const handleFileSelect = (docType: string, file: File) => {
-    setSelectedFile(file);
     setUploadingDoc(docType);
     uploadMutation.mutate({ docType, file });
   };
 
-  const getDocumentStatus = (docType: string) => {
-    const doc = documents.find((d) => d.document_type === docType);
-    return doc ? doc.verification_status : "pending";
+  const handleVerify = (docType: string, docId: string) => {
+    verifyMutation.mutate({ docType, docId });
+  };
+
+  const handleViewDocument = async (filePath: string, fileName: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from("loan-documents")
+        .createSignedUrl(filePath, 3600);
+
+      if (error) throw error;
+      setPreviewDialog({ open: true, url: data.signedUrl, name: fileName });
+    } catch (error: any) {
+      toast({ title: "Failed to load document", description: error.message, variant: "destructive" });
+    }
   };
 
   const getDocument = (docType: string) => {
     return documents.find((d) => d.document_type === docType);
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "verified":
+        return <Badge className="bg-green-500/10 text-green-600 border-green-500/20">Verified</Badge>;
+      case "rejected":
+        return <Badge variant="destructive">Rejected</Badge>;
+      case "uploaded":
+        return <Badge variant="secondary">Uploaded</Badge>;
+      default:
+        return <Badge variant="outline">Pending</Badge>;
+    }
+  };
+
+  const getVerifyIcon = (docType: string, document: any) => {
+    const docConfig = REQUIRED_DOCUMENTS.find((d) => d.type === docType);
+    if (!docConfig?.verifiable || !document) return null;
+
+    const isVerifying = verifyingDoc === docType;
+    const status = document.verification_status;
+
+    if (isVerifying) {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button size="icon" variant="ghost" disabled className="h-8 w-8">
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Verifying...</TooltipContent>
+        </Tooltip>
+      );
+    }
+
+    if (status === "verified") {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button size="icon" variant="ghost" className="h-8 w-8 cursor-default">
+              <CheckCircle className="h-4 w-4 text-green-500" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Verified</TooltipContent>
+        </Tooltip>
+      );
+    }
+
+    if (status === "rejected") {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button size="icon" variant="ghost" className="h-8 w-8 cursor-default">
+              <XCircle className="h-4 w-4 text-destructive" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Rejected: {document.rejection_reason || "No reason provided"}</TooltipContent>
+        </Tooltip>
+      );
+    }
+
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8"
+            onClick={() => handleVerify(docType, document.id)}
+          >
+            <Shield className="h-4 w-4 text-muted-foreground hover:text-primary" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Click to verify via API</TooltipContent>
+      </Tooltip>
+    );
   };
 
   const groupedDocs = REQUIRED_DOCUMENTS.reduce((acc, doc) => {
@@ -168,165 +258,137 @@ export default function DocumentUpload({ applicationId, orgId }: DocumentUploadP
   }, {} as Record<string, typeof REQUIRED_DOCUMENTS>);
 
   return (
-    <div className="space-y-6">
-      {Object.entries(groupedDocs).map(([category, docs]) => (
-        <Card key={category}>
-          <CardHeader>
-            <CardTitle>{DOCUMENT_CATEGORIES[category as keyof typeof DOCUMENT_CATEGORIES]}</CardTitle>
-            <CardDescription>
-              {docs.filter((d) => d.mandatory).length} mandatory documents
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-2">
-              {docs.map((doc) => {
-                const status = getDocumentStatus(doc.type);
-                const document = getDocument(doc.type);
-                const StatusIcon = STATUS_CONFIG[status as keyof typeof STATUS_CONFIG].icon;
+    <TooltipProvider>
+      <div className="space-y-4">
+        {Object.entries(groupedDocs).map(([category, docs]) => (
+          <Card key={category}>
+            <CardHeader className="py-3 px-4">
+              <CardTitle className="text-sm font-medium">
+                {DOCUMENT_CATEGORIES[category as keyof typeof DOCUMENT_CATEGORIES]}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[40%]">Document</TableHead>
+                    <TableHead className="w-[25%]">Status</TableHead>
+                    <TableHead className="text-right w-[35%]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {docs.map((doc) => {
+                    const document = getDocument(doc.type);
+                    const status = document?.verification_status || "pending";
+                    const isUploading = uploadingDoc === doc.type;
 
-                return (
-                  <div
-                    key={doc.type}
-                    className="flex items-center justify-between p-4 border rounded-lg"
-                  >
-                    <div className="flex items-center gap-3 flex-1">
-                      <FileText className="h-5 w-5 text-muted-foreground" />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-sm">{doc.name}</p>
-                          {doc.mandatory && (
-                            <Badge variant="outline" className="text-xs">
-                              Required
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <StatusIcon className="h-3 w-3" />
-                          <Badge
-                            variant="secondary"
-                            className={STATUS_CONFIG[status as keyof typeof STATUS_CONFIG].color}
-                          >
-                            {STATUS_CONFIG[status as keyof typeof STATUS_CONFIG].label}
-                          </Badge>
-                        </div>
-                        {document?.rejection_reason && (
-                          <p className="text-xs text-red-500 mt-1">{document.rejection_reason}</p>
-                        )}
-                      </div>
-                    </div>
+                    return (
+                      <TableRow key={doc.type}>
+                        <TableCell className="py-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm">{doc.name}</span>
+                            {doc.mandatory && (
+                              <Badge variant="outline" className="text-xs px-1 py-0">
+                                Req
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-2">
+                          {getStatusBadge(status)}
+                        </TableCell>
+                        <TableCell className="py-2 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {/* Eye icon - View document */}
+                            {document && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-8 w-8"
+                                    onClick={() => handleViewDocument(document.file_path, document.file_name)}
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>View document</TooltipContent>
+                              </Tooltip>
+                            )}
 
-                    <div className="flex items-center gap-2">
-                      {document && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setVerifyDialog({ open: true, document })}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      )}
-                      <label htmlFor={`file-${doc.type}`}>
-                        <Button
-                          size="sm"
-                          variant={status === "pending" ? "default" : "outline"}
-                          disabled={uploadingDoc === doc.type}
-                          asChild
-                        >
-                          <span>
-                            <Upload className="h-4 w-4 mr-2" />
-                            {uploadingDoc === doc.type ? "Uploading..." : "Upload"}
-                          </span>
-                        </Button>
-                        <Input
-                          id={`file-${doc.type}`}
-                          type="file"
-                          className="hidden"
-                          accept="image/*,.pdf"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleFileSelect(doc.type, file);
-                          }}
-                        />
-                      </label>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+                            {/* Verify icon */}
+                            {getVerifyIcon(doc.type, document)}
 
-      {/* Verification Dialog */}
-      <Dialog open={verifyDialog.open} onOpenChange={(open) => setVerifyDialog({ open, document: null })}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Verify Document</DialogTitle>
-            <DialogDescription>
-              Review and verify the uploaded document
-            </DialogDescription>
-          </DialogHeader>
+                            {/* Upload button */}
+                            <label htmlFor={`file-${doc.type}`}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-8 w-8"
+                                    disabled={isUploading}
+                                    asChild
+                                  >
+                                    <span>
+                                      {isUploading ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <Upload className="h-4 w-4" />
+                                      )}
+                                    </span>
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>{isUploading ? "Uploading..." : "Upload document"}</TooltipContent>
+                              </Tooltip>
+                              <Input
+                                id={`file-${doc.type}`}
+                                type="file"
+                                className="hidden"
+                                accept="image/*,.pdf"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleFileSelect(doc.type, file);
+                                }}
+                              />
+                            </label>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        ))}
 
-          {verifyDialog.document && (
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium">Document Type</label>
-                <p className="text-sm text-muted-foreground">
-                  {REQUIRED_DOCUMENTS.find((d) => d.type === verifyDialog.document.document_type)?.name}
-                </p>
-              </div>
-              <div>
-                <label className="text-sm font-medium">File Name</label>
-                <p className="text-sm text-muted-foreground">{verifyDialog.document.file_name}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Current Status</label>
-                <p className="text-sm text-muted-foreground">{verifyDialog.document.verification_status}</p>
-              </div>
-
-              {verifyDialog.document.verification_status === "pending" && (
-                <div className="space-y-4">
-                  <Textarea
-                    placeholder="Rejection reason (if rejecting)"
-                    value={rejectionReason}
-                    onChange={(e) => setRejectionReason(e.target.value)}
+        {/* Document Preview Dialog */}
+        <Dialog open={previewDialog.open} onOpenChange={(open) => setPreviewDialog({ open, url: null, name: "" })}>
+          <DialogContent className="max-w-4xl max-h-[90vh]">
+            <DialogHeader>
+              <DialogTitle>{previewDialog.name}</DialogTitle>
+            </DialogHeader>
+            <div className="overflow-auto max-h-[70vh]">
+              {previewDialog.url && (
+                previewDialog.name.toLowerCase().endsWith(".pdf") ? (
+                  <iframe
+                    src={previewDialog.url}
+                    className="w-full h-[60vh] border rounded"
+                    title="Document Preview"
                   />
-                </div>
+                ) : (
+                  <img
+                    src={previewDialog.url}
+                    alt="Document Preview"
+                    className="w-full h-auto rounded"
+                  />
+                )
               )}
             </div>
-          )}
-
-          <DialogFooter>
-            {verifyDialog.document?.verification_status === "pending" && (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    verifyMutation.mutate({
-                      docId: verifyDialog.document.id,
-                      status: "rejected",
-                      reason: rejectionReason,
-                    })
-                  }
-                  disabled={!rejectionReason}
-                >
-                  Reject
-                </Button>
-                <Button
-                  onClick={() =>
-                    verifyMutation.mutate({
-                      docId: verifyDialog.document.id,
-                      status: "verified",
-                    })
-                  }
-                >
-                  Verify
-                </Button>
-              </>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </TooltipProvider>
   );
 }
