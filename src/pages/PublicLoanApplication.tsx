@@ -143,6 +143,8 @@ export default function PublicLoanApplication() {
   const [geolocation, setGeolocation] = useState<{ latitude: number; longitude: number; accuracy: number } | null>(null);
   const [formStartTime] = useState(Date.now());
   const [honeypot, setHoneypot] = useState("");
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [savingDraft, setSavingDraft] = useState(false);
 
   // Fetch form config
   useEffect(() => {
@@ -206,8 +208,40 @@ export default function PublicLoanApplication() {
     }));
   };
 
-  const nextStep = () => {
+  // Save draft application after personal details step
+  const saveDraftApplication = async () => {
+    if (savingDraft) return;
+    
+    setSavingDraft(true);
+    try {
+      const response = await supabase.functions.invoke("save-draft-application", {
+        body: {
+          formSlug: slug,
+          draftId,
+          loanDetails: formData.loanDetails,
+          personalDetails: formData.personalDetails,
+          geolocation,
+        },
+      });
+
+      if (response.data?.draftId) {
+        setDraftId(response.data.draftId);
+        console.log("Draft saved:", response.data.draftId);
+      }
+    } catch (err) {
+      console.error("Error saving draft:", err);
+      // Don't show error to user - draft save is background operation
+    } finally {
+      setSavingDraft(false);
+    }
+  };
+
+  const nextStep = async () => {
     if (currentStep < STEPS.length) {
+      // Save draft after completing personal details (step 2)
+      if (currentStep === 2 && formData.personalDetails.fullName && formData.personalDetails.mobile) {
+        saveDraftApplication();
+      }
       setCurrentStep(currentStep + 1);
       window.scrollTo(0, 0);
     }
@@ -237,6 +271,7 @@ export default function PublicLoanApplication() {
           formSlug: slug,
           formStartTime,
           honeypot,
+          draftId, // Pass draft ID if exists
           loanDetails: {
             amount: formData.loanDetails.amount,
             tenure: formData.loanDetails.tenure,
