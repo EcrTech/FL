@@ -183,9 +183,53 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Generate application number
-    const applicationNumber = generateApplicationNumber();
-    console.log(`[submit-loan-application] Generated application number: ${applicationNumber}`);
+    // Check if we have an existing draft to update
+    const draftId = body.draftId;
+    let application: any;
+    let applicationNumber: string = generateApplicationNumber();
+
+    if (draftId) {
+      // Update existing draft application
+      console.log(`[submit-loan-application] Updating existing draft: ${draftId}`);
+      
+      const { data: existingApp, error: fetchError } = await supabase
+        .from('loan_applications')
+        .select('id, application_number')
+        .eq('id', draftId)
+        .single();
+
+      if (!fetchError && existingApp) {
+        applicationNumber = existingApp.application_number;
+        
+        // Update the draft to submitted status
+        const { data: updatedApp, error: updateError } = await supabase
+          .from('loan_applications')
+          .update({
+            requested_amount: loanAmount,
+            tenure_months: body.loanDetails.tenure,
+            status: 'in_progress',
+            latitude: body.geolocation?.latitude || null,
+            longitude: body.geolocation?.longitude || null,
+            geolocation_accuracy: body.geolocation?.accuracy || null,
+            submitted_from_ip: clientIP,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', draftId)
+          .select()
+          .single();
+
+        if (updateError) {
+          console.error('[submit-loan-application] Error updating draft:', updateError);
+        } else {
+          application = updatedApp;
+          console.log(`[submit-loan-application] Draft updated: ${applicationNumber}`);
+        }
+      } else {
+        console.log(`[submit-loan-application] Draft not found, creating new application`);
+      }
+    }
+
+    console.log(`[submit-loan-application] Using application number: ${applicationNumber}`);
 
     // Upload documents to storage
     const uploadedDocuments: Array<{ type: string; path: string; name: string }> = [];
@@ -226,33 +270,36 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Create loan application
-    const { data: application, error: appError } = await supabase
-      .from('loan_applications')
-      .insert({
-        org_id: formConfig.org_id,
-        form_id: formConfig.id,
-        application_number: applicationNumber,
-        product_type: formConfig.product_type,
-        requested_amount: loanAmount,
-        tenure_months: body.loanDetails.tenure,
-        current_stage: 'application_login',
-        status: 'in_progress',
-        source: 'public_form',
-        latitude: body.geolocation?.latitude || null,
-        longitude: body.geolocation?.longitude || null,
-        geolocation_accuracy: body.geolocation?.accuracy || null,
-        submitted_from_ip: clientIP
-      })
-      .select()
-      .single();
+    // Create loan application only if not updated from draft
+    if (!application) {
+      const { data: newApp, error: appError } = await supabase
+        .from('loan_applications')
+        .insert({
+          org_id: formConfig.org_id,
+          form_id: formConfig.id,
+          application_number: applicationNumber,
+          product_type: formConfig.product_type,
+          requested_amount: loanAmount,
+          tenure_months: body.loanDetails.tenure,
+          current_stage: 'application_login',
+          status: 'in_progress',
+          source: 'public_form',
+          latitude: body.geolocation?.latitude || null,
+          longitude: body.geolocation?.longitude || null,
+          geolocation_accuracy: body.geolocation?.accuracy || null,
+          submitted_from_ip: clientIP
+        })
+        .select()
+        .single();
 
-    if (appError) {
-      console.error('[submit-loan-application] Application creation error:', appError);
-      throw new Error('Failed to create application');
+      if (appError) {
+        console.error('[submit-loan-application] Error creating application:', appError);
+        throw appError;
+      }
+      application = newApp;
     }
 
-    console.log(`[submit-loan-application] Created application: ${application.id}`);
+    console.log(`[submit-loan-application] Created/Updated application: ${application.id}`);
 
     // Parse name into first/last
     const nameParts = body.personalDetails.fullName.trim().split(' ');

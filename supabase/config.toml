@@ -2,3 +2,9 @@ project_id = "xopuasvbypkiszcqgdwm"
 
 [functions.parse-loan-document]
 verify_jwt = true
+
+[functions.save-draft-application]
+verify_jwt = false
+
+[functions.submit-loan-application]
+verify_jwt = false
