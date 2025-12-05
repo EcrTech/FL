@@ -7,9 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Upload, CheckCircle, XCircle, Clock, Eye, Shield, Loader2 } from "lucide-react";
+import { Upload, CheckCircle, XCircle, Clock, Eye, Shield, Loader2, Wand2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 interface DocumentUploadProps {
   applicationId: string;
@@ -27,17 +28,20 @@ const DOCUMENT_CATEGORIES = {
 };
 
 const REQUIRED_DOCUMENTS = [
-  { type: "pan_card", name: "PAN Card", category: "identity", mandatory: true, verifiable: true },
-  { type: "aadhaar_card", name: "Aadhaar Card", category: "identity", mandatory: true, verifiable: true },
-  { type: "salary_slip_1", name: "Salary Slip - Month 1", category: "income", mandatory: true, verifiable: false },
-  { type: "salary_slip_2", name: "Salary Slip - Month 2", category: "income", mandatory: true, verifiable: false },
-  { type: "salary_slip_3", name: "Salary Slip - Month 3", category: "income", mandatory: true, verifiable: false },
-  { type: "bank_statement", name: "Bank Statement (6 months)", category: "bank", mandatory: true, verifiable: false },
-  { type: "form_16", name: "Form 16", category: "income", mandatory: false, verifiable: false },
-  { type: "offer_letter", name: "Offer Letter", category: "employment", mandatory: true, verifiable: false },
-  { type: "employee_id", name: "Employee ID Card", category: "employment", mandatory: false, verifiable: false },
-  { type: "passport_photo", name: "Passport Size Photo", category: "photo", mandatory: true, verifiable: false },
-  { type: "selfie", name: "Selfie with Document", category: "photo", mandatory: true, verifiable: false },
+  { type: "pan_card", name: "PAN Card", category: "identity", mandatory: true, verifiable: true, parseable: true },
+  { type: "aadhaar_card", name: "Aadhaar Card", category: "identity", mandatory: true, verifiable: true, parseable: true },
+  { type: "salary_slip_1", name: "Salary Slip - Month 1", category: "income", mandatory: true, verifiable: false, parseable: true },
+  { type: "salary_slip_2", name: "Salary Slip - Month 2", category: "income", mandatory: true, verifiable: false, parseable: true },
+  { type: "salary_slip_3", name: "Salary Slip - Month 3", category: "income", mandatory: true, verifiable: false, parseable: true },
+  { type: "form_16_year_1", name: "Form 16 (Current Year)", category: "income", mandatory: true, verifiable: false, parseable: true },
+  { type: "form_16_year_2", name: "Form 16 (Previous Year)", category: "income", mandatory: true, verifiable: false, parseable: true },
+  { type: "itr_year_1", name: "ITR (Current Year)", category: "income", mandatory: false, verifiable: false, parseable: true },
+  { type: "itr_year_2", name: "ITR (Previous Year)", category: "income", mandatory: false, verifiable: false, parseable: true },
+  { type: "bank_statement", name: "Bank Statement (6 months)", category: "bank", mandatory: true, verifiable: false, parseable: false },
+  { type: "offer_letter", name: "Offer Letter", category: "employment", mandatory: true, verifiable: false, parseable: false },
+  { type: "employee_id", name: "Employee ID Card", category: "employment", mandatory: false, verifiable: false, parseable: false },
+  { type: "passport_photo", name: "Passport Size Photo", category: "photo", mandatory: true, verifiable: false, parseable: false },
+  { type: "selfie", name: "Selfie with Document", category: "photo", mandatory: true, verifiable: false, parseable: false },
 ];
 
 const VERIFIABLE_ENDPOINTS: Record<string, string> = {
@@ -50,6 +54,7 @@ export default function DocumentUpload({ applicationId, orgId }: DocumentUploadP
   const queryClient = useQueryClient();
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
   const [verifyingDoc, setVerifyingDoc] = useState<string | null>(null);
+  const [parsingDoc, setParsingDoc] = useState<string | null>(null);
   const [previewDialog, setPreviewDialog] = useState<{ open: boolean; url: string | null; name: string }>({
     open: false,
     url: null,
@@ -157,6 +162,34 @@ export default function DocumentUpload({ applicationId, orgId }: DocumentUploadP
     verifyMutation.mutate({ docType, docId });
   };
 
+  const parseMutation = useMutation({
+    mutationFn: async ({ docType, docId, filePath }: { docType: string; docId: string; filePath: string }) => {
+      setParsingDoc(docType);
+      
+      const { data, error } = await supabase.functions.invoke("parse-loan-document", {
+        body: { documentId: docId, documentType: docType, filePath },
+      });
+
+      if (error) throw error;
+      if (!data.success) throw new Error(data.error || "Parsing failed");
+      
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["loan-documents", applicationId] });
+      toast({ title: "Document parsed successfully", description: "Data extracted using AI" });
+      setParsingDoc(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Parsing failed", description: error.message, variant: "destructive" });
+      setParsingDoc(null);
+    },
+  });
+
+  const handleParse = (docType: string, docId: string, filePath: string) => {
+    parseMutation.mutate({ docType, docId, filePath });
+  };
+
   const handleViewDocument = async (filePath: string, fileName: string) => {
     try {
       const { data, error } = await supabase.storage
@@ -187,9 +220,93 @@ export default function DocumentUpload({ applicationId, orgId }: DocumentUploadP
     }
   };
 
+  const getParseIcon = (docType: string, document: any) => {
+    const docConfig = REQUIRED_DOCUMENTS.find((d) => d.type === docType);
+    if (!docConfig?.parseable) return null;
+
+    const isParsing = parsingDoc === docType;
+    const hasParsedData = document?.ocr_data && !document.ocr_data.parse_error;
+
+    if (!document) {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button size="icon" variant="ghost" className="h-8 w-8" disabled>
+              <Wand2 className="h-4 w-4 text-muted-foreground/40" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Upload document first to parse</TooltipContent>
+        </Tooltip>
+      );
+    }
+
+    if (isParsing) {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button size="icon" variant="ghost" disabled className="h-8 w-8">
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Parsing with AI...</TooltipContent>
+        </Tooltip>
+      );
+    }
+
+    if (hasParsedData) {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button 
+              size="icon" 
+              variant="ghost" 
+              className="h-8 w-8"
+              onClick={() => handleParse(docType, document.id, document.file_path)}
+            >
+              <CheckCircle className="h-4 w-4 text-green-500" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Parsed - Click to re-parse</TooltipContent>
+        </Tooltip>
+      );
+    }
+
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8"
+            onClick={() => handleParse(docType, document.id, document.file_path)}
+          >
+            <Wand2 className="h-4 w-4 text-muted-foreground hover:text-primary" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Parse with AI</TooltipContent>
+      </Tooltip>
+    );
+  };
+
   const getVerifyIcon = (docType: string, document: any) => {
     const docConfig = REQUIRED_DOCUMENTS.find((d) => d.type === docType);
-    if (!docConfig?.verifiable || !document) return null;
+    
+    // Not verifiable - don't show
+    if (!docConfig?.verifiable) return null;
+
+    // No document - show disabled
+    if (!document) {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button size="icon" variant="ghost" className="h-8 w-8" disabled>
+              <Shield className="h-4 w-4 text-muted-foreground/40" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Upload document first to verify</TooltipContent>
+        </Tooltip>
+      );
+    }
 
     const isVerifying = verifyingDoc === docType;
     const status = document.verification_status;
@@ -300,21 +417,23 @@ export default function DocumentUpload({ applicationId, orgId }: DocumentUploadP
                         <TableCell className="py-2 text-right">
                           <div className="flex items-center justify-end gap-1">
                             {/* Eye icon - View document */}
-                            {document && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-8 w-8"
-                                    onClick={() => handleViewDocument(document.file_path, document.file_name)}
-                                  >
-                                    <Eye className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>View document</TooltipContent>
-                              </Tooltip>
-                            )}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-8 w-8"
+                                  disabled={!document}
+                                  onClick={() => document && handleViewDocument(document.file_path, document.file_name)}
+                                >
+                                  <Eye className={cn("h-4 w-4", !document && "text-muted-foreground/40")} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>{document ? "View document" : "No document uploaded"}</TooltipContent>
+                            </Tooltip>
+
+                            {/* Parse icon */}
+                            {getParseIcon(doc.type, document)}
 
                             {/* Verify icon */}
                             {getVerifyIcon(doc.type, document)}

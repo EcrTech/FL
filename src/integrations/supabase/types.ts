@@ -4273,6 +4273,112 @@ export type Database = {
           },
         ]
       }
+      loan_income_summaries: {
+        Row: {
+          annual_average_income: number | null
+          applicant_id: string | null
+          average_monthly_income: number | null
+          created_at: string | null
+          id: string
+          income_growth_percentage: number | null
+          income_stability_score: string | null
+          loan_application_id: string
+          monthly_deductions: number | null
+          monthly_gross_salary: number | null
+          monthly_net_salary: number | null
+          org_id: string
+          salary_slip_details: Json | null
+          source_documents: Json | null
+          updated_at: string | null
+          year_1_gross_income: number | null
+          year_1_label: string | null
+          year_1_source: string | null
+          year_1_tax_paid: number | null
+          year_1_taxable_income: number | null
+          year_2_gross_income: number | null
+          year_2_label: string | null
+          year_2_source: string | null
+          year_2_tax_paid: number | null
+          year_2_taxable_income: number | null
+        }
+        Insert: {
+          annual_average_income?: number | null
+          applicant_id?: string | null
+          average_monthly_income?: number | null
+          created_at?: string | null
+          id?: string
+          income_growth_percentage?: number | null
+          income_stability_score?: string | null
+          loan_application_id: string
+          monthly_deductions?: number | null
+          monthly_gross_salary?: number | null
+          monthly_net_salary?: number | null
+          org_id: string
+          salary_slip_details?: Json | null
+          source_documents?: Json | null
+          updated_at?: string | null
+          year_1_gross_income?: number | null
+          year_1_label?: string | null
+          year_1_source?: string | null
+          year_1_tax_paid?: number | null
+          year_1_taxable_income?: number | null
+          year_2_gross_income?: number | null
+          year_2_label?: string | null
+          year_2_source?: string | null
+          year_2_tax_paid?: number | null
+          year_2_taxable_income?: number | null
+        }
+        Update: {
+          annual_average_income?: number | null
+          applicant_id?: string | null
+          average_monthly_income?: number | null
+          created_at?: string | null
+          id?: string
+          income_growth_percentage?: number | null
+          income_stability_score?: string | null
+          loan_application_id?: string
+          monthly_deductions?: number | null
+          monthly_gross_salary?: number | null
+          monthly_net_salary?: number | null
+          org_id?: string
+          salary_slip_details?: Json | null
+          source_documents?: Json | null
+          updated_at?: string | null
+          year_1_gross_income?: number | null
+          year_1_label?: string | null
+          year_1_source?: string | null
+          year_1_tax_paid?: number | null
+          year_1_taxable_income?: number | null
+          year_2_gross_income?: number | null
+          year_2_label?: string | null
+          year_2_source?: string | null
+          year_2_tax_paid?: number | null
+          year_2_taxable_income?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loan_income_summaries_applicant_id_fkey"
+            columns: ["applicant_id"]
+            isOneToOne: false
+            referencedRelation: "loan_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_income_summaries_loan_application_id_fkey"
+            columns: ["loan_application_id"]
+            isOneToOne: true
+            referencedRelation: "loan_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_income_summaries_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       loan_negative_areas: {
         Row: {
           area_type: string

@@ -12,6 +12,8 @@ import { ArrowLeft, User, FileText, CheckCircle, Calculator, ThumbsUp, FileCheck
 import { LoadingState } from "@/components/common/LoadingState";
 import { format } from "date-fns";
 import DocumentUpload from "@/components/LOS/DocumentUpload";
+import DocumentDataVerification from "@/components/LOS/DocumentDataVerification";
+import IncomeSummary from "@/components/LOS/IncomeSummary";
 import VerificationDashboard from "@/components/LOS/VerificationDashboard";
 import AssessmentDashboard from "@/components/LOS/Assessment/AssessmentDashboard";
 import ApprovalActionDialog from "@/components/LOS/Approval/ApprovalActionDialog";
@@ -284,8 +286,10 @@ export default function ApplicationDetail() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="documents">
+          <TabsContent value="documents" className="space-y-6">
             <DocumentUpload applicationId={application.id} orgId={orgId} />
+            <DocumentDataVerification applicationId={application.id} />
+            <IncomeSummary applicationId={application.id} orgId={orgId} />
           </TabsContent>
 
           <TabsContent value="verification">
