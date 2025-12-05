@@ -87,6 +87,16 @@ export default function PipelineBoard() {
     },
   });
 
+  // Set default stage to "Lead" when stages are loaded
+  useEffect(() => {
+    if (stagesData && !newLead.pipeline_stage_id) {
+      const leadStage = stagesData.find(s => s.name === "Lead");
+      if (leadStage) {
+        setNewLead(prev => ({ ...prev, pipeline_stage_id: leadStage.id }));
+      }
+    }
+  }, [stagesData]);
+
   const { data: contactsData, isLoading: contactsLoading } = useQuery({
     queryKey: ['leads-contacts', filters, tablePagination.currentPage, tablePagination.pageSize, stagesData],
     queryFn: async () => {
