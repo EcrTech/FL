@@ -72,8 +72,9 @@ export default function Applications() {
         .from("loan_applications")
         .select(`
           *,
+          loan_applicants(first_name, last_name),
           contacts(first_name, last_name),
-          assigned_profile:profiles!assigned_to(first_name, last_name)
+          assigned_profile:profiles!loan_applications_assigned_to_fkey(first_name, last_name)
         `)
         .eq("org_id", orgId)
         .order("created_at", { ascending: false });
@@ -87,7 +88,10 @@ export default function Applications() {
       }
 
       const { data, error } = await query;
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching loan applications:", error);
+        throw error;
+      }
       return data as any;
     },
     enabled: !!orgId,
@@ -115,11 +119,16 @@ export default function Applications() {
 
   const filteredApplications = applications.filter((app) => {
     const searchLower = searchQuery.toLowerCase();
+    const applicant = app.loan_applicants?.[0];
+    const applicantName = applicant
+      ? `${applicant.first_name || ""} ${applicant.last_name || ""}`.toLowerCase()
+      : "";
     const contactName = app.contacts
       ? `${app.contacts.first_name} ${app.contacts.last_name || ""}`.toLowerCase()
       : "";
     return (
-      app.application_number.toLowerCase().includes(searchLower) ||
+      (app.application_number || "").toLowerCase().includes(searchLower) ||
+      applicantName.includes(searchLower) ||
       contactName.includes(searchLower)
     );
   });
@@ -297,9 +306,11 @@ export default function Applications() {
                       <div className="grid gap-2 md:grid-cols-3 text-sm text-muted-foreground">
                         <div>
                           <span className="font-medium">Applicant: </span>
-                          {app.contacts
-                            ? `${app.contacts.first_name} ${app.contacts.last_name || ""}`
-                            : "Not linked"}
+                          {app.loan_applicants?.[0]
+                            ? `${app.loan_applicants[0].first_name} ${app.loan_applicants[0].last_name || ""}`
+                            : app.contacts
+                              ? `${app.contacts.first_name} ${app.contacts.last_name || ""}`
+                              : "Not linked"}
                         </div>
                         <div>
                           <span className="font-medium">Amount: </span>
