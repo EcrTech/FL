@@ -64,6 +64,8 @@ interface Contact {
   notes: string | null;
   pipeline_stage_id: string | null;
   created_at: string;
+  phone_verified?: boolean;
+  email_verified?: boolean;
   pipeline_stages: { name: string; color: string } | null;
   profiles: { first_name: string; last_name: string } | null;
 }
@@ -215,12 +217,24 @@ export default function ContactDetail() {
 
               <div>
                 <p className="text-sm font-medium mb-2">Email Addresses</p>
-                <ContactEmails contactId={id!} orgId={contact.org_id} readOnly />
+                <ContactEmails 
+                  contactId={id!} 
+                  orgId={contact.org_id} 
+                  readOnly 
+                  emailVerified={contact.email_verified}
+                  onVerificationChange={fetchContact}
+                />
               </div>
 
               <div>
                 <p className="text-sm font-medium mb-2">Phone Numbers</p>
-                <ContactPhones contactId={id!} orgId={contact.org_id} readOnly />
+                <ContactPhones 
+                  contactId={id!} 
+                  orgId={contact.org_id} 
+                  readOnly 
+                  phoneVerified={contact.phone_verified}
+                  onVerificationChange={fetchContact}
+                />
               </div>
 
               {contact.linkedin_url && (
