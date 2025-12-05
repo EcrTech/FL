@@ -41,6 +41,7 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
   });
 
   const [policyChecks, setPolicyChecks] = useState<Record<string, { passed: boolean; details: string }>>({});
+  const [hasCalculated, setHasCalculated] = useState(false);
 
   const { data: application } = useQuery({
     queryKey: ["loan-application-full", applicationId],
@@ -93,6 +94,7 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
         recommended_interest_rate: existingEligibility.recommended_interest_rate?.toString() || "12",
       });
       setPolicyChecks(existingEligibility.policy_checks as any || {});
+      setHasCalculated(true);
     }
   }, [existingEligibility]);
 
@@ -197,6 +199,7 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
       eligible_loan_amount: eligibleAmount.toString(),
     });
 
+    setHasCalculated(true);
     toast({ title: "Eligibility calculated successfully" });
   };
 
@@ -355,7 +358,7 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
         </CardContent>
       </Card>
 
-      {formData.foir_percentage !== "0" && (
+      {hasCalculated && (
         <>
           <Card>
             <CardHeader>
