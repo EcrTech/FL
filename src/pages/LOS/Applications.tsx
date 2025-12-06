@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrgContext } from "@/hooks/useOrgContext";
 import { useLOSPermissions } from "@/hooks/useLOSPermissions";
@@ -10,10 +10,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Search, Eye, Clock, FileText, Sparkles, UserPlus } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, Search, Eye, Clock, FileText, Sparkles, UserPlus, Phone } from "lucide-react";
 import { differenceInHours } from "date-fns";
 import { format } from "date-fns";
 import { LoadingState } from "@/components/common/LoadingState";
+import { toast } from "sonner";
+
+const STATUS_OPTIONS = [
+  { value: "new", label: "New" },
+  { value: "approved", label: "Approved" },
+  { value: "rejected", label: "Rejected" },
+  { value: "in_progress", label: "In-progress" },
+];
 
 // Section tabs for lead status
 const SECTIONS = [
@@ -58,6 +67,8 @@ export default function Applications() {
     return differenceInHours(new Date(), new Date(createdAt)) < 48;
   };
 
+  const queryClient = useQueryClient();
+
   const { data: applications = [], isLoading } = useQuery({
     queryKey: ["loan-applications", orgId],
     queryFn: async () => {
@@ -65,8 +76,8 @@ export default function Applications() {
         .from("loan_applications")
         .select(`
           *,
-          loan_applicants(first_name, last_name),
-          contacts(first_name, last_name),
+          loan_applicants(first_name, last_name, phone),
+          contacts(first_name, last_name, phone),
           assigned_profile:profiles!loan_applications_assigned_to_fkey(first_name, last_name),
           referrer:profiles!loan_applications_referred_by_fkey(full_name)
         `)
@@ -81,6 +92,42 @@ export default function Applications() {
     },
     enabled: !!orgId,
   });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ appId, status }: { appId: string; status: string }) => {
+      const { error } = await supabase
+        .from("loan_applications")
+        .update({ status })
+        .eq("id", appId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["loan-applications", orgId] });
+      toast.success("Status updated successfully");
+    },
+    onError: (error) => {
+      console.error("Error updating status:", error);
+      toast.error("Failed to update status");
+    },
+  });
+
+  const handleStatusChange = (appId: string, status: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    updateStatusMutation.mutate({ appId, status });
+  };
+
+  const handleCall = (phone: string | null, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (phone) {
+      window.location.href = `tel:${phone}`;
+    } else {
+      toast.error("No phone number available");
+    }
+  };
+
+  const getApplicantPhone = (app: any) => {
+    return app.loan_applicants?.[0]?.phone || app.contacts?.phone || null;
+  };
 
   // Get section counts
   const sectionCounts = SECTIONS.reduce((acc, section) => {
@@ -240,13 +287,21 @@ export default function Applications() {
                         </div>
 
                         <div className="grid gap-2 md:grid-cols-3 text-sm text-muted-foreground">
-                          <div>
+                          <div className="flex items-center gap-2">
                             <span className="font-medium">Applicant: </span>
                             {app.loan_applicants?.[0]
                               ? `${app.loan_applicants[0].first_name} ${app.loan_applicants[0].last_name || ""}`
                               : app.contacts
                                 ? `${app.contacts.first_name} ${app.contacts.last_name || ""}`
                                 : "Not linked"}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-green-600 hover:text-green-700 hover:bg-green-100"
+                              onClick={(e) => handleCall(getApplicantPhone(app), e)}
+                            >
+                              <Phone className="h-4 w-4" />
+                            </Button>
                           </div>
                           <div>
                             <span className="font-medium">Amount: </span>
@@ -276,9 +331,26 @@ export default function Applications() {
                         </div>
                       </div>
 
-                      <Button variant="ghost" size="icon">
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        <Select
+                          value={app.status}
+                          onValueChange={(value) => handleStatusChange(app.id, value, { stopPropagation: () => {} } as any)}
+                        >
+                          <SelectTrigger className="w-[140px]">
+                            <SelectValue placeholder="Set status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {STATUS_OPTIONS.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button variant="ghost" size="icon">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
