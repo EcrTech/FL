@@ -345,6 +345,46 @@ Deno.serve(async (req) => {
     const firstName = nameParts[0] || '';
     const lastName = nameParts.slice(1).join(' ') || '';
 
+    // Create a contact/lead for this applicant (marked as "New Lead")
+    const { data: existingContact } = await supabase
+      .from('contacts')
+      .select('id')
+      .eq('org_id', formConfig.org_id)
+      .eq('phone', body.personalDetails.mobile)
+      .maybeSingle();
+
+    if (!existingContact) {
+      const { data: newContact, error: contactError } = await supabase
+        .from('contacts')
+        .insert({
+          org_id: formConfig.org_id,
+          first_name: firstName,
+          last_name: lastName || null,
+          phone: body.personalDetails.mobile,
+          email: body.personalDetails.email || null,
+          source: referrerUserId ? 'referral_link' : 'loan_application',
+          status: 'new',
+          referred_by: referrerUserId || null,
+          address: body.addressDetails?.currentAddress?.addressLine1 || null,
+          city: body.addressDetails?.currentAddress?.city || null,
+          state: body.addressDetails?.currentAddress?.state || null,
+          postal_code: body.addressDetails?.currentAddress?.pincode || null,
+          company: body.employmentDetails?.employerName || null,
+          job_title: body.employmentDetails?.designation || null,
+          notes: `New Lead from Loan Application ${applicationNumber}`,
+        })
+        .select()
+        .single();
+
+      if (contactError) {
+        console.error('[submit-loan-application] Error creating contact/lead:', contactError);
+      } else {
+        console.log(`[submit-loan-application] Created new lead: ${newContact.id}`);
+      }
+    } else {
+      console.log(`[submit-loan-application] Contact already exists: ${existingContact.id}`);
+    }
+
     // Create applicant record
     const { data: applicant, error: applicantError } = await supabase
       .from('loan_applicants')

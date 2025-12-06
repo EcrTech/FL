@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,59 +15,7 @@ import { DocumentUploadStep } from "@/components/PublicLoanApplication/DocumentU
 import { ReviewStep } from "@/components/PublicLoanApplication/ReviewStep";
 import { SuccessScreen } from "@/components/PublicLoanApplication/SuccessScreen";
 import { LoadingState } from "@/components/common/LoadingState";
-
-interface LoanFormData {
-  loanDetails: {
-    amount: string;
-    purpose: string;
-    tenure: number;
-  };
-  personalDetails: {
-    fullName: string;
-    dob: string;
-    gender: string;
-    maritalStatus: string;
-    panNumber: string;
-    aadhaarNumber: string;
-    email: string;
-    mobile: string;
-    fatherName: string;
-  };
-  addressDetails: {
-    currentAddress: {
-      addressLine1: string;
-      addressLine2: string;
-      city: string;
-      state: string;
-      pincode: string;
-    };
-    permanentAddress: {
-      addressLine1: string;
-      addressLine2: string;
-      city: string;
-      state: string;
-      pincode: string;
-    };
-    sameAsCurrentAddress: boolean;
-    residenceType: string;
-  };
-  employmentDetails: {
-    employmentType: string;
-    employerName: string;
-    employerType: string;
-    designation: string;
-    grossSalary: number;
-    netSalary: number;
-    bankName: string;
-    accountNumber: string;
-  };
-  documents: Array<{
-    type: string;
-    name: string;
-    base64: string;
-    mimeType: string;
-  }>;
-}
+import { LoanFormData } from "@/pages/PublicLoanApplication";
 
 interface ReferrerInfo {
   referralCode: string;
@@ -86,7 +34,7 @@ const STEPS = [
 ];
 
 const initialFormData: LoanFormData = {
-  loanDetails: { amount: "", purpose: "", tenure: 12 },
+  loanDetails: { productType: "personal_loan", amount: "", tenure: 12 },
   personalDetails: {
     fullName: "",
     dob: "",
@@ -101,7 +49,7 @@ const initialFormData: LoanFormData = {
   addressDetails: {
     currentAddress: { addressLine1: "", addressLine2: "", city: "", state: "", pincode: "" },
     permanentAddress: { addressLine1: "", addressLine2: "", city: "", state: "", pincode: "" },
-    sameAsCurrentAddress: true,
+    sameAsCurrent: true,
     residenceType: "",
   },
   employmentDetails: {
@@ -109,8 +57,8 @@ const initialFormData: LoanFormData = {
     employerName: "",
     employerType: "",
     designation: "",
-    grossSalary: 0,
-    netSalary: 0,
+    grossSalary: "",
+    netSalary: "",
     bankName: "",
     accountNumber: "",
   },
@@ -191,7 +139,7 @@ export default function ReferralLoanApplication() {
     }
   }, []);
 
-  const updateFormData = <K extends keyof LoanFormData>(section: K, data: Partial<LoanFormData[K]>) => {
+  const updateFormData = (section: keyof LoanFormData, data: any) => {
     setFormData((prev) => ({
       ...prev,
       [section]: { ...prev[section], ...data },
@@ -212,6 +160,13 @@ export default function ReferralLoanApplication() {
     }
   };
 
+  const goToStep = (step: number) => {
+    if (step < currentStep) {
+      setCurrentStep(step);
+      window.scrollTo(0, 0);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!referrerInfo) return;
 
@@ -221,11 +176,23 @@ export default function ReferralLoanApplication() {
         body: {
           formSlug: "referral",
           referralCode: referrerInfo.referralCode,
-          loanDetails: formData.loanDetails,
+          loanDetails: {
+            amount: formData.loanDetails.amount,
+            tenure: formData.loanDetails.tenure,
+          },
           personalDetails: formData.personalDetails,
           addressDetails: formData.addressDetails,
-          employmentDetails: formData.employmentDetails,
-          documents: formData.documents,
+          employmentDetails: {
+            ...formData.employmentDetails,
+            grossSalary: parseFloat(formData.employmentDetails.grossSalary) || 0,
+            netSalary: parseFloat(formData.employmentDetails.netSalary) || 0,
+          },
+          documents: formData.documents.map(doc => ({
+            type: doc.type,
+            base64: doc.base64,
+            name: doc.name,
+            mimeType: doc.mimeType,
+          })),
           geolocation,
           formStartTime,
           honeypot,
@@ -357,61 +324,53 @@ export default function ReferralLoanApplication() {
               <LoanDetailsStep
                 data={formData.loanDetails}
                 onChange={(data) => updateFormData("loanDetails", data)}
+                onNext={nextStep}
               />
             )}
             {currentStep === 2 && (
               <PersonalDetailsStep
                 data={formData.personalDetails}
                 onChange={(data) => updateFormData("personalDetails", data)}
+                onNext={nextStep}
+                onPrev={prevStep}
               />
             )}
             {currentStep === 3 && (
               <AddressDetailsStep
                 data={formData.addressDetails}
                 onChange={(data) => updateFormData("addressDetails", data)}
+                onNext={nextStep}
+                onPrev={prevStep}
               />
             )}
             {currentStep === 4 && (
               <EmploymentDetailsStep
                 data={formData.employmentDetails}
                 onChange={(data) => updateFormData("employmentDetails", data)}
+                onNext={nextStep}
+                onPrev={prevStep}
               />
             )}
             {currentStep === 5 && (
               <DocumentUploadStep
-                documents={formData.documents}
-                onChange={(docs) => setFormData((prev) => ({ ...prev, documents: docs }))}
+                data={formData.documents}
                 requiredDocuments={["pan_card", "aadhaar_card", "salary_slip"]}
+                onChange={(docs) => setFormData((prev) => ({ ...prev, documents: docs }))}
+                onNext={nextStep}
+                onPrev={prevStep}
               />
             )}
             {currentStep === 6 && (
-              <ReviewStep formData={formData} onEdit={setCurrentStep} />
+              <ReviewStep 
+                formData={formData} 
+                onSubmit={handleSubmit}
+                onPrev={prevStep}
+                onEdit={goToStep} 
+                submitting={submitting}
+              />
             )}
           </CardContent>
         </Card>
-
-        {/* Navigation */}
-        <div className="flex justify-between">
-          <Button
-            variant="outline"
-            onClick={prevStep}
-            disabled={currentStep === 1}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Previous
-          </Button>
-
-          {currentStep < STEPS.length ? (
-            <Button onClick={nextStep}>
-              Next
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          ) : (
-            <Button onClick={handleSubmit} disabled={submitting}>
-              {submitting ? "Submitting..." : "Submit Application"}
-            </Button>
-          )}
-        </div>
 
         {/* Footer */}
         <p className="text-center text-xs text-muted-foreground">
