@@ -421,7 +421,8 @@ export default function PipelineBoard() {
               </TableHeader>
               <TableBody>
                 {contacts.map(contact => {
-                  const isNew = contact.status === "new" || (!contact.status && isFreshLead(contact.created_at));
+                  const isReferral = contact.source === 'referral_link';
+                  const showNewBadge = isReferral || contact.status === "new" || (!contact.status && isFreshLead(contact.created_at));
                   return (
                     <TableRow
                       key={contact.id}
@@ -446,7 +447,7 @@ export default function PipelineBoard() {
                                   <Phone className="h-4 w-4" />
                                 )}
                               </Button>
-                              {isNew && (
+                              {showNewBadge && (
                                 <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white border-0">
                                   <Sparkles className="h-3 w-3 mr-1" />
                                   NEW LEAD

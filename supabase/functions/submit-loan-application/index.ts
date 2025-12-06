@@ -363,7 +363,7 @@ Deno.serve(async (req) => {
           phone: body.personalDetails.mobile,
           email: body.personalDetails.email || null,
           source: referrerUserId ? 'referral_link' : 'loan_application',
-          status: 'new',
+          status: referrerUserId ? 'in_progress' : 'new',
           referred_by: referrerUserId || null,
           address: body.addressDetails?.currentAddress?.addressLine1 || null,
           city: body.addressDetails?.currentAddress?.city || null,
