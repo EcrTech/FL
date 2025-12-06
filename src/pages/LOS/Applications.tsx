@@ -15,12 +15,12 @@ import { differenceInHours } from "date-fns";
 import { format } from "date-fns";
 import { LoadingState } from "@/components/common/LoadingState";
 
-// Section tabs matching the loan lifecycle
+// Section tabs for lead status
 const SECTIONS = [
-  { id: "application", label: "Application", stages: ["application_login", "document_collection", "field_verification", "credit_assessment", "approval_pending"] },
-  { id: "sanction", label: "Sanction", stages: ["approved", "sanction_generated", "disbursement_pending"] },
-  { id: "disbursed", label: "Disbursed", stages: ["disbursed"] },
-  { id: "collection", label: "Collection", stages: ["closed", "cancelled"] },
+  { id: "new", label: "New", statuses: ["new", "draft"] },
+  { id: "approved", label: "Approved", statuses: ["approved"] },
+  { id: "rejected", label: "Rejected", statuses: ["rejected"] },
+  { id: "in_progress", label: "In-progress", statuses: ["in_progress"] },
 ];
 
 const STAGE_LABELS: Record<string, string> = {
@@ -52,7 +52,7 @@ export default function Applications() {
   const { orgId } = useOrgContext();
   const { permissions } = useLOSPermissions();
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeSection, setActiveSection] = useState("application");
+  const [activeSection, setActiveSection] = useState("new");
 
   const isFreshApplication = (createdAt: string) => {
     return differenceInHours(new Date(), new Date(createdAt)) < 48;
@@ -85,17 +85,17 @@ export default function Applications() {
   // Get section counts
   const sectionCounts = SECTIONS.reduce((acc, section) => {
     acc[section.id] = applications.filter(app => 
-      section.stages.includes(app.current_stage)
+      section.statuses.includes(app.status)
     ).length;
     return acc;
   }, {} as Record<string, number>);
 
   // Filter applications by active section
-  const activeStages = SECTIONS.find(s => s.id === activeSection)?.stages || [];
+  const activeStatuses = SECTIONS.find(s => s.id === activeSection)?.statuses || [];
   
   const filteredApplications = applications.filter((app) => {
-    // First filter by section stages
-    if (!activeStages.includes(app.current_stage)) return false;
+    // First filter by section statuses
+    if (!activeStatuses.includes(app.status)) return false;
     
     // Then filter by search query
     const searchLower = searchQuery.toLowerCase();
@@ -198,7 +198,7 @@ export default function Applications() {
                   <p className="text-muted-foreground mb-4">
                     Applications will appear here as they progress through the workflow
                   </p>
-                  {activeSection === "application" && (
+                  {activeSection === "new" && (
                     <Button onClick={() => navigate("/los/applications/new")}>
                       <Plus className="mr-2 h-4 w-4" />
                       Create Application
