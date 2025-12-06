@@ -145,7 +145,7 @@ export default function ApplicationDetail() {
   }
 
   const primaryApplicant = application.loan_applicants?.[0];
-  const tenureDays = application.tenure_months * 30;
+  const tenureDays = application.tenure_days;
 
   return (
     <DashboardLayout>

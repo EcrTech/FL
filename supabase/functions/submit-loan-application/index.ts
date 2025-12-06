@@ -179,8 +179,8 @@ Deno.serve(async (req) => {
       errors.push('Loan amount must be between ₹10,000 and ₹50,00,000');
     }
 
-    if (!body.loanDetails?.tenure || body.loanDetails.tenure < 6 || body.loanDetails.tenure > 84) {
-      errors.push('Tenure must be between 6 and 84 months');
+    if (!body.loanDetails?.tenure || body.loanDetails.tenure < 180 || body.loanDetails.tenure > 2520) {
+      errors.push('Tenure must be between 180 and 2520 days');
     }
 
     // Address validation
@@ -233,7 +233,7 @@ Deno.serve(async (req) => {
           .from('loan_applications')
           .update({
             requested_amount: loanAmount,
-            tenure_months: body.loanDetails.tenure,
+            tenure_days: body.loanDetails.tenure,
             status: 'in_progress',
             latitude: body.geolocation?.latitude || null,
             longitude: body.geolocation?.longitude || null,
@@ -307,7 +307,7 @@ Deno.serve(async (req) => {
           application_number: applicationNumber,
           product_type: formConfig.product_type,
           requested_amount: loanAmount,
-          tenure_months: body.loanDetails.tenure,
+          tenure_days: body.loanDetails.tenure,
           current_stage: 'application_login',
           status: 'in_progress',
           source: referrerUserId ? 'referral_link' : 'public_form',

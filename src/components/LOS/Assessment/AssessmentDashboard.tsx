@@ -235,7 +235,7 @@ export default function AssessmentDashboard({ applicationId, orgId }: Assessment
                 <div>
                   <Label className="text-sm text-muted-foreground">Recommended Tenure</Label>
                   <div className="text-xl font-bold">
-                    {eligibility.recommended_tenure || "N/A"} months
+                    {eligibility.recommended_tenure_days || "N/A"} days
                   </div>
                 </div>
                 <div>

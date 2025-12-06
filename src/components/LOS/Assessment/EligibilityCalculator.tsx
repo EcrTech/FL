@@ -92,7 +92,7 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
         foir_percentage: existingEligibility.foir_percentage?.toString() || "0",
         max_allowed_foir: existingEligibility.max_allowed_foir?.toString() || "50",
         eligible_loan_amount: existingEligibility.eligible_loan_amount?.toString() || "",
-        recommended_tenure: existingEligibility.recommended_tenure?.toString() || "",
+        recommended_tenure: existingEligibility.recommended_tenure_days?.toString() || "",
         recommended_interest_rate: existingEligibility.recommended_interest_rate?.toString() || "12",
       });
       setPolicyChecks(existingEligibility.policy_checks as any || {});
@@ -116,7 +116,8 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
     const existingEMI = parseFloat(formData.existing_emi_obligations) || 0;
     const maxFOIR = parseFloat(formData.max_allowed_foir) || 50;
     const interestRate = parseFloat(formData.recommended_interest_rate) || 12;
-    const tenure = parseInt(formData.recommended_tenure) || 36;
+    const tenureDays = parseInt(formData.recommended_tenure) || 360;
+    const tenure = Math.round(tenureDays / 30); // Convert days to months for EMI calculation
 
     // Calculate max EMI based on FOIR
     const maxEMI = (netIncome * maxFOIR / 100) - existingEMI;
@@ -216,7 +217,7 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
         foir_percentage: parseFloat(formData.foir_percentage) || 0,
         max_allowed_foir: parseFloat(formData.max_allowed_foir) || 50,
         eligible_loan_amount: parseFloat(formData.eligible_loan_amount) || 0,
-        recommended_tenure: parseInt(formData.recommended_tenure) || null,
+        recommended_tenure_days: parseInt(formData.recommended_tenure) || null,
         recommended_interest_rate: parseFloat(formData.recommended_interest_rate) || null,
         policy_checks: policyChecks,
         is_eligible: Object.values(policyChecks).filter(c => POLICY_RULES.find(r => r.critical)?.key ? c.passed : true).every(c => c.passed),
@@ -331,12 +332,12 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
 
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <Label>Recommended Tenure (months)</Label>
+              <Label>Recommended Tenure (days)</Label>
               <Input
                 type="number"
                 value={formData.recommended_tenure}
                 onChange={(e) => setFormData({ ...formData, recommended_tenure: e.target.value })}
-                placeholder="36"
+                placeholder="360"
               />
             </div>
             <div>

@@ -254,7 +254,7 @@ export default function Applications() {
                           </div>
                           <div>
                             <span className="font-medium">Tenure: </span>
-                            {app.tenure_months} months
+                            {app.tenure_days} days
                           </div>
                         </div>
 

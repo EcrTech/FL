@@ -11,7 +11,7 @@ interface EMIScheduleGeneratorProps {
     id: string;
     sanctioned_amount: number;
     interest_rate: number;
-    tenure_months: number;
+    tenure_days: number;
   };
   disbursement: {
     disbursement_date: string;
@@ -27,13 +27,14 @@ export default function EMIScheduleGenerator({
   const [emiAmount, setEmiAmount] = useState<number>(0);
 
   useEffect(() => {
-    // Calculate EMI preview
+    // Calculate EMI preview (convert days to months for EMI calculation)
+    const tenureMonths = Math.round(sanction.tenure_days / 30);
     const monthlyRate = sanction.interest_rate / 12 / 100;
     const emi =
       (sanction.sanctioned_amount *
         monthlyRate *
-        Math.pow(1 + monthlyRate, sanction.tenure_months)) /
-      (Math.pow(1 + monthlyRate, sanction.tenure_months) - 1);
+        Math.pow(1 + monthlyRate, tenureMonths)) /
+      (Math.pow(1 + monthlyRate, tenureMonths) - 1);
     setEmiAmount(Math.round(emi * 100) / 100);
   }, [sanction]);
 
@@ -83,7 +84,7 @@ export default function EMIScheduleGenerator({
 
           <div className="space-y-1">
             <div className="text-sm text-muted-foreground">Tenure</div>
-            <div className="text-lg font-semibold">{sanction.tenure_months} months</div>
+            <div className="text-lg font-semibold">{sanction.tenure_days} days</div>
           </div>
 
           <div className="space-y-1">
@@ -113,12 +114,12 @@ export default function EMIScheduleGenerator({
         <div className="p-4 bg-muted rounded-lg space-y-2">
           <div className="text-sm font-medium">Total Repayment</div>
           <div className="text-2xl font-bold">
-            {formatCurrency(emiAmount * sanction.tenure_months)}
+            {formatCurrency(emiAmount * Math.round(sanction.tenure_days / 30))}
           </div>
           <div className="text-xs text-muted-foreground">
             Interest:{" "}
             {formatCurrency(
-              emiAmount * sanction.tenure_months - sanction.sanctioned_amount
+              emiAmount * Math.round(sanction.tenure_days / 30) - sanction.sanctioned_amount
             )}
           </div>
         </div>
@@ -130,7 +131,7 @@ export default function EMIScheduleGenerator({
               sanctionId: sanction.id,
               loanAmount: sanction.sanctioned_amount,
               interestRate: sanction.interest_rate,
-              tenureMonths: sanction.tenure_months,
+              tenureMonths: Math.round(sanction.tenure_days / 30),
               disbursementDate: disbursement.disbursement_date,
             })
           }
