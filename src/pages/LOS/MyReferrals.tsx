@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { LoadingState } from "@/components/common/LoadingState";
 import { QRCodeSVG } from "qrcode.react";
-import { Copy, Check, QrCode, Link2, Users, TrendingUp, Clock, Eye } from "lucide-react";
+import { Copy, Check, QrCode, Link2, Users, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -139,50 +139,7 @@ export default function MyReferrals() {
           </p>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Users className="h-4 w-4 text-primary" />
-                Total Referrals
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{referredApps.length}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-green-500" />
-                Approved
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {referredApps.filter((a: any) => a.status === "approved" || a.status === "disbursed").length}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Clock className="h-4 w-4 text-blue-500" />
-                In Progress
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">
-                {referredApps.filter((a: any) => a.status === "in_progress").length}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* QR Code and Link Section */}
+        
         <div className="grid gap-6 md:grid-cols-2">
           {/* QR Code Card */}
           <Card>
