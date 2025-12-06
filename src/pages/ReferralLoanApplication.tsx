@@ -34,7 +34,7 @@ const STEPS = [
 ];
 
 const initialFormData: LoanFormData = {
-  loanDetails: { productType: "personal_loan", amount: "", tenure: 12 },
+  loanDetails: { productType: "personal_loan", amount: "", tenure: 360 }, // Default 360 days (12 months)
   personalDetails: {
     fullName: "",
     dob: "",
