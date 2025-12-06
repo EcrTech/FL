@@ -88,27 +88,39 @@ export default function ReferralLoanApplication() {
       }
 
       try {
+        // First, validate the referral code (public access via RLS)
         const { data, error: fetchError } = await supabase
           .from("user_referral_codes")
-          .select(`
-            referral_code,
-            user_id,
-            org_id,
-            profiles:user_id(full_name)
-          `)
+          .select("referral_code, user_id, org_id")
           .eq("referral_code", referralCode)
           .eq("is_active", true)
           .maybeSingle();
 
         if (fetchError || !data) {
+          console.error("Referral validation error:", fetchError);
           setError("This referral link is invalid or has expired");
           setLoading(false);
           return;
         }
 
+        // Try to get the referrer's name (may fail for unauthenticated users due to RLS)
+        let referrerName: string | null = null;
+        try {
+          const { data: profileData } = await supabase
+            .from("profiles")
+            .select("first_name, last_name")
+            .eq("id", data.user_id)
+            .maybeSingle();
+          if (profileData) {
+            referrerName = [profileData.first_name, profileData.last_name].filter(Boolean).join(" ") || null;
+          }
+        } catch {
+          // Ignore - profile lookup is optional for unauthenticated users
+        }
+
         setReferrerInfo({
           referralCode: data.referral_code,
-          referrerName: (data.profiles as any)?.full_name || null,
+          referrerName: referrerName,
           referrerUserId: data.user_id,
           orgId: data.org_id,
         });
