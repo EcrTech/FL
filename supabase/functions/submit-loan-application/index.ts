@@ -179,8 +179,8 @@ Deno.serve(async (req) => {
       errors.push('Loan amount must be between ₹10,000 and ₹50,00,000');
     }
 
-    if (!body.loanDetails?.tenure || body.loanDetails.tenure < 180 || body.loanDetails.tenure > 2520) {
-      errors.push('Tenure must be between 180 and 2520 days');
+    if (!body.loanDetails?.tenure || body.loanDetails.tenure < 1 || body.loanDetails.tenure > 90) {
+      errors.push('Tenure must be between 1 and 90 days');
     }
 
     // Address validation
