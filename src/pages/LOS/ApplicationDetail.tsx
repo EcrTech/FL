@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, User, FileText, Calculator, FileCheck, DollarSign, XCircle, CreditCard, CheckCircle, ShieldCheck } from "lucide-react";
+import { ArrowLeft, User, FileText, Calculator, FileCheck, DollarSign, XCircle, CreditCard, CheckCircle } from "lucide-react";
 import { LoadingState } from "@/components/common/LoadingState";
 import { format } from "date-fns";
 import DocumentUpload from "@/components/LOS/DocumentUpload";
@@ -20,7 +20,6 @@ import ApprovalHistory from "@/components/LOS/Approval/ApprovalHistory";
 import SanctionDashboard from "@/components/LOS/Sanction/SanctionDashboard";
 import DisbursementDashboard from "@/components/LOS/Disbursement/DisbursementDashboard";
 import EMIDashboard from "@/components/LOS/EMI/EMIDashboard";
-import VerificationDashboard from "@/components/LOS/VerificationDashboard";
 
 const STAGE_LABELS: Record<string, string> = {
   application_login: "Application Login",
@@ -225,7 +224,7 @@ export default function ApplicationDetail() {
 
         {/* Tabs */}
         <Tabs defaultValue="application" className="w-full">
-          <TabsList className="grid w-full grid-cols-7">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="application">
               <User className="h-4 w-4 mr-2" />
               Application
@@ -233,10 +232,6 @@ export default function ApplicationDetail() {
             <TabsTrigger value="documents">
               <FileText className="h-4 w-4 mr-2" />
               Documents
-            </TabsTrigger>
-            <TabsTrigger value="verification">
-              <ShieldCheck className="h-4 w-4 mr-2" />
-              Verification
             </TabsTrigger>
             <TabsTrigger value="assessment">
               <Calculator className="h-4 w-4 mr-2" />
@@ -408,12 +403,8 @@ export default function ApplicationDetail() {
           </TabsContent>
 
           <TabsContent value="documents" className="space-y-6">
-            <DocumentUpload applicationId={application.id} orgId={orgId} />
+            <DocumentUpload applicationId={application.id} orgId={orgId} applicant={primaryApplicant} />
             <IncomeSummary applicationId={application.id} orgId={orgId} />
-          </TabsContent>
-
-          <TabsContent value="verification" className="space-y-6">
-            <VerificationDashboard applicationId={application.id} orgId={orgId} />
           </TabsContent>
 
           <TabsContent value="assessment" className="space-y-6">
