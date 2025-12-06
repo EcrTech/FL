@@ -67,8 +67,7 @@ export default function Applications() {
           *,
           loan_applicants(first_name, last_name, phone),
           contacts(first_name, last_name, phone),
-          assigned_profile:profiles!loan_applications_assigned_to_fkey(first_name, last_name),
-          referrer:profiles!loan_applications_referred_by_fkey(full_name)
+          assigned_profile:profiles!loan_applications_assigned_to_fkey(first_name, last_name)
         `)
         .eq("org_id", orgId)
         .order("created_at", { ascending: false });
