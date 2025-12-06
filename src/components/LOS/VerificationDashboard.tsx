@@ -234,6 +234,145 @@ export default function VerificationDashboard({ applicationId, orgId }: Verifica
                 </div>
               </CardHeader>
               <CardContent>
+                {/* Display matched/verified details */}
+                {verification?.response_data && typeof verification.response_data === 'object' && !Array.isArray(verification.response_data) && (
+                  <div className="mb-3 p-3 bg-muted/50 rounded-md border">
+                    <p className="text-xs font-medium text-muted-foreground mb-2">Verified Details</p>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      {verificationType.type === "pan" && (
+                        <>
+                          {(verification.response_data as Record<string, any>).name_on_pan && (
+                            <div>
+                              <span className="text-muted-foreground">Name: </span>
+                              <span className="font-medium">{(verification.response_data as Record<string, any>).name_on_pan}</span>
+                            </div>
+                          )}
+                          {(verification.response_data as Record<string, any>).pan_status && (
+                            <div>
+                              <span className="text-muted-foreground">Status: </span>
+                              <Badge variant={(verification.response_data as Record<string, any>).pan_status === "valid" ? "default" : "destructive"} className="text-xs">
+                                {(verification.response_data as Record<string, any>).pan_status}
+                              </Badge>
+                            </div>
+                          )}
+                          {(verification.response_data as Record<string, any>).name_match_result && (
+                            <div>
+                              <span className="text-muted-foreground">Name Match: </span>
+                              <Badge variant={(verification.response_data as Record<string, any>).name_match_result === "exact" ? "default" : "secondary"} className="text-xs">
+                                {(verification.response_data as Record<string, any>).name_match_result}
+                              </Badge>
+                            </div>
+                          )}
+                        </>
+                      )}
+                      {verificationType.type === "aadhaar" && (
+                        <>
+                          {(verification.response_data as Record<string, any>).name_on_aadhaar && (
+                            <div>
+                              <span className="text-muted-foreground">Name: </span>
+                              <span className="font-medium">{(verification.response_data as Record<string, any>).name_on_aadhaar}</span>
+                            </div>
+                          )}
+                          {(verification.response_data as Record<string, any>).address_match && (
+                            <div>
+                              <span className="text-muted-foreground">Address Match: </span>
+                              <Badge variant={(verification.response_data as Record<string, any>).address_match === "exact" ? "default" : "secondary"} className="text-xs">
+                                {(verification.response_data as Record<string, any>).address_match}
+                              </Badge>
+                            </div>
+                          )}
+                        </>
+                      )}
+                      {verificationType.type === "bank_account" && (
+                        <>
+                          {(verification.response_data as Record<string, any>).account_holder_name && (
+                            <div>
+                              <span className="text-muted-foreground">Holder: </span>
+                              <span className="font-medium">{(verification.response_data as Record<string, any>).account_holder_name}</span>
+                            </div>
+                          )}
+                          {(verification.response_data as Record<string, any>).account_status && (
+                            <div>
+                              <span className="text-muted-foreground">Status: </span>
+                              <Badge variant={(verification.response_data as Record<string, any>).account_status === "active" ? "default" : "destructive"} className="text-xs">
+                                {(verification.response_data as Record<string, any>).account_status}
+                              </Badge>
+                            </div>
+                          )}
+                        </>
+                      )}
+                      {verificationType.type === "employment" && (
+                        <>
+                          {(verification.response_data as Record<string, any>).employer_name && (
+                            <div>
+                              <span className="text-muted-foreground">Employer: </span>
+                              <span className="font-medium">{(verification.response_data as Record<string, any>).employer_name}</span>
+                            </div>
+                          )}
+                          {(verification.response_data as Record<string, any>).employment_status && (
+                            <div>
+                              <span className="text-muted-foreground">Status: </span>
+                              <Badge variant={(verification.response_data as Record<string, any>).employment_status === "employed" ? "default" : "secondary"} className="text-xs">
+                                {(verification.response_data as Record<string, any>).employment_status}
+                              </Badge>
+                            </div>
+                          )}
+                        </>
+                      )}
+                      {verificationType.type === "credit_bureau" && (
+                        <>
+                          {(verification.response_data as Record<string, any>).credit_score && (
+                            <div>
+                              <span className="text-muted-foreground">Score: </span>
+                              <span className="font-bold">{(verification.response_data as Record<string, any>).credit_score}</span>
+                            </div>
+                          )}
+                          {(verification.response_data as Record<string, any>).score_range && (
+                            <div>
+                              <span className="text-muted-foreground">Range: </span>
+                              <span className="font-medium">{(verification.response_data as Record<string, any>).score_range}</span>
+                            </div>
+                          )}
+                        </>
+                      )}
+                      {verificationType.type === "bank_statement" && (
+                        <>
+                          {(verification.response_data as Record<string, any>).average_balance && (
+                            <div>
+                              <span className="text-muted-foreground">Avg Balance: </span>
+                              <span className="font-medium">₹{Number((verification.response_data as Record<string, any>).average_balance).toLocaleString()}</span>
+                            </div>
+                          )}
+                          {(verification.response_data as Record<string, any>).monthly_credits && (
+                            <div>
+                              <span className="text-muted-foreground">Monthly Credits: </span>
+                              <span className="font-medium">₹{Number((verification.response_data as Record<string, any>).monthly_credits).toLocaleString()}</span>
+                            </div>
+                          )}
+                        </>
+                      )}
+                      {verificationType.type === "video_kyc" && (
+                        <>
+                          {(verification.response_data as Record<string, any>).face_match_score && (
+                            <div>
+                              <span className="text-muted-foreground">Face Match: </span>
+                              <span className="font-medium">{(verification.response_data as Record<string, any>).face_match_score}%</span>
+                            </div>
+                          )}
+                          {(verification.response_data as Record<string, any>).liveness_check && (
+                            <div>
+                              <span className="text-muted-foreground">Liveness: </span>
+                              <Badge variant={(verification.response_data as Record<string, any>).liveness_check === "passed" ? "default" : "destructive"} className="text-xs">
+                                {(verification.response_data as Record<string, any>).liveness_check}
+                              </Badge>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {verification && verification.remarks && (
                   <div className="mb-3 p-3 bg-muted rounded-md">
                     <p className="text-sm text-muted-foreground">{verification.remarks}</p>
