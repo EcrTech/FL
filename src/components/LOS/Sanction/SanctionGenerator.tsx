@@ -175,12 +175,12 @@ export default function SanctionGenerator({ applicationId, orgId }: SanctionGene
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="interest-rate">Interest Rate (% p.a.) *</Label>
+            <Label htmlFor="interest-rate">Interest Rate (% per day) *</Label>
             <Input
               id="interest-rate"
               type="number"
               step="0.01"
-              placeholder="e.g., 10.5"
+              placeholder="e.g., 1"
               value={interestRate}
               onChange={(e) => setInterestRate(e.target.value)}
             />

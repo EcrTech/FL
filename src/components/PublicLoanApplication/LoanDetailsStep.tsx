@@ -46,9 +46,9 @@ export function LoanDetailsStep({ data, onChange, onNext }: LoanDetailsStepProps
 
   const amount = parseFloat(data.amount) || 0;
   const tenureDays = data.tenure || 30;
-  const estimatedEMI = amount > 0 && tenureDays > 0
-    ? Math.round((amount * (1 + (0.12 * tenureDays / 365))) / tenureDays)
-    : 0;
+  const dailyInterestRate = 0.01; // 1% per day
+  const totalInterest = amount * dailyInterestRate * tenureDays;
+  const totalRepayment = amount + totalInterest;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -112,18 +112,18 @@ export function LoanDetailsStep({ data, onChange, onNext }: LoanDetailsStepProps
         </div>
       </div>
 
-      {/* EMI Estimate */}
-      {estimatedEMI > 0 && (
+      {/* Repayment Estimate */}
+      {totalRepayment > 0 && (
         <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
           <div className="flex items-center gap-2 mb-2">
             <Calendar className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium">Estimated Monthly EMI</span>
+            <span className="text-sm font-medium">Total Repayment</span>
           </div>
           <p className="text-2xl font-bold text-primary">
-            ₹{new Intl.NumberFormat("en-IN").format(estimatedEMI)}
+            ₹{new Intl.NumberFormat("en-IN").format(Math.round(totalRepayment))}
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            *Approximate EMI at 12% p.a. Actual EMI may vary based on your profile.
+            Interest: ₹{new Intl.NumberFormat("en-IN").format(Math.round(totalInterest))} (1% per day × {tenureDays} days)
           </p>
         </div>
       )}
