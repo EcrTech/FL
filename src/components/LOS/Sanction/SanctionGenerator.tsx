@@ -81,7 +81,7 @@ export default function SanctionGenerator({ applicationId, orgId }: SanctionGene
         sanction_date: new Date().toISOString(),
         sanctioned_amount: approval.approved_amount,
         sanctioned_rate: parseFloat(interestRate),
-        sanctioned_tenure_days: application?.tenure_days || 0,
+        sanctioned_tenure: application?.tenure_months || 0,
         processing_fee: parseFloat(processingFee),
         net_disbursement_amount: approval.approved_amount - parseFloat(processingFee),
         conditions: { terms: terms },
@@ -166,21 +166,21 @@ export default function SanctionGenerator({ applicationId, orgId }: SanctionGene
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="tenure">Tenure (Days)</Label>
+            <Label htmlFor="tenure">Tenure (Months)</Label>
             <Input
               id="tenure"
-              value={application?.tenure_days}
+              value={application?.tenure_months}
               disabled
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="interest-rate">Interest Rate (% per day) *</Label>
+            <Label htmlFor="interest-rate">Interest Rate (% p.a.) *</Label>
             <Input
               id="interest-rate"
               type="number"
               step="0.01"
-              placeholder="e.g., 1"
+              placeholder="e.g., 10.5"
               value={interestRate}
               onChange={(e) => setInterestRate(e.target.value)}
             />

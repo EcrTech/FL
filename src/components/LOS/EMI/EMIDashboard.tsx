@@ -22,7 +22,7 @@ export default function EMIDashboard({ applicationId }: EMIDashboardProps) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("loan_applications")
-        .select("interest_rate, tenure_days")
+        .select("interest_rate, tenure_months")
         .eq("id", applicationId)
         .single();
       if (error) throw error;
@@ -159,7 +159,7 @@ export default function EMIDashboard({ applicationId }: EMIDashboardProps) {
   const sanctionWithAppData = {
     ...sanction,
     interest_rate: application.interest_rate,
-    tenure_days: application.tenure_days,
+    tenure_months: application.tenure_months,
   };
 
   if (isLoading) {

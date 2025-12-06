@@ -179,8 +179,8 @@ Deno.serve(async (req) => {
       errors.push('Loan amount must be between ₹10,000 and ₹50,00,000');
     }
 
-    if (!body.loanDetails?.tenure || body.loanDetails.tenure < 1 || body.loanDetails.tenure > 90) {
-      errors.push('Tenure must be between 1 and 90 days');
+    if (!body.loanDetails?.tenure || body.loanDetails.tenure < 6 || body.loanDetails.tenure > 84) {
+      errors.push('Tenure must be between 6 and 84 months');
     }
 
     // Address validation
@@ -233,7 +233,7 @@ Deno.serve(async (req) => {
           .from('loan_applications')
           .update({
             requested_amount: loanAmount,
-            tenure_days: body.loanDetails.tenure,
+            tenure_months: body.loanDetails.tenure,
             status: 'in_progress',
             latitude: body.geolocation?.latitude || null,
             longitude: body.geolocation?.longitude || null,
@@ -307,7 +307,7 @@ Deno.serve(async (req) => {
           application_number: applicationNumber,
           product_type: formConfig.product_type,
           requested_amount: loanAmount,
-          tenure_days: body.loanDetails.tenure,
+          tenure_months: body.loanDetails.tenure,
           current_stage: 'application_login',
           status: 'in_progress',
           source: referrerUserId ? 'referral_link' : 'public_form',
@@ -363,7 +363,7 @@ Deno.serve(async (req) => {
           phone: body.personalDetails.mobile,
           email: body.personalDetails.email || null,
           source: referrerUserId ? 'referral_link' : 'loan_application',
-          status: referrerUserId ? 'in_progress' : 'new',
+          status: 'new',
           referred_by: referrerUserId || null,
           address: body.addressDetails?.currentAddress?.addressLine1 || null,
           city: body.addressDetails?.currentAddress?.city || null,

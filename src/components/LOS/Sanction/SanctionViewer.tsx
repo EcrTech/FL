@@ -49,11 +49,12 @@ export default function SanctionViewer({ applicationId }: SanctionViewerProps) {
     }).format(amount);
   };
 
-  const calculateTotalRepayment = () => {
+  const calculateEMI = () => {
     const P = sanction.sanctioned_amount;
-    const dailyRate = sanction.sanctioned_rate / 100; // Rate is % per day
-    const totalInterest = P * dailyRate * sanction.sanctioned_tenure_days;
-    return P + totalInterest;
+    const r = sanction.sanctioned_rate / 12 / 100;
+    const n = sanction.sanctioned_tenure;
+    const emi = (P * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+    return emi;
   };
 
   return (
@@ -118,11 +119,11 @@ export default function SanctionViewer({ applicationId }: SanctionViewerProps) {
                 </div>
                 <div className="p-4 bg-muted rounded-lg">
                   <div className="text-sm text-muted-foreground">Interest Rate</div>
-                  <div className="text-2xl font-bold">{sanction.sanctioned_rate}% per day</div>
+                  <div className="text-2xl font-bold">{sanction.sanctioned_rate}% p.a.</div>
                 </div>
                 <div className="p-4 bg-muted rounded-lg">
                   <div className="text-sm text-muted-foreground">Tenure</div>
-                  <div className="text-2xl font-bold">{sanction.sanctioned_tenure_days} days</div>
+                  <div className="text-2xl font-bold">{sanction.sanctioned_tenure} months</div>
                 </div>
               </div>
             </div>
@@ -131,8 +132,8 @@ export default function SanctionViewer({ applicationId }: SanctionViewerProps) {
               <h4 className="font-medium mb-3">Payment Details</h4>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="p-4 border rounded-lg">
-                  <div className="text-sm text-muted-foreground">Total Repayment</div>
-                  <div className="text-xl font-bold">{formatCurrency(calculateTotalRepayment())}</div>
+                  <div className="text-sm text-muted-foreground">Monthly EMI</div>
+                  <div className="text-xl font-bold">{formatCurrency(calculateEMI())}</div>
                 </div>
                 <div className="p-4 border rounded-lg">
                   <div className="text-sm text-muted-foreground">Processing Fee</div>

@@ -421,8 +421,7 @@ export default function PipelineBoard() {
               </TableHeader>
               <TableBody>
                 {contacts.map(contact => {
-                  const isReferral = contact.source === 'referral_link';
-                  const showNewBadge = isReferral || contact.status === "new" || (!contact.status && isFreshLead(contact.created_at));
+                  const isNew = contact.status === "new" || (!contact.status && isFreshLead(contact.created_at));
                   return (
                     <TableRow
                       key={contact.id}
@@ -447,7 +446,7 @@ export default function PipelineBoard() {
                                   <Phone className="h-4 w-4" />
                                 )}
                               </Button>
-                              {showNewBadge && (
+                              {isNew && (
                                 <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white border-0">
                                   <Sparkles className="h-3 w-3 mr-1" />
                                   NEW LEAD
@@ -572,6 +571,26 @@ export default function PipelineBoard() {
                 onChange={(e) => setNewLead(prev => ({ ...prev, company: e.target.value }))}
                 placeholder="Company name"
               />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="source">Source</Label>
+              <Select
+                value={newLead.source}
+                onValueChange={(value) => setNewLead(prev => ({ ...prev, source: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select source" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="website">Website</SelectItem>
+                  <SelectItem value="referral">Referral</SelectItem>
+                  <SelectItem value="social_media">Social Media</SelectItem>
+                  <SelectItem value="cold_call">Cold Call</SelectItem>
+                  <SelectItem value="event">Event</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">

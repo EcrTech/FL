@@ -235,13 +235,13 @@ export default function AssessmentDashboard({ applicationId, orgId }: Assessment
                 <div>
                   <Label className="text-sm text-muted-foreground">Recommended Tenure</Label>
                   <div className="text-xl font-bold">
-                    {eligibility.recommended_tenure_days || "N/A"} days
+                    {eligibility.recommended_tenure || "N/A"} months
                   </div>
                 </div>
                 <div>
                   <Label className="text-sm text-muted-foreground">Interest Rate</Label>
                   <div className="text-xl font-bold">
-                    {eligibility.recommended_interest_rate || "N/A"}% per day
+                    {eligibility.recommended_interest_rate || "N/A"}% p.a.
                   </div>
                 </div>
               </div>

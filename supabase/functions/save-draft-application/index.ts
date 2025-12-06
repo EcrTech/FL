@@ -72,7 +72,7 @@ serve(async (req) => {
         .from("loan_applications")
         .update({
           requested_amount: parseFloat(loanDetails?.amount) || 0,
-          tenure_days: loanDetails?.tenure || 360,
+          tenure_months: loanDetails?.tenure || 12,
           updated_at: new Date().toISOString(),
         })
         .eq("id", draftId);
@@ -123,7 +123,7 @@ serve(async (req) => {
         org_id: formConfig.org_id,
         product_type: formConfig.product_type || loanDetails?.productType || "personal_loan",
         requested_amount: parseFloat(loanDetails?.amount) || 0,
-        tenure_days: loanDetails?.tenure || 360,
+        tenure_months: loanDetails?.tenure || 12,
         status: "draft",
         current_stage: "application_login",
         source: "public_form",

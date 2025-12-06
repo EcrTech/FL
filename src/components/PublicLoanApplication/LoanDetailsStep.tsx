@@ -45,10 +45,10 @@ export function LoanDetailsStep({ data, onChange, onNext }: LoanDetailsStepProps
   };
 
   const amount = parseFloat(data.amount) || 0;
-  const tenureDays = data.tenure || 30;
-  const dailyInterestRate = 0.01; // 1% per day
-  const totalInterest = amount * dailyInterestRate * tenureDays;
-  const totalRepayment = amount + totalInterest;
+  const tenure = data.tenure || 12;
+  const estimatedEMI = amount > 0 
+    ? Math.round((amount * (1 + (0.12 * tenure / 12))) / tenure)
+    : 0;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -96,34 +96,34 @@ export function LoanDetailsStep({ data, onChange, onNext }: LoanDetailsStepProps
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <Label>Loan Tenure</Label>
-          <span className="text-sm font-medium">{tenureDays} days</span>
+          <span className="text-sm font-medium">{tenure} months</span>
         </div>
         <Slider
-          value={[tenureDays]}
+          value={[tenure]}
           onValueChange={([value]) => onChange({ tenure: value })}
-          min={1}
-          max={90}
-          step={1}
+          min={6}
+          max={84}
+          step={6}
           className="py-4"
         />
         <div className="flex justify-between text-xs text-muted-foreground">
-          <span>1 day</span>
-          <span>90 days</span>
+          <span>6 months</span>
+          <span>84 months</span>
         </div>
       </div>
 
-      {/* Repayment Estimate */}
-      {totalRepayment > 0 && (
+      {/* EMI Estimate */}
+      {estimatedEMI > 0 && (
         <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
           <div className="flex items-center gap-2 mb-2">
             <Calendar className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium">Total Repayment</span>
+            <span className="text-sm font-medium">Estimated Monthly EMI</span>
           </div>
           <p className="text-2xl font-bold text-primary">
-            ₹{new Intl.NumberFormat("en-IN").format(Math.round(totalRepayment))}
+            ₹{new Intl.NumberFormat("en-IN").format(estimatedEMI)}
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            Interest: ₹{new Intl.NumberFormat("en-IN").format(Math.round(totalInterest))} (1% per day × {tenureDays} days)
+            *Approximate EMI at 12% p.a. Actual EMI may vary based on your profile.
           </p>
         </div>
       )}

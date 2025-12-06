@@ -3506,7 +3506,7 @@ export type Database = {
           source: string | null
           status: string
           submitted_from_ip: string | null
-          tenure_days: number
+          tenure_months: number
           updated_at: string
         }
         Insert: {
@@ -3531,7 +3531,7 @@ export type Database = {
           source?: string | null
           status?: string
           submitted_from_ip?: string | null
-          tenure_days: number
+          tenure_months: number
           updated_at?: string
         }
         Update: {
@@ -3556,7 +3556,7 @@ export type Database = {
           source?: string | null
           status?: string
           submitted_from_ip?: string | null
-          tenure_days?: number
+          tenure_months?: number
           updated_at?: string
         }
         Relationships: [
@@ -3611,7 +3611,7 @@ export type Database = {
           approved_amount: number | null
           approved_at: string | null
           approved_rate: number | null
-          approved_tenure_days: number | null
+          approved_tenure: number | null
           approver_id: string | null
           approver_role: string | null
           comments: string | null
@@ -3628,7 +3628,7 @@ export type Database = {
           approved_amount?: number | null
           approved_at?: string | null
           approved_rate?: number | null
-          approved_tenure_days?: number | null
+          approved_tenure?: number | null
           approver_id?: string | null
           approver_role?: string | null
           comments?: string | null
@@ -3645,7 +3645,7 @@ export type Database = {
           approved_amount?: number | null
           approved_at?: string | null
           approved_rate?: number | null
-          approved_tenure_days?: number | null
+          approved_tenure?: number | null
           approver_id?: string | null
           approver_role?: string | null
           comments?: string | null
@@ -4148,7 +4148,7 @@ export type Database = {
           policy_checks: Json | null
           proposed_emi: number
           recommended_interest_rate: number | null
-          recommended_tenure_days: number | null
+          recommended_tenure: number | null
           total_deductions: number | null
         }
         Insert: {
@@ -4170,7 +4170,7 @@ export type Database = {
           policy_checks?: Json | null
           proposed_emi: number
           recommended_interest_rate?: number | null
-          recommended_tenure_days?: number | null
+          recommended_tenure?: number | null
           total_deductions?: number | null
         }
         Update: {
@@ -4192,7 +4192,7 @@ export type Database = {
           policy_checks?: Json | null
           proposed_emi?: number
           recommended_interest_rate?: number | null
-          recommended_tenure_days?: number | null
+          recommended_tenure?: number | null
           total_deductions?: number | null
         }
         Relationships: [
@@ -4580,9 +4580,9 @@ export type Database = {
           is_active: boolean | null
           max_amount: number
           max_interest_rate: number
-          max_tenure_days: number
+          max_tenure: number
           min_amount: number
-          min_tenure_days: number
+          min_tenure: number
           org_id: string
           processing_fee_percentage: number | null
           product_code: string
@@ -4598,9 +4598,9 @@ export type Database = {
           is_active?: boolean | null
           max_amount: number
           max_interest_rate: number
-          max_tenure_days: number
+          max_tenure: number
           min_amount: number
-          min_tenure_days: number
+          min_tenure: number
           org_id: string
           processing_fee_percentage?: number | null
           product_code: string
@@ -4616,9 +4616,9 @@ export type Database = {
           is_active?: boolean | null
           max_amount?: number
           max_interest_rate?: number
-          max_tenure_days?: number
+          max_tenure?: number
           min_amount?: number
-          min_tenure_days?: number
+          min_tenure?: number
           org_id?: string
           processing_fee_percentage?: number | null
           product_code?: string
@@ -4731,7 +4731,7 @@ export type Database = {
           sanction_number: string
           sanctioned_amount: number
           sanctioned_rate: number
-          sanctioned_tenure_days: number
+          sanctioned_tenure: number
           status: string
           updated_at: string
           validity_date: string | null
@@ -4751,7 +4751,7 @@ export type Database = {
           sanction_number: string
           sanctioned_amount: number
           sanctioned_rate: number
-          sanctioned_tenure_days: number
+          sanctioned_tenure: number
           status?: string
           updated_at?: string
           validity_date?: string | null
@@ -4771,7 +4771,7 @@ export type Database = {
           sanction_number?: string
           sanctioned_amount?: number
           sanctioned_rate?: number
-          sanctioned_tenure_days?: number
+          sanctioned_tenure?: number
           status?: string
           updated_at?: string
           validity_date?: string | null

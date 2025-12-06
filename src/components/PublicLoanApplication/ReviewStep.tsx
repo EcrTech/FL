@@ -80,7 +80,7 @@ export function ReviewStep({ formData, onSubmit, onPrev, onEdit, submitting }: R
           value={productTypeLabels[formData.loanDetails.productType] || formData.loanDetails.productType} 
         />
         <Field label="Loan Amount" value={formatAmount(formData.loanDetails.amount)} />
-        <Field label="Tenure" value={`${formData.loanDetails.tenure} days`} />
+        <Field label="Tenure" value={`${formData.loanDetails.tenure} months`} />
       </Section>
 
       {/* Personal Details */}
