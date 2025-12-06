@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import logo from "@/assets/paisaa-saarthi-logo.jpg";
+import logo from "@/assets/paisaa-saarthi-new-logo.png";
 import backgroundImage from "@/assets/login-background.png";
 
 interface AuthLayoutProps {
