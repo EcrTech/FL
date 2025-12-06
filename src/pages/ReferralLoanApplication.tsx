@@ -88,7 +88,9 @@ export default function ReferralLoanApplication() {
       }
 
       try {
-        // First, validate the referral code (public access via RLS)
+        console.log("[ReferralLoanApplication] Validating referral code:", referralCode);
+        
+        // Validate the referral code (public access via RLS policy)
         const { data, error: fetchError } = await supabase
           .from("user_referral_codes")
           .select("referral_code, user_id, org_id")
@@ -96,38 +98,46 @@ export default function ReferralLoanApplication() {
           .eq("is_active", true)
           .maybeSingle();
 
-        if (fetchError || !data) {
-          console.error("Referral validation error:", fetchError);
+        console.log("[ReferralLoanApplication] Query result:", { data, error: fetchError });
+
+        if (fetchError) {
+          console.error("[ReferralLoanApplication] Database error:", fetchError.message, fetchError.code);
+          setError("Unable to validate referral link. Please try again.");
+          setLoading(false);
+          return;
+        }
+
+        if (!data) {
+          console.log("[ReferralLoanApplication] No matching referral code found");
           setError("This referral link is invalid or has expired");
           setLoading(false);
           return;
         }
 
-        // Try to get the referrer's name (may fail for unauthenticated users due to RLS)
+        // Profile lookup is optional - may fail for unauthenticated users due to RLS
         let referrerName: string | null = null;
-        try {
-          const { data: profileData } = await supabase
-            .from("profiles")
-            .select("first_name, last_name")
-            .eq("id", data.user_id)
-            .maybeSingle();
-          if (profileData) {
-            referrerName = [profileData.first_name, profileData.last_name].filter(Boolean).join(" ") || null;
-          }
-        } catch {
-          // Ignore - profile lookup is optional for unauthenticated users
+        const { data: profileData, error: profileError } = await supabase
+          .from("profiles")
+          .select("first_name, last_name")
+          .eq("id", data.user_id)
+          .maybeSingle();
+        
+        if (profileData) {
+          referrerName = [profileData.first_name, profileData.last_name].filter(Boolean).join(" ") || null;
         }
+        console.log("[ReferralLoanApplication] Profile lookup:", { profileData, profileError: profileError?.message });
 
         setReferrerInfo({
           referralCode: data.referral_code,
-          referrerName: referrerName,
+          referrerName,
           referrerUserId: data.user_id,
           orgId: data.org_id,
         });
         setLoading(false);
+        console.log("[ReferralLoanApplication] Form loaded successfully");
       } catch (err) {
-        console.error("Error fetching referrer info:", err);
-        setError("Unable to load application form");
+        console.error("[ReferralLoanApplication] Unexpected error:", err);
+        setError("Unable to load application form. Please try again.");
         setLoading(false);
       }
     };
