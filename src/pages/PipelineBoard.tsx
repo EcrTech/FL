@@ -572,26 +572,6 @@ export default function PipelineBoard() {
                 placeholder="Company name"
               />
             </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="source">Source</Label>
-              <Select
-                value={newLead.source}
-                onValueChange={(value) => setNewLead(prev => ({ ...prev, source: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select source" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="website">Website</SelectItem>
-                  <SelectItem value="referral">Referral</SelectItem>
-                  <SelectItem value="social_media">Social Media</SelectItem>
-                  <SelectItem value="cold_call">Cold Call</SelectItem>
-                  <SelectItem value="event">Event</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
 
             <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
