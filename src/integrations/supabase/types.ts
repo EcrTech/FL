@@ -3501,6 +3501,7 @@ export type Database = {
           org_id: string
           previous_stage: string | null
           product_type: string
+          referred_by: string | null
           requested_amount: number
           source: string | null
           status: string
@@ -3525,6 +3526,7 @@ export type Database = {
           org_id: string
           previous_stage?: string | null
           product_type?: string
+          referred_by?: string | null
           requested_amount: number
           source?: string | null
           status?: string
@@ -3549,6 +3551,7 @@ export type Database = {
           org_id?: string
           previous_stage?: string | null
           product_type?: string
+          referred_by?: string | null
           requested_amount?: number
           source?: string | null
           status?: string
@@ -6500,6 +6503,47 @@ export type Database = {
         }
         Relationships: []
       }
+      user_referral_codes: {
+        Row: {
+          applications_count: number | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          org_id: string
+          referral_code: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          applications_count?: number | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          org_id: string
+          referral_code: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          applications_count?: number | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          org_id?: string
+          referral_code?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_referral_codes_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -7021,6 +7065,7 @@ export type Database = {
         Returns: boolean
       }
       generate_loan_application_number: { Args: never; Returns: string }
+      generate_referral_code: { Args: { p_user_id: string }; Returns: string }
       generate_webhook_token: { Args: never; Returns: string }
       get_active_pricing: {
         Args: never

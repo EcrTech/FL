@@ -110,20 +110,47 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Validate form slug and get form config
-    const { data: formConfig, error: formError } = await supabase
-      .from('loan_application_forms')
-      .select('*')
-      .eq('slug', body.formSlug)
-      .eq('is_active', true)
-      .single();
+    // Handle referral-based submissions
+    let formConfig: any = null;
+    let referrerUserId: string | null = null;
 
-    if (formError || !formConfig) {
-      console.log(`[submit-loan-application] Form not found: ${body.formSlug}`);
-      return new Response(
-        JSON.stringify({ error: 'Application form not found or inactive' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (body.referralCode) {
+      // Lookup referral code
+      const { data: referralData, error: refError } = await supabase
+        .from('user_referral_codes')
+        .select('user_id, org_id')
+        .eq('referral_code', body.referralCode)
+        .eq('is_active', true)
+        .single();
+
+      if (refError || !referralData) {
+        console.log(`[submit-loan-application] Invalid referral code: ${body.referralCode}`);
+        return new Response(
+          JSON.stringify({ error: 'Invalid or expired referral code' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      referrerUserId = referralData.user_id;
+      formConfig = { org_id: referralData.org_id, product_type: 'personal_loan' };
+      console.log(`[submit-loan-application] Referral submission from user: ${referrerUserId}`);
+    } else {
+      // Validate form slug and get form config
+      const { data: formData, error: formError } = await supabase
+        .from('loan_application_forms')
+        .select('*')
+        .eq('slug', body.formSlug)
+        .eq('is_active', true)
+        .single();
+
+      if (formError || !formData) {
+        console.log(`[submit-loan-application] Form not found: ${body.formSlug}`);
+        return new Response(
+          JSON.stringify({ error: 'Application form not found or inactive' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      formConfig = formData;
     }
 
     // Validate required fields
@@ -276,14 +303,15 @@ Deno.serve(async (req) => {
         .from('loan_applications')
         .insert({
           org_id: formConfig.org_id,
-          form_id: formConfig.id,
+          form_id: formConfig.id || null,
           application_number: applicationNumber,
           product_type: formConfig.product_type,
           requested_amount: loanAmount,
           tenure_months: body.loanDetails.tenure,
           current_stage: 'application_login',
           status: 'in_progress',
-          source: 'public_form',
+          source: referrerUserId ? 'referral_link' : 'public_form',
+          referred_by: referrerUserId,
           latitude: body.geolocation?.latitude || null,
           longitude: body.geolocation?.longitude || null,
           geolocation_accuracy: body.geolocation?.accuracy || null,
@@ -297,6 +325,17 @@ Deno.serve(async (req) => {
         throw appError;
       }
       application = newApp;
+
+      // Update referral count if this is a referral
+      if (referrerUserId && body.referralCode) {
+        await supabase
+          .from('user_referral_codes')
+          .update({ 
+            applications_count: supabase.rpc('increment_counter', { row_id: body.referralCode }),
+            updated_at: new Date().toISOString()
+          })
+          .eq('referral_code', body.referralCode);
+      }
     }
 
     console.log(`[submit-loan-application] Created/Updated application: ${application.id}`);
