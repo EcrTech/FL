@@ -306,7 +306,7 @@ export default function PipelineBoard() {
         {/* Filter Bar */}
         <Card>
           <CardContent className="pt-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-1">
                 <Label htmlFor="filter-name" className="text-xs text-muted-foreground">Name</Label>
                 <Input
@@ -333,25 +333,6 @@ export default function PipelineBoard() {
                   value={filters.phone}
                   onChange={(e) => handleFilterChange("phone", e.target.value)}
                 />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="filter-stage" className="text-xs text-muted-foreground">Pipeline Stage</Label>
-                <Select
-                  value={filters.pipelineStage}
-                  onValueChange={(value) => handleFilterChange("pipelineStage", value)}
-                >
-                  <SelectTrigger id="filter-stage">
-                    <SelectValue placeholder="All Stages" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Stages</SelectItem>
-                    {stages.map((stage) => (
-                      <SelectItem key={stage.id} value={stage.name}>
-                        {stage.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
             </div>
             
