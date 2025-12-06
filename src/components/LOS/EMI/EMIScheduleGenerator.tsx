@@ -27,15 +27,11 @@ export default function EMIScheduleGenerator({
   const [emiAmount, setEmiAmount] = useState<number>(0);
 
   useEffect(() => {
-    // Calculate EMI preview (convert days to months for EMI calculation)
-    const tenureMonths = Math.round(sanction.tenure_days / 30);
-    const monthlyRate = sanction.interest_rate / 12 / 100;
-    const emi =
-      (sanction.sanctioned_amount *
-        monthlyRate *
-        Math.pow(1 + monthlyRate, tenureMonths)) /
-      (Math.pow(1 + monthlyRate, tenureMonths) - 1);
-    setEmiAmount(Math.round(emi * 100) / 100);
+    // Calculate total repayment preview (daily interest model)
+    const dailyRate = sanction.interest_rate / 100; // Rate is % per day
+    const totalInterest = sanction.sanctioned_amount * dailyRate * sanction.tenure_days;
+    const totalRepayment = sanction.sanctioned_amount + totalInterest;
+    setEmiAmount(Math.round(totalRepayment * 100) / 100);
   }, [sanction]);
 
   const formatCurrency = (amount: number) => {
@@ -79,7 +75,7 @@ export default function EMIScheduleGenerator({
 
           <div className="space-y-1">
             <div className="text-sm text-muted-foreground">Interest Rate</div>
-            <div className="text-lg font-semibold">{sanction.interest_rate}% p.a.</div>
+            <div className="text-lg font-semibold">{sanction.interest_rate}% per day</div>
           </div>
 
           <div className="space-y-1">
@@ -88,7 +84,7 @@ export default function EMIScheduleGenerator({
           </div>
 
           <div className="space-y-1">
-            <div className="text-sm text-muted-foreground">Monthly EMI</div>
+            <div className="text-sm text-muted-foreground">Total Repayment</div>
             <div className="text-lg font-semibold text-primary">
               {formatCurrency(emiAmount)}
             </div>
@@ -112,15 +108,12 @@ export default function EMIScheduleGenerator({
         </div>
 
         <div className="p-4 bg-muted rounded-lg space-y-2">
-          <div className="text-sm font-medium">Total Repayment</div>
+          <div className="text-sm font-medium">Repayment Summary</div>
           <div className="text-2xl font-bold">
-            {formatCurrency(emiAmount * Math.round(sanction.tenure_days / 30))}
+            {formatCurrency(emiAmount)}
           </div>
           <div className="text-xs text-muted-foreground">
-            Interest:{" "}
-            {formatCurrency(
-              emiAmount * Math.round(sanction.tenure_days / 30) - sanction.sanctioned_amount
-            )}
+            Interest: {formatCurrency(emiAmount - sanction.sanctioned_amount)} ({sanction.interest_rate}% × {sanction.tenure_days} days)
           </div>
         </div>
 
@@ -131,7 +124,7 @@ export default function EMIScheduleGenerator({
               sanctionId: sanction.id,
               loanAmount: sanction.sanctioned_amount,
               interestRate: sanction.interest_rate,
-              tenureMonths: Math.round(sanction.tenure_days / 30),
+              tenureDays: sanction.tenure_days,
               disbursementDate: disbursement.disbursement_date,
             })
           }

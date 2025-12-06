@@ -37,7 +37,7 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
     max_allowed_foir: "50",
     eligible_loan_amount: "",
     recommended_tenure: "",
-    recommended_interest_rate: "12",
+    recommended_interest_rate: "1",
   });
 
   const [policyChecks, setPolicyChecks] = useState<Record<string, { passed: boolean; details: string }>>({});
@@ -93,7 +93,7 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
         max_allowed_foir: existingEligibility.max_allowed_foir?.toString() || "50",
         eligible_loan_amount: existingEligibility.eligible_loan_amount?.toString() || "",
         recommended_tenure: existingEligibility.recommended_tenure_days?.toString() || "",
-        recommended_interest_rate: existingEligibility.recommended_interest_rate?.toString() || "12",
+        recommended_interest_rate: existingEligibility.recommended_interest_rate?.toString() || "1",
       });
       setPolicyChecks(existingEligibility.policy_checks as any || {});
       setHasCalculated(true);
@@ -115,18 +115,19 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
     const netIncome = parseFloat(formData.net_income) || 0;
     const existingEMI = parseFloat(formData.existing_emi_obligations) || 0;
     const maxFOIR = parseFloat(formData.max_allowed_foir) || 50;
-    const interestRate = parseFloat(formData.recommended_interest_rate) || 12;
-    const tenureDays = parseInt(formData.recommended_tenure) || 360;
-    const tenure = Math.round(tenureDays / 30); // Convert days to months for EMI calculation
+    const dailyInterestRate = parseFloat(formData.recommended_interest_rate) || 1;
+    const tenureDays = parseInt(formData.recommended_tenure) || 30;
 
-    // Calculate max EMI based on FOIR
-    const maxEMI = (netIncome * maxFOIR / 100) - existingEMI;
+    // Calculate max total payment based on FOIR (single repayment model)
+    // Max total payment = net income - existing EMI (considering max FOIR)
+    const maxPayment = (netIncome * maxFOIR / 100) - existingEMI;
 
-    // Calculate loan amount using EMI formula: P = (EMI * n) / (1 + r/12)^n - 1) / (r/12 * (1 + r/12)^n)
-    const monthlyRate = interestRate / 12 / 100;
-    const eligibleAmount = maxEMI * ((Math.pow(1 + monthlyRate, tenure) - 1) / (monthlyRate * Math.pow(1 + monthlyRate, tenure)));
+    // For daily interest: Total Repayment = Principal + (Principal × daily_rate × days)
+    // Max Payment = P + (P × r × d) = P(1 + r × d)
+    // P = Max Payment / (1 + r × d)
+    const eligibleAmount = maxPayment / (1 + (dailyInterestRate / 100) * tenureDays);
 
-    return Math.round(eligibleAmount);
+    return Math.round(Math.max(0, eligibleAmount));
   };
 
   const runPolicyChecks = () => {
@@ -337,17 +338,17 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
                 type="number"
                 value={formData.recommended_tenure}
                 onChange={(e) => setFormData({ ...formData, recommended_tenure: e.target.value })}
-                placeholder="360"
+                placeholder="30"
               />
             </div>
             <div>
-              <Label>Interest Rate (% p.a.)</Label>
+              <Label>Interest Rate (% per day)</Label>
               <Input
                 type="number"
                 step="0.01"
                 value={formData.recommended_interest_rate}
                 onChange={(e) => setFormData({ ...formData, recommended_interest_rate: e.target.value })}
-                placeholder="12"
+                placeholder="1"
               />
             </div>
           </div>

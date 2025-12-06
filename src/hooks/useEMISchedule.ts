@@ -51,47 +51,39 @@ export function useEMISchedule(applicationId?: string) {
       sanctionId,
       loanAmount,
       interestRate,
-      tenureMonths,
+      tenureDays,
       disbursementDate,
     }: {
       applicationId: string;
       sanctionId: string;
       loanAmount: number;
       interestRate: number;
-      tenureMonths: number;
+      tenureDays: number;
       disbursementDate: string;
     }) => {
-      // Calculate EMI using reducing balance method
-      const monthlyRate = interestRate / 12 / 100;
-      const emi = (loanAmount * monthlyRate * Math.pow(1 + monthlyRate, tenureMonths)) / 
-                  (Math.pow(1 + monthlyRate, tenureMonths) - 1);
+      // Calculate total repayment using daily interest model
+      const dailyRate = interestRate / 100; // Rate is % per day
+      const totalInterest = loanAmount * dailyRate * tenureDays;
+      const totalRepayment = loanAmount + totalInterest;
 
-      let outstandingPrincipal = loanAmount;
-      const scheduleItems = [];
+      // For short-term loans, create a single repayment entry
+      const dueDate = new Date(disbursementDate);
+      dueDate.setDate(dueDate.getDate() + tenureDays);
 
-      for (let i = 1; i <= tenureMonths; i++) {
-        const interestAmount = outstandingPrincipal * monthlyRate;
-        const principalAmount = emi - interestAmount;
-        outstandingPrincipal -= principalAmount;
-
-        const dueDate = new Date(disbursementDate);
-        dueDate.setMonth(dueDate.getMonth() + i);
-
-        scheduleItems.push({
-          loan_application_id: applicationId,
-          sanction_id: sanctionId,
-          org_id: orgId!,
-          emi_number: i,
-          due_date: dueDate.toISOString().split("T")[0],
-          principal_amount: Math.round(principalAmount * 100) / 100,
-          interest_amount: Math.round(interestAmount * 100) / 100,
-          total_emi: Math.round(emi * 100) / 100,
-          outstanding_principal: Math.max(0, Math.round(outstandingPrincipal * 100) / 100),
-          status: "pending",
-          amount_paid: 0,
-          late_fee: 0,
-        });
-      }
+      const scheduleItems = [{
+        loan_application_id: applicationId,
+        sanction_id: sanctionId,
+        org_id: orgId!,
+        emi_number: 1,
+        due_date: dueDate.toISOString().split("T")[0],
+        principal_amount: Math.round(loanAmount * 100) / 100,
+        interest_amount: Math.round(totalInterest * 100) / 100,
+        total_emi: Math.round(totalRepayment * 100) / 100,
+        outstanding_principal: 0,
+        status: "pending",
+        amount_paid: 0,
+        late_fee: 0,
+      }];
 
       const { error } = await supabase
         .from("loan_repayment_schedule")

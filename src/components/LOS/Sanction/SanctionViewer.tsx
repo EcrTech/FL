@@ -49,12 +49,11 @@ export default function SanctionViewer({ applicationId }: SanctionViewerProps) {
     }).format(amount);
   };
 
-  const calculateEMI = () => {
+  const calculateTotalRepayment = () => {
     const P = sanction.sanctioned_amount;
-    const r = sanction.sanctioned_rate / 12 / 100;
-    const tenureMonths = Math.round(sanction.sanctioned_tenure_days / 30);
-    const emi = (P * r * Math.pow(1 + r, tenureMonths)) / (Math.pow(1 + r, tenureMonths) - 1);
-    return emi;
+    const dailyRate = sanction.sanctioned_rate / 100; // Rate is % per day
+    const totalInterest = P * dailyRate * sanction.sanctioned_tenure_days;
+    return P + totalInterest;
   };
 
   return (
@@ -119,7 +118,7 @@ export default function SanctionViewer({ applicationId }: SanctionViewerProps) {
                 </div>
                 <div className="p-4 bg-muted rounded-lg">
                   <div className="text-sm text-muted-foreground">Interest Rate</div>
-                  <div className="text-2xl font-bold">{sanction.sanctioned_rate}% p.a.</div>
+                  <div className="text-2xl font-bold">{sanction.sanctioned_rate}% per day</div>
                 </div>
                 <div className="p-4 bg-muted rounded-lg">
                   <div className="text-sm text-muted-foreground">Tenure</div>
@@ -132,8 +131,8 @@ export default function SanctionViewer({ applicationId }: SanctionViewerProps) {
               <h4 className="font-medium mb-3">Payment Details</h4>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="p-4 border rounded-lg">
-                  <div className="text-sm text-muted-foreground">Monthly EMI</div>
-                  <div className="text-xl font-bold">{formatCurrency(calculateEMI())}</div>
+                  <div className="text-sm text-muted-foreground">Total Repayment</div>
+                  <div className="text-xl font-bold">{formatCurrency(calculateTotalRepayment())}</div>
                 </div>
                 <div className="p-4 border rounded-lg">
                   <div className="text-sm text-muted-foreground">Processing Fee</div>
