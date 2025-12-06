@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrgContext } from "@/hooks/useOrgContext";
 import { useLOSPermissions } from "@/hooks/useLOSPermissions";
@@ -9,27 +9,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Eye, Clock, FileText, Sparkles, UserPlus, Phone } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Plus, Search, Eye, Clock, FileText, Sparkles, UserPlus } from "lucide-react";
 import { differenceInHours } from "date-fns";
 import { format } from "date-fns";
 import { LoadingState } from "@/components/common/LoadingState";
-import { toast } from "sonner";
 
-const STATUS_OPTIONS = [
-  { value: "new", label: "New" },
-  { value: "approved", label: "Approved" },
-  { value: "rejected", label: "Rejected" },
-  { value: "in_progress", label: "In-progress" },
-];
-
-// Section tabs for lead status
+// Section tabs for loan stages
 const SECTIONS = [
-  { id: "new", label: "New", statuses: ["new", "draft"] },
-  { id: "approved", label: "Approved", statuses: ["approved"] },
-  { id: "rejected", label: "Rejected", statuses: ["rejected"] },
-  { id: "in_progress", label: "In-progress", statuses: ["in_progress"] },
+  { id: "application", label: "Application", stages: ["application_login", "document_collection", "field_verification", "credit_assessment", "approval_pending"] },
+  { id: "sanction", label: "Sanction", stages: ["approved", "sanction_generated"] },
+  { id: "disbursed", label: "Disbursed", stages: ["disbursement_pending", "disbursed"] },
+  { id: "collection", label: "Collection", stages: ["closed"] },
 ];
 
 const STAGE_LABELS: Record<string, string> = {
@@ -61,13 +52,11 @@ export default function Applications() {
   const { orgId } = useOrgContext();
   const { permissions } = useLOSPermissions();
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeSection, setActiveSection] = useState("new");
+  const [activeSection, setActiveSection] = useState("application");
 
   const isFreshApplication = (createdAt: string) => {
     return differenceInHours(new Date(), new Date(createdAt)) < 48;
   };
-
-  const queryClient = useQueryClient();
 
   const { data: applications = [], isLoading } = useQuery({
     queryKey: ["loan-applications", orgId],
@@ -93,56 +82,20 @@ export default function Applications() {
     enabled: !!orgId,
   });
 
-  const updateStatusMutation = useMutation({
-    mutationFn: async ({ appId, status }: { appId: string; status: string }) => {
-      const { error } = await supabase
-        .from("loan_applications")
-        .update({ status })
-        .eq("id", appId);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["loan-applications", orgId] });
-      toast.success("Status updated successfully");
-    },
-    onError: (error) => {
-      console.error("Error updating status:", error);
-      toast.error("Failed to update status");
-    },
-  });
-
-  const handleStatusChange = (appId: string, status: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    updateStatusMutation.mutate({ appId, status });
-  };
-
-  const handleCall = (phone: string | null, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (phone) {
-      window.location.href = `tel:${phone}`;
-    } else {
-      toast.error("No phone number available");
-    }
-  };
-
-  const getApplicantPhone = (app: any) => {
-    return app.loan_applicants?.[0]?.phone || app.contacts?.phone || null;
-  };
-
   // Get section counts
   const sectionCounts = SECTIONS.reduce((acc, section) => {
     acc[section.id] = applications.filter(app => 
-      section.statuses.includes(app.status)
+      section.stages.includes(app.current_stage)
     ).length;
     return acc;
   }, {} as Record<string, number>);
 
   // Filter applications by active section
-  const activeStatuses = SECTIONS.find(s => s.id === activeSection)?.statuses || [];
+  const activeStages = SECTIONS.find(s => s.id === activeSection)?.stages || [];
   
   const filteredApplications = applications.filter((app) => {
-    // First filter by section statuses
-    if (!activeStatuses.includes(app.status)) return false;
+    // First filter by section stages
+    if (!activeStages.includes(app.current_stage)) return false;
     
     // Then filter by search query
     const searchLower = searchQuery.toLowerCase();
@@ -245,7 +198,7 @@ export default function Applications() {
                   <p className="text-muted-foreground mb-4">
                     Applications will appear here as they progress through the workflow
                   </p>
-                  {activeSection === "new" && (
+                  {activeSection === "application" && (
                     <Button onClick={() => navigate("/los/applications/new")}>
                       <Plus className="mr-2 h-4 w-4" />
                       Create Application
@@ -265,10 +218,10 @@ export default function Applications() {
                           <span className="font-mono font-semibold">
                             {app.application_number}
                           </span>
-                          {app.status === "new" || isFreshApplication(app.created_at) ? (
+                          {isFreshApplication(app.created_at) ? (
                             <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white border-0">
                               <Sparkles className="h-3 w-3 mr-1" />
-                              NEW LEAD
+                              NEW
                             </Badge>
                           ) : (
                             <Badge className={STATUS_COLORS[app.status] || "bg-muted"}>
@@ -287,21 +240,13 @@ export default function Applications() {
                         </div>
 
                         <div className="grid gap-2 md:grid-cols-3 text-sm text-muted-foreground">
-                          <div className="flex items-center gap-2">
+                          <div>
                             <span className="font-medium">Applicant: </span>
                             {app.loan_applicants?.[0]
                               ? `${app.loan_applicants[0].first_name} ${app.loan_applicants[0].last_name || ""}`
                               : app.contacts
                                 ? `${app.contacts.first_name} ${app.contacts.last_name || ""}`
                                 : "Not linked"}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 text-green-600 hover:text-green-700 hover:bg-green-100"
-                              onClick={(e) => handleCall(getApplicantPhone(app), e)}
-                            >
-                              <Phone className="h-4 w-4" />
-                            </Button>
                           </div>
                           <div>
                             <span className="font-medium">Amount: </span>
@@ -331,26 +276,9 @@ export default function Applications() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                        <Select
-                          value={app.status}
-                          onValueChange={(value) => handleStatusChange(app.id, value, { stopPropagation: () => {} } as any)}
-                        >
-                          <SelectTrigger className="w-[140px]">
-                            <SelectValue placeholder="Set status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {STATUS_OPTIONS.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button variant="ghost" size="icon">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      <Button variant="ghost" size="icon">
+                        <Eye className="h-4 w-4" />
+                      </Button>
                     </div>
                   ))}
                 </div>

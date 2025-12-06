@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LoadingState } from "@/components/common/LoadingState";
 import { useNotification } from "@/hooks/useNotification";
-import { Loader2, Search, Phone, Plus } from "lucide-react";
+import { Loader2, Search, Phone, Plus, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,6 +18,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { usePagination } from "@/hooks/usePagination";
 import PaginationControls from "@/components/common/PaginationControls";
 import { useOrgContext } from "@/hooks/useOrgContext";
+import { differenceInHours } from "date-fns";
+import { toast } from "sonner";
 
 interface PipelineStage {
   id: string;
@@ -37,23 +39,39 @@ interface Contact {
   job_title?: string | null;
   source?: string | null;
   status?: string | null;
+  created_at?: string;
 }
 
 interface Filters {
   name: string;
   company: string;
   phone: string;
-  pipelineStage: string;
+  statusFilter: string;
 }
 
-const STAGE_FILTERS = ["all", "Lead", "Application", "Sanction", "Disbursed", "Collection"];
+const STATUS_FILTERS = ["all", "new", "approved", "rejected", "in_progress"];
+
+const STATUS_OPTIONS = [
+  { value: "new", label: "New" },
+  { value: "approved", label: "Approved" },
+  { value: "rejected", label: "Rejected" },
+  { value: "in_progress", label: "In-progress" },
+];
+
+const STATUS_LABELS: Record<string, string> = {
+  all: "All",
+  new: "New",
+  approved: "Approved",
+  rejected: "Rejected",
+  in_progress: "In-progress",
+};
 
 export default function PipelineBoard() {
   const [filters, setFilters] = useState<Filters>({
     name: "",
     company: "",
     phone: "",
-    pipelineStage: "all"
+    statusFilter: "all"
   });
   const [callingContactId, setCallingContactId] = useState<string | null>(null);
   const [showNewLeadDialog, setShowNewLeadDialog] = useState(false);
@@ -64,7 +82,8 @@ export default function PipelineBoard() {
     phone: "",
     company: "",
     pipeline_stage_id: "",
-    source: ""
+    source: "",
+    status: "new"
   });
   
   const notify = useNotification();
@@ -98,7 +117,7 @@ export default function PipelineBoard() {
   }, [stagesData]);
 
   const { data: contactsData, isLoading: contactsLoading } = useQuery({
-    queryKey: ['leads-contacts', filters, tablePagination.currentPage, tablePagination.pageSize, stagesData],
+    queryKey: ['leads-contacts', filters, tablePagination.currentPage, tablePagination.pageSize],
     queryFn: async () => {
       const offset = (tablePagination.currentPage - 1) * tablePagination.pageSize;
       
@@ -122,11 +141,12 @@ export default function PipelineBoard() {
         query = query.ilike("phone", `%${filters.phone.trim()}%`);
       }
       
-      // Apply pipeline stage filter
-      if (filters.pipelineStage !== "all" && stagesData) {
-        const stage = stagesData.find(s => s.name === filters.pipelineStage);
-        if (stage) {
-          query = query.eq("pipeline_stage_id", stage.id);
+      // Apply status filter
+      if (filters.statusFilter !== "all") {
+        if (filters.statusFilter === "new") {
+          query = query.or("status.eq.new,status.is.null");
+        } else {
+          query = query.eq("status", filters.statusFilter);
         }
       }
       
@@ -136,7 +156,25 @@ export default function PipelineBoard() {
       if (error) throw error;
       return { data: data as Contact[], count: count || 0 };
     },
-    enabled: !!stagesData,
+  });
+
+  // Update status mutation
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ contactId, status }: { contactId: string; status: string }) => {
+      const { error } = await supabase
+        .from("contacts")
+        .update({ status })
+        .eq("id", contactId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leads-contacts'] });
+      toast.success("Status updated successfully");
+    },
+    onError: (error) => {
+      console.error("Error updating status:", error);
+      toast.error("Failed to update status");
+    },
   });
 
   // Create new lead mutation
@@ -154,6 +192,7 @@ export default function PipelineBoard() {
           company: leadData.company || null,
           pipeline_stage_id: leadData.pipeline_stage_id || null,
           source: leadData.source || null,
+          status: leadData.status || "new",
           org_id: orgId,
         })
         .select()
@@ -173,7 +212,8 @@ export default function PipelineBoard() {
         phone: "",
         company: "",
         pipeline_stage_id: "",
-        source: ""
+        source: "",
+        status: "new"
       });
     },
     onError: (error: any) => {
@@ -195,6 +235,16 @@ export default function PipelineBoard() {
   const stages = stagesData || [];
   const contacts = contactsData?.data || [];
   const loading = !stagesData || contactsLoading;
+
+  const isFreshLead = (createdAt?: string) => {
+    if (!createdAt) return false;
+    return differenceInHours(new Date(), new Date(createdAt)) < 48;
+  };
+
+  const handleStatusChange = (contactId: string, status: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    updateStatusMutation.mutate({ contactId, status });
+  };
 
   const handleCall = async (contact: Contact, e?: React.MouseEvent) => {
     if (e) {
@@ -249,7 +299,7 @@ export default function PipelineBoard() {
       name: "",
       company: "",
       phone: "",
-      pipelineStage: "all"
+      statusFilter: "all"
     });
   };
 
@@ -266,7 +316,7 @@ export default function PipelineBoard() {
     createLeadMutation.mutate(newLead);
   };
 
-  const hasActiveFilters = filters.name || filters.company || filters.phone || filters.pipelineStage !== "all";
+  const hasActiveFilters = filters.name || filters.company || filters.phone || filters.statusFilter !== "all";
 
   if (loading) {
     return (
@@ -292,12 +342,12 @@ export default function PipelineBoard() {
           </div>
         </div>
 
-        {/* Stage Filter Tabs */}
-        <Tabs value={filters.pipelineStage} onValueChange={(value) => handleFilterChange("pipelineStage", value)} className="w-full">
+        {/* Status Filter Tabs */}
+        <Tabs value={filters.statusFilter} onValueChange={(value) => handleFilterChange("statusFilter", value)} className="w-full">
           <TabsList className="flex-wrap h-auto gap-1">
-            {STAGE_FILTERS.map((stage) => (
-              <TabsTrigger key={stage} value={stage} className="capitalize">
-                {stage === "all" ? "All Leads" : stage}
+            {STATUS_FILTERS.map((status) => (
+              <TabsTrigger key={status} value={status} className="capitalize">
+                {STATUS_LABELS[status]}
               </TabsTrigger>
             ))}
           </TabsList>
@@ -357,7 +407,7 @@ export default function PipelineBoard() {
         {/* Leads Table */}
         <Card>
           <CardHeader>
-            <CardTitle>All Leads</CardTitle>
+            <CardTitle>{STATUS_LABELS[filters.statusFilter]} Leads</CardTitle>
           </CardHeader>
           <CardContent>
             <Table>
@@ -366,13 +416,12 @@ export default function PipelineBoard() {
                   <TableHead>Name</TableHead>
                   <TableHead>Company</TableHead>
                   <TableHead>Phone</TableHead>
-                  <TableHead>Pipeline Stage</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {contacts.map(contact => {
-                  const stage = stages.find(s => s.id === contact.pipeline_stage_id);
+                  const isNew = contact.status === "new" || (!contact.status && isFreshLead(contact.created_at));
                   return (
                     <TableRow
                       key={contact.id}
@@ -380,49 +429,63 @@ export default function PipelineBoard() {
                       onClick={() => navigate(`/contacts/${contact.id}`)}
                     >
                       <TableCell>
-                        <div>
-                          <p className="font-medium">{contact.first_name} {contact.last_name}</p>
-                          {contact.job_title && (
-                            <p className="text-xs text-muted-foreground">{contact.job_title}</p>
-                          )}
+                        <div className="flex items-center gap-2">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium">{contact.first_name} {contact.last_name}</p>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-green-600 hover:text-green-700 hover:bg-green-100"
+                                onClick={(e) => handleCall(contact, e)}
+                                disabled={!contact.phone || callingContactId === contact.id}
+                              >
+                                {callingContactId === contact.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Phone className="h-4 w-4" />
+                                )}
+                              </Button>
+                              {isNew && (
+                                <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white border-0">
+                                  <Sparkles className="h-3 w-3 mr-1" />
+                                  NEW LEAD
+                                </Badge>
+                              )}
+                            </div>
+                            {contact.job_title && (
+                              <p className="text-xs text-muted-foreground">{contact.job_title}</p>
+                            )}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>{contact.company || '-'}</TableCell>
                       <TableCell>
                         <p className="text-sm">{contact.phone || '-'}</p>
                       </TableCell>
-                      <TableCell>
-                        {stage ? (
-                          <Badge 
-                            variant="outline" 
-                            style={{ borderColor: stage.color, color: stage.color }}
-                          >
-                            {stage.name}
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary">Unassigned</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={(e) => handleCall(contact, e)}
-                          disabled={!contact.phone || callingContactId === contact.id}
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Select
+                          value={contact.status || "new"}
+                          onValueChange={(value) => handleStatusChange(contact.id, value, { stopPropagation: () => {} } as any)}
                         >
-                          {callingContactId === contact.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Phone className="h-4 w-4" />
-                          )}
-                        </Button>
+                          <SelectTrigger className="w-[130px]">
+                            <SelectValue placeholder="Set status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {STATUS_OPTIONS.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </TableCell>
                     </TableRow>
                   );
                 })}
                 {contacts.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
                       No leads found
                     </TableCell>
                   </TableRow>
@@ -506,39 +569,49 @@ export default function PipelineBoard() {
                 id="company"
                 value={newLead.company}
                 onChange={(e) => setNewLead(prev => ({ ...prev, company: e.target.value }))}
-                placeholder="Acme Corp"
+                placeholder="Company name"
               />
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="pipeline_stage">Pipeline Stage</Label>
+              <Label htmlFor="source">Source</Label>
               <Select
-                value={newLead.pipeline_stage_id}
-                onValueChange={(value) => setNewLead(prev => ({ ...prev, pipeline_stage_id: value }))}
+                value={newLead.source}
+                onValueChange={(value) => setNewLead(prev => ({ ...prev, source: value }))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a stage" />
+                  <SelectValue placeholder="Select source" />
                 </SelectTrigger>
                 <SelectContent>
-                  {stages.map((stage) => (
-                    <SelectItem key={stage.id} value={stage.id}>
-                      {stage.name}
+                  <SelectItem value="website">Website</SelectItem>
+                  <SelectItem value="referral">Referral</SelectItem>
+                  <SelectItem value="social_media">Social Media</SelectItem>
+                  <SelectItem value="cold_call">Cold Call</SelectItem>
+                  <SelectItem value="event">Event</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="status">Status</Label>
+              <Select
+                value={newLead.status}
+                onValueChange={(value) => setNewLead(prev => ({ ...prev, status: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="source">Source</Label>
-              <Input
-                id="source"
-                value={newLead.source}
-                onChange={(e) => setNewLead(prev => ({ ...prev, source: e.target.value }))}
-                placeholder="Website, Referral, etc."
-              />
-            </div>
-            
+
             <div className="flex justify-end gap-2 pt-4">
               <Button type="button" variant="outline" onClick={() => setShowNewLeadDialog(false)}>
                 Cancel
@@ -546,11 +619,14 @@ export default function PipelineBoard() {
               <Button type="submit" disabled={createLeadMutation.isPending}>
                 {createLeadMutation.isPending ? (
                   <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Creating...
                   </>
                 ) : (
-                  "Create Lead"
+                  <>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Lead
+                  </>
                 )}
               </Button>
             </div>
