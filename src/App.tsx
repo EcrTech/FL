@@ -51,6 +51,8 @@ import NewApplication from "./pages/LOS/NewApplication";
 import ApplicationDetail from "./pages/LOS/ApplicationDetail";
 import ApprovalQueuePage from "./pages/LOS/ApprovalQueue";
 import LOSDashboard from "./pages/LOS/Dashboard";
+import MyReferrals from "./pages/LOS/MyReferrals";
+import ReferralLoanApplication from "./pages/ReferralLoanApplication";
 import ProtectedRoute from "./components/Auth/ProtectedRoute";
 
 const App = () => (
@@ -64,6 +66,7 @@ const App = () => (
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/form/:formId" element={<PublicForm />} />
           <Route path="/apply/:slug" element={<PublicLoanApplication />} />
+          <Route path="/apply/ref/:referralCode" element={<ReferralLoanApplication />} />
           
           <Route path="/dashboard" element={
             <ProtectedRoute>
@@ -295,6 +298,12 @@ const App = () => (
           <Route path="/los/approval-queue" element={
             <ProtectedRoute>
               <ApprovalQueuePage />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/los/my-referrals" element={
+            <ProtectedRoute>
+              <MyReferrals />
             </ProtectedRoute>
           } />
           

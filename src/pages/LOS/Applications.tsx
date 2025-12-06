@@ -10,7 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Filter, Eye, Clock, CheckCircle2, XCircle, FileText } from "lucide-react";
+import { Plus, Search, Filter, Eye, Clock, CheckCircle2, XCircle, FileText, Sparkles, UserPlus } from "lucide-react";
+import { differenceInHours } from "date-fns";
 import { format } from "date-fns";
 import { LoadingState } from "@/components/common/LoadingState";
 
@@ -24,6 +25,8 @@ interface LoanApplication {
   status: string;
   created_at: string;
   assigned_to: string | null;
+  source: string | null;
+  referred_by: string | null;
   contacts: {
     first_name: string;
     last_name: string | null;
@@ -64,9 +67,14 @@ export default function Applications() {
   const [searchQuery, setSearchQuery] = useState("");
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [sourceFilter, setSourceFilter] = useState<string>("all");
+
+  const isFreshApplication = (createdAt: string) => {
+    return differenceInHours(new Date(), new Date(createdAt)) < 48;
+  };
 
   const { data: applications = [], isLoading } = useQuery({
-    queryKey: ["loan-applications", orgId, stageFilter, statusFilter],
+    queryKey: ["loan-applications", orgId, stageFilter, statusFilter, sourceFilter],
     queryFn: async () => {
       let query = supabase
         .from("loan_applications")
@@ -74,7 +82,8 @@ export default function Applications() {
           *,
           loan_applicants(first_name, last_name),
           contacts(first_name, last_name),
-          assigned_profile:profiles!loan_applications_assigned_to_fkey(first_name, last_name)
+          assigned_profile:profiles!loan_applications_assigned_to_fkey(first_name, last_name),
+          referrer:profiles!loan_applications_referred_by_fkey(full_name)
         `)
         .eq("org_id", orgId)
         .order("created_at", { ascending: false });
@@ -85,6 +94,16 @@ export default function Applications() {
 
       if (statusFilter !== "all") {
         query = query.eq("status", statusFilter);
+      }
+
+      if (sourceFilter === "referral") {
+        query = query.eq("source", "referral_link");
+      } else if (sourceFilter === "public") {
+        query = query.eq("source", "public_form");
+      } else if (sourceFilter === "fresh") {
+        const cutoff = new Date();
+        cutoff.setHours(cutoff.getHours() - 48);
+        query = query.gte("created_at", cutoff.toISOString());
       }
 
       const { data, error } = await query;
@@ -257,6 +276,18 @@ export default function Applications() {
                   <SelectItem value="disbursed">Disbursed</SelectItem>
                 </SelectContent>
               </Select>
+
+              <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filter by source" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sources</SelectItem>
+                  <SelectItem value="fresh">Fresh (Last 48h)</SelectItem>
+                  <SelectItem value="referral">Referral</SelectItem>
+                  <SelectItem value="public">Public Form</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </CardContent>
         </Card>
@@ -291,7 +322,7 @@ export default function Applications() {
                     onClick={() => navigate(`/los/applications/${app.id}`)}
                   >
                     <div className="flex-1 space-y-2">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 flex-wrap">
                         <span className="font-mono font-semibold">
                           {app.application_number}
                         </span>
@@ -301,6 +332,18 @@ export default function Applications() {
                         <Badge variant="outline">
                           {STAGE_LABELS[app.current_stage] || app.current_stage}
                         </Badge>
+                        {isFreshApplication(app.created_at) && (
+                          <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white border-0 animate-pulse">
+                            <Sparkles className="h-3 w-3 mr-1" />
+                            FRESH
+                          </Badge>
+                        )}
+                        {app.source === "referral_link" && (
+                          <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 border-blue-500/20">
+                            <UserPlus className="h-3 w-3 mr-1" />
+                            Referral
+                          </Badge>
+                        )}
                       </div>
 
                       <div className="grid gap-2 md:grid-cols-3 text-sm text-muted-foreground">
@@ -322,7 +365,7 @@ export default function Applications() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
                         <div className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
                           {format(new Date(app.created_at), "MMM dd, yyyy")}
@@ -330,6 +373,11 @@ export default function Applications() {
                         {(app as any).assigned_profile && (
                           <div>
                             Assigned to: {(app as any).assigned_profile.first_name} {(app as any).assigned_profile.last_name}
+                          </div>
+                        )}
+                        {(app as any).referrer?.full_name && (
+                          <div className="text-blue-600">
+                            Referred by: {(app as any).referrer.full_name}
                           </div>
                         )}
                       </div>
