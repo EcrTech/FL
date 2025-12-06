@@ -45,10 +45,9 @@ export function LoanDetailsStep({ data, onChange, onNext }: LoanDetailsStepProps
   };
 
   const amount = parseFloat(data.amount) || 0;
-  const tenureDays = data.tenure || 360;
-  const tenureMonths = Math.round(tenureDays / 30);
-  const estimatedEMI = amount > 0 
-    ? Math.round((amount * (1 + (0.12 * tenureMonths / 12))) / tenureMonths)
+  const tenureDays = data.tenure || 30;
+  const estimatedEMI = amount > 0 && tenureDays > 0
+    ? Math.round((amount * (1 + (0.12 * tenureDays / 365))) / tenureDays)
     : 0;
 
   return (
@@ -97,19 +96,19 @@ export function LoanDetailsStep({ data, onChange, onNext }: LoanDetailsStepProps
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <Label>Loan Tenure</Label>
-          <span className="text-sm font-medium">{tenureDays} days ({tenureMonths} months)</span>
+          <span className="text-sm font-medium">{tenureDays} days</span>
         </div>
         <Slider
           value={[tenureDays]}
           onValueChange={([value]) => onChange({ tenure: value })}
-          min={180}
-          max={2520}
-          step={30}
+          min={1}
+          max={90}
+          step={1}
           className="py-4"
         />
         <div className="flex justify-between text-xs text-muted-foreground">
-          <span>180 days (6 mo)</span>
-          <span>2520 days (84 mo)</span>
+          <span>1 day</span>
+          <span>90 days</span>
         </div>
       </div>
 
