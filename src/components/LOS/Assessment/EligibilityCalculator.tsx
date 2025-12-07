@@ -92,7 +92,7 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
         foir_percentage: existingEligibility.foir_percentage?.toString() || "0",
         max_allowed_foir: existingEligibility.max_allowed_foir?.toString() || "50",
         eligible_loan_amount: existingEligibility.eligible_loan_amount?.toString() || "",
-        recommended_tenure: existingEligibility.recommended_tenure?.toString() || "",
+        recommended_tenure: existingEligibility.recommended_tenure_days ? Math.round(existingEligibility.recommended_tenure_days / 30).toString() : "",
         recommended_interest_rate: existingEligibility.recommended_interest_rate?.toString() || "12",
       });
       setPolicyChecks(existingEligibility.policy_checks as any || {});

@@ -75,19 +75,19 @@ export default function SanctionGenerator({ applicationId, orgId }: SanctionGene
       const validUntil = new Date();
       validUntil.setDate(validUntil.getDate() + 30); // Valid for 30 days
 
-      const { error } = await supabase.from("loan_sanctions").insert({
+      const { error } = await supabase.from("loan_sanctions").insert([{
         loan_application_id: applicationId,
         sanction_number: sanctionNumber,
         sanction_date: new Date().toISOString(),
         sanctioned_amount: approval.approved_amount,
         sanctioned_rate: parseFloat(interestRate),
-        sanctioned_tenure: application?.tenure_months || 0,
+        sanctioned_tenure_days: application?.tenure_days || 0,
         processing_fee: parseFloat(processingFee),
         net_disbursement_amount: approval.approved_amount - parseFloat(processingFee),
         conditions: { terms: terms },
         validity_date: validUntil.toISOString(),
         status: "active",
-      });
+      }]);
 
       if (error) throw error;
 
@@ -166,10 +166,10 @@ export default function SanctionGenerator({ applicationId, orgId }: SanctionGene
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="tenure">Tenure (Months)</Label>
+            <Label htmlFor="tenure">Tenure (Days)</Label>
             <Input
               id="tenure"
-              value={application?.tenure_months}
+              value={application?.tenure_days}
               disabled
             />
           </div>

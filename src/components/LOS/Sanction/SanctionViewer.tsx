@@ -52,7 +52,7 @@ export default function SanctionViewer({ applicationId }: SanctionViewerProps) {
   const calculateEMI = () => {
     const P = sanction.sanctioned_amount;
     const r = sanction.sanctioned_rate / 12 / 100;
-    const n = sanction.sanctioned_tenure;
+    const n = Math.round(sanction.sanctioned_tenure_days / 30); // Convert days to months
     const emi = (P * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
     return emi;
   };
@@ -123,7 +123,7 @@ export default function SanctionViewer({ applicationId }: SanctionViewerProps) {
                 </div>
                 <div className="p-4 bg-muted rounded-lg">
                   <div className="text-sm text-muted-foreground">Tenure</div>
-                  <div className="text-2xl font-bold">{sanction.sanctioned_tenure} months</div>
+                  <div className="text-2xl font-bold">{sanction.sanctioned_tenure_days} days</div>
                 </div>
               </div>
             </div>
