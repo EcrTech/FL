@@ -7,45 +7,54 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LoadingState } from "@/components/common/LoadingState";
 import { useNotification } from "@/hooks/useNotification";
-import { Loader2, Search, Phone, Plus, Sparkles } from "lucide-react";
+import { Search, FileCheck, FileX, Phone, Mail } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { usePagination } from "@/hooks/usePagination";
 import PaginationControls from "@/components/common/PaginationControls";
 import { useOrgContext } from "@/hooks/useOrgContext";
-import { differenceInHours } from "date-fns";
 import { toast } from "sonner";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-interface PipelineStage {
+interface LoanApplication {
   id: string;
-  name: string;
-  color: string;
-  stage_order: number;
+  requested_amount: number | null;
+  tenure_days: number | null;
+  status: string | null;
+  source: string | null;
+  created_at: string;
+  loan_applicants: {
+    first_name: string | null;
+    last_name: string | null;
+    mobile: string | null;
+    email: string | null;
+    current_address: {
+      state?: string;
+      pin_code?: string;
+    } | null;
+  }[] | null;
+  contacts: {
+    first_name: string;
+    last_name: string | null;
+    phone: string | null;
+    email: string | null;
+  } | null;
 }
 
-interface Contact {
-  id: string;
-  first_name: string;
-  last_name: string | null;
-  email: string | null;
-  phone: string | null;
-  company: string | null;
-  pipeline_stage_id: string | null;
-  job_title?: string | null;
-  source?: string | null;
-  status?: string | null;
-  created_at?: string;
+interface DocumentCount {
+  application_id: string;
+  count: number;
+  document_types: string[];
 }
 
 interface Filters {
   name: string;
-  company: string;
   phone: string;
+  source: string;
   statusFilter: string;
 }
 
@@ -66,24 +75,106 @@ const STATUS_LABELS: Record<string, string> = {
   in_progress: "In-progress",
 };
 
+const SOURCE_OPTIONS = [
+  { value: "all", label: "All Sources" },
+  { value: "website", label: "Website" },
+  { value: "whatsapp", label: "WhatsApp" },
+  { value: "email", label: "Email" },
+  { value: "fb", label: "Facebook" },
+  { value: "direct", label: "Direct" },
+  { value: "referral_link", label: "Referral" },
+  { value: "others", label: "Others" },
+];
+
+const SOURCE_DISPLAY: Record<string, string> = {
+  website: "Website",
+  whatsapp: "WhatsApp",
+  email: "Email",
+  fb: "Facebook",
+  direct: "Direct",
+  referral_link: "Referral",
+  others: "Others",
+};
+
+const REQUIRED_DOCUMENTS = [
+  "pan_card",
+  "aadhaar_card",
+  "salary_slip_1",
+  "salary_slip_2",
+  "salary_slip_3",
+];
+
+const DOCUMENT_LABELS: Record<string, string> = {
+  pan_card: "PAN Card",
+  aadhaar_card: "Aadhaar Card",
+  salary_slip_1: "Salary Slip 1",
+  salary_slip_2: "Salary Slip 2",
+  salary_slip_3: "Salary Slip 3",
+};
+
+function DocumentChecklist({ uploaded, applicationId }: { uploaded: string[]; applicationId: string }) {
+  const uploadedSet = new Set(uploaded.map(d => d.toLowerCase().replace(/\s+/g, '_')));
+  const uploadedCount = REQUIRED_DOCUMENTS.filter(doc => uploadedSet.has(doc)).length;
+  const totalRequired = REQUIRED_DOCUMENTS.length;
+  
+  let colorClass = "text-destructive";
+  if (uploadedCount === totalRequired) {
+    colorClass = "text-green-600";
+  } else if (uploadedCount > 0) {
+    colorClass = "text-yellow-600";
+  }
+
+  const missing = REQUIRED_DOCUMENTS.filter(doc => !uploadedSet.has(doc));
+  const present = REQUIRED_DOCUMENTS.filter(doc => uploadedSet.has(doc));
+
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className={`flex items-center gap-1 font-medium cursor-help ${colorClass}`}>
+            {uploadedCount === totalRequired ? (
+              <FileCheck className="h-3.5 w-3.5" />
+            ) : (
+              <FileX className="h-3.5 w-3.5" />
+            )}
+            <span className="text-xs">{uploadedCount}/{totalRequired}</span>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs">
+          <div className="text-xs space-y-1">
+            {present.length > 0 && (
+              <div>
+                <span className="font-medium text-green-600">Uploaded:</span>
+                <ul className="ml-2">
+                  {present.map(doc => (
+                    <li key={doc}>✓ {DOCUMENT_LABELS[doc]}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {missing.length > 0 && (
+              <div>
+                <span className="font-medium text-destructive">Missing:</span>
+                <ul className="ml-2">
+                  {missing.map(doc => (
+                    <li key={doc}>✗ {DOCUMENT_LABELS[doc]}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 export default function PipelineBoard() {
   const [filters, setFilters] = useState<Filters>({
     name: "",
-    company: "",
     phone: "",
+    source: "all",
     statusFilter: "all"
-  });
-  const [callingContactId, setCallingContactId] = useState<string | null>(null);
-  const [showNewLeadDialog, setShowNewLeadDialog] = useState(false);
-  const [newLead, setNewLead] = useState({
-    first_name: "",
-    last_name: "",
-    email: "",
-    phone: "",
-    company: "",
-    pipeline_stage_id: "",
-    source: "",
-    status: "new"
   });
   
   const notify = useNotification();
@@ -93,82 +184,104 @@ export default function PipelineBoard() {
   
   const tablePagination = usePagination({ defaultPageSize: 50 });
 
-  const { data: stagesData } = useQuery({
-    queryKey: ['pipeline-stages'],
+  // Fetch loan applications with applicant info
+  const { data: applicationsData, isLoading } = useQuery({
+    queryKey: ['leads-applications', orgId, filters, tablePagination.currentPage, tablePagination.pageSize],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("pipeline_stages")
-        .select("id, name, color, stage_order")
-        .eq("is_active", true)
-        .order("stage_order");
-      if (error) throw error;
-      return data as PipelineStage[];
-    },
-  });
-
-  // Set default stage to "Lead" when stages are loaded
-  useEffect(() => {
-    if (stagesData && !newLead.pipeline_stage_id) {
-      const leadStage = stagesData.find(s => s.name === "Lead");
-      if (leadStage) {
-        setNewLead(prev => ({ ...prev, pipeline_stage_id: leadStage.id }));
-      }
-    }
-  }, [stagesData]);
-
-  const { data: contactsData, isLoading: contactsLoading } = useQuery({
-    queryKey: ['leads-contacts', filters, tablePagination.currentPage, tablePagination.pageSize],
-    queryFn: async () => {
+      if (!orgId) return { data: [], count: 0 };
+      
       const offset = (tablePagination.currentPage - 1) * tablePagination.pageSize;
       
       let query = supabase
-        .from("contacts")
-        .select("id, first_name, last_name, email, phone, company, pipeline_stage_id, job_title, source, status, created_at", { count: 'exact' })
+        .from("loan_applications")
+        .select(`
+          id,
+          requested_amount,
+          tenure_days,
+          status,
+          source,
+          created_at,
+          loan_applicants (
+            first_name,
+            last_name,
+            mobile,
+            email,
+            current_address
+          ),
+          contacts (
+            first_name,
+            last_name,
+            phone,
+            email
+          )
+        `, { count: 'exact' })
+        .eq("org_id", orgId)
         .order("created_at", { ascending: false });
-      
-      // Apply name filter (searches first_name and last_name)
-      if (filters.name.trim()) {
-        query = query.or(`first_name.ilike.%${filters.name.trim()}%,last_name.ilike.%${filters.name.trim()}%`);
-      }
-      
-      // Apply company filter
-      if (filters.company.trim()) {
-        query = query.ilike("company", `%${filters.company.trim()}%`);
-      }
-      
-      // Apply phone filter
-      if (filters.phone.trim()) {
-        query = query.ilike("phone", `%${filters.phone.trim()}%`);
-      }
       
       // Apply status filter
       if (filters.statusFilter !== "all") {
         if (filters.statusFilter === "new") {
-          query = query.or("status.eq.new,status.is.null");
+          query = query.or("status.eq.new,status.eq.draft,status.is.null");
         } else {
           query = query.eq("status", filters.statusFilter);
         }
+      }
+      
+      // Apply source filter
+      if (filters.source !== "all") {
+        query = query.eq("source", filters.source);
       }
       
       query = query.range(offset, offset + tablePagination.pageSize - 1);
       
       const { data, error, count } = await query;
       if (error) throw error;
-      return { data: data as Contact[], count: count || 0 };
+      
+      return { data: data as LoanApplication[], count: count || 0 };
     },
+    enabled: !!orgId,
+  });
+
+  // Fetch document counts for all applications
+  const applicationIds = applicationsData?.data?.map(a => a.id) || [];
+  
+  const { data: documentCounts } = useQuery({
+    queryKey: ['application-documents', applicationIds],
+    queryFn: async () => {
+      if (applicationIds.length === 0) return {};
+      
+      const { data, error } = await supabase
+        .from("loan_documents")
+        .select("loan_application_id, document_type")
+        .in("loan_application_id", applicationIds);
+      
+      if (error) throw error;
+      
+      // Group by loan_application_id
+      const counts: Record<string, string[]> = {};
+      (data || []).forEach((doc: { loan_application_id: string; document_type: string }) => {
+        if (!counts[doc.loan_application_id]) {
+          counts[doc.loan_application_id] = [];
+        }
+        counts[doc.loan_application_id].push(doc.document_type);
+      });
+      
+      return counts;
+    },
+    enabled: applicationIds.length > 0,
   });
 
   // Update status mutation
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ contactId, status }: { contactId: string; status: string }) => {
+    mutationFn: async ({ applicationId, status }: { applicationId: string; status: string }) => {
       const { error } = await supabase
-        .from("contacts")
+        .from("loan_applications")
         .update({ status })
-        .eq("id", contactId);
+        .eq("id", applicationId);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['leads-contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['leads-applications'] });
       toast.success("Status updated successfully");
     },
     onError: (error) => {
@@ -177,117 +290,21 @@ export default function PipelineBoard() {
     },
   });
 
-  // Create new lead mutation
-  const createLeadMutation = useMutation({
-    mutationFn: async (leadData: typeof newLead) => {
-      if (!orgId) throw new Error("No organization context");
-      
-      const { data, error } = await supabase
-        .from("contacts")
-        .insert({
-          first_name: leadData.first_name,
-          last_name: leadData.last_name || null,
-          email: leadData.email || null,
-          phone: leadData.phone || null,
-          company: leadData.company || null,
-          pipeline_stage_id: leadData.pipeline_stage_id || null,
-          source: leadData.source || null,
-          status: leadData.status || "new",
-          org_id: orgId,
-        })
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      notify.success("Lead created", "New lead has been added successfully");
-      queryClient.invalidateQueries({ queryKey: ['leads-contacts'] });
-      setShowNewLeadDialog(false);
-      setNewLead({
-        first_name: "",
-        last_name: "",
-        email: "",
-        phone: "",
-        company: "",
-        pipeline_stage_id: "",
-        source: "",
-        status: "new"
-      });
-    },
-    onError: (error: any) => {
-      notify.error("Error creating lead", error.message);
-    }
-  });
-
   useEffect(() => {
-    if (contactsData) {
-      tablePagination.setTotalRecords(contactsData.count);
+    if (applicationsData) {
+      tablePagination.setTotalRecords(applicationsData.count);
     }
-  }, [contactsData]);
+  }, [applicationsData]);
 
   // Reset to page 1 when filters change
   useEffect(() => {
     tablePagination.setPage(1);
   }, [filters]);
 
-  const stages = stagesData || [];
-  const contacts = contactsData?.data || [];
-  const loading = !stagesData || contactsLoading;
+  const applications = applicationsData?.data || [];
 
-  const isFreshLead = (createdAt?: string) => {
-    if (!createdAt) return false;
-    return differenceInHours(new Date(), new Date(createdAt)) < 48;
-  };
-
-  const handleStatusChange = (contactId: string, status: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    updateStatusMutation.mutate({ contactId, status });
-  };
-
-  const handleCall = async (contact: Contact, e?: React.MouseEvent) => {
-    if (e) {
-      e.stopPropagation();
-    }
-
-    if (!contact.phone) {
-      notify.error("No phone number", "This contact doesn't have a phone number");
-      return;
-    }
-
-    setCallingContactId(contact.id);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('phone')
-        .eq('id', user.id)
-        .single();
-
-      if (!profile?.phone) {
-        notify.error("Phone number required", "Please add your phone number in profile settings");
-        return;
-      }
-
-      const { data, error } = await supabase.functions.invoke('exotel-make-call', {
-        body: {
-          contactId: contact.id,
-          agentPhoneNumber: profile.phone,
-          customerPhoneNumber: contact.phone,
-        },
-      });
-
-      if (error) throw error;
-
-      notify.success("Call initiated", `Calling ${contact.first_name} ${contact.last_name || ''}`);
-    } catch (error: any) {
-      notify.error("Call failed", error.message);
-    } finally {
-      setCallingContactId(null);
-    }
+  const handleStatusChange = (applicationId: string, status: string) => {
+    updateStatusMutation.mutate({ applicationId, status });
   };
 
   const handleFilterChange = (key: keyof Filters, value: string) => {
@@ -297,28 +314,50 @@ export default function PipelineBoard() {
   const handleClearFilters = () => {
     setFilters({
       name: "",
-      company: "",
       phone: "",
+      source: "all",
       statusFilter: "all"
     });
   };
 
-  const handleCreateLead = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newLead.first_name.trim()) {
-      notify.error("First name required", "Please enter a first name");
-      return;
-    }
-    if (!newLead.phone.trim()) {
-      notify.error("Phone required", "Please enter a phone number");
-      return;
-    }
-    createLeadMutation.mutate(newLead);
+  // Helper to get applicant/contact info
+  const getApplicantInfo = (app: LoanApplication) => {
+    const applicant = app.loan_applicants?.[0];
+    const contact = app.contacts;
+    
+    return {
+      name: applicant?.first_name 
+        ? `${applicant.first_name} ${applicant.last_name || ''}`.trim()
+        : contact 
+          ? `${contact.first_name} ${contact.last_name || ''}`.trim()
+          : '-',
+      phone: applicant?.mobile || contact?.phone || '-',
+      email: applicant?.email || contact?.email || '-',
+      state: applicant?.current_address?.state || '-',
+      pinCode: applicant?.current_address?.pin_code || '-',
+    };
   };
 
-  const hasActiveFilters = filters.name || filters.company || filters.phone || filters.statusFilter !== "all";
+  // Filter by name and phone client-side (since they span multiple tables)
+  const filteredApplications = applications.filter(app => {
+    const info = getApplicantInfo(app);
+    
+    if (filters.name.trim()) {
+      const nameMatch = info.name.toLowerCase().includes(filters.name.toLowerCase());
+      if (!nameMatch) return false;
+    }
+    
+    if (filters.phone.trim()) {
+      const phoneMatch = info.phone.includes(filters.phone);
+      if (!phoneMatch) return false;
+    }
+    
+    return true;
+  });
 
-  if (loading) {
+  const hasActiveFilters = filters.name || filters.phone || filters.source !== "all" || filters.statusFilter !== "all";
+
+  if (isLoading) {
     return (
       <DashboardLayout>
         <LoadingState message="Loading leads..." />
@@ -328,174 +367,184 @@ export default function PipelineBoard() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Leads</h1>
-            <p className="text-muted-foreground">View and manage your leads</p>
+            <h1 className="text-2xl font-bold">Leads</h1>
+            <p className="text-sm text-muted-foreground">Loan applications overview</p>
           </div>
-          <div className="flex gap-2">
-            <Button onClick={() => navigate('/pipeline/advanced-search')} variant="outline">
-              <Search className="h-4 w-4 mr-2" />
-              Advanced Search
-            </Button>
-          </div>
+          <Button onClick={() => navigate('/pipeline/advanced-search')} variant="outline" size="sm">
+            <Search className="h-4 w-4 mr-2" />
+            Advanced Search
+          </Button>
         </div>
 
         {/* Status Filter Tabs */}
         <Tabs value={filters.statusFilter} onValueChange={(value) => handleFilterChange("statusFilter", value)} className="w-full">
-          <TabsList className="flex-wrap h-auto gap-1">
+          <TabsList className="h-8">
             {STATUS_FILTERS.map((status) => (
-              <TabsTrigger key={status} value={status} className="capitalize">
+              <TabsTrigger key={status} value={status} className="text-xs capitalize px-3 py-1">
                 {STATUS_LABELS[status]}
               </TabsTrigger>
             ))}
           </TabsList>
         </Tabs>
 
-        {/* Filter Bar */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-1">
+        {/* Compact Filter Bar */}
+        <Card className="border">
+          <CardContent className="py-3 px-4">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1 flex-1 min-w-[150px]">
                 <Label htmlFor="filter-name" className="text-xs text-muted-foreground">Name</Label>
                 <Input
                   id="filter-name"
-                  placeholder="Search by name..."
+                  placeholder="Search name..."
                   value={filters.name}
                   onChange={(e) => handleFilterChange("name", e.target.value)}
+                  className="h-8 text-sm"
                 />
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="filter-company" className="text-xs text-muted-foreground">Company</Label>
-                <Input
-                  id="filter-company"
-                  placeholder="Search by company..."
-                  value={filters.company}
-                  onChange={(e) => handleFilterChange("company", e.target.value)}
-                />
-              </div>
-              <div className="space-y-1">
+              <div className="space-y-1 flex-1 min-w-[150px]">
                 <Label htmlFor="filter-phone" className="text-xs text-muted-foreground">Phone</Label>
                 <Input
                   id="filter-phone"
-                  placeholder="Search by phone..."
+                  placeholder="Search phone..."
                   value={filters.phone}
                   onChange={(e) => handleFilterChange("phone", e.target.value)}
+                  className="h-8 text-sm"
                 />
               </div>
-            </div>
-            
-            {hasActiveFilters && (
-              <div className="mt-4 flex items-center gap-2">
-                <Badge variant="secondary" className="text-sm">
-                  {contactsData?.count || 0} results
-                </Badge>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleClearFilters}
-                  className="h-6 text-xs"
-                >
-                  Clear filters
-                </Button>
+              <div className="space-y-1 min-w-[130px]">
+                <Label htmlFor="filter-source" className="text-xs text-muted-foreground">Source</Label>
+                <Select value={filters.source} onValueChange={(value) => handleFilterChange("source", value)}>
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue placeholder="Source" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SOURCE_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            )}
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={handleClearFilters} className="h-8 text-xs">
+                  Clear
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
 
-        {/* Leads Table */}
+        {/* Compact Leads Table */}
         <Card>
-          <CardHeader>
-            <CardTitle>{STATUS_LABELS[filters.statusFilter]} Leads</CardTitle>
+          <CardHeader className="py-3 px-4">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">{STATUS_LABELS[filters.statusFilter]} Leads</CardTitle>
+              <Badge variant="secondary" className="text-xs">
+                {filteredApplications.length} results
+              </Badge>
+            </div>
           </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Company</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {contacts.map(contact => {
-                  const isNew = contact.status === "new" || (!contact.status && isFreshLead(contact.created_at));
-                  return (
-                    <TableRow
-                      key={contact.id}
-                      className="hover:bg-muted/50 cursor-pointer"
-                      onClick={() => navigate(`/contacts/${contact.id}`)}
-                    >
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium">{contact.first_name} {contact.last_name}</p>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 text-green-600 hover:text-green-700 hover:bg-green-100"
-                                onClick={(e) => handleCall(contact, e)}
-                                disabled={!contact.phone || callingContactId === contact.id}
-                              >
-                                {callingContactId === contact.id ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Phone className="h-4 w-4" />
-                                )}
-                              </Button>
-                              {isNew && (
-                                <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white border-0">
-                                  <Sparkles className="h-3 w-3 mr-1" />
-                                  NEW LEAD
-                                </Badge>
-                              )}
-                            </div>
-                            {contact.job_title && (
-                              <p className="text-xs text-muted-foreground">{contact.job_title}</p>
-                            )}
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="text-xs font-medium py-2 px-3">Name</TableHead>
+                    <TableHead className="text-xs font-medium py-2 px-3">Phone</TableHead>
+                    <TableHead className="text-xs font-medium py-2 px-3">Email</TableHead>
+                    <TableHead className="text-xs font-medium py-2 px-3 text-right">Amount</TableHead>
+                    <TableHead className="text-xs font-medium py-2 px-3 text-center">Tenure</TableHead>
+                    <TableHead className="text-xs font-medium py-2 px-3">State</TableHead>
+                    <TableHead className="text-xs font-medium py-2 px-3">Pin Code</TableHead>
+                    <TableHead className="text-xs font-medium py-2 px-3 text-center">Docs</TableHead>
+                    <TableHead className="text-xs font-medium py-2 px-3">Status</TableHead>
+                    <TableHead className="text-xs font-medium py-2 px-3">Source</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredApplications.map(app => {
+                    const info = getApplicantInfo(app);
+                    const docs = documentCounts?.[app.id] || [];
+                    
+                    return (
+                      <TableRow
+                        key={app.id}
+                        className="hover:bg-muted/50 cursor-pointer"
+                        onClick={() => navigate(`/los/applications/${app.id}`)}
+                      >
+                        <TableCell className="py-2 px-3">
+                          <span className="text-sm font-medium">{info.name}</span>
+                        </TableCell>
+                        <TableCell className="py-2 px-3">
+                          <div className="flex items-center gap-1">
+                            <Phone className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-xs">{info.phone}</span>
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{contact.company || '-'}</TableCell>
-                      <TableCell>
-                        <p className="text-sm">{contact.phone || '-'}</p>
-                      </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Select
-                          value={contact.status || "new"}
-                          onValueChange={(value) => handleStatusChange(contact.id, value, { stopPropagation: () => {} } as any)}
-                        >
-                          <SelectTrigger className="w-[130px]">
-                            <SelectValue placeholder="Set status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {STATUS_OPTIONS.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        </TableCell>
+                        <TableCell className="py-2 px-3">
+                          <div className="flex items-center gap-1 max-w-[150px]">
+                            <Mail className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                            <span className="text-xs truncate">{info.email}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-2 px-3 text-right">
+                          <span className="text-xs font-medium">
+                            {app.requested_amount ? `₹${app.requested_amount.toLocaleString('en-IN')}` : '-'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="py-2 px-3 text-center">
+                          <span className="text-xs">{app.tenure_days ? `${app.tenure_days}d` : '-'}</span>
+                        </TableCell>
+                        <TableCell className="py-2 px-3">
+                          <span className="text-xs">{info.state}</span>
+                        </TableCell>
+                        <TableCell className="py-2 px-3">
+                          <span className="text-xs">{info.pinCode}</span>
+                        </TableCell>
+                        <TableCell className="py-2 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                          <DocumentChecklist uploaded={docs} applicationId={app.id} />
+                        </TableCell>
+                        <TableCell className="py-2 px-3" onClick={(e) => e.stopPropagation()}>
+                          <Select
+                            value={app.status || "new"}
+                            onValueChange={(value) => handleStatusChange(app.id, value)}
+                          >
+                            <SelectTrigger className="h-7 w-[100px] text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {STATUS_OPTIONS.map((option) => (
+                                <SelectItem key={option.value} value={option.value} className="text-xs">
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell className="py-2 px-3">
+                          <Badge variant="outline" className="text-xs font-normal">
+                            {SOURCE_DISPLAY[app.source || ''] || app.source || '-'}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {filteredApplications.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground text-sm">
+                        No leads found
                       </TableCell>
                     </TableRow>
-                  );
-                })}
-                {contacts.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                      No leads found
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
 
             {/* Pagination */}
             {tablePagination.totalRecords > tablePagination.pageSize && (
-              <div className="mt-4">
+              <div className="p-3 border-t">
                 <PaginationControls
                   currentPage={tablePagination.currentPage}
                   totalPages={tablePagination.totalPages}
@@ -511,128 +560,6 @@ export default function PipelineBoard() {
           </CardContent>
         </Card>
       </div>
-
-      {/* New Lead Dialog */}
-      <Dialog open={showNewLeadDialog} onOpenChange={setShowNewLeadDialog}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Add New Lead</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleCreateLead} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="first_name">First Name *</Label>
-                <Input
-                  id="first_name"
-                  value={newLead.first_name}
-                  onChange={(e) => setNewLead(prev => ({ ...prev, first_name: e.target.value }))}
-                  placeholder="John"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="last_name">Last Name</Label>
-                <Input
-                  id="last_name"
-                  value={newLead.last_name}
-                  onChange={(e) => setNewLead(prev => ({ ...prev, last_name: e.target.value }))}
-                  placeholder="Doe"
-                />
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={newLead.email}
-                onChange={(e) => setNewLead(prev => ({ ...prev, email: e.target.value }))}
-                placeholder="john@example.com"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone *</Label>
-              <Input
-                id="phone"
-                value={newLead.phone}
-                onChange={(e) => setNewLead(prev => ({ ...prev, phone: e.target.value }))}
-                placeholder="+91 98765 43210"
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="company">Company</Label>
-              <Input
-                id="company"
-                value={newLead.company}
-                onChange={(e) => setNewLead(prev => ({ ...prev, company: e.target.value }))}
-                placeholder="Company name"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="source">Source</Label>
-              <Select
-                value={newLead.source}
-                onValueChange={(value) => setNewLead(prev => ({ ...prev, source: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select source" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="website">Website</SelectItem>
-                  <SelectItem value="referral">Referral</SelectItem>
-                  <SelectItem value="social_media">Social Media</SelectItem>
-                  <SelectItem value="cold_call">Cold Call</SelectItem>
-                  <SelectItem value="event">Event</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <Select
-                value={newLead.status}
-                onValueChange={(value) => setNewLead(prev => ({ ...prev, status: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
-                <SelectContent>
-                  {STATUS_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => setShowNewLeadDialog(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={createLeadMutation.isPending}>
-                {createLeadMutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create Lead
-                  </>
-                )}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </Dialog>
     </DashboardLayout>
   );
 }
