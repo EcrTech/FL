@@ -17,10 +17,12 @@ import { LoadingState } from "@/components/common/LoadingState";
 
 // Section tabs for loan stages
 const SECTIONS = [
-  { id: "application", label: "Application", stages: ["application_login", "document_collection", "field_verification", "credit_assessment", "approval_pending"] },
-  { id: "sanction", label: "Sanction", stages: ["approved", "sanction_generated"] },
-  { id: "disbursed", label: "Disbursed", stages: ["disbursement_pending", "disbursed"] },
-  { id: "collection", label: "Collection", stages: ["closed"] },
+  { id: "application", label: "Application", stages: ["application_login"] },
+  { id: "documents", label: "Documents", stages: ["document_collection"] },
+  { id: "assessment", label: "Assessment & Approval", stages: ["field_verification", "credit_assessment", "approval_pending", "approved", "rejected"] },
+  { id: "sanction", label: "Sanction", stages: ["sanction_generated"] },
+  { id: "disbursement", label: "Disbursement", stages: ["disbursement_pending", "disbursed"] },
+  { id: "emi", label: "EMI", stages: ["closed"] },
 ];
 
 const STAGE_LABELS: Record<string, string> = {
@@ -254,7 +256,7 @@ export default function Applications() {
                           </div>
                           <div>
                             <span className="font-medium">Tenure: </span>
-                            {app.tenure_months} months
+                            {app.tenure_days} days
                           </div>
                         </div>
 
