@@ -93,8 +93,7 @@ export default function ReferralLoanApplication() {
           .select(`
             referral_code,
             user_id,
-            org_id,
-            profiles:user_id(full_name)
+            org_id
           `)
           .eq("referral_code", referralCode)
           .eq("is_active", true)
@@ -108,7 +107,7 @@ export default function ReferralLoanApplication() {
 
         setReferrerInfo({
           referralCode: data.referral_code,
-          referrerName: (data.profiles as any)?.full_name || null,
+          referrerName: null,
           referrerUserId: data.user_id,
           orgId: data.org_id,
         });
