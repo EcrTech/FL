@@ -45,10 +45,7 @@ export function LoanDetailsStep({ data, onChange, onNext }: LoanDetailsStepProps
   };
 
   const amount = parseFloat(data.amount) || 0;
-  const tenure = data.tenure || 12;
-  const estimatedEMI = amount > 0 
-    ? Math.round((amount * (1 + (0.12 * tenure / 12))) / tenure)
-    : 0;
+  const tenure = data.tenure || 7;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -96,37 +93,21 @@ export function LoanDetailsStep({ data, onChange, onNext }: LoanDetailsStepProps
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <Label>Loan Tenure</Label>
-          <span className="text-sm font-medium">{tenure} months</span>
+          <span className="text-sm font-medium">{tenure} days</span>
         </div>
         <Slider
           value={[tenure]}
           onValueChange={([value]) => onChange({ tenure: value })}
-          min={6}
-          max={84}
-          step={6}
+          min={1}
+          max={90}
+          step={1}
           className="py-4"
         />
         <div className="flex justify-between text-xs text-muted-foreground">
-          <span>6 months</span>
-          <span>84 months</span>
+          <span>1 day</span>
+          <span>90 days</span>
         </div>
       </div>
-
-      {/* EMI Estimate */}
-      {estimatedEMI > 0 && (
-        <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
-          <div className="flex items-center gap-2 mb-2">
-            <Calendar className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium">Estimated Monthly EMI</span>
-          </div>
-          <p className="text-2xl font-bold text-primary">
-            ₹{new Intl.NumberFormat("en-IN").format(estimatedEMI)}
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            *Approximate EMI at 12% p.a. Actual EMI may vary based on your profile.
-          </p>
-        </div>
-      )}
 
       <Button 
         type="submit" 

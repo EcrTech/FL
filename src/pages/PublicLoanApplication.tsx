@@ -87,7 +87,7 @@ const initialFormData: LoanFormData = {
   loanDetails: {
     productType: "",
     amount: "",
-    tenure: 12,
+    tenure: 7,
   },
   personalDetails: {
     fullName: "",
