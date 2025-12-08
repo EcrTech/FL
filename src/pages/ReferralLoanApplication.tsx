@@ -31,7 +31,8 @@ const STEPS = [
   { id: 3, name: "Address", description: "Residence Details" },
   { id: 4, name: "Employment", description: "Work Information" },
   { id: 5, name: "Documents", description: "Upload Documents" },
-  { id: 6, name: "Review", description: "Confirm & Submit" },
+  { id: 6, name: "Review", description: "Review Details" },
+  { id: 7, name: "Consent", description: "Terms & Submit" },
 ];
 
 const initialFormData: LoanFormData = {
@@ -167,7 +168,7 @@ export default function ReferralLoanApplication() {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleConsent = async (otpVerificationId: string) => {
     if (!referrerInfo) return;
 
     setSubmitting(true);
@@ -176,6 +177,7 @@ export default function ReferralLoanApplication() {
         body: {
           formSlug: "referral",
           referralCode: referrerInfo.referralCode,
+          consentOtpId: otpVerificationId,
           loanDetails: {
             amount: formData.loanDetails.amount,
             tenure: formData.loanDetails.tenure,
@@ -363,9 +365,16 @@ export default function ReferralLoanApplication() {
             {currentStep === 6 && (
               <ReviewStep 
                 formData={formData} 
-                onSubmit={handleSubmit}
+                onNext={nextStep}
                 onPrev={prevStep}
                 onEdit={goToStep} 
+              />
+            )}
+            {currentStep === 7 && (
+              <ConsentOTPStep
+                mobile={formData.personalDetails.mobile}
+                onConsent={handleConsent}
+                onPrev={prevStep}
                 submitting={submitting}
               />
             )}
