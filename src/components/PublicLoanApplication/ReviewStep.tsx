@@ -1,13 +1,12 @@
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Edit2, Loader2 } from "lucide-react";
+import { ArrowLeft, Edit2, TrendingUp } from "lucide-react";
 import type { LoanFormData } from "@/pages/PublicLoanApplication";
 
 interface ReviewStepProps {
   formData: LoanFormData;
-  onSubmit: () => void;
+  onNext: () => void;
   onPrev: () => void;
   onEdit: (step: number) => void;
-  submitting: boolean;
 }
 
 const productTypeLabels: Record<string, string> = {
@@ -18,7 +17,10 @@ const productTypeLabels: Record<string, string> = {
   vehicle_loan: "Vehicle Loan",
 };
 
-export function ReviewStep({ formData, onSubmit, onPrev, onEdit, submitting }: ReviewStepProps) {
+// Interest rate: 1% per day
+const DAILY_INTEREST_RATE = 1;
+
+export function ReviewStep({ formData, onNext, onPrev, onEdit }: ReviewStepProps) {
   const formatAmount = (value: string) => {
     const num = parseFloat(value);
     if (isNaN(num)) return "₹0";
@@ -29,6 +31,12 @@ export function ReviewStep({ formData, onSubmit, onPrev, onEdit, submitting }: R
     const digits = value.replace(/\D/g, "");
     return `XXXX XXXX ${digits.slice(-4)}`;
   };
+
+  // Calculate interest
+  const amount = parseFloat(formData.loanDetails.amount) || 0;
+  const tenure = formData.loanDetails.tenure || 7;
+  const interestAmount = amount * (DAILY_INTEREST_RATE / 100) * tenure;
+  const totalRepayment = amount + interestAmount;
 
   const Section = ({ 
     title, 
@@ -47,7 +55,6 @@ export function ReviewStep({ formData, onSubmit, onPrev, onEdit, submitting }: R
           variant="ghost"
           size="sm"
           onClick={() => onEdit(step)}
-          disabled={submitting}
         >
           <Edit2 className="h-4 w-4 mr-1" />
           Edit
@@ -69,11 +76,11 @@ export function ReviewStep({ formData, onSubmit, onPrev, onEdit, submitting }: R
       <div className="text-center mb-6">
         <h2 className="text-xl font-semibold">Review Your Application</h2>
         <p className="text-muted-foreground text-sm mt-1">
-          Please verify all details before submitting
+          Please verify all details before proceeding
         </p>
       </div>
 
-      {/* Loan Details */}
+      {/* Loan Details with Interest */}
       <Section title="Loan Details" step={1}>
         <Field 
           label="Loan Type" 
@@ -81,6 +88,19 @@ export function ReviewStep({ formData, onSubmit, onPrev, onEdit, submitting }: R
         />
         <Field label="Loan Amount" value={formatAmount(formData.loanDetails.amount)} />
         <Field label="Tenure" value={`${formData.loanDetails.tenure} days`} />
+        
+        {/* Interest Calculation */}
+        <div className="pt-3 mt-3 border-t space-y-2">
+          <div className="flex items-center gap-2 text-primary mb-2">
+            <TrendingUp className="h-4 w-4" />
+            <span className="font-medium text-xs">Interest Details (1% per day)</span>
+          </div>
+          <Field label="Interest Amount" value={`₹${new Intl.NumberFormat("en-IN").format(Math.round(interestAmount))}`} />
+          <div className="flex justify-between gap-4 pt-2 border-t">
+            <span className="font-medium">Total Repayment</span>
+            <span className="font-bold text-primary">{`₹${new Intl.NumberFormat("en-IN").format(Math.round(totalRepayment))}`}</span>
+          </div>
+        </div>
       </Section>
 
       {/* Personal Details */}
@@ -155,11 +175,11 @@ export function ReviewStep({ formData, onSubmit, onPrev, onEdit, submitting }: R
         )}
       </Section>
 
-      {/* Terms */}
-      <div className="p-4 bg-muted/50 rounded-lg text-xs text-muted-foreground">
-        <p>
-          By submitting this application, I confirm that all information provided is accurate and complete. 
-          I authorize the verification of my details and consent to being contacted regarding this loan application.
+      {/* Info about next step */}
+      <div className="p-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg text-sm">
+        <p className="text-blue-800 dark:text-blue-200">
+          <strong>Next Step:</strong> You will be asked to review and accept the Terms & Conditions, 
+          then verify your consent via OTP sent to your registered mobile number.
         </p>
       </div>
 
@@ -169,24 +189,15 @@ export function ReviewStep({ formData, onSubmit, onPrev, onEdit, submitting }: R
           variant="outline" 
           onClick={onPrev} 
           className="flex-1"
-          disabled={submitting}
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
         </Button>
         <Button 
-          onClick={onSubmit} 
+          onClick={onNext} 
           className="flex-1"
-          disabled={submitting}
         >
-          {submitting ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Submitting...
-            </>
-          ) : (
-            "Submit Application"
-          )}
+          Proceed to Consent
         </Button>
       </div>
     </div>

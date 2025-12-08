@@ -8,3 +8,9 @@ verify_jwt = false
 
 [functions.submit-loan-application]
 verify_jwt = false
+
+[functions.send-consent-otp]
+verify_jwt = false
+
+[functions.verify-consent-otp]
+verify_jwt = false

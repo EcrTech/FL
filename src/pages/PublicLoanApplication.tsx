@@ -10,6 +10,7 @@ import { AddressDetailsStep } from "@/components/PublicLoanApplication/AddressDe
 import { EmploymentDetailsStep } from "@/components/PublicLoanApplication/EmploymentDetailsStep";
 import { DocumentUploadStep } from "@/components/PublicLoanApplication/DocumentUploadStep";
 import { ReviewStep } from "@/components/PublicLoanApplication/ReviewStep";
+import { ConsentOTPStep } from "@/components/PublicLoanApplication/ConsentOTPStep";
 import { SuccessScreen } from "@/components/PublicLoanApplication/SuccessScreen";
 
 export interface LoanFormData {
@@ -81,6 +82,7 @@ const STEPS = [
   { id: 4, name: "Employment" },
   { id: 5, name: "Documents" },
   { id: 6, name: "Review" },
+  { id: 7, name: "Consent" },
 ];
 
 const initialFormData: LoanFormData = {
@@ -146,7 +148,6 @@ export default function PublicLoanApplication() {
   const [draftId, setDraftId] = useState<string | null>(null);
   const [savingDraft, setSavingDraft] = useState(false);
 
-  // Fetch form config
   useEffect(() => {
     async function fetchFormConfig() {
       if (!slug) {
@@ -182,7 +183,6 @@ export default function PublicLoanApplication() {
     fetchFormConfig();
   }, [slug]);
 
-  // Request geolocation
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -208,7 +208,6 @@ export default function PublicLoanApplication() {
     }));
   };
 
-  // Save draft application after personal details step
   const saveDraftApplication = async () => {
     if (savingDraft) return;
     
@@ -226,11 +225,9 @@ export default function PublicLoanApplication() {
 
       if (response.data?.draftId) {
         setDraftId(response.data.draftId);
-        console.log("Draft saved:", response.data.draftId);
       }
     } catch (err) {
       console.error("Error saving draft:", err);
-      // Don't show error to user - draft save is background operation
     } finally {
       setSavingDraft(false);
     }
@@ -238,7 +235,6 @@ export default function PublicLoanApplication() {
 
   const nextStep = async () => {
     if (currentStep < STEPS.length) {
-      // Save draft after completing personal details (step 2)
       if (currentStep === 2 && formData.personalDetails.fullName && formData.personalDetails.mobile) {
         saveDraftApplication();
       }
@@ -261,7 +257,7 @@ export default function PublicLoanApplication() {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleConsent = async (otpVerificationId: string) => {
     setSubmitting(true);
     setError(null);
 
@@ -271,7 +267,8 @@ export default function PublicLoanApplication() {
           formSlug: slug,
           formStartTime,
           honeypot,
-          draftId, // Pass draft ID if exists
+          draftId,
+          consentOtpId: otpVerificationId,
           loanDetails: {
             amount: formData.loanDetails.amount,
             tenure: formData.loanDetails.tenure,
@@ -302,7 +299,7 @@ export default function PublicLoanApplication() {
       }
 
       setApplicationNumber(response.data.applicationNumber);
-      setCurrentStep(7); // Success screen
+      setCurrentStep(8);
     } catch (err: any) {
       console.error("Submission error:", err);
       setError(err.message || "Failed to submit application. Please try again.");
@@ -332,8 +329,7 @@ export default function PublicLoanApplication() {
     );
   }
 
-  // Success screen
-  if (currentStep === 7 && applicationNumber) {
+  if (currentStep === 8 && applicationNumber) {
     return <SuccessScreen applicationNumber={applicationNumber} />;
   }
 
@@ -342,7 +338,6 @@ export default function PublicLoanApplication() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4">
       <div className="max-w-2xl mx-auto">
-        {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
             {formConfig?.name || "Loan Application"}
@@ -352,7 +347,6 @@ export default function PublicLoanApplication() {
           )}
         </div>
 
-        {/* Progress */}
         <div className="mb-8">
           <div className="flex justify-between mb-2">
             {STEPS.map((step) => (
@@ -376,7 +370,6 @@ export default function PublicLoanApplication() {
           <Progress value={progress} className="h-2" />
         </div>
 
-        {/* Honeypot field (hidden) */}
         <input
           type="text"
           name="website"
@@ -387,14 +380,12 @@ export default function PublicLoanApplication() {
           autoComplete="off"
         />
 
-        {/* Error display */}
         {error && (
           <div className="mb-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm">
             {error}
           </div>
         )}
 
-        {/* Form Steps */}
         <Card>
           <CardContent className="p-6">
             {currentStep === 1 && (
@@ -435,21 +426,28 @@ export default function PublicLoanApplication() {
                 onChange={(docs) => setFormData(prev => ({ ...prev, documents: docs }))}
                 onNext={nextStep}
                 onPrev={prevStep}
+                geolocation={geolocation}
               />
             )}
             {currentStep === 6 && (
               <ReviewStep
                 formData={formData}
-                onSubmit={handleSubmit}
+                onNext={nextStep}
                 onPrev={prevStep}
                 onEdit={goToStep}
+              />
+            )}
+            {currentStep === 7 && (
+              <ConsentOTPStep
+                mobile={formData.personalDetails.mobile}
+                onConsent={handleConsent}
+                onPrev={prevStep}
                 submitting={submitting}
               />
             )}
           </CardContent>
         </Card>
 
-        {/* Footer */}
         <p className="text-center text-xs text-muted-foreground mt-6">
           Your information is secure and encrypted. We do not share your data with third parties.
         </p>
