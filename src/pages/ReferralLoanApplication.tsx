@@ -13,6 +13,7 @@ import { AddressDetailsStep } from "@/components/PublicLoanApplication/AddressDe
 import { EmploymentDetailsStep } from "@/components/PublicLoanApplication/EmploymentDetailsStep";
 import { DocumentUploadStep } from "@/components/PublicLoanApplication/DocumentUploadStep";
 import { ReviewStep } from "@/components/PublicLoanApplication/ReviewStep";
+import { ConsentOTPStep } from "@/components/PublicLoanApplication/ConsentOTPStep";
 import { SuccessScreen } from "@/components/PublicLoanApplication/SuccessScreen";
 import { LoadingState } from "@/components/common/LoadingState";
 import { LoanFormData } from "@/pages/PublicLoanApplication";

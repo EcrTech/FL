@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft } from "lucide-react";
+import { STATE_CITY_MAP, INDIAN_STATES } from "./StateCityMap";
 
 interface AddressDetailsStepProps {
   data: {
@@ -29,16 +31,10 @@ interface AddressDetailsStepProps {
   onPrev: () => void;
 }
 
-const INDIAN_STATES = [
-  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
-  "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka",
-  "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram",
-  "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu",
-  "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal",
-  "Delhi", "Jammu and Kashmir", "Ladakh", "Puducherry", "Chandigarh"
-];
-
 export function AddressDetailsStep({ data, onChange, onNext, onPrev }: AddressDetailsStepProps) {
+  const [currentOtherCity, setCurrentOtherCity] = useState("");
+  const [permanentOtherCity, setPermanentOtherCity] = useState("");
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -51,6 +47,13 @@ export function AddressDetailsStep({ data, onChange, onNext, onPrev }: AddressDe
 
   const updateCurrentAddress = (field: string, value: string) => {
     const newCurrent = { ...data.currentAddress, [field]: value };
+    
+    // If changing state, reset city
+    if (field === "state") {
+      newCurrent.city = "";
+      setCurrentOtherCity("");
+    }
+    
     onChange({ 
       currentAddress: newCurrent,
       permanentAddress: data.sameAsCurrent ? newCurrent : data.permanentAddress
@@ -58,7 +61,15 @@ export function AddressDetailsStep({ data, onChange, onNext, onPrev }: AddressDe
   };
 
   const updatePermanentAddress = (field: string, value: string) => {
-    onChange({ permanentAddress: { ...data.permanentAddress, [field]: value } });
+    const newPermanent = { ...data.permanentAddress, [field]: value };
+    
+    // If changing state, reset city
+    if (field === "state") {
+      newPermanent.city = "";
+      setPermanentOtherCity("");
+    }
+    
+    onChange({ permanentAddress: newPermanent });
   };
 
   const handleSameAsCurrentChange = (checked: boolean) => {
@@ -68,7 +79,37 @@ export function AddressDetailsStep({ data, onChange, onNext, onPrev }: AddressDe
     });
   };
 
+  const handleCurrentCityChange = (value: string) => {
+    if (value === "Other") {
+      // Don't set city yet, wait for custom input
+      setCurrentOtherCity("");
+    } else {
+      updateCurrentAddress("city", value);
+      setCurrentOtherCity("");
+    }
+  };
+
+  const handlePermanentCityChange = (value: string) => {
+    if (value === "Other") {
+      setPermanentOtherCity("");
+    } else {
+      updatePermanentAddress("city", value);
+      setPermanentOtherCity("");
+    }
+  };
+
   const validatePincode = (pin: string) => /^[1-9][0-9]{5}$/.test(pin);
+
+  const getCurrentCities = () => {
+    return data.currentAddress.state ? STATE_CITY_MAP[data.currentAddress.state] || [] : [];
+  };
+
+  const getPermanentCities = () => {
+    return data.permanentAddress.state ? STATE_CITY_MAP[data.permanentAddress.state] || [] : [];
+  };
+
+  const isCurrentCityOther = data.currentAddress.city && !getCurrentCities().includes(data.currentAddress.city);
+  const isPermanentCityOther = data.permanentAddress.city && !getPermanentCities().includes(data.permanentAddress.city);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -106,33 +147,6 @@ export function AddressDetailsStep({ data, onChange, onNext, onPrev }: AddressDe
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="currentCity">City *</Label>
-            <Input
-              id="currentCity"
-              value={data.currentAddress.city}
-              onChange={(e) => updateCurrentAddress("city", e.target.value)}
-              placeholder="City"
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="currentPincode">Pincode *</Label>
-            <Input
-              id="currentPincode"
-              value={data.currentAddress.pincode}
-              onChange={(e) => updateCurrentAddress("pincode", e.target.value.replace(/\D/g, "").slice(0, 6))}
-              placeholder="110001"
-              maxLength={6}
-              required
-            />
-            {data.currentAddress.pincode && !validatePincode(data.currentAddress.pincode) && (
-              <p className="text-xs text-destructive">Invalid pincode</p>
-            )}
-          </div>
-        </div>
-
         <div className="space-y-2">
           <Label>State *</Label>
           <Select 
@@ -148,6 +162,61 @@ export function AddressDetailsStep({ data, onChange, onNext, onPrev }: AddressDe
               ))}
             </SelectContent>
           </Select>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>City *</Label>
+            {data.currentAddress.state ? (
+              <>
+                <Select 
+                  value={isCurrentCityOther ? "Other" : data.currentAddress.city} 
+                  onValueChange={handleCurrentCityChange}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select city" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {getCurrentCities().map((city) => (
+                      <SelectItem key={city} value={city}>{city}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {(isCurrentCityOther || currentOtherCity !== undefined && data.currentAddress.city === "") && (
+                  <Input
+                    placeholder="Enter city name"
+                    value={isCurrentCityOther ? data.currentAddress.city : currentOtherCity}
+                    onChange={(e) => {
+                      setCurrentOtherCity(e.target.value);
+                      updateCurrentAddress("city", e.target.value);
+                    }}
+                    className="mt-2"
+                  />
+                )}
+              </>
+            ) : (
+              <Input
+                value={data.currentAddress.city}
+                onChange={(e) => updateCurrentAddress("city", e.target.value)}
+                placeholder="Select state first"
+                disabled
+              />
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="currentPincode">Pincode *</Label>
+            <Input
+              id="currentPincode"
+              value={data.currentAddress.pincode}
+              onChange={(e) => updateCurrentAddress("pincode", e.target.value.replace(/\D/g, "").slice(0, 6))}
+              placeholder="110001"
+              maxLength={6}
+              required
+            />
+            {data.currentAddress.pincode && !validatePincode(data.currentAddress.pincode) && (
+              <p className="text-xs text-destructive">Invalid pincode</p>
+            )}
+          </div>
         </div>
 
         <div className="space-y-2">
@@ -209,30 +278,6 @@ export function AddressDetailsStep({ data, onChange, onNext, onPrev }: AddressDe
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="permCity">City *</Label>
-              <Input
-                id="permCity"
-                value={data.permanentAddress.city}
-                onChange={(e) => updatePermanentAddress("city", e.target.value)}
-                placeholder="City"
-                required={!data.sameAsCurrent}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="permPincode">Pincode *</Label>
-              <Input
-                id="permPincode"
-                value={data.permanentAddress.pincode}
-                onChange={(e) => updatePermanentAddress("pincode", e.target.value.replace(/\D/g, "").slice(0, 6))}
-                placeholder="110001"
-                maxLength={6}
-                required={!data.sameAsCurrent}
-              />
-            </div>
-          </div>
-
           <div className="space-y-2">
             <Label>State *</Label>
             <Select 
@@ -248,6 +293,58 @@ export function AddressDetailsStep({ data, onChange, onNext, onPrev }: AddressDe
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>City *</Label>
+              {data.permanentAddress.state ? (
+                <>
+                  <Select 
+                    value={isPermanentCityOther ? "Other" : data.permanentAddress.city} 
+                    onValueChange={handlePermanentCityChange}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select city" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getPermanentCities().map((city) => (
+                        <SelectItem key={city} value={city}>{city}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {(isPermanentCityOther || permanentOtherCity !== undefined && data.permanentAddress.city === "") && (
+                    <Input
+                      placeholder="Enter city name"
+                      value={isPermanentCityOther ? data.permanentAddress.city : permanentOtherCity}
+                      onChange={(e) => {
+                        setPermanentOtherCity(e.target.value);
+                        updatePermanentAddress("city", e.target.value);
+                      }}
+                      className="mt-2"
+                    />
+                  )}
+                </>
+              ) : (
+                <Input
+                  value={data.permanentAddress.city}
+                  onChange={(e) => updatePermanentAddress("city", e.target.value)}
+                  placeholder="Select state first"
+                  disabled
+                />
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="permPincode">Pincode *</Label>
+              <Input
+                id="permPincode"
+                value={data.permanentAddress.pincode}
+                onChange={(e) => updatePermanentAddress("pincode", e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="110001"
+                maxLength={6}
+                required={!data.sameAsCurrent}
+              />
+            </div>
           </div>
         </div>
       )}

@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { IndianRupee, Calendar } from "lucide-react";
+import { IndianRupee, Calendar, TrendingUp } from "lucide-react";
 
 interface LoanDetailsStepProps {
   data: {
@@ -21,6 +21,9 @@ const productTypeLabels: Record<string, string> = {
   education_loan: "Education Loan",
   vehicle_loan: "Vehicle Loan",
 };
+
+// Interest rate: 1% per day
+const DAILY_INTEREST_RATE = 1;
 
 export function LoanDetailsStep({ data, onChange, onNext }: LoanDetailsStepProps) {
   const handleSubmit = (e: React.FormEvent) => {
@@ -46,6 +49,10 @@ export function LoanDetailsStep({ data, onChange, onNext }: LoanDetailsStepProps
 
   const amount = parseFloat(data.amount) || 0;
   const tenure = data.tenure || 7;
+
+  // Calculate interest and total repayment
+  const interestAmount = amount * (DAILY_INTEREST_RATE / 100) * tenure;
+  const totalRepayment = amount + interestAmount;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -108,6 +115,42 @@ export function LoanDetailsStep({ data, onChange, onNext }: LoanDetailsStepProps
           <span>90 days</span>
         </div>
       </div>
+
+      {/* Interest Rate Display */}
+      {amount > 0 && (
+        <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+          <div className="flex items-center gap-2 text-primary">
+            <TrendingUp className="h-4 w-4" />
+            <span className="font-medium text-sm">Interest Calculation</span>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="text-muted-foreground text-xs">Daily Interest Rate</p>
+              <p className="font-semibold text-lg text-primary">{DAILY_INTEREST_RATE}%</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs">Tenure</p>
+              <p className="font-semibold">{tenure} days</p>
+            </div>
+          </div>
+
+          <div className="border-t pt-3 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Principal Amount</span>
+              <span className="font-medium">₹{formatAmount(data.amount)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Interest ({DAILY_INTEREST_RATE}% × {tenure} days)</span>
+              <span className="font-medium text-amber-600">₹{new Intl.NumberFormat("en-IN").format(Math.round(interestAmount))}</span>
+            </div>
+            <div className="flex justify-between text-base pt-2 border-t">
+              <span className="font-medium">Total Repayment</span>
+              <span className="font-bold text-primary">₹{new Intl.NumberFormat("en-IN").format(Math.round(totalRepayment))}</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Button 
         type="submit" 
