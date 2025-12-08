@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, Clock, Edit, AlertCircle } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Edit, AlertCircle, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import PANVerificationDialog from "./Verification/PANVerificationDialog";
 import AadhaarVerificationDialog from "./Verification/AadhaarVerificationDialog";
@@ -13,6 +13,7 @@ import BankAnalysisDialog from "./Verification/BankAnalysisDialog";
 import CreditBureauDialog from "./Verification/CreditBureauDialog";
 import { VideoKYCDialog } from "./Verification/VideoKYCDialog";
 import BankAccountVerificationDialog from "./Verification/BankAccountVerificationDialog";
+import VerificationDetailsDialog from "./Verification/VerificationDetailsDialog";
 
 interface VerificationDashboardProps {
   applicationId: string;
@@ -75,6 +76,7 @@ export default function VerificationDashboard({ applicationId, orgId }: Verifica
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedVerification, setSelectedVerification] = useState<{ type: string; data: any } | null>(null);
+  const [detailsVerification, setDetailsVerification] = useState<{ verification: any; type: typeof VERIFICATION_TYPES[0] } | null>(null);
 
   const { data: verifications = [], isLoading } = useQuery({
     queryKey: ["loan-verifications", applicationId],
@@ -379,20 +381,41 @@ export default function VerificationDashboard({ applicationId, orgId }: Verifica
                   </div>
                 )}
 
-                <Button
-                  variant={status === "pending" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSelectedVerification({ type: verificationType.type, data: verification })}
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  {status === "pending" ? "Start Verification" : "Update"}
-                </Button>
+                <div className="flex gap-2">
+                  {verification && status !== "pending" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setDetailsVerification({ verification, type: verificationType })}
+                    >
+                      <Eye className="h-4 w-4 mr-2" />
+                      View Details
+                    </Button>
+                  )}
+                  <Button
+                    variant={status === "pending" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedVerification({ type: verificationType.type, data: verification })}
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    {status === "pending" ? "Start Verification" : "Update"}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           );
         })}
       </div>
 
+      {/* Verification Details Dialog */}
+      {detailsVerification && (
+        <VerificationDetailsDialog
+          open={true}
+          onClose={() => setDetailsVerification(null)}
+          verification={detailsVerification.verification}
+          verificationType={detailsVerification.type}
+        />
+      )}
       {/* Verification Dialogs */}
       {selectedVerification?.type === "video_kyc" && (
         <VideoKYCDialog
