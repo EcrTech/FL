@@ -6,7 +6,7 @@ import { useOrgContext } from "@/hooks/useOrgContext";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, User, FileText, Calculator, FileCheck, DollarSign, XCircle, CreditCard, CheckCircle, MapPin } from "lucide-react";
 import { LoadingState } from "@/components/common/LoadingState";
@@ -247,240 +247,209 @@ export default function ApplicationDetail() {
           </Card>
         </div>
 
-        {/* Tabs */}
-        <Tabs defaultValue="application" className="w-full">
-          <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="application">
-              <User className="h-4 w-4 mr-2" />
-              Application
-            </TabsTrigger>
-            <TabsTrigger value="documents">
-              <FileText className="h-4 w-4 mr-2" />
-              Documents
-            </TabsTrigger>
-            <TabsTrigger value="assessment">
-              <Calculator className="h-4 w-4 mr-2" />
-              Assessment & Approval
-            </TabsTrigger>
-            <TabsTrigger value="sanction">
-              <FileCheck className="h-4 w-4 mr-2" />
-              Sanction
-            </TabsTrigger>
-            <TabsTrigger value="disbursement">
-              <DollarSign className="h-4 w-4 mr-2" />
-              Disbursement
-            </TabsTrigger>
-            <TabsTrigger value="emi">
-              <CreditCard className="h-4 w-4 mr-2" />
-              EMI
-            </TabsTrigger>
-          </TabsList>
+        {/* Application Details Section */}
+        <div className="space-y-6">
+          {/* Applicant Details Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Applicant Details
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {primaryApplicant && (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Full Name</label>
+                    <p className="text-sm">
+                      {primaryApplicant.first_name} {primaryApplicant.middle_name || ""}{" "}
+                      {primaryApplicant.last_name || ""}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Date of Birth</label>
+                    <p className="text-sm">
+                      {primaryApplicant.dob
+                        ? format(new Date(primaryApplicant.dob as string), "MMM dd, yyyy")
+                        : "N/A"}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Gender</label>
+                    <p className="text-sm">{(primaryApplicant.gender as string) || "N/A"}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Marital Status</label>
+                    <p className="text-sm">{(primaryApplicant.marital_status as string) || "N/A"}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">PAN Number</label>
+                    <p className="text-sm font-mono">{(primaryApplicant.pan_number as string) || "N/A"}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Mobile</label>
+                    <p className="text-sm">{(primaryApplicant.mobile as string) || "N/A"}</p>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="text-sm font-medium text-muted-foreground">Current Address</label>
+                    <p className="text-sm">{formatAddress(primaryApplicant.current_address)}</p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-          <TabsContent value="application" className="space-y-4">
-            {/* Applicant Details Card */}
+          {/* Parsed Document Data Card */}
+          {(panData || aadhaarData) && (
             <Card>
               <CardHeader>
-                <CardTitle>Applicant Details</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  Verified Document Data
+                  <Badge className="bg-green-500/10 text-green-600 border-green-500/20">AI Parsed</Badge>
+                </CardTitle>
+                <CardDescription>Information extracted from uploaded documents</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {primaryApplicant && (
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">Full Name</label>
-                      <p className="text-sm">
-                        {primaryApplicant.first_name} {primaryApplicant.middle_name || ""}{" "}
-                        {primaryApplicant.last_name || ""}
-                      </p>
+              <CardContent>
+                <div className="grid gap-6 md:grid-cols-2">
+                  {/* PAN Card Data */}
+                  {panData && !panData.parse_error && (
+                    <div className="space-y-3 p-4 rounded-lg bg-muted/50">
+                      <h4 className="font-medium text-sm flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        PAN Card
+                      </h4>
+                      <div className="grid gap-2 text-sm">
+                        {panData.name && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Name</span>
+                            <span className="font-medium">{panData.name}</span>
+                          </div>
+                        )}
+                        {panData.pan_number && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">PAN</span>
+                            <span className="font-mono font-medium">{panData.pan_number}</span>
+                          </div>
+                        )}
+                        {panData.father_name && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Father's Name</span>
+                            <span className="font-medium">{panData.father_name}</span>
+                          </div>
+                        )}
+                        {panData.dob && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">DOB</span>
+                            <span className="font-medium">
+                              {format(new Date(panData.dob), "MMM dd, yyyy")}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">Date of Birth</label>
-                      <p className="text-sm">
-                        {primaryApplicant.dob
-                          ? format(new Date(primaryApplicant.dob as string), "MMM dd, yyyy")
-                          : "N/A"}
-                      </p>
+                  )}
+
+                  {/* Aadhaar Card Data */}
+                  {aadhaarData && !aadhaarData.parse_error && (
+                    <div className="space-y-3 p-4 rounded-lg bg-muted/50">
+                      <h4 className="font-medium text-sm flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Aadhaar Card
+                      </h4>
+                      <div className="grid gap-2 text-sm">
+                        {aadhaarData.name && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Name</span>
+                            <span className="font-medium">{aadhaarData.name}</span>
+                          </div>
+                        )}
+                        {aadhaarData.aadhaar_number && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Aadhaar</span>
+                            <span className="font-mono font-medium">{aadhaarData.aadhaar_number}</span>
+                          </div>
+                        )}
+                        {aadhaarData.gender && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Gender</span>
+                            <span className="font-medium">{aadhaarData.gender}</span>
+                          </div>
+                        )}
+                        {aadhaarData.dob && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">DOB</span>
+                            <span className="font-medium">
+                              {format(new Date(aadhaarData.dob), "MMM dd, yyyy")}
+                            </span>
+                          </div>
+                        )}
+                        {aadhaarData.address && (
+                          <div className="flex flex-col gap-1">
+                            <span className="text-muted-foreground">Address</span>
+                            <span className="font-medium text-xs">{aadhaarData.address}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">Gender</label>
-                      <p className="text-sm">{(primaryApplicant.gender as string) || "N/A"}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">Marital Status</label>
-                      <p className="text-sm">{(primaryApplicant.marital_status as string) || "N/A"}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">PAN Number</label>
-                      <p className="text-sm font-mono">{(primaryApplicant.pan_number as string) || "N/A"}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-muted-foreground">Mobile</label>
-                      <p className="text-sm">{(primaryApplicant.mobile as string) || "N/A"}</p>
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="text-sm font-medium text-muted-foreground">Current Address</label>
-                      <p className="text-sm">{formatAddress(primaryApplicant.current_address)}</p>
-                    </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </CardContent>
             </Card>
+          )}
 
-            {/* Parsed Document Data Card */}
-            {(panData || aadhaarData) && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    Verified Document Data
-                    <Badge className="bg-green-500/10 text-green-600 border-green-500/20">AI Parsed</Badge>
-                  </CardTitle>
-                  <CardDescription>Information extracted from uploaded documents</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-6 md:grid-cols-2">
-                    {/* PAN Card Data */}
-                    {panData && !panData.parse_error && (
-                      <div className="space-y-3 p-4 rounded-lg bg-muted/50">
-                        <h4 className="font-medium text-sm flex items-center gap-2">
-                          <FileText className="h-4 w-4" />
-                          PAN Card
-                        </h4>
-                        <div className="grid gap-2 text-sm">
-                          {panData.name && (
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Name</span>
-                              <span className="font-medium">{panData.name}</span>
-                            </div>
-                          )}
-                          {panData.pan_number && (
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">PAN</span>
-                              <span className="font-mono font-medium">{panData.pan_number}</span>
-                            </div>
-                          )}
-                          {panData.father_name && (
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Father's Name</span>
-                              <span className="font-medium">{panData.father_name}</span>
-                            </div>
-                          )}
-                          {panData.dob && (
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">DOB</span>
-                              <span className="font-medium">
-                                {format(new Date(panData.dob), "MMM dd, yyyy")}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
+          {/* Document Data Verification */}
+          <DocumentDataVerification applicationId={application.id} />
 
-                    {/* Aadhaar Card Data */}
-                    {aadhaarData && !aadhaarData.parse_error && (
-                      <div className="space-y-3 p-4 rounded-lg bg-muted/50">
-                        <h4 className="font-medium text-sm flex items-center gap-2">
-                          <FileText className="h-4 w-4" />
-                          Aadhaar Card
-                        </h4>
-                        <div className="grid gap-2 text-sm">
-                          {aadhaarData.name && (
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Name</span>
-                              <span className="font-medium">{aadhaarData.name}</span>
-                            </div>
-                          )}
-                          {aadhaarData.aadhaar_number && (
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Aadhaar</span>
-                              <span className="font-mono font-medium">{aadhaarData.aadhaar_number}</span>
-                            </div>
-                          )}
-                          {aadhaarData.gender && (
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Gender</span>
-                              <span className="font-medium">{aadhaarData.gender}</span>
-                            </div>
-                          )}
-                          {aadhaarData.dob && (
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">DOB</span>
-                              <span className="font-medium">
-                                {format(new Date(aadhaarData.dob), "MMM dd, yyyy")}
-                              </span>
-                            </div>
-                          )}
-                          {aadhaarData.address && (
-                            <div className="flex flex-col gap-1">
-                              <span className="text-muted-foreground">Address</span>
-                              <span className="font-medium text-xs">{aadhaarData.address}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+          {/* Documents Section */}
+          <DocumentUpload applicationId={application.id} orgId={orgId} applicant={primaryApplicant} />
+          <IncomeSummary applicationId={application.id} orgId={orgId} />
 
-            {/* Document Data Verification */}
-            <DocumentDataVerification applicationId={application.id} />
-          </TabsContent>
+          {/* Assessment Section */}
+          <AssessmentDashboard applicationId={application.id} orgId={orgId} />
+          
+          {/* Approval Actions - Only shown when stage is approval_pending */}
+          {application.current_stage === "approval_pending" && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Approval Actions</CardTitle>
+                <CardDescription>
+                  Review and take action on this loan application
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-4">
+                  <Button
+                    variant="default"
+                    onClick={() => setApprovalAction("approve")}
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Approve Application
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => setApprovalAction("reject")}
+                  >
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Reject Application
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-          <TabsContent value="documents" className="space-y-6">
-            <DocumentUpload applicationId={application.id} orgId={orgId} applicant={primaryApplicant} />
-            <IncomeSummary applicationId={application.id} orgId={orgId} />
-          </TabsContent>
+          {/* Approval History */}
+          <ApprovalHistory applicationId={id!} />
 
-          <TabsContent value="assessment" className="space-y-6">
-            <AssessmentDashboard applicationId={application.id} orgId={orgId} />
-            
-            {/* Approval Actions - Only shown when stage is approval_pending */}
-            {application.current_stage === "approval_pending" && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Approval Actions</CardTitle>
-                  <CardDescription>
-                    Review and take action on this loan application
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex gap-4">
-                    <Button
-                      variant="default"
-                      onClick={() => setApprovalAction("approve")}
-                    >
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Approve Application
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      onClick={() => setApprovalAction("reject")}
-                    >
-                      <XCircle className="h-4 w-4 mr-2" />
-                      Reject Application
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+          {/* Sanction Section */}
+          <SanctionDashboard applicationId={application.id} orgId={orgId} />
 
-            {/* Approval History - Always shown */}
-            <ApprovalHistory applicationId={id!} />
-          </TabsContent>
+          {/* Disbursement Section */}
+          <DisbursementDashboard applicationId={application.id} />
 
-          <TabsContent value="sanction">
-            <SanctionDashboard applicationId={application.id} orgId={orgId} />
-          </TabsContent>
-
-          <TabsContent value="disbursement">
-            <DisbursementDashboard applicationId={application.id} />
-          </TabsContent>
-
-          <TabsContent value="emi">
-            <EMIDashboard applicationId={application.id} />
-          </TabsContent>
-        </Tabs>
+          {/* EMI Section */}
+          <EMIDashboard applicationId={application.id} />
+        </div>
       </div>
 
       {approvalAction && orgId && user && (
