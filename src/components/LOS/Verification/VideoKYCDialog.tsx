@@ -35,13 +35,16 @@ function MeetingView({
 }) {
   const [isMicOn, setIsMicOn] = useState(true);
   const [isWebcamOn, setIsWebcamOn] = useState(true);
+  const [isJoined, setIsJoined] = useState(false);
 
   const { join, leave, toggleMic, toggleWebcam, participants } = useMeeting({
     onMeetingJoined: () => {
       console.log("Meeting joined successfully");
+      setIsJoined(true);
     },
     onMeetingLeft: () => {
       console.log("Meeting left");
+      setIsJoined(false);
       onLeave();
     },
     onParticipantJoined: (participant) => {
@@ -83,6 +86,7 @@ function MeetingView({
           variant={isMicOn ? "secondary" : "destructive"}
           size="icon"
           onClick={handleToggleMic}
+          disabled={!isJoined}
         >
           {isMicOn ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
         </Button>
@@ -91,6 +95,7 @@ function MeetingView({
           variant={isWebcamOn ? "secondary" : "destructive"}
           size="icon"
           onClick={handleToggleWebcam}
+          disabled={!isJoined}
         >
           {isWebcamOn ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
         </Button>
@@ -100,6 +105,7 @@ function MeetingView({
           size="icon"
           onClick={onCapture}
           title="Capture Snapshot"
+          disabled={!isJoined}
         >
           <Camera className="h-4 w-4" />
         </Button>
@@ -108,6 +114,8 @@ function MeetingView({
           <Button
             variant="secondary"
             onClick={onStartRecording}
+            disabled={!isJoined}
+            title={!isJoined ? "Waiting for meeting to be joined..." : "Start Recording"}
           >
             Start Recording
           </Button>
@@ -124,6 +132,7 @@ function MeetingView({
           variant="destructive"
           size="icon"
           onClick={() => leave()}
+          disabled={!isJoined}
         >
           <PhoneOff className="h-4 w-4" />
         </Button>
