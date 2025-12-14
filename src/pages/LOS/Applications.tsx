@@ -9,21 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Search, Eye, Clock, FileText, Sparkles, UserPlus } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, Search, Eye, Clock, FileText, Sparkles, UserPlus, Filter } from "lucide-react";
 import { differenceInHours } from "date-fns";
 import { format } from "date-fns";
 import { LoadingState } from "@/components/common/LoadingState";
-
-// Section tabs for loan stages
-const SECTIONS = [
-  { id: "application", label: "Application", stages: ["application_login"] },
-  { id: "documents", label: "Documents", stages: ["document_collection"] },
-  { id: "assessment", label: "Assessment & Approval", stages: ["field_verification", "credit_assessment", "approval_pending", "approved", "rejected"] },
-  { id: "sanction", label: "Sanction", stages: ["sanction_generated"] },
-  { id: "disbursement", label: "Disbursement", stages: ["disbursement_pending", "disbursed"] },
-  { id: "emi", label: "EMI", stages: ["closed"] },
-];
 
 const STAGE_LABELS: Record<string, string> = {
   application_login: "Application Login",
@@ -40,6 +30,30 @@ const STAGE_LABELS: Record<string, string> = {
   cancelled: "Cancelled",
 };
 
+const STATUS_OPTIONS = [
+  { value: "all", label: "All Statuses" },
+  { value: "draft", label: "Draft" },
+  { value: "in_progress", label: "In Progress" },
+  { value: "approved", label: "Approved" },
+  { value: "rejected", label: "Rejected" },
+  { value: "disbursed", label: "Disbursed" },
+];
+
+const STAGE_OPTIONS = [
+  { value: "all", label: "All Stages" },
+  { value: "application_login", label: "Application Login" },
+  { value: "document_collection", label: "Document Collection" },
+  { value: "field_verification", label: "Field Verification" },
+  { value: "credit_assessment", label: "Credit Assessment" },
+  { value: "approval_pending", label: "Approval Pending" },
+  { value: "approved", label: "Approved" },
+  { value: "rejected", label: "Rejected" },
+  { value: "sanction_generated", label: "Sanction Generated" },
+  { value: "disbursement_pending", label: "Disbursement Pending" },
+  { value: "disbursed", label: "Disbursed" },
+  { value: "closed", label: "Closed" },
+];
+
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-muted",
   in_progress: "bg-blue-500",
@@ -54,8 +68,8 @@ export default function Applications() {
   const { orgId } = useOrgContext();
   const { permissions } = useLOSPermissions();
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeSection, setActiveSection] = useState("application");
-
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [stageFilter, setStageFilter] = useState("all");
   const isFreshApplication = (createdAt: string) => {
     return differenceInHours(new Date(), new Date(createdAt)) < 48;
   };
@@ -83,22 +97,14 @@ export default function Applications() {
     enabled: !!orgId,
   });
 
-  // Get section counts
-  const sectionCounts = SECTIONS.reduce((acc, section) => {
-    acc[section.id] = applications.filter(app => 
-      section.stages.includes(app.current_stage)
-    ).length;
-    return acc;
-  }, {} as Record<string, number>);
-
-  // Filter applications by active section
-  const activeStages = SECTIONS.find(s => s.id === activeSection)?.stages || [];
-  
   const filteredApplications = applications.filter((app) => {
-    // First filter by section stages
-    if (!activeStages.includes(app.current_stage)) return false;
+    // Filter by status
+    if (statusFilter !== "all" && app.status !== statusFilter) return false;
     
-    // Then filter by search query
+    // Filter by stage
+    if (stageFilter !== "all" && app.current_stage !== stageFilter) return false;
+    
+    // Filter by search query
     const searchLower = searchQuery.toLowerCase();
     if (!searchLower) return true;
     
@@ -151,62 +157,67 @@ export default function Applications() {
           )}
         </div>
 
-        {/* Section Tabs */}
-        <Tabs value={activeSection} onValueChange={setActiveSection}>
-          <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent">
-            {SECTIONS.map((section) => (
-              <TabsTrigger
-                key={section.id}
-                value={section.id}
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-6 py-3"
-              >
-                {section.label}
-                {sectionCounts[section.id] > 0 && (
-                  <Badge variant="secondary" className="ml-2 text-xs">
-                    {sectionCounts[section.id]}
-                  </Badge>
-                )}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-
-          {/* Search */}
-          <div className="pt-4">
-            <div className="relative max-w-md">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by application number or name..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
-            </div>
+        {/* Filters */}
+        <div className="flex flex-wrap gap-4 items-center">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by application number or name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
           </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={stageFilter} onValueChange={setStageFilter}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Filter by stage" />
+            </SelectTrigger>
+            <SelectContent>
+              {STAGE_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-          {/* Applications List */}
-          <Card>
-            <CardHeader>
-              <CardTitle>{SECTIONS.find(s => s.id === activeSection)?.label} Applications</CardTitle>
-              <CardDescription>
-                {filteredApplications.length} application{filteredApplications.length !== 1 ? "s" : ""}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {filteredApplications.length === 0 ? (
-                <div className="text-center py-12">
-                  <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No applications in this section</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Applications will appear here as they progress through the workflow
-                  </p>
-                  {activeSection === "application" && (
-                    <Button onClick={() => navigate("/los/applications/new")}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Create Application
-                    </Button>
-                  )}
-                </div>
-              ) : (
+        {/* Applications List */}
+        <Card>
+          <CardHeader>
+            <CardTitle>All Applications</CardTitle>
+            <CardDescription>
+              {filteredApplications.length} application{filteredApplications.length !== 1 ? "s" : ""}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {filteredApplications.length === 0 ? (
+              <div className="text-center py-12">
+                <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No applications found</h3>
+                <p className="text-muted-foreground mb-4">
+                  {searchQuery || statusFilter !== "all" || stageFilter !== "all"
+                    ? "Try adjusting your filters"
+                    : "Create your first application to get started"}
+                </p>
+                <Button onClick={() => navigate("/los/applications/new")}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create Application
+                </Button>
+              </div>
+            ) : (
                 <div className="space-y-4">
                   {filteredApplications.map((app) => (
                     <div
@@ -283,10 +294,9 @@ export default function Applications() {
                     </div>
                   ))}
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </Tabs>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </DashboardLayout>
   );
