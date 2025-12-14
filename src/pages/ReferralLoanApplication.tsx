@@ -2,15 +2,12 @@ import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, CheckCircle } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Loader2, CheckCircle, User, CreditCard, FileCheck, Video, ArrowLeft } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { BasicInfoStep } from "@/components/ReferralApplication/BasicInfoStep";
 import { PANVerificationStep } from "@/components/ReferralApplication/PANVerificationStep";
 import { AadhaarVerificationStep } from "@/components/ReferralApplication/AadhaarVerificationStep";
 import { VideoKYCStep } from "@/components/ReferralApplication/VideoKYCStep";
-import { FeatureHighlights } from "@/components/ReferralApplication/FeatureHighlights";
-import { HeroSection } from "@/components/ReferralApplication/HeroSection";
 import logo from "@/assets/paisaa-saarthi-new-logo.png";
 
 interface ReferrerInfo {
@@ -22,10 +19,10 @@ interface ReferrerInfo {
 }
 
 const STEPS = [
-  { id: 1, title: "Basic Info", description: "Personal details & consent" },
-  { id: 2, title: "PAN Verification", description: "Verify your PAN card" },
-  { id: 3, title: "Aadhaar Verification", description: "Verify your Aadhaar" },
-  { id: 4, title: "Video KYC", description: "Complete video verification" },
+  { id: 1, title: "Personal Details", description: "Basic information", icon: User },
+  { id: 2, title: "PAN Verification", description: "Income tax validation", icon: CreditCard },
+  { id: 3, title: "Aadhaar Verification", description: "eKYC via UIDAI", icon: FileCheck },
+  { id: 4, title: "Video KYC", description: "Identity verification", icon: Video },
 ];
 
 export default function ReferralLoanApplication() {
@@ -172,11 +169,9 @@ export default function ReferralLoanApplication() {
     }
   };
 
-  const progress = (currentStep / STEPS.length) * 100;
-
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-primary/5 to-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
@@ -184,13 +179,13 @@ export default function ReferralLoanApplication() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <Card className="max-w-md w-full">
-          <CardContent className="pt-6 text-center">
-            <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-3xl">⚠️</span>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-primary/5 to-background p-4">
+        <Card className="max-w-md w-full shadow-xl border-0">
+          <CardContent className="pt-8 pb-8 text-center">
+            <div className="w-20 h-20 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-6">
+              <span className="text-4xl">⚠️</span>
             </div>
-            <h2 className="text-xl font-semibold mb-2">Invalid Referral Link</h2>
+            <h2 className="text-2xl font-bold mb-3">Invalid Referral Link</h2>
             <p className="text-muted-foreground">{error}</p>
           </CardContent>
         </Card>
@@ -200,19 +195,19 @@ export default function ReferralLoanApplication() {
 
   if (applicationNumber) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <Card className="max-w-md w-full">
-          <CardContent className="pt-6 text-center">
-            <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
-              <CheckCircle className="h-10 w-10 text-white" />
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-primary/5 to-background p-4">
+        <Card className="max-w-md w-full shadow-xl border-0">
+          <CardContent className="pt-8 pb-8 text-center">
+            <div className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+              <CheckCircle className="h-12 w-12 text-white" />
             </div>
-            <h2 className="text-2xl font-bold text-foreground mb-2">Application Submitted!</h2>
-            <p className="text-muted-foreground mb-6">
+            <h2 className="text-2xl font-bold text-foreground mb-3">Application Submitted!</h2>
+            <p className="text-muted-foreground mb-8">
               Your loan application has been successfully submitted. Our team will review your application and contact you shortly.
             </p>
-            <div className="bg-muted p-4 rounded-lg">
-              <p className="text-sm text-muted-foreground">Application Number</p>
-              <p className="text-xl font-bold text-primary">{applicationNumber}</p>
+            <div className="bg-primary/5 p-6 rounded-xl border border-primary/10">
+              <p className="text-sm text-muted-foreground mb-1">Application Number</p>
+              <p className="text-2xl font-bold text-primary">{applicationNumber}</p>
             </div>
           </CardContent>
         </Card>
@@ -221,132 +216,167 @@ export default function ReferralLoanApplication() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-screen bg-gradient-to-b from-primary/5 via-background to-background">
+      {/* Top Gradient Bar */}
+      <div className="h-1.5 bg-gradient-to-r from-primary via-primary/80 to-accent" />
+      
       {/* Header */}
-      <header className="bg-card border-b border-border px-4 py-3">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <img src={logo} alt="Paisaa Saarthi" className="h-10 md:h-12" />
-          <div className="text-sm text-muted-foreground hidden md:block">
-            Step {currentStep} of {STEPS.length}
+      <header className="bg-card/80 backdrop-blur-sm border-b border-border sticky top-0 z-50">
+        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <img src={logo} alt="Paisaa Saarthi" className="h-10" />
+          </div>
+          <div className="flex items-center gap-3">
+            <a 
+              href="/" 
+              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="hidden sm:inline">Back to Home</span>
+            </a>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col lg:flex-row">
-        {/* Form Section */}
-        <div className="flex-1 lg:w-[55%] order-2 lg:order-1">
-          <div className="max-w-xl mx-auto p-6 lg:p-12">
-            {/* Progress */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-foreground">
-                  Step {currentStep}: {STEPS[currentStep - 1].title}
-                </span>
-                <span className="text-sm text-muted-foreground">{Math.round(progress)}%</span>
-              </div>
-              <Progress value={progress} className="h-2" />
-              <p className="text-sm text-muted-foreground mt-2">
-                {STEPS[currentStep - 1].description}
-              </p>
+      <main className="max-w-4xl mx-auto px-4 py-8 md:py-12">
+        {/* Title Section */}
+        <div className="text-center mb-10">
+          <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-3">
+            Loan Application
+          </h1>
+          <p className="text-muted-foreground text-lg">
+            Complete the following steps to submit your application
+          </p>
+          {referrerInfo?.name && (
+            <div className="inline-flex items-center gap-2 mt-4 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium">
+              Referred by {referrerInfo.name}
             </div>
+          )}
+        </div>
 
-            {/* Step Indicators */}
-            <div className="flex items-center justify-between mb-8">
-              {STEPS.map((step, index) => (
+        {/* Step Indicators */}
+        <div className="flex items-center justify-center mb-10">
+          <div className="flex items-center gap-0">
+            {STEPS.map((step, index) => {
+              const Icon = step.icon;
+              const isCompleted = currentStep > step.id;
+              const isCurrent = currentStep === step.id;
+              
+              return (
                 <div key={step.id} className="flex items-center">
-                  <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${
-                      currentStep > step.id
-                        ? "bg-green-500 text-white"
-                        : currentStep === step.id
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground"
-                    }`}
-                  >
-                    {currentStep > step.id ? <CheckCircle className="h-4 w-4" /> : step.id}
+                  <div className="flex flex-col items-center">
+                    <div
+                      className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${
+                        isCompleted
+                          ? "bg-green-500 text-white shadow-lg shadow-green-500/30"
+                          : isCurrent
+                          ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30 ring-4 ring-primary/20"
+                          : "bg-muted text-muted-foreground border-2 border-border"
+                      }`}
+                    >
+                      {isCompleted ? (
+                        <CheckCircle className="h-5 w-5" />
+                      ) : (
+                        <Icon className="h-5 w-5" />
+                      )}
+                    </div>
+                    <div className="mt-3 text-center hidden md:block">
+                      <p className={`text-sm font-medium ${isCurrent ? "text-primary" : "text-foreground"}`}>
+                        {step.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {step.description}
+                      </p>
+                    </div>
                   </div>
                   {index < STEPS.length - 1 && (
                     <div
-                      className={`w-8 md:w-16 h-0.5 mx-1 ${
-                        currentStep > step.id ? "bg-green-500" : "bg-muted"
+                      className={`w-12 md:w-20 h-0.5 mx-2 transition-colors duration-300 ${
+                        isCompleted ? "bg-green-500" : "bg-border"
                       }`}
                     />
                   )}
                 </div>
-              ))}
-            </div>
-
-            {/* Form Card */}
-            <Card className="border-border shadow-lg">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-xl">{STEPS[currentStep - 1].title}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {currentStep === 1 && (
-                  <BasicInfoStep
-                    formData={basicInfo}
-                    onUpdate={(data) => setBasicInfo((prev) => ({ ...prev, ...data }))}
-                    consents={consents}
-                    onConsentChange={handleConsentChange}
-                    verificationStatus={verificationStatus}
-                    onVerificationComplete={handleVerificationComplete}
-                    onNext={() => setCurrentStep(2)}
-                  />
-                )}
-
-                {currentStep === 2 && (
-                  <PANVerificationStep
-                    panNumber={panNumber}
-                    onPanChange={setPanNumber}
-                    onVerified={handlePanVerified}
-                    onNext={() => setCurrentStep(3)}
-                    onBack={() => setCurrentStep(1)}
-                    isVerified={panVerified}
-                    verifiedData={panData}
-                  />
-                )}
-
-                {currentStep === 3 && (
-                  <AadhaarVerificationStep
-                    aadhaarNumber={aadhaarNumber}
-                    onAadhaarChange={setAadhaarNumber}
-                    onVerified={handleAadhaarVerified}
-                    onNext={() => setCurrentStep(4)}
-                    onBack={() => setCurrentStep(2)}
-                    isVerified={aadhaarVerified}
-                    verifiedData={aadhaarData}
-                  />
-                )}
-
-                {currentStep === 4 && (
-                  <VideoKYCStep
-                    onComplete={handleVideoKycComplete}
-                    onBack={() => setCurrentStep(3)}
-                    isCompleted={videoKycCompleted}
-                    applicantName={basicInfo.name}
-                  />
-                )}
-
-                {submitting && (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    <span className="ml-3 text-muted-foreground">Submitting application...</span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+              );
+            })}
           </div>
         </div>
 
-        {/* Hero Section */}
-        <div className="lg:w-[45%] order-1 lg:order-2 h-64 lg:h-auto">
-          <HeroSection referrerName={referrerInfo?.name} />
+        {/* Mobile Step Title */}
+        <div className="md:hidden text-center mb-6">
+          <p className="text-sm font-medium text-primary">
+            Step {currentStep}: {STEPS[currentStep - 1].title}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {STEPS[currentStep - 1].description}
+          </p>
         </div>
-      </div>
 
-      {/* Feature Highlights */}
-      <FeatureHighlights />
+        {/* Form Card */}
+        <Card className="border-0 shadow-xl bg-card">
+          <CardContent className="p-6 md:p-10">
+            {currentStep === 1 && (
+              <BasicInfoStep
+                formData={basicInfo}
+                onUpdate={(data) => setBasicInfo((prev) => ({ ...prev, ...data }))}
+                consents={consents}
+                onConsentChange={handleConsentChange}
+                verificationStatus={verificationStatus}
+                onVerificationComplete={handleVerificationComplete}
+                onNext={() => setCurrentStep(2)}
+              />
+            )}
+
+            {currentStep === 2 && (
+              <PANVerificationStep
+                panNumber={panNumber}
+                onPanChange={setPanNumber}
+                onVerified={handlePanVerified}
+                onNext={() => setCurrentStep(3)}
+                onBack={() => setCurrentStep(1)}
+                isVerified={panVerified}
+                verifiedData={panData}
+              />
+            )}
+
+            {currentStep === 3 && (
+              <AadhaarVerificationStep
+                aadhaarNumber={aadhaarNumber}
+                onAadhaarChange={setAadhaarNumber}
+                onVerified={handleAadhaarVerified}
+                onNext={() => setCurrentStep(4)}
+                onBack={() => setCurrentStep(2)}
+                isVerified={aadhaarVerified}
+                verifiedData={aadhaarData}
+              />
+            )}
+
+            {currentStep === 4 && (
+              <VideoKYCStep
+                onComplete={handleVideoKycComplete}
+                onBack={() => setCurrentStep(3)}
+                isCompleted={videoKycCompleted}
+                applicantName={basicInfo.name}
+              />
+            )}
+
+            {submitting && (
+              <div className="flex flex-col items-center justify-center py-12">
+                <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
+                <span className="text-muted-foreground">Submitting your application...</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Footer Info */}
+        <div className="mt-8 text-center">
+          <p className="text-sm text-muted-foreground">
+            Your information is secure and encrypted. We'll never share your data without your consent.
+          </p>
+        </div>
+      </main>
     </div>
   );
 }
