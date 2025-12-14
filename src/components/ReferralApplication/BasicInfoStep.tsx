@@ -142,7 +142,7 @@ export function BasicInfoStep({
   };
 
   const allConsentsChecked = consents.householdIncome && consents.termsAndConditions && consents.aadhaarConsent;
-  const canProceed = formData.name && verificationStatus.emailVerified && verificationStatus.phoneVerified && allConsentsChecked;
+  const canProceed = formData.name && verificationStatus.emailVerified && allConsentsChecked;
 
   return (
     <div className="space-y-8">
@@ -240,7 +240,7 @@ export function BasicInfoStep({
         <div className="space-y-2">
           <Label htmlFor="phone" className="text-sm font-heading font-semibold text-foreground flex items-center gap-2">
             <Phone className="h-4 w-4 text-muted-foreground" />
-            Mobile Number <span className="text-[hsl(var(--coral-500))]">*</span>
+            Mobile Number <span className="text-muted-foreground text-xs font-normal">(optional)</span>
           </Label>
           <div className="flex gap-3">
             <div className="relative flex-1">
