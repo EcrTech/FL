@@ -101,8 +101,22 @@ serve(async (req) => {
     if (type === "email") {
       const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
       
+      // Get org's email settings for verified domain
+      const { data: emailSettings } = await supabaseClient
+        .from("email_settings")
+        .select("sending_domain, domain_status")
+        .eq("org_id", orgId)
+        .single();
+      
+      // Use verified domain if available, otherwise use Resend test domain
+      const fromEmail = emailSettings?.domain_status === "verified" && emailSettings?.sending_domain
+        ? `Verification <noreply@${emailSettings.sending_domain}>`
+        : "Verification <onboarding@resend.dev>";
+      
+      console.log("Sending email from:", fromEmail, "to:", target);
+      
       const emailResponse = await resend.emails.send({
-        from: "Verification <onboarding@resend.dev>",
+        from: fromEmail,
         to: [target],
         subject: "Your Verification Code",
         html: `
