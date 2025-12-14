@@ -112,28 +112,46 @@ serve(async (req) => {
         }
       }
     } else if (identifierType === 'phone') {
-      // Send SMS OTP using MSG91 or similar service
-      const msg91AuthKey = Deno.env.get('MSG91_AUTH_KEY');
-      const msg91TemplateId = Deno.env.get('MSG91_OTP_TEMPLATE_ID');
+      // Send SMS OTP using Exotel
+      // Fetch Exotel settings from the first active org (system-level config for public forms)
+      const { data: exotelSettings } = await supabase
+        .from('exotel_settings')
+        .select('*')
+        .eq('is_active', true)
+        .limit(1)
+        .single();
       
-      if (msg91AuthKey && msg91TemplateId) {
+      if (exotelSettings) {
         const formattedPhone = identifier.replace(/^\+91/, '').replace(/\D/g, '');
-        const smsResponse = await fetch('https://control.msg91.com/api/v5/otp', {
+        const smsMessage = `Your OTP for Paisaa Saarthi loan application is: ${otpCode}. Valid for 5 minutes. Do not share this with anyone.`;
+        
+        // Exotel SMS API
+        const exotelSmsUrl = `https://${exotelSettings.subdomain}/v1/Accounts/${exotelSettings.account_sid}/Sms/send.json`;
+        const auth = btoa(`${exotelSettings.api_key}:${exotelSettings.api_token}`);
+        
+        const smsParams = new URLSearchParams({
+          From: exotelSettings.caller_id,
+          To: formattedPhone,
+          Body: smsMessage,
+        });
+        
+        const smsResponse = await fetch(exotelSmsUrl, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'authkey': msg91AuthKey,
+            'Authorization': `Basic ${auth}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
           },
-          body: JSON.stringify({
-            template_id: msg91TemplateId,
-            mobile: `91${formattedPhone}`,
-            otp: otpCode,
-          }),
+          body: smsParams.toString(),
         });
 
         if (!smsResponse.ok) {
-          console.error('SMS sending failed:', await smsResponse.text());
+          const errorText = await smsResponse.text();
+          console.error('Exotel SMS error:', errorText);
+        } else {
+          console.log(`[send-public-otp] SMS OTP sent via Exotel to: ${formattedPhone.substring(0, 4)}***`);
         }
+      } else {
+        console.warn('Exotel not configured - SMS OTP not sent');
       }
     }
 
