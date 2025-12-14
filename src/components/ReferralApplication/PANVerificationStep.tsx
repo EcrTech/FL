@@ -112,9 +112,13 @@ export function PANVerificationStep({
 
       if (data.success && data.panNumber) {
         onPanChange(data.panNumber);
-        setParsedName(data.name || null);
+        const extractedName = data.name || null;
+        setParsedName(extractedName);
         setIsParsed(true);
-        toast.success("PAN details extracted successfully");
+        toast.success("PAN details extracted successfully. Auto-verifying...");
+        
+        // Auto-verify after extraction
+        await autoVerifyPan(data.panNumber, extractedName);
       } else {
         toast.error(data.error || "Could not extract PAN details from the document");
       }
@@ -123,6 +127,49 @@ export function PANVerificationStep({
       toast.error(error.message || "Failed to parse document");
     } finally {
       setParsing(false);
+    }
+  };
+
+  const autoVerifyPan = async (pan: string, name: string | null) => {
+    setVerifying(true);
+    try {
+      // First authenticate
+      const { data: authData, error: authError } = await supabase.functions.invoke('sandbox-authenticate', {
+        body: {},
+      });
+
+      if (authError) throw authError;
+
+      if (!authData.access_token) {
+        throw new Error("Failed to get authentication token");
+      }
+
+      setAccessToken(authData.access_token);
+
+      // Then verify PAN
+      const { data, error } = await supabase.functions.invoke('verify-public-pan', {
+        body: {
+          panNumber: pan,
+          accessToken: authData.access_token,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        onVerified({
+          name: data.name || name || 'Name not available',
+          status: data.status || 'Verified',
+        });
+        toast.success("PAN verified successfully");
+      } else {
+        toast.error(data.message || "PAN verification failed");
+      }
+    } catch (error: any) {
+      console.error('Auto PAN verification error:', error);
+      toast.error(error.message || "Auto-verification failed. Please verify manually.");
+    } finally {
+      setVerifying(false);
     }
   };
 
