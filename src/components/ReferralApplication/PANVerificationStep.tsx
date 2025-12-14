@@ -115,16 +115,16 @@ export function PANVerificationStep({
         const extractedName = data.name || null;
         setParsedName(extractedName);
         setIsParsed(true);
-        toast.success("PAN details extracted successfully. Auto-verifying...");
+        toast.success("PAN details fetched successfully. Auto-verifying...");
         
         // Auto-verify after extraction
         await autoVerifyPan(data.panNumber, extractedName);
       } else {
-        toast.error(data.error || "Could not extract PAN details from the document");
+        toast.error(data.error || "Could not fetch PAN details from the document");
       }
     } catch (error: any) {
       console.error('Document parsing error:', error);
-      toast.error(error.message || "Failed to parse document");
+      toast.error(error.message || "Failed to fetch document details");
     } finally {
       setParsing(false);
     }
@@ -242,7 +242,7 @@ export function PANVerificationStep({
         </div>
         <div>
           <h3 className="text-xl font-heading font-bold text-foreground">PAN Verification</h3>
-          <p className="text-sm text-muted-foreground font-body">Upload your PAN card to extract and verify details</p>
+          <p className="text-sm text-muted-foreground font-body">Upload your PAN card to fetch and verify details</p>
         </div>
       </div>
 
@@ -291,11 +291,18 @@ export function PANVerificationStep({
                   <p className="text-sm text-muted-foreground font-body">
                     {(uploadedFile.size / 1024).toFixed(1)} KB
                   </p>
-                  {isParsed && (
-                    <Badge className="mt-2 bg-[hsl(var(--success))] text-white border-0">
-                      <Check className="h-3 w-3 mr-1" /> Details Extracted
-                    </Badge>
-                  )}
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {isParsed && (
+                      <Badge className="bg-primary/10 text-primary border-0">
+                        <Check className="h-3 w-3 mr-1" /> Details Fetched
+                      </Badge>
+                    )}
+                    {isVerified && (
+                      <Badge className="bg-[hsl(var(--success))] text-white border-0">
+                        <ShieldCheck className="h-3 w-3 mr-1" /> Verified
+                      </Badge>
+                    )}
+                  </div>
                 </div>
                 <Button
                   variant="ghost"
@@ -329,12 +336,12 @@ export function PANVerificationStep({
             {parsing ? (
               <>
                 <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                Extracting Details...
+                Fetching Details...
               </>
             ) : (
               <>
                 <Image className="h-5 w-5 mr-2" />
-                Extract PAN Details
+                Fetch PAN Details
               </>
             )}
           </Button>
