@@ -34,7 +34,7 @@ interface LoanApplication {
     email: string | null;
     current_address: {
       state?: string;
-      pin_code?: string;
+      pincode?: string;
     } | null;
   }[] | null;
   contacts: {
@@ -334,7 +334,7 @@ export default function PipelineBoard() {
       phone: applicant?.mobile || contact?.phone || '-',
       email: applicant?.email || contact?.email || '-',
       state: applicant?.current_address?.state || '-',
-      pinCode: applicant?.current_address?.pin_code || '-',
+      pinCode: applicant?.current_address?.pincode || '-',
     };
   };
 
