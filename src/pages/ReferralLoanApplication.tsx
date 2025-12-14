@@ -77,30 +77,23 @@ export default function ReferralLoanApplication() {
       try {
         const { data, error: fetchError } = await supabase
           .from("user_referral_codes")
-          .select(`
-            user_id,
-            profiles:user_id (
-              first_name,
-              last_name,
-              org_id
-            )
-          `)
+          .select("user_id, org_id")
           .eq("referral_code", referralCode)
           .eq("is_active", true)
           .single();
 
         if (fetchError || !data) {
+          console.error("Error fetching referral code:", fetchError);
           setError("Invalid or expired referral link");
           setLoading(false);
           return;
         }
 
-        const profile = data.profiles as any;
         setReferrerInfo({
-          name: `${profile.first_name || ""} ${profile.last_name || ""}`.trim(),
+          name: "Your Loan Advisor",
           email: "",
           phone: "",
-          orgId: profile.org_id,
+          orgId: data.org_id,
           userId: data.user_id,
         });
       } catch (err) {
