@@ -1,88 +1,73 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ArrowLeft, ArrowRight, CheckCircle, User } from "lucide-react";
-import { LoanDetailsStep } from "@/components/PublicLoanApplication/LoanDetailsStep";
-import { PersonalDetailsStep } from "@/components/PublicLoanApplication/PersonalDetailsStep";
-import { AddressDetailsStep } from "@/components/PublicLoanApplication/AddressDetailsStep";
-import { EmploymentDetailsStep } from "@/components/PublicLoanApplication/EmploymentDetailsStep";
-import { DocumentUploadStep } from "@/components/PublicLoanApplication/DocumentUploadStep";
-import { ReviewStep } from "@/components/PublicLoanApplication/ReviewStep";
-import { ConsentOTPStep } from "@/components/PublicLoanApplication/ConsentOTPStep";
-import { SuccessScreen } from "@/components/PublicLoanApplication/SuccessScreen";
-import { LoadingState } from "@/components/common/LoadingState";
-import { LoanFormData } from "@/pages/PublicLoanApplication";
+import { Loader2, CheckCircle } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BasicInfoStep } from "@/components/ReferralApplication/BasicInfoStep";
+import { PANVerificationStep } from "@/components/ReferralApplication/PANVerificationStep";
+import { AadhaarVerificationStep } from "@/components/ReferralApplication/AadhaarVerificationStep";
+import { VideoKYCStep } from "@/components/ReferralApplication/VideoKYCStep";
+import { FeatureHighlights } from "@/components/ReferralApplication/FeatureHighlights";
+import { HeroSection } from "@/components/ReferralApplication/HeroSection";
+import logo from "@/assets/paisaa-saarthi-new-logo.png";
 
 interface ReferrerInfo {
-  referralCode: string;
-  referrerName: string | null;
-  referrerUserId: string;
+  name: string;
+  email: string;
+  phone: string;
   orgId: string;
+  userId: string;
 }
 
 const STEPS = [
-  { id: 1, name: "Loan Details", description: "Amount & Purpose" },
-  { id: 2, name: "Personal Details", description: "Your Information" },
-  { id: 3, name: "Address", description: "Residence Details" },
-  { id: 4, name: "Employment", description: "Work Information" },
-  { id: 5, name: "Documents", description: "Upload Documents" },
-  { id: 6, name: "Review", description: "Review Details" },
-  { id: 7, name: "Consent", description: "Terms & Submit" },
+  { id: 1, title: "Basic Info", description: "Personal details & consent" },
+  { id: 2, title: "PAN Verification", description: "Verify your PAN card" },
+  { id: 3, title: "Aadhaar Verification", description: "Verify your Aadhaar" },
+  { id: 4, title: "Video KYC", description: "Complete video verification" },
 ];
-
-const initialFormData: LoanFormData = {
-  loanDetails: { productType: "personal_loan", amount: "", tenure: 7 },
-  personalDetails: {
-    fullName: "",
-    dob: "",
-    gender: "",
-    maritalStatus: "",
-    panNumber: "",
-    aadhaarNumber: "",
-    email: "",
-    mobile: "",
-    fatherName: "",
-  },
-  addressDetails: {
-    currentAddress: { addressLine1: "", addressLine2: "", city: "", state: "", pincode: "" },
-    permanentAddress: { addressLine1: "", addressLine2: "", city: "", state: "", pincode: "" },
-    sameAsCurrent: true,
-    residenceType: "",
-  },
-  employmentDetails: {
-    employmentType: "salaried",
-    employerName: "",
-    employerType: "",
-    designation: "",
-    grossSalary: "",
-    netSalary: "",
-    bankName: "",
-    accountNumber: "",
-  },
-  documents: [],
-};
 
 export default function ReferralLoanApplication() {
   const { referralCode } = useParams<{ referralCode: string }>();
   const [currentStep, setCurrentStep] = useState(1);
-  const [formData, setFormData] = useState<LoanFormData>(initialFormData);
   const [referrerInfo, setReferrerInfo] = useState<ReferrerInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [applicationNumber, setApplicationNumber] = useState<string | null>(null);
-  const [geolocation, setGeolocation] = useState<{ latitude: number; longitude: number; accuracy: number } | null>(null);
-  const [formStartTime] = useState(Date.now());
-  const [honeypot, setHoneypot] = useState("");
+
+  // Form data
+  const [basicInfo, setBasicInfo] = useState({
+    name: "",
+    email: "",
+    phone: "",
+  });
+
+  const [consents, setConsents] = useState({
+    householdIncome: false,
+    termsAndConditions: false,
+    aadhaarConsent: false,
+  });
+
+  const [verificationStatus, setVerificationStatus] = useState({
+    emailVerified: false,
+    phoneVerified: false,
+  });
+
+  const [panNumber, setPanNumber] = useState("");
+  const [panVerified, setPanVerified] = useState(false);
+  const [panData, setPanData] = useState<{ name: string; status: string } | undefined>();
+
+  const [aadhaarNumber, setAadhaarNumber] = useState("");
+  const [aadhaarVerified, setAadhaarVerified] = useState(false);
+  const [aadhaarData, setAadhaarData] = useState<{ name: string; address: string; dob: string } | undefined>();
+
+  const [videoKycCompleted, setVideoKycCompleted] = useState(false);
 
   // Fetch referrer info
   useEffect(() => {
-    const fetchReferrerInfo = async () => {
+    async function fetchReferrerInfo() {
       if (!referralCode) {
         setError("Invalid referral link");
         setLoading(false);
@@ -93,124 +78,101 @@ export default function ReferralLoanApplication() {
         const { data, error: fetchError } = await supabase
           .from("user_referral_codes")
           .select(`
-            referral_code,
             user_id,
-            org_id
+            profiles:user_id (
+              first_name,
+              last_name,
+              org_id
+            )
           `)
           .eq("referral_code", referralCode)
           .eq("is_active", true)
-          .maybeSingle();
+          .single();
 
         if (fetchError || !data) {
-          setError("This referral link is invalid or has expired");
+          setError("Invalid or expired referral link");
           setLoading(false);
           return;
         }
 
+        const profile = data.profiles as any;
         setReferrerInfo({
-          referralCode: data.referral_code,
-          referrerName: null,
-          referrerUserId: data.user_id,
-          orgId: data.org_id,
+          name: `${profile.first_name || ""} ${profile.last_name || ""}`.trim(),
+          email: "",
+          phone: "",
+          orgId: profile.org_id,
+          userId: data.user_id,
         });
-        setLoading(false);
       } catch (err) {
-        console.error("Error fetching referrer info:", err);
-        setError("Unable to load application form");
+        console.error("Error fetching referrer:", err);
+        setError("Failed to load referral information");
+      } finally {
         setLoading(false);
       }
-    };
+    }
 
     fetchReferrerInfo();
   }, [referralCode]);
 
-  // Get geolocation
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setGeolocation({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-          });
-        },
-        (err) => console.log("Geolocation error:", err)
-      );
-    }
-  }, []);
-
-  const updateFormData = (section: keyof LoanFormData, data: any) => {
-    setFormData((prev) => ({
+  const handleVerificationComplete = (type: 'email' | 'phone') => {
+    setVerificationStatus((prev) => ({
       ...prev,
-      [section]: { ...prev[section], ...data },
+      [type === 'email' ? 'emailVerified' : 'phoneVerified']: true,
     }));
   };
 
-  const nextStep = () => {
-    if (currentStep < STEPS.length) {
-      setCurrentStep(currentStep + 1);
-      window.scrollTo(0, 0);
-    }
+  const handleConsentChange = (consent: 'householdIncome' | 'termsAndConditions' | 'aadhaarConsent', value: boolean) => {
+    setConsents((prev) => ({ ...prev, [consent]: value }));
   };
 
-  const prevStep = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-      window.scrollTo(0, 0);
-    }
+  const handlePanVerified = (data: { name: string; status: string }) => {
+    setPanData(data);
+    setPanVerified(true);
   };
 
-  const goToStep = (step: number) => {
-    if (step < currentStep) {
-      setCurrentStep(step);
-      window.scrollTo(0, 0);
-    }
+  const handleAadhaarVerified = (data: { name: string; address: string; dob: string }) => {
+    setAadhaarData(data);
+    setAadhaarVerified(true);
   };
 
-  const handleConsent = async (otpVerificationId: string) => {
-    if (!referrerInfo) return;
+  const handleVideoKycComplete = () => {
+    setVideoKycCompleted(true);
+    submitApplication();
+  };
 
+  const submitApplication = async () => {
     setSubmitting(true);
     try {
-      const { data, error: submitError } = await supabase.functions.invoke("submit-loan-application", {
-        body: {
-          formSlug: "referral",
-          referralCode: referrerInfo.referralCode,
-          consentOtpId: otpVerificationId,
-          loanDetails: {
-            amount: formData.loanDetails.amount,
-            tenure: formData.loanDetails.tenure,
-          },
-          personalDetails: formData.personalDetails,
-          addressDetails: formData.addressDetails,
-          employmentDetails: {
-            ...formData.employmentDetails,
-            grossSalary: parseFloat(formData.employmentDetails.grossSalary) || 0,
-            netSalary: parseFloat(formData.employmentDetails.netSalary) || 0,
-          },
-          documents: formData.documents.map(doc => ({
-            type: doc.type,
-            base64: doc.base64,
-            name: doc.name,
-            mimeType: doc.mimeType,
-          })),
-          geolocation,
-          formStartTime,
-          honeypot,
+      const applicationData = {
+        applicant: {
+          name: basicInfo.name,
+          email: basicInfo.email,
+          phone: basicInfo.phone,
+          pan: panNumber,
+          panVerified,
+          panName: panData?.name,
+          aadhaar: aadhaarNumber,
+          aadhaarVerified,
+          aadhaarName: aadhaarData?.name,
+          aadhaarAddress: aadhaarData?.address,
+          aadhaarDob: aadhaarData?.dob,
+          videoKycCompleted,
         },
+        consents,
+        referrerInfo,
+        referralCode,
+      };
+
+      const { data, error: submitError } = await supabase.functions.invoke("submit-loan-application", {
+        body: applicationData,
       });
 
       if (submitError) throw submitError;
 
-      if (data?.success) {
-        setApplicationNumber(data.applicationNumber);
-        toast.success("Application submitted successfully!");
-      } else {
-        throw new Error(data?.error || "Failed to submit application");
-      }
+      setApplicationNumber(data?.applicationNumber || `APP-${Date.now()}`);
+      toast.success("Application submitted successfully!");
     } catch (err: any) {
-      console.error("Submit error:", err);
+      console.error("Error submitting application:", err);
       toast.error(err.message || "Failed to submit application");
     } finally {
       setSubmitting(false);
@@ -221,24 +183,22 @@ export default function ReferralLoanApplication() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5 flex items-center justify-center">
-        <LoadingState message="Loading application form..." />
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5 flex items-center justify-center p-4">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="max-w-md w-full">
-          <CardHeader className="text-center">
-            <CardTitle className="text-destructive">Invalid Referral Link</CardTitle>
-            <CardDescription>{error}</CardDescription>
-          </CardHeader>
-          <CardContent className="text-center">
-            <p className="text-muted-foreground mb-4">
-              Please contact your referrer for a valid link.
-            </p>
+          <CardContent className="pt-6 text-center">
+            <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl">⚠️</span>
+            </div>
+            <h2 className="text-xl font-semibold mb-2">Invalid Referral Link</h2>
+            <p className="text-muted-foreground">{error}</p>
           </CardContent>
         </Card>
       </div>
@@ -246,147 +206,154 @@ export default function ReferralLoanApplication() {
   }
 
   if (applicationNumber) {
-    return <SuccessScreen applicationNumber={applicationNumber} />;
-  }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-secondary/5 py-8 px-4">
-      <div className="max-w-3xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold text-foreground">Loan Application</h1>
-          <p className="text-muted-foreground">
-            Complete the form below to apply for a loan
-          </p>
-          {referrerInfo?.referrerName && (
-            <Badge variant="secondary" className="gap-2">
-              <User className="h-3 w-3" />
-              Referred by {referrerInfo.referrerName}
-            </Badge>
-          )}
-        </div>
-
-        {/* Progress */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="space-y-4">
-              <div className="flex justify-between text-sm">
-                <span className="font-medium">
-                  Step {currentStep} of {STEPS.length}: {STEPS[currentStep - 1].name}
-                </span>
-                <span className="text-muted-foreground">{Math.round(progress)}% complete</span>
-              </div>
-              <Progress value={progress} className="h-2" />
-              <div className="flex justify-between">
-                {STEPS.map((step) => (
-                  <div
-                    key={step.id}
-                    className={`flex flex-col items-center ${
-                      step.id === currentStep
-                        ? "text-primary"
-                        : step.id < currentStep
-                        ? "text-green-500"
-                        : "text-muted-foreground"
-                    }`}
-                  >
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium ${
-                        step.id < currentStep
-                          ? "bg-green-500 text-white"
-                          : step.id === currentStep
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted"
-                      }`}
-                    >
-                      {step.id < currentStep ? <CheckCircle className="h-4 w-4" /> : step.id}
-                    </div>
-                    <span className="text-xs mt-1 hidden sm:block">{step.name}</span>
-                  </div>
-                ))}
-              </div>
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="max-w-md w-full">
+          <CardContent className="pt-6 text-center">
+            <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
+              <CheckCircle className="h-10 w-10 text-white" />
+            </div>
+            <h2 className="text-2xl font-bold text-foreground mb-2">Application Submitted!</h2>
+            <p className="text-muted-foreground mb-6">
+              Your loan application has been successfully submitted. Our team will review your application and contact you shortly.
+            </p>
+            <div className="bg-muted p-4 rounded-lg">
+              <p className="text-sm text-muted-foreground">Application Number</p>
+              <p className="text-xl font-bold text-primary">{applicationNumber}</p>
             </div>
           </CardContent>
         </Card>
-
-        {/* Honeypot (hidden) */}
-        <input
-          type="text"
-          name="website"
-          value={honeypot}
-          onChange={(e) => setHoneypot(e.target.value)}
-          style={{ position: "absolute", left: "-9999px" }}
-          tabIndex={-1}
-          autoComplete="off"
-        />
-
-        {/* Form Steps */}
-        <Card>
-          <CardContent className="pt-6">
-            {currentStep === 1 && (
-              <LoanDetailsStep
-                data={formData.loanDetails}
-                onChange={(data) => updateFormData("loanDetails", data)}
-                onNext={nextStep}
-              />
-            )}
-            {currentStep === 2 && (
-              <PersonalDetailsStep
-                data={formData.personalDetails}
-                onChange={(data) => updateFormData("personalDetails", data)}
-                onNext={nextStep}
-                onPrev={prevStep}
-              />
-            )}
-            {currentStep === 3 && (
-              <AddressDetailsStep
-                data={formData.addressDetails}
-                onChange={(data) => updateFormData("addressDetails", data)}
-                onNext={nextStep}
-                onPrev={prevStep}
-              />
-            )}
-            {currentStep === 4 && (
-              <EmploymentDetailsStep
-                data={formData.employmentDetails}
-                onChange={(data) => updateFormData("employmentDetails", data)}
-                onNext={nextStep}
-                onPrev={prevStep}
-              />
-            )}
-            {currentStep === 5 && (
-              <DocumentUploadStep
-                data={formData.documents}
-                requiredDocuments={["pan_card", "aadhaar_card", "salary_slip"]}
-                onChange={(docs) => setFormData((prev) => ({ ...prev, documents: docs }))}
-                onNext={nextStep}
-                onPrev={prevStep}
-              />
-            )}
-            {currentStep === 6 && (
-              <ReviewStep 
-                formData={formData} 
-                onNext={nextStep}
-                onPrev={prevStep}
-                onEdit={goToStep} 
-              />
-            )}
-            {currentStep === 7 && (
-              <ConsentOTPStep
-                mobile={formData.personalDetails.mobile}
-                onConsent={handleConsent}
-                onPrev={prevStep}
-                submitting={submitting}
-              />
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Footer */}
-        <p className="text-center text-xs text-muted-foreground">
-          By submitting this application, you agree to our terms and conditions.
-          Your information is securely encrypted.
-        </p>
       </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col bg-background">
+      {/* Header */}
+      <header className="bg-card border-b border-border px-4 py-3">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <img src={logo} alt="Paisaa Saarthi" className="h-10 md:h-12" />
+          <div className="text-sm text-muted-foreground hidden md:block">
+            Step {currentStep} of {STEPS.length}
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col lg:flex-row">
+        {/* Form Section */}
+        <div className="flex-1 lg:w-[55%] order-2 lg:order-1">
+          <div className="max-w-xl mx-auto p-6 lg:p-12">
+            {/* Progress */}
+            <div className="mb-8">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-foreground">
+                  Step {currentStep}: {STEPS[currentStep - 1].title}
+                </span>
+                <span className="text-sm text-muted-foreground">{Math.round(progress)}%</span>
+              </div>
+              <Progress value={progress} className="h-2" />
+              <p className="text-sm text-muted-foreground mt-2">
+                {STEPS[currentStep - 1].description}
+              </p>
+            </div>
+
+            {/* Step Indicators */}
+            <div className="flex items-center justify-between mb-8">
+              {STEPS.map((step, index) => (
+                <div key={step.id} className="flex items-center">
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${
+                      currentStep > step.id
+                        ? "bg-green-500 text-white"
+                        : currentStep === step.id
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {currentStep > step.id ? <CheckCircle className="h-4 w-4" /> : step.id}
+                  </div>
+                  {index < STEPS.length - 1 && (
+                    <div
+                      className={`w-8 md:w-16 h-0.5 mx-1 ${
+                        currentStep > step.id ? "bg-green-500" : "bg-muted"
+                      }`}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Form Card */}
+            <Card className="border-border shadow-lg">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-xl">{STEPS[currentStep - 1].title}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {currentStep === 1 && (
+                  <BasicInfoStep
+                    formData={basicInfo}
+                    onUpdate={(data) => setBasicInfo((prev) => ({ ...prev, ...data }))}
+                    consents={consents}
+                    onConsentChange={handleConsentChange}
+                    verificationStatus={verificationStatus}
+                    onVerificationComplete={handleVerificationComplete}
+                    onNext={() => setCurrentStep(2)}
+                  />
+                )}
+
+                {currentStep === 2 && (
+                  <PANVerificationStep
+                    panNumber={panNumber}
+                    onPanChange={setPanNumber}
+                    onVerified={handlePanVerified}
+                    onNext={() => setCurrentStep(3)}
+                    onBack={() => setCurrentStep(1)}
+                    isVerified={panVerified}
+                    verifiedData={panData}
+                  />
+                )}
+
+                {currentStep === 3 && (
+                  <AadhaarVerificationStep
+                    aadhaarNumber={aadhaarNumber}
+                    onAadhaarChange={setAadhaarNumber}
+                    onVerified={handleAadhaarVerified}
+                    onNext={() => setCurrentStep(4)}
+                    onBack={() => setCurrentStep(2)}
+                    isVerified={aadhaarVerified}
+                    verifiedData={aadhaarData}
+                  />
+                )}
+
+                {currentStep === 4 && (
+                  <VideoKYCStep
+                    onComplete={handleVideoKycComplete}
+                    onBack={() => setCurrentStep(3)}
+                    isCompleted={videoKycCompleted}
+                    applicantName={basicInfo.name}
+                  />
+                )}
+
+                {submitting && (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <span className="ml-3 text-muted-foreground">Submitting application...</span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Hero Section */}
+        <div className="lg:w-[45%] order-1 lg:order-2 h-64 lg:h-auto">
+          <HeroSection referrerName={referrerInfo?.name} />
+        </div>
+      </div>
+
+      {/* Feature Highlights */}
+      <FeatureHighlights />
     </div>
   );
 }
