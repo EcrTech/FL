@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.verify-consent-otp]
 verify_jwt = false
+
+[functions.send-public-otp]
+verify_jwt = false
+
+[functions.verify-public-otp]
+verify_jwt = false

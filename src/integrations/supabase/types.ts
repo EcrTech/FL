@@ -5777,6 +5777,48 @@ export type Database = {
           },
         ]
       }
+      public_otp_verifications: {
+        Row: {
+          attempts: number
+          created_at: string
+          expires_at: string
+          id: string
+          identifier: string
+          identifier_type: string
+          ip_address: unknown
+          max_attempts: number
+          otp_code: string
+          session_id: string
+          verified_at: string | null
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          expires_at?: string
+          id?: string
+          identifier: string
+          identifier_type: string
+          ip_address?: unknown
+          max_attempts?: number
+          otp_code: string
+          session_id?: string
+          verified_at?: string | null
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          expires_at?: string
+          id?: string
+          identifier?: string
+          identifier_type?: string
+          ip_address?: unknown
+          max_attempts?: number
+          otp_code?: string
+          session_id?: string
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
       rate_limit_log: {
         Row: {
           created_at: string
@@ -7031,6 +7073,7 @@ export type Database = {
       }
       check_inactive_contacts: { Args: never; Returns: undefined }
       cleanup_expired_otps: { Args: never; Returns: undefined }
+      cleanup_expired_public_otps: { Args: never; Returns: undefined }
       cleanup_orphaned_profile: {
         Args: { user_id: string }
         Returns: undefined
