@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, User, FileText, Calculator, FileCheck, DollarSign, XCircle, CreditCard, CheckCircle } from "lucide-react";
+import { ArrowLeft, User, FileText, Calculator, FileCheck, DollarSign, XCircle, CreditCard, CheckCircle, MapPin } from "lucide-react";
 import { LoadingState } from "@/components/common/LoadingState";
 import { format } from "date-fns";
 import DocumentUpload from "@/components/LOS/DocumentUpload";
@@ -176,7 +176,7 @@ export default function ApplicationDetail() {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-5">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium">Requested Amount</CardTitle>
@@ -218,6 +218,31 @@ export default function ApplicationDetail() {
                   ? `${(application as any).assigned_profile.first_name} ${(application as any).assigned_profile.last_name || ""}`
                   : "Unassigned"}
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-1.5">
+                <MapPin className="h-3.5 w-3.5" />
+                Location
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {application.latitude && application.longitude ? (
+                <div className="space-y-1">
+                  <div className="text-xs font-mono text-muted-foreground">
+                    {Number(application.latitude).toFixed(6)}, {Number(application.longitude).toFixed(6)}
+                  </div>
+                  {application.geolocation_accuracy && (
+                    <div className="text-xs text-muted-foreground">
+                      ±{Math.round(Number(application.geolocation_accuracy))}m accuracy
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground">Not captured</div>
+              )}
             </CardContent>
           </Card>
         </div>
