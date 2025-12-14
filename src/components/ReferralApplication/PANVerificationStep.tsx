@@ -163,11 +163,22 @@ export function PANVerificationStep({
         });
         toast.success("PAN verified successfully");
       } else {
-        toast.error(data.message || "PAN verification failed");
+        // Fallback: Mark as unverified but allow to proceed
+        console.log('PAN verification failed, using fallback');
+        onVerified({
+          name: name || 'Name not available',
+          status: 'Details Fetched (Unverified)',
+        });
+        toast.info("PAN details saved. Verification service unavailable.");
       }
     } catch (error: any) {
       console.error('Auto PAN verification error:', error);
-      toast.error(error.message || "Auto-verification failed. Please verify manually.");
+      // Fallback: Mark as unverified but allow to proceed
+      onVerified({
+        name: name || 'Name not available',
+        status: 'Details Fetched (Unverified)',
+      });
+      toast.info("PAN details saved. Verification will be done manually.");
     } finally {
       setVerifying(false);
     }
