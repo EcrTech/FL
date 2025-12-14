@@ -53,6 +53,7 @@ import ApprovalQueuePage from "./pages/LOS/ApprovalQueue";
 import LOSDashboard from "./pages/LOS/Dashboard";
 import MyReferrals from "./pages/LOS/MyReferrals";
 import ReferralLoanApplication from "./pages/ReferralLoanApplication";
+import NegativePinCodes from "./pages/NegativePinCodes";
 import ProtectedRoute from "./components/Auth/ProtectedRoute";
 
 const App = () => (
@@ -304,6 +305,12 @@ const App = () => (
           <Route path="/los/my-referrals" element={
             <ProtectedRoute>
               <MyReferrals />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/los/negative-pincodes" element={
+            <ProtectedRoute requiredRole="admin">
+              <NegativePinCodes />
             </ProtectedRoute>
           } />
           
