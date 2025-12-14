@@ -20,7 +20,7 @@ serve(async (req) => {
     }
 
     // Stop recording via VideoSDK API
-    const stopResponse = await fetch(`https://api.videosdk.live/v2/recordings/stop`, {
+    const stopResponse = await fetch(`https://api.videosdk.live/v2/recordings/end`, {
       method: 'POST',
       headers: {
         'Authorization': token,
