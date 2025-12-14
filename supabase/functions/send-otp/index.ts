@@ -104,14 +104,14 @@ serve(async (req) => {
       // Get org's email settings for verified domain
       const { data: emailSettings } = await supabaseClient
         .from("email_settings")
-        .select("sending_domain, domain_status")
+        .select("sending_domain, verification_status")
         .eq("org_id", orgId)
         .single();
       
-      // Use verified domain if available, otherwise use Resend test domain
-      const fromEmail = emailSettings?.domain_status === "verified" && emailSettings?.sending_domain
-        ? `Verification <noreply@${emailSettings.sending_domain}>`
-        : "Verification <onboarding@resend.dev>";
+      // Use org's verified domain if available, otherwise use global verified domain
+      const fromEmail = emailSettings?.verification_status === "verified" && emailSettings?.sending_domain
+        ? `Paisaa Saarthi <noreply@${emailSettings.sending_domain}>`
+        : "Paisaa Saarthi <noreply@in-sync.co.in>";
       
       console.log("Sending email from:", fromEmail, "to:", target);
       
@@ -122,8 +122,8 @@ serve(async (req) => {
         html: `
           <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f9fafb; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
             <!-- Header -->
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center;">
-              <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 600;">LeadFlow CRM</h1>
+            <div style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); padding: 30px; text-align: center;">
+              <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 600;">Paisaa Saarthi</h1>
               <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 14px;">Secure Verification</p>
             </div>
             
@@ -141,7 +141,7 @@ serve(async (req) => {
                 <p style="color: #64748b; font-size: 14px; margin: 0 0 15px 0; text-transform: uppercase; letter-spacing: 1px;">Your verification code</p>
                 <div style="font-size: 44px; font-weight: bold; letter-spacing: 14px; 
                             color: #1e293b; font-family: 'Courier New', Courier, monospace;
-                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
                             -webkit-background-clip: text;
                             -webkit-text-fill-color: transparent;
                             background-clip: text;">
@@ -174,7 +174,7 @@ serve(async (req) => {
                 If you didn't request this code, you can safely ignore this email.
               </p>
               <p style="color: #94a3b8; font-size: 12px; margin: 0;">
-                © ${new Date().getFullYear()} LeadFlow CRM. All rights reserved.
+                © ${new Date().getFullYear()} Paisaa Saarthi. All rights reserved.
               </p>
             </div>
           </div>
