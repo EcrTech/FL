@@ -117,6 +117,12 @@ const App = () => (
             </ProtectedRoute>
           } />
           
+          <Route path="/exotel-settings" element={
+            <ProtectedRoute requiredRole="admin">
+              <ExotelSettings />
+            </ProtectedRoute>
+          } />
+          
           <Route path="/users" element={
             <ProtectedRoute requiredRole="admin">
               <Users />
