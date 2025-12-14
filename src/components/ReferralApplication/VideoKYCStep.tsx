@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Check, Loader2, Video, Camera, Mic, ArrowLeft, AlertCircle } from "lucide-react";
+import { Check, Loader2, Video, Camera, Mic, ArrowLeft, AlertCircle, Play, Square } from "lucide-react";
 import { toast } from "sonner";
 
 interface VideoKYCStepProps {
@@ -73,17 +73,15 @@ export function VideoKYCStep({
       };
 
       mediaRecorder.onstop = () => {
-        // Recording stopped - video data is in chunksRef
         console.log('Recording completed, chunks:', chunksRef.current.length);
       };
 
       mediaRecorderRef.current = mediaRecorder;
-      mediaRecorder.start(1000); // Collect data every second
+      mediaRecorder.start(1000);
       setIsRecording(true);
       setStep('recording');
       setRecordingTime(0);
 
-      // Start timer
       timerRef.current = setInterval(() => {
         setRecordingTime((prev) => prev + 1);
       }, 1000);
@@ -103,7 +101,6 @@ export function VideoKYCStep({
         clearInterval(timerRef.current);
       }
 
-      // Stop all tracks
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
@@ -120,25 +117,29 @@ export function VideoKYCStep({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const minRecordingTime = 10; // Minimum 10 seconds
+  const minRecordingTime = 10;
 
   if (isCompleted) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-2 text-muted-foreground mb-4">
-          <Button variant="ghost" size="sm" onClick={onBack} className="p-0 h-auto">
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Back
-          </Button>
+      <div className="space-y-8">
+        {/* Section Header */}
+        <div className="flex items-center gap-4 pb-5 border-b border-border">
+          <div className="w-12 h-12 rounded-xl bg-[hsl(var(--success))]/10 flex items-center justify-center">
+            <Video className="h-6 w-6 text-[hsl(var(--success))]" />
+          </div>
+          <div>
+            <h3 className="text-xl font-heading font-bold text-foreground">Video KYC</h3>
+            <p className="text-sm text-muted-foreground font-body">Identity verification complete</p>
+          </div>
         </div>
 
-        <Card className="bg-green-50 border-green-200">
-          <CardContent className="pt-6 text-center">
-            <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Check className="h-8 w-8 text-white" />
+        <Card className="bg-[hsl(var(--success))]/5 border-2 border-[hsl(var(--success))]/20 rounded-xl">
+          <CardContent className="pt-8 pb-8 text-center">
+            <div className="w-20 h-20 bg-[hsl(var(--success))] rounded-full flex items-center justify-center mx-auto mb-5 shadow-lg">
+              <Check className="h-10 w-10 text-white" />
             </div>
-            <h3 className="text-lg font-semibold text-green-800">Video KYC Completed</h3>
-            <p className="text-green-600 mt-2">Your video verification has been recorded successfully.</p>
+            <h3 className="text-2xl font-heading font-bold text-[hsl(var(--success))] mb-2">Video KYC Completed</h3>
+            <p className="text-muted-foreground font-body">Your video verification has been recorded successfully.</p>
           </CardContent>
         </Card>
       </div>
@@ -146,50 +147,84 @@ export function VideoKYCStep({
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2 text-muted-foreground mb-4">
-        <Button variant="ghost" size="sm" onClick={onBack} className="p-0 h-auto">
-          <ArrowLeft className="h-4 w-4 mr-1" />
-          Back
-        </Button>
+    <div className="space-y-8">
+      {/* Section Header */}
+      <div className="flex items-center gap-4 pb-5 border-b border-border">
+        <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+          <Video className="h-6 w-6 text-primary" />
+        </div>
+        <div>
+          <h3 className="text-xl font-heading font-bold text-foreground">Video KYC</h3>
+          <p className="text-sm text-muted-foreground font-body">Record a short video for identity verification</p>
+        </div>
       </div>
 
+      {/* Back Button */}
+      <button
+        onClick={onBack}
+        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors font-body"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to Aadhaar Verification
+      </button>
+
       {step === 'instructions' && (
-        <Card>
-          <CardContent className="pt-6">
-            <h3 className="text-lg font-semibold mb-4">Video KYC Instructions</h3>
-            <ul className="space-y-3 text-muted-foreground">
-              <li className="flex items-start gap-2">
-                <Camera className="h-5 w-5 mt-0.5 text-primary" />
-                Ensure you are in a well-lit area with your face clearly visible
+        <Card className="border-2 border-[hsl(var(--coral-500))]/20 rounded-xl overflow-hidden">
+          <div className="h-1.5 bg-gradient-to-r from-[hsl(var(--coral-500))] to-[hsl(var(--coral-400))]" />
+          <CardContent className="p-6">
+            <h4 className="text-lg font-heading font-bold text-foreground mb-5">Before You Begin</h4>
+            <ul className="space-y-4">
+              <li className="flex items-start gap-4">
+                <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Camera className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-heading font-semibold text-foreground">Good Lighting</p>
+                  <p className="text-sm text-muted-foreground font-body">Ensure you are in a well-lit area with your face clearly visible</p>
+                </div>
               </li>
-              <li className="flex items-start gap-2">
-                <Mic className="h-5 w-5 mt-0.5 text-primary" />
-                Allow camera and microphone access when prompted
+              <li className="flex items-start gap-4">
+                <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Mic className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-heading font-semibold text-foreground">Clear Audio</p>
+                  <p className="text-sm text-muted-foreground font-body">Allow camera and microphone access when prompted</p>
+                </div>
               </li>
-              <li className="flex items-start gap-2">
-                <Video className="h-5 w-5 mt-0.5 text-primary" />
-                You will need to record a short video (minimum 10 seconds)
+              <li className="flex items-start gap-4">
+                <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Video className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-heading font-semibold text-foreground">Short Recording</p>
+                  <p className="text-sm text-muted-foreground font-body">You will need to record a video (minimum 10 seconds)</p>
+                </div>
               </li>
-              <li className="flex items-start gap-2">
-                <AlertCircle className="h-5 w-5 mt-0.5 text-primary" />
-                Please state your name clearly during the recording
+              <li className="flex items-start gap-4">
+                <div className="w-10 h-10 bg-[hsl(var(--coral-500))]/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <AlertCircle className="h-5 w-5 text-[hsl(var(--coral-500))]" />
+                </div>
+                <div>
+                  <p className="font-heading font-semibold text-foreground">State Your Name</p>
+                  <p className="text-sm text-muted-foreground font-body">Please state your name clearly during the recording</p>
+                </div>
               </li>
             </ul>
 
             <Button
               onClick={checkPermissions}
               disabled={checkingPermissions}
-              className="w-full h-12 bg-primary hover:bg-primary/90 mt-6"
+              className="w-full h-14 text-base font-heading font-bold btn-electric rounded-xl mt-6"
             >
               {checkingPermissions ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
                   Checking permissions...
                 </>
               ) : (
                 <>
-                  <Camera className="h-4 w-4 mr-2" />
+                  <Camera className="h-5 w-5 mr-2" />
                   Allow Camera & Microphone
                 </>
               )}
@@ -199,8 +234,8 @@ export function VideoKYCStep({
       )}
 
       {(step === 'permissions' || step === 'recording') && (
-        <div className="space-y-4">
-          <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+        <div className="space-y-5">
+          <div className="relative aspect-video bg-foreground rounded-2xl overflow-hidden shadow-xl">
             <video
               ref={videoRef}
               autoPlay
@@ -210,41 +245,43 @@ export function VideoKYCStep({
             />
             
             {isRecording && (
-              <div className="absolute top-4 left-4 flex items-center gap-2">
-                <Badge variant="destructive" className="animate-pulse">
-                  <span className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse" />
+              <div className="absolute top-4 left-4">
+                <Badge className="bg-[hsl(var(--error))] text-white border-0 font-heading px-4 py-2 text-sm animate-pulse-record">
+                  <span className="w-2.5 h-2.5 bg-white rounded-full mr-2 inline-block" />
                   REC {formatTime(recordingTime)}
                 </Badge>
               </div>
             )}
 
             {step === 'permissions' && (
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2">
-                <Badge className="bg-green-500">
-                  <Camera className="h-3 w-3 mr-1" /> Camera Ready
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3">
+                <Badge className="bg-[hsl(var(--success))] text-white border-0 font-heading">
+                  <Camera className="h-3.5 w-3.5 mr-1.5" /> Camera Ready
                 </Badge>
-                <Badge className="bg-green-500">
-                  <Mic className="h-3 w-3 mr-1" /> Mic Ready
+                <Badge className="bg-[hsl(var(--success))] text-white border-0 font-heading">
+                  <Mic className="h-3.5 w-3.5 mr-1.5" /> Mic Ready
                 </Badge>
               </div>
             )}
           </div>
 
           {step === 'permissions' && (
-            <div className="bg-muted p-4 rounded-lg">
-              <p className="text-sm text-muted-foreground">
-                Please say: <strong>"My name is {applicantName} and I am applying for a personal loan."</strong>
-              </p>
-            </div>
+            <Card className="bg-[hsl(var(--electric-blue-100))] border-0 rounded-xl">
+              <CardContent className="p-5">
+                <p className="text-sm text-foreground font-body">
+                  <span className="font-heading font-semibold">Please say:</span> "My name is <span className="text-primary font-semibold">{applicantName || 'your name'}</span> and I am applying for a personal loan."
+                </p>
+              </CardContent>
+            </Card>
           )}
 
-          <div className="flex gap-3">
+          <div className="flex gap-4">
             {step === 'permissions' && (
               <Button
                 onClick={startRecording}
-                className="flex-1 h-12 bg-red-500 hover:bg-red-600 text-white"
+                className="flex-1 h-14 text-base font-heading font-bold btn-coral rounded-xl"
               >
-                <Video className="h-4 w-4 mr-2" />
+                <Play className="h-5 w-5 mr-2" />
                 Start Recording
               </Button>
             )}
@@ -253,13 +290,13 @@ export function VideoKYCStep({
               <Button
                 onClick={stopRecording}
                 disabled={recordingTime < minRecordingTime}
-                className="flex-1 h-12 bg-red-500 hover:bg-red-600 text-white"
+                className="flex-1 h-14 text-base font-heading font-bold bg-[hsl(var(--error))] hover:bg-[hsl(var(--error))]/90 text-white rounded-xl shadow-lg transition-all disabled:opacity-50"
               >
                 {recordingTime < minRecordingTime ? (
                   `Wait ${minRecordingTime - recordingTime}s...`
                 ) : (
                   <>
-                    <Video className="h-4 w-4 mr-2" />
+                    <Square className="h-5 w-5 mr-2" />
                     Stop Recording
                   </>
                 )}
