@@ -142,7 +142,7 @@ export function BasicInfoStep({
   };
 
   const allConsentsChecked = consents.householdIncome && consents.termsAndConditions && consents.aadhaarConsent;
-  const canProceed = formData.name && verificationStatus.emailVerified && allConsentsChecked;
+  const canProceed = formData.name && allConsentsChecked;
 
   return (
     <div className="space-y-8">
@@ -177,7 +177,7 @@ export function BasicInfoStep({
         <div className="space-y-2">
           <Label htmlFor="email" className="text-sm font-heading font-semibold text-foreground flex items-center gap-2">
             <Mail className="h-4 w-4 text-muted-foreground" />
-            Email Address <span className="text-[hsl(var(--coral-500))]">*</span>
+            Email Address <span className="text-muted-foreground text-xs font-normal">(optional)</span>
           </Label>
           <div className="flex gap-3">
             <div className="relative flex-1">
