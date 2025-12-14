@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.sandbox-authenticate]
 verify_jwt = false
+
+[functions.parse-pan-document]
+verify_jwt = false
