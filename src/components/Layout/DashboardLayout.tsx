@@ -39,6 +39,7 @@ import {
   MessageCircle,
   Phone,
   Sparkles,
+  MapPinOff,
 } from "lucide-react";
 import { useNotification } from "@/hooks/useNotification";
 import { OnboardingDialog } from "@/components/Onboarding/OnboardingDialog";
@@ -278,6 +279,17 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                 <List size={20} />
                 <span>Approval Queue</span>
               </Link>
+
+              {isAdmin && (
+                <Link
+                  to="/los/negative-pincodes"
+                  className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <MapPinOff size={20} />
+                  <span>Negative Pin Codes</span>
+                </Link>
+              )}
 
               <Link
                 to="/tasks"
