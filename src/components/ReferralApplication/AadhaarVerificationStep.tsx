@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Check, Loader2, AlertCircle, ArrowLeft } from "lucide-react";
+import { Check, Loader2, AlertCircle, ArrowLeft, ArrowRight, FileCheck, ShieldCheck, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -139,16 +139,32 @@ export function AadhaarVerificationStep({
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2 text-muted-foreground mb-4">
-        <Button variant="ghost" size="sm" onClick={onBack} className="p-0 h-auto">
-          <ArrowLeft className="h-4 w-4 mr-1" />
-          Back
-        </Button>
+    <div className="space-y-8">
+      {/* Section Header */}
+      <div className="flex items-center gap-4 pb-5 border-b border-border">
+        <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+          <FileCheck className="h-6 w-6 text-primary" />
+        </div>
+        <div>
+          <h3 className="text-xl font-heading font-bold text-foreground">Aadhaar Verification</h3>
+          <p className="text-sm text-muted-foreground font-body">Complete eKYC via UIDAI</p>
+        </div>
       </div>
 
+      {/* Back Button */}
+      <button
+        onClick={onBack}
+        className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors font-body"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to PAN Verification
+      </button>
+
+      {/* Aadhaar Input */}
       <div className="space-y-2">
-        <Label htmlFor="aadhaar" className="text-foreground font-medium">Aadhaar Number *</Label>
+        <Label htmlFor="aadhaar" className="text-sm font-heading font-semibold text-foreground">
+          Aadhaar Number <span className="text-[hsl(var(--coral-500))]">*</span>
+        </Label>
         <div className="relative">
           <Input
             id="aadhaar"
@@ -156,18 +172,18 @@ export function AadhaarVerificationStep({
             value={isVerified ? getMaskedAadhaar() : formatAadhaar(aadhaarNumber)}
             onChange={(e) => onAadhaarChange(e.target.value.replace(/\D/g, '').slice(0, 12))}
             disabled={isVerified || otpSent}
-            className="h-12 bg-background border-border tracking-widest font-mono"
+            className="h-14 bg-background border-2 border-border rounded-xl tracking-[0.3em] font-mono text-lg text-center focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
             maxLength={14}
           />
           {isVerified && (
-            <Badge className="absolute right-2 top-1/2 -translate-y-1/2 bg-green-500 text-white">
+            <Badge className="absolute right-3 top-1/2 -translate-y-1/2 bg-[hsl(var(--success))] text-white border-0 font-heading">
               <Check className="h-3 w-3 mr-1" /> Verified
             </Badge>
           )}
         </div>
         {aadhaarNumber && !isValidAadhaar && (
-          <p className="text-sm text-destructive flex items-center gap-1">
-            <AlertCircle className="h-3 w-3" />
+          <p className="text-sm text-[hsl(var(--coral-500))] flex items-center gap-1.5 font-body mt-2">
+            <AlertCircle className="h-4 w-4" />
             Please enter a valid 12-digit Aadhaar number
           </p>
         )}
@@ -175,48 +191,55 @@ export function AadhaarVerificationStep({
 
       {/* OTP Input */}
       {otpSent && !isVerified && (
-        <div className="space-y-2">
-          <Label className="text-foreground font-medium">Enter OTP</Label>
-          <div className="flex gap-2">
+        <div className="p-5 bg-[hsl(var(--electric-blue-100))] rounded-xl border border-[hsl(var(--electric-blue-400))]/20 space-y-4">
+          <Label className="text-sm font-heading font-semibold text-foreground">Enter OTP sent to your Aadhaar-linked mobile</Label>
+          <div className="flex gap-3">
             <Input
               placeholder="Enter 6-digit OTP"
               value={otp}
               onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              className="h-12 bg-background border-border tracking-widest"
+              className="h-12 bg-white border-2 border-border rounded-xl tracking-[0.3em] font-mono text-center"
               maxLength={6}
             />
             <Button
               onClick={verifyAadhaarOtp}
               disabled={verifying || otp.length !== 6}
-              className="h-12 bg-primary hover:bg-primary/90"
+              className="h-12 px-6 btn-electric rounded-xl font-heading"
             >
-              {verifying ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Submit'}
+              {verifying ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verify OTP'}
             </Button>
-            {timer > 0 && (
-              <span className="flex items-center text-sm text-muted-foreground min-w-[50px]">
-                {formatTimer(timer)}
-              </span>
-            )}
           </div>
+          {timer > 0 && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground font-body">
+              <Clock className="h-4 w-4" />
+              Resend OTP in {formatTimer(timer)}
+            </div>
+          )}
         </div>
       )}
 
       {/* Verified Details */}
       {isVerified && verifiedData && (
-        <Card className="bg-green-50 border-green-200">
-          <CardContent className="pt-4">
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Name:</span>
-                <span className="font-medium">{verifiedData.name}</span>
+        <Card className="bg-[hsl(var(--success))]/5 border-2 border-[hsl(var(--success))]/20 rounded-xl overflow-hidden">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-[hsl(var(--success))] rounded-full flex items-center justify-center">
+                <ShieldCheck className="h-5 w-5 text-white" />
+              </div>
+              <span className="font-heading font-bold text-[hsl(var(--success))]">Aadhaar Verified Successfully</span>
+            </div>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground font-body text-sm">Name</span>
+                <span className="font-heading font-semibold text-foreground">{verifiedData.name}</span>
               </div>
               <div className="flex justify-between items-start">
-                <span className="text-muted-foreground">Address:</span>
-                <span className="font-medium text-right max-w-[200px]">{verifiedData.address}</span>
+                <span className="text-muted-foreground font-body text-sm">Address</span>
+                <span className="font-body text-foreground text-right max-w-[220px] text-sm">{verifiedData.address}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Date of Birth:</span>
-                <span className="font-medium">{verifiedData.dob}</span>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground font-body text-sm">Date of Birth</span>
+                <span className="font-heading font-semibold text-foreground">{verifiedData.dob}</span>
               </div>
             </div>
           </CardContent>
@@ -228,15 +251,15 @@ export function AadhaarVerificationStep({
         <Button
           onClick={sendAadhaarOtp}
           disabled={sendingOtp || !isValidAadhaar}
-          className="w-full h-12 bg-primary hover:bg-primary/90"
+          className="w-full h-14 text-base font-heading font-bold btn-electric rounded-xl"
         >
           {sendingOtp ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              <Loader2 className="h-5 w-5 animate-spin mr-2" />
               Sending OTP...
             </>
           ) : (
-            'Send OTP'
+            'Send OTP to Aadhaar-linked Mobile'
           )}
         </Button>
       )}
@@ -245,9 +268,10 @@ export function AadhaarVerificationStep({
       <Button
         onClick={onNext}
         disabled={!isVerified}
-        className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-lg"
+        className="w-full h-14 text-lg font-heading font-bold btn-electric rounded-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
       >
-        Next
+        Continue to Video KYC
+        <ArrowRight className="h-5 w-5 ml-2" />
       </Button>
     </div>
   );

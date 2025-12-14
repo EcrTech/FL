@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Check, Loader2, User, Mail, Phone } from "lucide-react";
+import { Check, Loader2, User, Mail, Phone, Clock, ArrowRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -147,39 +147,39 @@ export function BasicInfoStep({
   return (
     <div className="space-y-8">
       {/* Section Header */}
-      <div className="flex items-center gap-3 pb-4 border-b border-border">
-        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-          <User className="h-5 w-5 text-primary" />
+      <div className="flex items-center gap-4 pb-5 border-b border-border">
+        <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+          <User className="h-6 w-6 text-primary" />
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-foreground">Personal Information</h3>
-          <p className="text-sm text-muted-foreground">Enter your basic details</p>
+          <h3 className="text-xl font-heading font-bold text-foreground">Personal Information</h3>
+          <p className="text-sm text-muted-foreground font-body">Enter your basic details to get started</p>
         </div>
       </div>
 
       {/* Form Fields */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="space-y-6">
         {/* Name Field */}
-        <div className="space-y-2 md:col-span-2">
-          <Label htmlFor="name" className="text-foreground font-medium">
-            Full Name (as per PAN) <span className="text-destructive">*</span>
+        <div className="space-y-2">
+          <Label htmlFor="name" className="text-sm font-heading font-semibold text-foreground">
+            Full Name (as per PAN) <span className="text-[hsl(var(--coral-500))]">*</span>
           </Label>
           <Input
             id="name"
             placeholder="Enter your full name"
             value={formData.name}
             onChange={(e) => onUpdate({ name: e.target.value })}
-            className="h-12 bg-background border-border text-base"
+            className="h-12 bg-background border-2 border-border rounded-xl text-base font-body focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
           />
         </div>
 
         {/* Email Field with OTP */}
         <div className="space-y-2">
-          <Label htmlFor="email" className="text-foreground font-medium flex items-center gap-2">
-            <Mail className="h-4 w-4" />
-            Email Address <span className="text-destructive">*</span>
+          <Label htmlFor="email" className="text-sm font-heading font-semibold text-foreground flex items-center gap-2">
+            <Mail className="h-4 w-4 text-muted-foreground" />
+            Email Address <span className="text-[hsl(var(--coral-500))]">*</span>
           </Label>
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <div className="relative flex-1">
               <Input
                 id="email"
@@ -188,10 +188,10 @@ export function BasicInfoStep({
                 value={formData.email}
                 onChange={(e) => onUpdate({ email: e.target.value })}
                 disabled={verificationStatus.emailVerified}
-                className="h-12 bg-background border-border text-base pr-24"
+                className="h-12 bg-background border-2 border-border rounded-xl text-base font-body pr-28 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
               />
               {verificationStatus.emailVerified && (
-                <Badge className="absolute right-2 top-1/2 -translate-y-1/2 bg-green-500 text-white border-0">
+                <Badge className="absolute right-3 top-1/2 -translate-y-1/2 bg-[hsl(var(--success))] text-white border-0 font-heading">
                   <Check className="h-3 w-3 mr-1" /> Verified
                 </Badge>
               )}
@@ -201,36 +201,36 @@ export function BasicInfoStep({
                 type="button"
                 onClick={() => sendOtp('email')}
                 disabled={sendingEmailOtp || !formData.email}
-                className="h-12 px-6"
+                className="h-12 px-6 btn-electric rounded-xl font-heading"
               >
-                {sendingEmailOtp ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verify'}
+                {sendingEmailOtp ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Send OTP'}
               </Button>
             )}
           </div>
 
           {/* Email OTP Input */}
           {emailOtpSent && !verificationStatus.emailVerified && (
-            <div className="flex gap-2 mt-2 p-3 bg-muted/50 rounded-lg">
+            <div className="flex gap-3 mt-3 p-4 bg-[hsl(var(--electric-blue-100))] rounded-xl border border-[hsl(var(--electric-blue-400))]/20">
               <Input
                 placeholder="Enter 6-digit OTP"
                 value={emailOtp}
                 onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                className="h-10 bg-background border-border"
+                className="h-11 bg-white border-2 border-border rounded-xl font-body tracking-widest"
                 maxLength={6}
               />
               <Button
                 type="button"
                 onClick={() => verifyOtp('email')}
                 disabled={verifyingEmail || emailOtp.length !== 6}
-                size="sm"
-                className="h-10 px-4"
+                className="h-11 px-5 btn-electric rounded-xl font-heading"
               >
-                {verifyingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Submit'}
+                {verifyingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verify'}
               </Button>
               {emailTimer > 0 && (
-                <span className="flex items-center text-sm text-muted-foreground min-w-[50px]">
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground font-body min-w-[60px]">
+                  <Clock className="h-3.5 w-3.5" />
                   {formatTimer(emailTimer)}
-                </span>
+                </div>
               )}
             </div>
           )}
@@ -238,13 +238,13 @@ export function BasicInfoStep({
 
         {/* Phone Field with OTP */}
         <div className="space-y-2">
-          <Label htmlFor="phone" className="text-foreground font-medium flex items-center gap-2">
-            <Phone className="h-4 w-4" />
-            Mobile Number <span className="text-destructive">*</span>
+          <Label htmlFor="phone" className="text-sm font-heading font-semibold text-foreground flex items-center gap-2">
+            <Phone className="h-4 w-4 text-muted-foreground" />
+            Mobile Number <span className="text-[hsl(var(--coral-500))]">*</span>
           </Label>
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <div className="relative flex-1">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-sm">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-heading font-semibold text-sm">
                 +91
               </div>
               <Input
@@ -254,11 +254,11 @@ export function BasicInfoStep({
                 value={formData.phone}
                 onChange={(e) => onUpdate({ phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
                 disabled={verificationStatus.phoneVerified}
-                className="h-12 bg-background border-border pl-12 pr-24 text-base"
+                className="h-12 bg-background border-2 border-border rounded-xl pl-14 pr-28 text-base font-body focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
                 maxLength={10}
               />
               {verificationStatus.phoneVerified && (
-                <Badge className="absolute right-2 top-1/2 -translate-y-1/2 bg-green-500 text-white border-0">
+                <Badge className="absolute right-3 top-1/2 -translate-y-1/2 bg-[hsl(var(--success))] text-white border-0 font-heading">
                   <Check className="h-3 w-3 mr-1" /> Verified
                 </Badge>
               )}
@@ -268,36 +268,36 @@ export function BasicInfoStep({
                 type="button"
                 onClick={() => sendOtp('phone')}
                 disabled={sendingPhoneOtp || formData.phone.length !== 10}
-                className="h-12 px-6"
+                className="h-12 px-6 btn-electric rounded-xl font-heading"
               >
-                {sendingPhoneOtp ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verify'}
+                {sendingPhoneOtp ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Send OTP'}
               </Button>
             )}
           </div>
 
           {/* Phone OTP Input */}
           {phoneOtpSent && !verificationStatus.phoneVerified && (
-            <div className="flex gap-2 mt-2 p-3 bg-muted/50 rounded-lg">
+            <div className="flex gap-3 mt-3 p-4 bg-[hsl(var(--electric-blue-100))] rounded-xl border border-[hsl(var(--electric-blue-400))]/20">
               <Input
                 placeholder="Enter 6-digit OTP"
                 value={phoneOtp}
                 onChange={(e) => setPhoneOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                className="h-10 bg-background border-border"
+                className="h-11 bg-white border-2 border-border rounded-xl font-body tracking-widest"
                 maxLength={6}
               />
               <Button
                 type="button"
                 onClick={() => verifyOtp('phone')}
                 disabled={verifyingPhone || phoneOtp.length !== 6}
-                size="sm"
-                className="h-10 px-4"
+                className="h-11 px-5 btn-electric rounded-xl font-heading"
               >
-                {verifyingPhone ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Submit'}
+                {verifyingPhone ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verify'}
               </Button>
               {phoneTimer > 0 && (
-                <span className="flex items-center text-sm text-muted-foreground min-w-[50px]">
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground font-body min-w-[60px]">
+                  <Clock className="h-3.5 w-3.5" />
                   {formatTimer(phoneTimer)}
-                </span>
+                </div>
               )}
             </div>
           )}
@@ -306,45 +306,45 @@ export function BasicInfoStep({
 
       {/* Consent Section */}
       <div className="space-y-4 pt-6 border-t border-border">
-        <h4 className="text-sm font-semibold text-foreground uppercase tracking-wide">Consents & Declarations</h4>
+        <h4 className="text-sm font-heading font-bold text-foreground uppercase tracking-wider">Consents & Declarations</h4>
         
-        <div className="space-y-4 bg-muted/30 p-4 rounded-xl">
-          <div className="flex items-start space-x-3">
+        <div className="space-y-4 p-5 rounded-xl border-2 border-border bg-muted/30">
+          <div className="flex items-start space-x-4">
             <Checkbox
               id="householdIncome"
               checked={consents.householdIncome}
               onCheckedChange={(checked) => onConsentChange('householdIncome', checked as boolean)}
-              className="mt-0.5"
+              className="mt-0.5 h-5 w-5 rounded border-2"
             />
-            <Label htmlFor="householdIncome" className="text-sm text-muted-foreground leading-relaxed cursor-pointer">
+            <Label htmlFor="householdIncome" className="text-sm text-muted-foreground font-body leading-relaxed cursor-pointer">
               I/We hereby confirm that the Household Income of my family is more than ₹ 3 Lakh per annum
             </Label>
           </div>
 
-          <div className="flex items-start space-x-3">
+          <div className="flex items-start space-x-4">
             <Checkbox
               id="termsAndConditions"
               checked={consents.termsAndConditions}
               onCheckedChange={(checked) => onConsentChange('termsAndConditions', checked as boolean)}
-              className="mt-0.5"
+              className="mt-0.5 h-5 w-5 rounded border-2"
             />
-            <Label htmlFor="termsAndConditions" className="text-sm text-muted-foreground leading-relaxed cursor-pointer">
+            <Label htmlFor="termsAndConditions" className="text-sm text-muted-foreground font-body leading-relaxed cursor-pointer">
               I have read and agreed to the{' '}
-              <a href="/terms" className="text-primary underline hover:no-underline" target="_blank">Terms and Conditions</a>,{' '}
-              <a href="/privacy" className="text-primary underline hover:no-underline" target="_blank">Privacy Policy</a> and{' '}
-              <a href="/risk" className="text-primary underline hover:no-underline" target="_blank">Gradation of Risk</a>
+              <a href="/terms" className="text-primary font-semibold hover:underline" target="_blank">Terms and Conditions</a>,{' '}
+              <a href="/privacy" className="text-primary font-semibold hover:underline" target="_blank">Privacy Policy</a> and{' '}
+              <a href="/risk" className="text-primary font-semibold hover:underline" target="_blank">Gradation of Risk</a>
             </Label>
           </div>
 
-          <div className="flex items-start space-x-3">
+          <div className="flex items-start space-x-4 p-4 bg-[hsl(var(--coral-500))]/5 rounded-lg border-l-4 border-[hsl(var(--coral-500))]">
             <Checkbox
               id="aadhaarConsent"
               checked={consents.aadhaarConsent}
               onCheckedChange={(checked) => onConsentChange('aadhaarConsent', checked as boolean)}
-              className="mt-0.5"
+              className="mt-0.5 h-5 w-5 rounded border-2"
             />
-            <Label htmlFor="aadhaarConsent" className="text-sm text-muted-foreground leading-relaxed cursor-pointer">
-              <span className="font-medium text-foreground">Aadhaar Consent:</span> I hereby give my consent to fetch my CKYCR record from the Central KYC Records Registry 
+            <Label htmlFor="aadhaarConsent" className="text-sm text-muted-foreground font-body leading-relaxed cursor-pointer">
+              <span className="font-heading font-semibold text-foreground">Aadhaar Consent:</span> I hereby give my consent to fetch my CKYCR record from the Central KYC Records Registry 
               using my KYC identifier. I/we further express my interest and accord consent to receive calls/emails/SMS 
               from MoneyBoxx Finance Limited pertaining to their financial products and offers.
             </Label>
@@ -356,9 +356,10 @@ export function BasicInfoStep({
       <Button
         onClick={onNext}
         disabled={!canProceed}
-        className="w-full h-14 text-lg font-semibold shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
+        className="w-full h-14 text-lg font-heading font-bold btn-electric rounded-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
       >
         Continue to PAN Verification
+        <ArrowRight className="h-5 w-5 ml-2" />
       </Button>
     </div>
   );

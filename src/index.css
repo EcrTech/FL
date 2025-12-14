@@ -1,126 +1,127 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Junoon LOS Design System - Brand Colors & Tokens */
+/* Paisaa Saarthi Design System - Bold Flat Fintech Aesthetic */
 @layer base {
   :root {
-    /* Brand Colors - Primary (Enhanced for Vibrancy) */
-    --primary-teal: 178 95% 42%;
-    --deep-teal: 168 60% 45%;
-    --analytics-teal: 197 65% 42%;
-    --success-teal: 175 80% 38%;
+    /* Primary Colors - Electric Blue Scale */
+    --electric-blue-700: 216 100% 30%;
+    --electric-blue-600: 216 100% 40%;
+    --electric-blue-500: 216 100% 50%;
+    --electric-blue-400: 216 100% 60%;
+    --electric-blue-100: 216 100% 95%;
     
-    /* Neutrals */
-    --deep-slate: 186 14% 24%;
-    --medium-gray: 185 7% 40%;
-    --charcoal: 186 8% 30%;
+    /* Accent Colors - Coral */
+    --coral-600: 14 88% 56%;
+    --coral-500: 14 100% 64%;
+    --coral-400: 14 100% 72%;
     
-    /* Accents - Energy (Enhanced) */
-    --coral: 197 78% 13%;
-    --soft-coral: 197 68% 18%;
-    --warm-coral: 197 75% 16%;
-    --salmon: 197 70% 20%;
+    /* Accent Colors - Purple */
+    --purple-500: 263 70% 58%;
+    --purple-400: 263 70% 68%;
     
-    /* Accents - Supporting (Enhanced) */
-    --vibrant-yellow: 48 100% 58%;
-    --soft-yellow: 50 94% 68%;
-    --purple: 280 85% 65%;
-    --lavender: 280 70% 75%;
-    --sky-blue: 195 85% 75%;
-    --light-blue: 195 80% 82%;
-    
-    /* Neutrals - Light */
-    --light-neutral: 0 14% 81%;
-    --sage: 78 11% 65%;
-    --gray-green: 185 7% 52%;
+    /* Gold Accent */
+    --gold-500: 38 92% 50%;
     
     /* Semantic Colors */
-    --success: 175 80% 38%;
-    --success-bg: 165 56% 92%;
-    --warning: 50 94% 68%;
-    --warning-bg: 48 100% 95%;
-    --error: 1 98% 69%;
-    --error-bg: 0 100% 95%;
-    --info: 195 85% 75%;
-    --info-bg: 195 76% 95%;
+    --success: 160 84% 39%;
+    --success-bg: 160 84% 95%;
+    --warning: 38 92% 50%;
+    --warning-bg: 38 92% 95%;
+    --error: 0 84% 60%;
+    --error-bg: 0 84% 95%;
+    --info: 217 91% 60%;
+    --info-bg: 217 91% 95%;
     
-    /* Visual Effects */
-    --gradient-primary: linear-gradient(135deg, hsl(178 95% 42%) 0%, hsl(168 60% 45%) 100%);
-    --gradient-accent: linear-gradient(135deg, hsl(197 78% 13%) 0%, hsl(197 70% 20%) 100%);
-    --gradient-purple: linear-gradient(135deg, hsl(280 85% 65%) 0%, hsl(280 70% 75%) 100%);
-    --shadow-vibrant: 0 8px 30px hsl(178 95% 42% / 0.25);
-    --shadow-glow: 0 0 40px hsl(178 95% 42% / 0.15);
-    --shadow-accent: 0 8px 30px hsl(197 78% 13% / 0.3);
+    /* Neutral Scale */
+    --neutral-900: 210 13% 9%;
+    --neutral-700: 214 10% 26%;
+    --neutral-500: 214 8% 49%;
+    --neutral-300: 214 10% 78%;
+    --neutral-100: 214 14% 95%;
     
     /* Design Tokens */
-    --background: 186 35% 96%;
-    --foreground: var(--deep-slate);
+    --background: 0 0% 100%;
+    --foreground: var(--neutral-900);
     
-    --card: 0 0% 98%;
-    --card-foreground: var(--deep-slate);
+    --card: 0 0% 100%;
+    --card-foreground: var(--neutral-900);
     
     --popover: 0 0% 100%;
-    --popover-foreground: var(--deep-slate);
+    --popover-foreground: var(--neutral-900);
     
-    --primary: var(--primary-teal);
+    --primary: var(--electric-blue-500);
     --primary-foreground: 0 0% 100%;
     
-    --secondary: var(--purple);
+    --secondary: var(--purple-500);
     --secondary-foreground: 0 0% 100%;
     
-    --muted: 0 0% 97%;
-    --muted-foreground: var(--medium-gray);
+    --muted: var(--neutral-100);
+    --muted-foreground: var(--neutral-500);
     
-    --accent: var(--coral);
-    --accent-foreground: 0 0% 98%;
+    --accent: var(--coral-500);
+    --accent-foreground: 0 0% 100%;
     
     --destructive: var(--error);
     --destructive-foreground: 0 0% 100%;
     
-    --border: 0 8% 82%;
-    --input: 0 8% 82%;
-    --ring: var(--primary-teal);
+    --border: var(--neutral-300);
+    --input: var(--neutral-300);
+    --ring: var(--electric-blue-500);
     
-    --radius: 0.5rem;
+    --radius: 0.75rem;
+    
+    /* Shadows with Color */
+    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.05);
+    --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.1), 0 2px 4px -2px hsl(0 0% 0% / 0.1);
+    --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.1), 0 4px 6px -4px hsl(0 0% 0% / 0.1);
+    --shadow-xl: 0 20px 25px -5px hsl(0 0% 0% / 0.1), 0 8px 10px -6px hsl(0 0% 0% / 0.1);
+    --shadow-primary: 0 10px 30px -5px hsl(var(--electric-blue-500) / 0.35);
+    --shadow-coral: 0 10px 30px -5px hsl(var(--coral-500) / 0.35);
+    --shadow-gold: 0 10px 30px -5px hsl(var(--gold-500) / 0.35);
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--electric-blue-500)) 0%, hsl(var(--electric-blue-600)) 100%);
+    --gradient-coral: linear-gradient(135deg, hsl(var(--coral-500)) 0%, hsl(var(--coral-600)) 100%);
+    --gradient-purple: linear-gradient(135deg, hsl(var(--purple-500)) 0%, hsl(var(--purple-400)) 100%);
+    --gradient-gold: linear-gradient(135deg, hsl(var(--gold-500)) 0%, hsl(38 92% 45%) 100%);
   }
   
   .dark {
     /* Dark mode tokens */
-    --background: 186 20% 12%;
+    --background: 220 13% 10%;
     --foreground: 0 0% 98%;
     
-    --card: 186 18% 16%;
+    --card: 220 13% 14%;
     --card-foreground: 0 0% 98%;
     
-    --popover: 186 18% 16%;
+    --popover: 220 13% 14%;
     --popover-foreground: 0 0% 98%;
     
-    --primary: 178 95% 48%;
+    --primary: var(--electric-blue-400);
     --primary-foreground: 0 0% 100%;
     
-    --secondary: 280 85% 70%;
+    --secondary: var(--purple-400);
     --secondary-foreground: 0 0% 100%;
     
-    --muted: 186 15% 20%;
-    --muted-foreground: 185 7% 68%;
+    --muted: 220 13% 18%;
+    --muted-foreground: 214 10% 60%;
     
-    --accent: 197 78% 18%;
-    --accent-foreground: 0 0% 98%;
+    --accent: var(--coral-400);
+    --accent-foreground: 0 0% 100%;
     
     --destructive: var(--error);
     --destructive-foreground: 0 0% 100%;
     
-    --border: 186 15% 22%;
-    --input: 186 15% 22%;
-    --ring: 178 95% 48%;
+    --border: 220 13% 22%;
+    --input: 220 13% 22%;
+    --ring: var(--electric-blue-400);
     
-    --gradient-primary: linear-gradient(135deg, hsl(178 95% 48%) 0%, hsl(168 60% 50%) 100%);
-    --gradient-accent: linear-gradient(135deg, hsl(197 78% 18%) 0%, hsl(197 70% 25%) 100%);
-    --gradient-purple: linear-gradient(135deg, hsl(280 85% 70%) 0%, hsl(280 70% 78%) 100%);
-    --shadow-vibrant: 0 8px 30px hsl(178 95% 48% / 0.35);
-    --shadow-glow: 0 0 40px hsl(178 95% 48% / 0.25);
-    --shadow-accent: 0 8px 30px hsl(197 78% 18% / 0.4);
+    --shadow-primary: 0 10px 30px -5px hsl(var(--electric-blue-400) / 0.4);
+    --shadow-coral: 0 10px 30px -5px hsl(var(--coral-400) / 0.4);
   }
 }
 
@@ -130,120 +131,99 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: linear-gradient(180deg, hsl(186 35% 96%) 0%, hsl(178 50% 94%) 100%);
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Plus Jakarta Sans', sans-serif;
   }
 }
 
 @layer utilities {
-  /* Gradient Text */
-  .gradient-text-primary {
-    background: var(--gradient-primary);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+  /* Font Families */
+  .font-heading {
+    font-family: 'Plus Jakarta Sans', sans-serif;
   }
   
-  .gradient-text-accent {
-    background: var(--gradient-accent);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+  .font-body {
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  /* Electric Blue Gradient Button */
+  .btn-electric {
+    background: var(--gradient-primary);
+    color: white;
+    font-weight: 600;
+    border: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: var(--shadow-primary);
+  }
+  
+  .btn-electric:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 15px 35px -5px hsl(var(--electric-blue-500) / 0.45);
+  }
+  
+  .btn-electric:active {
+    transform: translateY(0);
+  }
+
+  /* Coral Gradient Button */
+  .btn-coral {
+    background: var(--gradient-coral);
+    color: white;
+    font-weight: 600;
+    border: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: var(--shadow-coral);
+  }
+  
+  .btn-coral:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 15px 35px -5px hsl(var(--coral-500) / 0.45);
+  }
+
+  /* Gold Success Button */
+  .btn-gold {
+    background: var(--gradient-gold);
+    color: white;
+    font-weight: 600;
+    border: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: var(--shadow-gold);
+  }
+
+  /* Input Focus Glow */
+  .input-focus-glow:focus {
+    border-color: hsl(var(--electric-blue-500));
+    box-shadow: 0 0 0 4px hsl(var(--electric-blue-500) / 0.1);
+    outline: none;
   }
 
   /* Card Hover Effects */
-  .card-hover-glow {
+  .card-hover-lift {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
   
-  .card-hover-glow:hover {
-    transform: translateY(-4px) scale(1.01);
-    box-shadow: var(--shadow-vibrant);
+  .card-hover-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-xl);
   }
 
-  .card-hover-accent:hover {
-    box-shadow: var(--shadow-accent);
-  }
-
-  /* Interactive Hover */
-  .hover-scale {
-    transition: transform 0.2s ease;
+  /* Section Border Accents */
+  .border-accent-coral {
+    border-left: 3px solid hsl(var(--coral-500));
   }
   
-  .hover-scale:hover {
-    transform: scale(1.05);
-  }
-
-  /* Gradient Buttons */
-  .btn-gradient-primary {
-    background: var(--gradient-primary);
-    background-size: 200% 100%;
-    transition: all 0.3s ease;
+  .border-accent-blue {
+    border-left: 3px solid hsl(var(--electric-blue-500));
   }
   
-  .btn-gradient-primary:hover {
-    background-position: 100% 0;
-    box-shadow: var(--shadow-glow);
+  .border-accent-gold {
+    border-left: 3px solid hsl(var(--gold-500));
   }
 
-  .btn-gradient-accent {
-    background: var(--gradient-accent);
-    background-size: 200% 100%;
-    transition: all 0.3s ease;
-  }
-  
-  .btn-gradient-accent:hover {
-    background-position: 100% 0;
-    box-shadow: var(--shadow-accent);
-  }
-
-  /* Section Accents */
-  .section-accent-teal {
-    position: relative;
-  }
-  
-  .section-accent-teal::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 3px;
-    height: 100%;
-    background: var(--gradient-primary);
-    border-radius: 2px;
-  }
-
-  .section-accent-coral {
-    position: relative;
-  }
-  
-  .section-accent-coral::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 3px;
-    height: 100%;
-    background: var(--gradient-accent);
-    border-radius: 2px;
-  }
-
-  .section-accent-purple {
-    position: relative;
-  }
-  
-  .section-accent-purple::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 3px;
-    height: 100%;
-    background: var(--gradient-purple);
-    border-radius: 2px;
-  }
-
-  /* Animated Gradient Backgrounds */
+  /* Animated Gradient Background */
   @keyframes gradient-shift {
     0%, 100% { background-position: 0% 50%; }
     50% { background-position: 100% 50%; }
@@ -254,18 +234,44 @@
     animation: gradient-shift 6s ease infinite;
   }
 
-  /* Pulse Glow */
-  @keyframes pulse-glow {
-    0%, 100% { 
-      box-shadow: 0 0 20px hsl(var(--primary) / 0.2);
+  /* Fade In Up Animation */
+  @keyframes fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
     }
-    50% { 
-      box-shadow: 0 0 40px hsl(var(--primary) / 0.4);
+    to {
+      opacity: 1;
+      transform: translateY(0);
     }
   }
 
-  .pulse-glow {
-    animation: pulse-glow 2s ease-in-out infinite;
+  .animate-fade-in-up {
+    animation: fade-in-up 0.5s ease-out forwards;
+  }
+
+  /* Pulse Recording */
+  @keyframes pulse-record {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .animate-pulse-record {
+    animation: pulse-record 1s ease-in-out infinite;
+  }
+
+  /* Progress Bar */
+  .progress-bar {
+    background: hsl(var(--neutral-100));
+    border-radius: 9999px;
+    overflow: hidden;
+  }
+  
+  .progress-bar-fill {
+    background: var(--gradient-primary);
+    height: 100%;
+    border-radius: 9999px;
+    transition: width 0.5s ease-out;
   }
 
   /* Rich Text Editor Styles */
