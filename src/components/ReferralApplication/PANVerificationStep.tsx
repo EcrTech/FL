@@ -68,7 +68,7 @@ export function PANVerificationStep({
 
     setVerifying(true);
     try {
-      const { data, error } = await supabase.functions.invoke('sandbox-pan-verify', {
+      const { data, error } = await supabase.functions.invoke('verify-public-pan', {
         body: {
           panNumber,
           accessToken,
