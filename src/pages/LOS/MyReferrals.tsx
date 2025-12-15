@@ -3,12 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrgContext } from "@/hooks/useOrgContext";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoadingState } from "@/components/common/LoadingState";
 import { QRCodeSVG } from "qrcode.react";
-import { Copy, Check, QrCode, Link2 } from "lucide-react";
+import { Copy, Check, Link2 } from "lucide-react";
 import { toast } from "sonner";
 
 const REFERRAL_BASE_URL = "https://ps.in-sync.co.in/apply/ref";
@@ -82,82 +82,37 @@ export default function MyReferrals() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold text-foreground">My Referral Link</h1>
+          <h1 className="text-3xl font-bold text-foreground">My Referrals</h1>
           <p className="text-muted-foreground mt-1">
-            Share your unique link to refer loan applicants
+            Share your referral link to onboard loan applicants
           </p>
         </div>
 
-        
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* QR Code Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <QrCode className="h-5 w-5" />
-                Your QR Code
-              </CardTitle>
-              <CardDescription>
-                Scan this QR code to apply for a loan
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col items-center">
-              <div className="p-4 bg-white rounded-lg border">
-                <QRCodeSVG
-                  value={referralLink}
-                  size={200}
-                  level="H"
-                  includeMargin
-                />
+        {/* Compact Referral Card */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-4">
+              <div className="p-2 bg-white rounded-lg border shrink-0">
+                <QRCodeSVG value={referralLink} size={64} level="H" />
               </div>
-              <p className="mt-4 text-sm text-muted-foreground text-center">
-                Code: <span className="font-mono font-bold">{referralData?.referral_code}</span>
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Shareable Link Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Link2 className="h-5 w-5" />
-                Your Referral Link
-              </CardTitle>
-              <CardDescription>
-                Share this link with prospective applicants
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-2">
-                <Input
-                  value={referralLink}
-                  readOnly
-                  className="font-mono text-sm"
-                />
-                <Button onClick={handleCopyLink} variant="outline">
-                  {copied ? (
-                    <Check className="h-4 w-4 text-green-500" />
-                  ) : (
-                    <Copy className="h-4 w-4" />
-                  )}
-                </Button>
+              <div className="flex-1 min-w-0 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Link2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="text-sm font-medium truncate">{referralLink}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Code:</span>
+                  <span className="font-mono text-xs font-bold">{referralData?.referral_code}</span>
+                </div>
               </div>
-
-              <div className="p-4 bg-muted/50 rounded-lg space-y-2">
-                <h4 className="font-medium text-sm">How it works:</h4>
-                <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
-                  <li>Share your unique link or QR code</li>
-                  <li>Applicant fills out the loan application</li>
-                  <li>Application is automatically linked to you</li>
-                  <li>Track all your referrals here</li>
-                </ol>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
+              <Button onClick={handleCopyLink} variant="outline" size="sm">
+                {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                <span className="ml-2 hidden sm:inline">{copied ? "Copied" : "Copy"}</span>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </DashboardLayout>
   );
