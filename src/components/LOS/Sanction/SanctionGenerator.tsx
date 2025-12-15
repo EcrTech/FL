@@ -124,17 +124,6 @@ export default function SanctionGenerator({ applicationId, orgId }: SanctionGene
     );
   }
 
-  if (!permissions.canGenerateSanction) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="text-center text-muted-foreground">
-            You don't have permission to generate sanction letters
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <Card>
