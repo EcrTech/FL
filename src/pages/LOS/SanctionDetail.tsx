@@ -8,6 +8,7 @@ import { ArrowLeft } from "lucide-react";
 import { LoadingState } from "@/components/common/LoadingState";
 import { format } from "date-fns";
 import DisbursementDashboard from "@/components/LOS/Disbursement/DisbursementDashboard";
+import SanctionGenerator from "@/components/LOS/Sanction/SanctionGenerator";
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-muted",
@@ -39,6 +40,19 @@ export default function SanctionDetail() {
     enabled: !!id,
   });
 
+  const { data: sanction, isLoading: loadingSanction } = useQuery({
+    queryKey: ["loan-sanction", id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("loan_sanctions")
+        .select("*")
+        .eq("loan_application_id", id)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!id,
+  });
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
@@ -47,7 +61,7 @@ export default function SanctionDetail() {
     }).format(amount);
   };
 
-  if (isLoading) {
+  if (isLoading || loadingSanction) {
     return (
       <DashboardLayout>
         <LoadingState message="Loading sanction details..." />
@@ -96,8 +110,12 @@ export default function SanctionDetail() {
           </div>
         </div>
 
-        {/* Sanction Content - Only Loan Summary & Documents */}
-        <DisbursementDashboard applicationId={application.id} />
+        {/* Show SanctionGenerator if no sanction exists, otherwise show DisbursementDashboard */}
+        {!sanction ? (
+          <SanctionGenerator applicationId={application.id} orgId={application.org_id} />
+        ) : (
+          <DisbursementDashboard applicationId={application.id} />
+        )}
       </div>
     </DashboardLayout>
   );
