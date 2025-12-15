@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrgContext } from "@/hooks/useOrgContext";
@@ -46,6 +46,8 @@ const STATUS_COLORS: Record<string, string> = {
 export default function ApplicationDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isReviewMode = searchParams.get("mode") === "review";
   const { orgId, isLoading: isOrgLoading } = useOrgContext();
   const [approvalAction, setApprovalAction] = useState<"approve" | "reject" | null>(null);
 
@@ -403,52 +405,58 @@ export default function ApplicationDetail() {
 
           {/* Documents Section */}
           <DocumentUpload applicationId={application.id} orgId={orgId} applicant={primaryApplicant} />
-          <IncomeSummary applicationId={application.id} orgId={orgId} />
 
-          {/* Assessment Section */}
-          <AssessmentDashboard applicationId={application.id} orgId={orgId} />
-          
-          {/* Approval Actions - Only shown when stage is approval_pending */}
-          {application.current_stage === "approval_pending" && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Approval Actions</CardTitle>
-                <CardDescription>
-                  Review and take action on this loan application
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex gap-4">
-                  <Button
-                    variant="default"
-                    onClick={() => setApprovalAction("approve")}
-                  >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Approve Application
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    onClick={() => setApprovalAction("reject")}
-                  >
-                    <XCircle className="h-4 w-4 mr-2" />
-                    Reject Application
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+          {/* Sections only visible in review mode */}
+          {isReviewMode && (
+            <>
+              <IncomeSummary applicationId={application.id} orgId={orgId} />
+
+              {/* Assessment Section */}
+              <AssessmentDashboard applicationId={application.id} orgId={orgId} />
+              
+              {/* Approval Actions - Only shown when stage is approval_pending */}
+              {application.current_stage === "approval_pending" && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Approval Actions</CardTitle>
+                    <CardDescription>
+                      Review and take action on this loan application
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex gap-4">
+                      <Button
+                        variant="default"
+                        onClick={() => setApprovalAction("approve")}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Approve Application
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={() => setApprovalAction("reject")}
+                      >
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Reject Application
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Approval History */}
+              <ApprovalHistory applicationId={id!} />
+
+              {/* Sanction Section */}
+              <SanctionDashboard applicationId={application.id} orgId={orgId} />
+
+              {/* Disbursement Section */}
+              <DisbursementDashboard applicationId={application.id} />
+
+              {/* EMI Section */}
+              <EMIDashboard applicationId={application.id} />
+            </>
           )}
-
-          {/* Approval History */}
-          <ApprovalHistory applicationId={id!} />
-
-          {/* Sanction Section */}
-          <SanctionDashboard applicationId={application.id} orgId={orgId} />
-
-          {/* Disbursement Section */}
-          <DisbursementDashboard applicationId={application.id} />
-
-          {/* EMI Section */}
-          <EMIDashboard applicationId={application.id} />
         </div>
       </div>
 
