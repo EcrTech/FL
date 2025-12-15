@@ -10,6 +10,7 @@ import {
   TrendingUp, Banknote, Calculator, Calendar 
 } from "lucide-react";
 import { addMonths } from "date-fns";
+import html2pdf from "html2pdf.js";
 
 // Document template imports
 import KFSDocument from "../Sanction/templates/KFSDocument";
@@ -265,27 +266,16 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
   const handleDownload = (docType: DocumentType) => {
     const printRef = printRefs.current[docType];
     if (printRef) {
-      const printContent = printRef.innerHTML;
-      const blob = new Blob([`
-        <html>
-          <head>
-            <title>${documentTypes.find(d => d.key === docType)?.label}</title>
-            <style>
-              body { margin: 0; padding: 20px; font-family: system-ui, sans-serif; }
-            </style>
-          </head>
-          <body>${printContent}</body>
-        </html>
-      `], { type: 'text/html' });
+      const docLabel = documentTypes.find(d => d.key === docType)?.label || docType;
+      const opt = {
+        margin: 10,
+        filename: `${docLabel.replace(/\s+/g, '-')}-${applicationId}.pdf`,
+        image: { type: 'jpeg' as const, quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const }
+      };
       
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${docType}-${applicationId}.html`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      html2pdf().set(opt).from(printRef).save();
     }
   };
 
