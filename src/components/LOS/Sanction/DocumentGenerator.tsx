@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { FileText, Download, Printer, Check, Clock, Loader2 } from "lucide-react";
+import { FileText, Download, Printer, Check, Loader2 } from "lucide-react";
 import { format, addDays, addMonths } from "date-fns";
 import KFSDocument from "./templates/KFSDocument";
 import SanctionLetterDocument from "./templates/SanctionLetterDocument";
@@ -66,6 +66,19 @@ const generateEMISchedule = (
   return schedule;
 };
 
+// Helper to extract address from JSON
+const formatAddress = (addressJson: unknown): string => {
+  if (!addressJson) return "";
+  const addr = addressJson as Record<string, string>;
+  return [
+    addr.line1 || addr.address_line1,
+    addr.line2 || addr.address_line2,
+    addr.city,
+    addr.state,
+    addr.pincode || addr.postal_code,
+  ].filter(Boolean).join(", ");
+};
+
 export default function DocumentGenerator({ applicationId, sanctionId, orgId }: DocumentGeneratorProps) {
   const [activeTab, setActiveTab] = useState<DocumentType>("kfs");
   const printRef = useRef<HTMLDivElement>(null);
@@ -89,7 +102,7 @@ export default function DocumentGenerator({ applicationId, sanctionId, orgId }: 
   const { data: sanction } = useQuery({
     queryKey: ["loan-sanction", applicationId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("loan_sanctions")
         .select("*")
         .eq("loan_application_id", applicationId)
@@ -98,31 +111,60 @@ export default function DocumentGenerator({ applicationId, sanctionId, orgId }: 
     },
   });
 
-  // Fetch primary applicant
-  const { data: applicant } = useQuery({
+  // Fetch primary applicant via REST API to avoid deep type instantiation issues
+  interface ApplicantData {
+    first_name: string;
+    last_name?: string;
+    mobile?: string;
+    alternate_mobile?: string;
+    email?: string;
+    current_address?: unknown;
+    pan_number?: string;
+    aadhaar_number?: string;
+  }
+  
+  const { data: applicant } = useQuery<ApplicantData | null>({
     queryKey: ["primary-applicant", applicationId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("loan_applicants")
-        .select("*")
-        .eq("loan_application_id", applicationId)
-        .eq("is_primary", true)
-        .maybeSingle();
-      return data;
+      try {
+        const session = await supabase.auth.getSession();
+        const result = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/loan_applicants?loan_application_id=eq.${applicationId}&is_primary=eq.true&select=first_name,last_name,mobile,alternate_mobile,email,current_address,pan_number,aadhaar_number`,
+          {
+            headers: {
+              'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              'Authorization': `Bearer ${session.data.session?.access_token}`,
+            },
+          }
+        );
+        const jsonData = await result.json();
+        return jsonData?.[0] || null;
+      } catch {
+        return null;
+      }
     },
   });
 
-  // Fetch bank details
+  // Fetch bank details via REST API to avoid TypeScript type issues
   const { data: bankDetails } = useQuery({
     queryKey: ["loan-bank-details", applicationId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("loan_bank_details")
-        .select("*")
-        .eq("loan_application_id", applicationId)
-        .eq("is_primary", true)
-        .maybeSingle();
-      return data;
+    queryFn: async (): Promise<{ bank_name?: string; account_number?: string; ifsc_code?: string } | null> => {
+      try {
+        const session = await supabase.auth.getSession();
+        const result = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/loan_bank_details?loan_application_id=eq.${applicationId}&is_primary=eq.true&select=*`,
+          {
+            headers: {
+              'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              'Authorization': `Bearer ${session.data.session?.access_token}`,
+            },
+          }
+        );
+        const jsonData = await result.json();
+        return jsonData?.[0] || null;
+      } catch {
+        return null;
+      }
     },
   });
 
@@ -130,7 +172,7 @@ export default function DocumentGenerator({ applicationId, sanctionId, orgId }: 
   const { data: orgSettings } = useQuery({
     queryKey: ["org-loan-settings", orgId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("organization_loan_settings")
         .select("*")
         .eq("org_id", orgId)
@@ -156,7 +198,7 @@ export default function DocumentGenerator({ applicationId, sanctionId, orgId }: 
   const { data: generatedDocs } = useQuery({
     queryKey: ["generated-documents", applicationId, sanctionId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("loan_generated_documents")
         .select("*")
         .eq("loan_application_id", applicationId)
@@ -211,7 +253,6 @@ export default function DocumentGenerator({ applicationId, sanctionId, orgId }: 
                 }
                 body { margin: 0; padding: 20px; font-family: system-ui, sans-serif; }
               </style>
-              <link rel="stylesheet" href="/src/index.css" />
             </head>
             <body>${printContent}</body>
           </html>
@@ -220,11 +261,6 @@ export default function DocumentGenerator({ applicationId, sanctionId, orgId }: 
         printWindow.print();
       }
     }
-  };
-
-  const getDocumentStatus = (docType: DocumentType) => {
-    const doc = generatedDocs?.find((d) => d.document_type === docType);
-    return doc?.status || null;
   };
 
   const isDocGenerated = (docType: DocumentType) => {
@@ -241,28 +277,29 @@ export default function DocumentGenerator({ applicationId, sanctionId, orgId }: 
     );
   }
 
-  // Prepare common data
-  const loanAmount = sanction.sanctioned_amount || application.approved_amount || application.loan_amount;
-  const interestRate = sanction.interest_rate || application.interest_rate || 12;
-  const tenure = sanction.tenure_months || application.tenure_months || 12;
+  // Prepare common data - using correct column names
+  const loanAmount = sanction.sanctioned_amount || application.approved_amount || application.requested_amount || 0;
+  const interestRate = sanction.sanctioned_rate || application.interest_rate || 12;
+  const tenureDays = sanction.sanctioned_tenure_days || 365;
+  const tenureMonths = application.tenure_months || Math.round(tenureDays / 30);
   const processingFee = sanction.processing_fee || 0;
   const gstOnProcessingFee = processingFee * ((orgSettings?.gst_on_processing_fee || 18) / 100);
-  const emi = calculateEMI(loanAmount, interestRate, tenure);
-  const totalRepayment = emi * tenure;
+  const emi = calculateEMI(loanAmount, interestRate, tenureMonths);
+  const totalRepayment = emi * tenureMonths;
   const totalInterest = totalRepayment - loanAmount;
-  const apr = interestRate; // Simplified, could be calculated more precisely
+  const apr = interestRate;
   const firstEmiDate = addMonths(new Date(), 1);
-  const emiSchedule = generateEMISchedule(loanAmount, interestRate, tenure, new Date());
+  const emiSchedule = generateEMISchedule(loanAmount, interestRate, tenureMonths, new Date());
 
   const borrowerName = `${applicant.first_name} ${applicant.last_name || ""}`.trim();
-  const borrowerAddress = [
-    applicant.current_address_line1,
-    applicant.current_address_line2,
-    applicant.current_city,
-    applicant.current_state,
-    applicant.current_pincode,
-  ].filter(Boolean).join(", ");
+  const borrowerAddress = formatAddress(applicant.current_address);
+  const borrowerPhone = applicant.mobile || applicant.alternate_mobile || "";
 
+  // Parse conditions from JSON
+  const conditionsText = typeof sanction.conditions === 'string' 
+    ? sanction.conditions 
+    : JSON.stringify(sanction.conditions || {});
+  
   const defaultTerms = [
     "The loan is granted subject to satisfactory completion of all documentation.",
     "The borrower must maintain the repayment schedule as agreed.",
@@ -343,10 +380,10 @@ export default function DocumentGenerator({ applicationId, sanctionId, orgId }: 
                 documentDate={new Date()}
                 borrowerName={borrowerName}
                 borrowerAddress={borrowerAddress}
-                borrowerPhone={applicant.mobile_number || ""}
+                borrowerPhone={borrowerPhone}
                 borrowerEmail={applicant.email || undefined}
                 loanAmount={loanAmount}
-                tenure={tenure}
+                tenure={tenureMonths}
                 interestRate={interestRate}
                 emi={emi}
                 processingFee={processingFee}
@@ -373,13 +410,13 @@ export default function DocumentGenerator({ applicationId, sanctionId, orgId }: 
                 borrowerName={borrowerName}
                 borrowerAddress={borrowerAddress}
                 loanAmount={loanAmount}
-                tenure={tenure}
+                tenure={tenureMonths}
                 interestRate={interestRate}
                 emi={emi}
                 processingFee={processingFee}
                 gstOnProcessingFee={gstOnProcessingFee}
-                validUntil={addDays(new Date(), 30)}
-                termsAndConditions={sanction.terms_and_conditions?.split("\n").filter(Boolean) || defaultTerms}
+                validUntil={new Date(sanction.validity_date)}
+                termsAndConditions={conditionsText ? conditionsText.split("\n").filter(Boolean) : defaultTerms}
               />
             </TabsContent>
 
@@ -394,11 +431,11 @@ export default function DocumentGenerator({ applicationId, sanctionId, orgId }: 
                 documentDate={new Date()}
                 borrowerName={borrowerName}
                 borrowerAddress={borrowerAddress}
-                borrowerPhone={applicant.mobile_number || ""}
+                borrowerPhone={borrowerPhone}
                 borrowerPAN={applicant.pan_number}
                 borrowerAadhaar={applicant.aadhaar_number}
                 loanAmount={loanAmount}
-                tenure={tenure}
+                tenure={tenureMonths}
                 interestRate={interestRate}
                 emi={emi}
                 firstEmiDate={firstEmiDate}
@@ -423,7 +460,7 @@ export default function DocumentGenerator({ applicationId, sanctionId, orgId }: 
                 borrowerName={borrowerName}
                 borrowerAddress={borrowerAddress}
                 loanAmount={loanAmount}
-                tenure={tenure}
+                tenure={tenureMonths}
                 interestRate={interestRate}
                 totalRepayment={totalRepayment}
               />
