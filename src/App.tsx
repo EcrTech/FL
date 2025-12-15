@@ -53,6 +53,7 @@ import ApprovalQueuePage from "./pages/LOS/ApprovalQueue";
 import LOSDashboard from "./pages/LOS/Dashboard";
 import MyReferrals from "./pages/LOS/MyReferrals";
 import Collections from "./pages/LOS/Collections";
+import Sanctions from "./pages/LOS/Sanctions";
 import ReferralLoanApplication from "./pages/ReferralLoanApplication";
 import NegativePinCodes from "./pages/NegativePinCodes";
 import Profile from "./pages/Profile";
@@ -307,6 +308,12 @@ const App = () => (
           <Route path="/los/approval-queue" element={
             <ProtectedRoute>
               <ApprovalQueuePage />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/los/sanctions" element={
+            <ProtectedRoute>
+              <Sanctions />
             </ProtectedRoute>
           } />
           
