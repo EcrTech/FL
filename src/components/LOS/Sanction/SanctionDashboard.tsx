@@ -1,11 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useOrgContext } from "@/hooks/useOrgContext";
 import SanctionGenerator from "./SanctionGenerator";
 import DocumentGenerator from "./DocumentGenerator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, Clock, FileText } from "lucide-react";
+import { CheckCircle, Clock } from "lucide-react";
 import { format } from "date-fns";
 
 interface SanctionDashboardProps {
@@ -25,10 +24,23 @@ export default function SanctionDashboard({ applicationId, orgId }: SanctionDash
   const { data: sanction, isLoading } = useQuery({
     queryKey: ["loan-sanction", applicationId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("loan_sanctions")
         .select("*")
         .eq("loan_application_id", applicationId)
+        .maybeSingle();
+      return data;
+    },
+  });
+
+  // Also fetch application for additional details
+  const { data: application } = useQuery({
+    queryKey: ["loan-application", applicationId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("loan_applications")
+        .select("*")
+        .eq("id", applicationId)
         .maybeSingle();
       return data;
     },
@@ -49,7 +61,18 @@ export default function SanctionDashboard({ applicationId, orgId }: SanctionDash
     return <SanctionGenerator applicationId={applicationId} orgId={orgId} />;
   }
 
-  // If sanction exists, show sanction summary + document generator
+  // Use correct column names from database schema
+  const interestRate = sanction.sanctioned_rate || application?.interest_rate || 0;
+  const tenureDays = sanction.sanctioned_tenure_days || 0;
+  const tenureMonths = application?.tenure_months || Math.round(tenureDays / 30);
+  
+  // Parse conditions - it's JSON in the database
+  const conditionsText = typeof sanction.conditions === 'string' 
+    ? sanction.conditions 
+    : typeof sanction.conditions === 'object' && sanction.conditions
+      ? JSON.stringify(sanction.conditions, null, 2)
+      : null;
+
   return (
     <div className="space-y-6">
       {/* Sanction Summary Card */}
@@ -73,25 +96,25 @@ export default function SanctionDashboard({ applicationId, orgId }: SanctionDash
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Interest Rate</p>
-              <p className="text-lg font-bold">{sanction.interest_rate}% p.a.</p>
+              <p className="text-lg font-bold">{interestRate}% p.a.</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Tenure</p>
-              <p className="text-lg font-bold">{sanction.tenure_months} months</p>
+              <p className="text-lg font-bold">{tenureMonths} months</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Valid Until</p>
               <p className="text-lg font-bold flex items-center gap-1">
                 <Clock className="h-4 w-4" />
-                {format(new Date(sanction.valid_until), "dd MMM yyyy")}
+                {format(new Date(sanction.validity_date), "dd MMM yyyy")}
               </p>
             </div>
           </div>
           
-          {sanction.terms_and_conditions && (
+          {conditionsText && (
             <div className="mt-4 pt-4 border-t">
-              <p className="text-sm text-muted-foreground mb-2">Terms & Conditions</p>
-              <p className="text-sm whitespace-pre-line">{sanction.terms_and_conditions}</p>
+              <p className="text-sm text-muted-foreground mb-2">Conditions</p>
+              <p className="text-sm whitespace-pre-line">{conditionsText}</p>
             </div>
           )}
         </CardContent>
