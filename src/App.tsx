@@ -58,6 +58,7 @@ import SanctionDetail from "./pages/LOS/SanctionDetail";
 import ReferralLoanApplication from "./pages/ReferralLoanApplication";
 import NegativePinCodes from "./pages/NegativePinCodes";
 import Profile from "./pages/Profile";
+import ESignDocument from "./pages/ESignDocument";
 import ProtectedRoute from "./components/Auth/ProtectedRoute";
 
 const App = () => (
@@ -72,6 +73,7 @@ const App = () => (
           <Route path="/form/:formId" element={<PublicForm />} />
           <Route path="/apply/:slug" element={<PublicLoanApplication />} />
           <Route path="/apply/ref/:referralCode" element={<ReferralLoanApplication />} />
+          <Route path="/esign/:token" element={<ESignDocument />} />
           
           <Route path="/dashboard" element={
             <ProtectedRoute>

@@ -1803,6 +1803,113 @@ export type Database = {
         }
         Relationships: []
       }
+      document_esign_requests: {
+        Row: {
+          aadhaar_request_id: string | null
+          access_token: string
+          application_id: string
+          audit_log: Json | null
+          created_at: string | null
+          created_by: string | null
+          document_id: string | null
+          document_type: string
+          id: string
+          notification_channel: string | null
+          notification_sent_at: string | null
+          org_id: string
+          signed_at: string | null
+          signed_document_path: string | null
+          signed_from_ip: string | null
+          signer_aadhaar_last4: string | null
+          signer_email: string | null
+          signer_name: string
+          signer_phone: string | null
+          status: string
+          token_expires_at: string
+          updated_at: string | null
+          viewed_at: string | null
+        }
+        Insert: {
+          aadhaar_request_id?: string | null
+          access_token: string
+          application_id: string
+          audit_log?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          document_id?: string | null
+          document_type: string
+          id?: string
+          notification_channel?: string | null
+          notification_sent_at?: string | null
+          org_id: string
+          signed_at?: string | null
+          signed_document_path?: string | null
+          signed_from_ip?: string | null
+          signer_aadhaar_last4?: string | null
+          signer_email?: string | null
+          signer_name: string
+          signer_phone?: string | null
+          status?: string
+          token_expires_at: string
+          updated_at?: string | null
+          viewed_at?: string | null
+        }
+        Update: {
+          aadhaar_request_id?: string | null
+          access_token?: string
+          application_id?: string
+          audit_log?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          document_id?: string | null
+          document_type?: string
+          id?: string
+          notification_channel?: string | null
+          notification_sent_at?: string | null
+          org_id?: string
+          signed_at?: string | null
+          signed_document_path?: string | null
+          signed_from_ip?: string | null
+          signer_aadhaar_last4?: string | null
+          signer_email?: string | null
+          signer_name?: string
+          signer_phone?: string | null
+          status?: string
+          token_expires_at?: string
+          updated_at?: string | null
+          viewed_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_esign_requests_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "loan_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_esign_requests_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_esign_requests_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "loan_generated_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_esign_requests_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_automation_cooldowns: {
         Row: {
           contact_id: string
@@ -4325,6 +4432,7 @@ export type Database = {
           sanction_id: string | null
           signature_data: Json | null
           signed_at: string | null
+          signed_document_path: string | null
           status: string | null
           updated_at: string | null
         }
@@ -4342,6 +4450,7 @@ export type Database = {
           sanction_id?: string | null
           signature_data?: Json | null
           signed_at?: string | null
+          signed_document_path?: string | null
           status?: string | null
           updated_at?: string | null
         }
@@ -4359,6 +4468,7 @@ export type Database = {
           sanction_id?: string | null
           signature_data?: Json | null
           signed_at?: string | null
+          signed_document_path?: string | null
           status?: string | null
           updated_at?: string | null
         }

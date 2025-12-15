@@ -18,6 +18,11 @@ import SanctionLetterDocument from "../Sanction/templates/SanctionLetterDocument
 import LoanAgreementDocument from "../Sanction/templates/LoanAgreementDocument";
 import DPNDocument from "../Sanction/templates/DPNDocument";
 
+// ESign imports
+import { RequestESignButton } from "../ESign/RequestESignButton";
+import { ESignStatusBadge } from "../ESign/ESignStatusBadge";
+import { useESignRequestByDocument } from "../ESign/useESignRequests";
+
 interface DisbursementDashboardProps {
   applicationId: string;
 }
