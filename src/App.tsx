@@ -54,6 +54,7 @@ import LOSDashboard from "./pages/LOS/Dashboard";
 import MyReferrals from "./pages/LOS/MyReferrals";
 import ReferralLoanApplication from "./pages/ReferralLoanApplication";
 import NegativePinCodes from "./pages/NegativePinCodes";
+import Profile from "./pages/Profile";
 import ProtectedRoute from "./components/Auth/ProtectedRoute";
 
 const App = () => (
@@ -329,6 +330,12 @@ const App = () => (
           <Route path="/reports/saved" element={
             <ProtectedRoute>
               <SavedReports />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/profile" element={
+            <ProtectedRoute>
+              <Profile />
             </ProtectedRoute>
           } />
           
