@@ -54,7 +54,6 @@ const REQUIRED_DOCUMENTS = [
   { type: "offer_letter", name: "Offer Letter", category: "employment", mandatory: true, verifiable: false, parseable: false },
   { type: "employee_id", name: "Employee ID Card", category: "employment", mandatory: false, verifiable: false, parseable: false },
   { type: "passport_photo", name: "Passport Size Photo", category: "photo", mandatory: true, verifiable: false, parseable: false },
-  { type: "selfie", name: "Selfie with Document", category: "photo", mandatory: true, verifiable: false, parseable: false },
 ];
 
 const VERIFIABLE_ENDPOINTS: Record<string, string> = {
