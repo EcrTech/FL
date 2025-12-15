@@ -75,17 +75,17 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
   const { data: application } = useQuery({
     queryKey: ["loan-application", applicationId, orgId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("loan_applications")
-        .select(`
-          *,
-          loan_applicants(
+        const { data, error } = await supabase
+          .from("loan_applications")
+          .select(`
             *,
-            loan_employment_details(*)
-          ),
-          loan_verifications(*),
-          approved_by_profile:profiles!loan_applications_approved_by_fkey(full_name)
-        `)
+            loan_applicants(
+              *,
+              loan_employment_details(*)
+            ),
+            loan_verifications(*),
+            approved_by_profile:profiles!loan_applications_approved_by_fkey(first_name,last_name)
+          `)
         .eq("id", applicationId)
         .eq("org_id", orgId)
         .maybeSingle();
@@ -384,7 +384,8 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
           status: "approved",
           approved_by: user?.id,
         })
-        .eq("id", applicationId);
+        .eq("id", applicationId)
+        .eq("org_id", orgId);
       
       if (error) throw error;
     },
@@ -417,7 +418,8 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
           status: "rejected",
           approved_by: user?.id,
         })
-        .eq("id", applicationId);
+        .eq("id", applicationId)
+        .eq("org_id", orgId);
       
       if (error) throw error;
     },
@@ -776,8 +778,15 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
                 <CardTitle>Decision</CardTitle>
                 <CardDescription>
                   Application has already been {application?.status?.toUpperCase()}
-                  {(application?.approved_by_profile as any)?.full_name && (
-                    <span> by {(application.approved_by_profile as any).full_name}</span>
+                  {((application?.approved_by_profile as any)?.first_name || (application?.approved_by_profile as any)?.last_name) && (
+                    <span>
+                      {" "}
+                      by
+                      {" "}
+                      {[(application?.approved_by_profile as any)?.first_name, (application?.approved_by_profile as any)?.last_name]
+                        .filter(Boolean)
+                        .join(" ")}
+                    </span>
                   )}
                   {application?.updated_at && (
                     <span className="block mt-1">
