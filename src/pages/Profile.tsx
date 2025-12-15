@@ -262,28 +262,32 @@ export default function Profile() {
               <CardDescription>Share your link to refer loan applicants</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-4">
-                <div className="p-2 bg-white rounded-lg border shrink-0">
-                  <QRCodeSVG value={referralLink} size={64} level="H" />
+              <div className="flex flex-col sm:flex-row items-start gap-6">
+                <div className="p-4 bg-white rounded-lg border shrink-0">
+                  <QRCodeSVG value={referralLink} size={160} level="H" />
                 </div>
-                <div className="flex-1 min-w-0 space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Input
-                      value={referralLink}
-                      readOnly
-                      className="font-mono text-sm"
-                    />
-                    <Button onClick={handleCopyLink} variant="outline" size="icon">
-                      {copied ? (
-                        <Check className="h-4 w-4 text-green-500" />
-                      ) : (
-                        <Copy className="h-4 w-4" />
-                      )}
-                    </Button>
+                <div className="flex-1 min-w-0 space-y-4">
+                  <div>
+                    <Label className="text-muted-foreground text-xs mb-1 block">Your referral code</Label>
+                    <p className="font-mono text-lg font-bold">{referralData?.referral_code}</p>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Code: <span className="font-mono font-bold">{referralData?.referral_code}</span>
-                  </p>
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground text-xs">Share this link</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={referralLink}
+                        readOnly
+                        className="font-mono text-sm"
+                      />
+                      <Button onClick={handleCopyLink} variant="outline" size="icon">
+                        {copied ? (
+                          <Check className="h-4 w-4 text-green-500" />
+                        ) : (
+                          <Copy className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </CardContent>
