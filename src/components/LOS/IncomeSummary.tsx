@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calculator, TrendingUp, TrendingDown, Minus, Loader2, ArrowRight } from "lucide-react";
+import { Calculator, TrendingUp, TrendingDown, Minus, RefreshCw, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface IncomeSummaryProps {
@@ -68,20 +68,6 @@ export default function IncomeSummary({ applicationId, orgId }: IncomeSummaryPro
         .eq("loan_application_id", applicationId)
         .maybeSingle();
       if (error && error.code !== "PGRST116") throw error;
-      return data;
-    },
-    enabled: !!applicationId,
-  });
-
-  const { data: application } = useQuery({
-    queryKey: ["loan-application-basic", applicationId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("loan_applications")
-        .select("current_stage")
-        .eq("id", applicationId)
-        .single();
-      if (error) throw error;
       return data;
     },
     enabled: !!applicationId,
@@ -279,29 +265,6 @@ export default function IncomeSummary({ applicationId, orgId }: IncomeSummaryPro
     },
   });
 
-  // Move to Approval Queue mutation
-  const moveToApprovalMutation = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase
-        .from("loan_applications")
-        .update({
-          current_stage: "approval_pending",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", applicationId);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["loan-application-basic", applicationId] });
-      queryClient.invalidateQueries({ queryKey: ["loan-application", applicationId] });
-      queryClient.invalidateQueries({ queryKey: ["loan-applications"] });
-      toast({ title: "Application moved to Approval Queue" });
-    },
-    onError: (error: any) => {
-      toast({ title: "Failed to move", description: error.message, variant: "destructive" });
-    },
-  });
-
   const handleCalculate = () => {
     setIsCalculating(true);
     saveMutation.mutate();
@@ -482,34 +445,6 @@ export default function IncomeSummary({ applicationId, orgId }: IncomeSummaryPro
                 ))}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Move to Approval Queue Button */}
-      {incomeSummary && application?.current_stage === "credit_assessment" && (
-        <Card className="border-green-200 bg-green-50">
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-green-900">Income Summary Complete</p>
-                <p className="text-sm text-green-700">
-                  Ready to move this application to the approval queue.
-                </p>
-              </div>
-              <Button
-                onClick={() => moveToApprovalMutation.mutate()}
-                disabled={moveToApprovalMutation.isPending}
-                className="bg-green-600 hover:bg-green-700"
-              >
-                {moveToApprovalMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <ArrowRight className="h-4 w-4 mr-2" />
-                )}
-                Move to Approval Queue
-              </Button>
-            </div>
           </CardContent>
         </Card>
       )}
