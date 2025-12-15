@@ -101,7 +101,11 @@ export default function Sanctions() {
                 </TableHeader>
                 <TableBody>
                   {applications.map((app) => (
-                    <TableRow key={app.id}>
+                    <TableRow 
+                      key={app.id} 
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => navigate(`/los/applications/${app.id}?mode=review`)}
+                    >
                       <TableCell className="font-medium">
                         {app.application_number}
                       </TableCell>
@@ -124,9 +128,10 @@ export default function Sanctions() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() =>
-                            navigate(`/los/applications/${app.id}?mode=review`)
-                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/los/applications/${app.id}?mode=review`);
+                          }}
                         >
                           <Eye className="h-4 w-4 mr-1" />
                           View
