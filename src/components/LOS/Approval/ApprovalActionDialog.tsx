@@ -167,13 +167,13 @@ export default function ApprovalActionDialog({
 
           <div className="space-y-2">
             <Label htmlFor="comments">
-              {action === "approve" ? "Comments (Optional)" : "Rejection Reason *"}
+              {action === "approve" ? "Comments *" : "Rejection Reason *"}
             </Label>
             <Textarea
               id="comments"
               placeholder={
                 action === "approve"
-                  ? "Add any additional comments..."
+                  ? "Add approval comments (required)..."
                   : "Explain why the application is being rejected..."
               }
               value={comments}
@@ -192,7 +192,7 @@ export default function ApprovalActionDialog({
             onClick={() => actionMutation.mutate()}
             disabled={
               actionMutation.isPending ||
-              (action === "approve" && !approvedAmount) ||
+              (action === "approve" && (!approvedAmount || !comments)) ||
               (action === "reject" && !comments)
             }
           >
