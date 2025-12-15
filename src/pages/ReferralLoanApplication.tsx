@@ -240,16 +240,21 @@ export default function ReferralLoanApplication() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-card border-b border-border sticky top-0 z-50">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <img src={logo} alt="Paisaa Saarthi" className="h-10" />
+      <header className="bg-gradient-to-r from-[hsl(var(--electric-blue-50))] via-card to-[hsl(var(--coral-50))] border-b border-border sticky top-0 z-50 shadow-sm">
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <a 
             href="/" 
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors font-body"
+            className="flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors font-heading group"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <div className="p-1.5 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors">
+              <ArrowLeft className="h-4 w-4" />
+            </div>
             <span className="hidden sm:inline">Back to Home</span>
           </a>
+          <div className="flex items-center gap-3">
+            <img src={logo} alt="Paisaa Saarthi" className="h-12 drop-shadow-sm" />
+          </div>
+          <div className="w-[100px] hidden sm:block" /> {/* Spacer for centering logo */}
         </div>
       </header>
 
