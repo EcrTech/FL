@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Calculator, CheckCircle, XCircle, TrendingUp } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Calculator, CheckCircle, XCircle, TrendingUp, ThumbsUp, ThumbsDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface EligibilityCalculatorProps {
@@ -68,6 +69,8 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
 
   const [policyChecks, setPolicyChecks] = useState<Record<string, { passed: boolean; details: string }>>({});
   const [hasCalculated, setHasCalculated] = useState(false);
+  const [remarks, setRemarks] = useState("");
+  const [remarksError, setRemarksError] = useState("");
 
   const { data: application } = useQuery({
     queryKey: ["loan-application-full", applicationId],
@@ -362,6 +365,84 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
     .filter(rule => rule.critical)
     .every(rule => policyChecks[rule.key]?.passed);
 
+  const approveMutation = useMutation({
+    mutationFn: async () => {
+      // First save the eligibility data
+      await saveMutation.mutateAsync();
+      
+      // Then update application status
+      const { error } = await supabase
+        .from("loan_applications")
+        .update({
+          current_stage: "approved",
+          status: "approved",
+          remarks: remarks,
+        })
+        .eq("id", applicationId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["loan-application-full", applicationId] });
+      toast({ title: "Application approved successfully" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to approve application",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: async () => {
+      // First save the eligibility data
+      await saveMutation.mutateAsync();
+      
+      // Then update application status
+      const { error } = await supabase
+        .from("loan_applications")
+        .update({
+          current_stage: "rejected",
+          status: "rejected",
+          remarks: remarks,
+        })
+        .eq("id", applicationId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["loan-application-full", applicationId] });
+      toast({ title: "Application rejected" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to reject application",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleApprove = () => {
+    if (!remarks.trim()) {
+      setRemarksError("Remarks are mandatory before approval");
+      return;
+    }
+    setRemarksError("");
+    approveMutation.mutate();
+  };
+
+  const handleReject = () => {
+    if (!remarks.trim()) {
+      setRemarksError("Remarks are mandatory before rejection");
+      return;
+    }
+    setRemarksError("");
+    rejectMutation.mutate();
+  };
+
   return (
     <div className="space-y-6">
       {/* Max Eligibility Banner */}
@@ -572,11 +653,49 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
             </CardContent>
           </Card>
 
-          <div className="flex justify-end gap-3">
-            <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending}>
-              {saveMutation.isPending ? "Saving..." : "Save Assessment"}
-            </Button>
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Decision</CardTitle>
+              <CardDescription>Provide remarks and approve or reject the application</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>Remarks <span className="text-destructive">*</span></Label>
+                <Textarea
+                  value={remarks}
+                  onChange={(e) => {
+                    setRemarks(e.target.value);
+                    if (e.target.value.trim()) setRemarksError("");
+                  }}
+                  placeholder="Enter remarks before approval or rejection..."
+                  className={remarksError ? "border-destructive" : ""}
+                  rows={3}
+                />
+                {remarksError && (
+                  <p className="text-sm text-destructive mt-1">{remarksError}</p>
+                )}
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  onClick={handleApprove}
+                  disabled={approveMutation.isPending || rejectMutation.isPending}
+                  className="flex-1 bg-green-600 hover:bg-green-700"
+                >
+                  <ThumbsUp className="mr-2 h-4 w-4" />
+                  {approveMutation.isPending ? "Approving..." : "Approve"}
+                </Button>
+                <Button
+                  onClick={handleReject}
+                  disabled={approveMutation.isPending || rejectMutation.isPending}
+                  variant="destructive"
+                  className="flex-1"
+                >
+                  <ThumbsDown className="mr-2 h-4 w-4" />
+                  {rejectMutation.isPending ? "Rejecting..." : "Reject"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </>
       )}
     </div>
