@@ -33,6 +33,7 @@ export default function ReferralLoanApplication() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [applicationNumber, setApplicationNumber] = useState<string | null>(null);
+  const [submissionSuccess, setSubmissionSuccess] = useState(false);
 
   // Form data
   const [basicInfo, setBasicInfo] = useState({
@@ -126,9 +127,9 @@ export default function ReferralLoanApplication() {
     setAadhaarVerified(true);
   };
 
-  const handleVideoKycComplete = () => {
+  const handleVideoKycComplete = async () => {
     setVideoKycCompleted(true);
-    submitApplication();
+    await submitApplication();
   };
 
   const submitApplication = async () => {
@@ -148,7 +149,7 @@ export default function ReferralLoanApplication() {
           aadhaarName: aadhaarData?.name,
           aadhaarAddress: aadhaarData?.address,
           aadhaarDob: aadhaarData?.dob,
-          videoKycCompleted,
+          videoKycCompleted: true,
         },
         consents,
         referrerInfo,
@@ -159,13 +160,22 @@ export default function ReferralLoanApplication() {
         body: applicationData,
       });
 
+      // Check for function invocation error
       if (submitError) throw submitError;
 
-      setApplicationNumber(data?.applicationNumber || `APP-${Date.now()}`);
+      // Check for error in response data (HTTP non-2xx responses)
+      if (data?.error) {
+        throw new Error(data.details?.join(', ') || data.error);
+      }
+
+      setApplicationNumber(data?.applicationNumber);
+      setSubmissionSuccess(true);
       toast.success("Application submitted successfully!");
     } catch (err: any) {
       console.error("Error submitting application:", err);
-      toast.error(err.message || "Failed to submit application");
+      toast.error(err.message || "Failed to submit application. Please try again.");
+      // Reset video KYC so user can retry
+      setVideoKycCompleted(false);
     } finally {
       setSubmitting(false);
     }
@@ -201,7 +211,7 @@ export default function ReferralLoanApplication() {
   }
 
   // Success State
-  if (applicationNumber) {
+  if (submissionSuccess && applicationNumber) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="max-w-md w-full shadow-xl border-0 animate-fade-in-up">
