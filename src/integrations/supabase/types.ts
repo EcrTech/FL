@@ -4146,6 +4146,7 @@ export type Database = {
           calculation_date: string
           calculation_details: Json | null
           created_at: string
+          daily_emi: number | null
           deviation_required: boolean | null
           dti_ratio: number | null
           eligible_loan_amount: number | null
@@ -4163,11 +4164,14 @@ export type Database = {
           recommended_interest_rate: number | null
           recommended_tenure_days: number | null
           total_deductions: number | null
+          total_interest: number | null
+          total_repayment: number | null
         }
         Insert: {
           calculation_date?: string
           calculation_details?: Json | null
           created_at?: string
+          daily_emi?: number | null
           deviation_required?: boolean | null
           dti_ratio?: number | null
           eligible_loan_amount?: number | null
@@ -4185,11 +4189,14 @@ export type Database = {
           recommended_interest_rate?: number | null
           recommended_tenure_days?: number | null
           total_deductions?: number | null
+          total_interest?: number | null
+          total_repayment?: number | null
         }
         Update: {
           calculation_date?: string
           calculation_details?: Json | null
           created_at?: string
+          daily_emi?: number | null
           deviation_required?: boolean | null
           dti_ratio?: number | null
           eligible_loan_amount?: number | null
@@ -4207,6 +4214,8 @@ export type Database = {
           recommended_interest_rate?: number | null
           recommended_tenure_days?: number | null
           total_deductions?: number | null
+          total_interest?: number | null
+          total_repayment?: number | null
         }
         Relationships: [
           {
