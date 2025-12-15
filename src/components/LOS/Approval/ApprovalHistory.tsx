@@ -174,8 +174,8 @@ export default function ApprovalHistory({ applicationId }: ApprovalHistoryProps)
         });
       }
 
-      // Sort by timestamp ascending
-      events.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      // Sort by timestamp descending (latest first)
+      events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
       return events;
     },
