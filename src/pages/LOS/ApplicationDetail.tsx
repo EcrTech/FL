@@ -96,6 +96,20 @@ export default function ApplicationDetail() {
     enabled: !!id,
   });
 
+  // Fetch verification data (for address from Aadhaar, DOB from PAN, etc.)
+  const { data: verifications = [] } = useQuery({
+    queryKey: ["loan-verifications-display", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("loan_verifications")
+        .select("*")
+        .eq("loan_application_id", id);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
@@ -125,8 +139,25 @@ export default function ApplicationDetail() {
     return doc?.ocr_data as Record<string, any> | null;
   };
 
-  const panData = getParsedData("pan_card");
-  const aadhaarData = getParsedData("aadhaar_card");
+  // Get verification data
+  const getVerificationData = (verType: string) => {
+    const ver = verifications.find((v: any) => v.verification_type === verType);
+    return ver?.response_data as Record<string, any> | null;
+  };
+
+  // Merge document OCR data with verification data
+  const panDocData = getParsedData("pan_card");
+  const panVerData = getVerificationData("pan");
+  const panData: Record<string, any> | null = panDocData || panVerData ? { ...panVerData, ...panDocData } : null;
+
+  const aadhaarDocData = getParsedData("aadhaar_card");
+  const aadhaarVerData = getVerificationData("aadhaar");
+  const aadhaarData: Record<string, any> | null = aadhaarDocData || aadhaarVerData ? { 
+    ...aadhaarVerData, 
+    ...aadhaarDocData,
+    // Ensure address from verification is available
+    address: aadhaarDocData?.address || aadhaarVerData?.verified_address || aadhaarVerData?.address
+  } : null;
 
   if (isLoading || isOrgLoading) {
     return (
