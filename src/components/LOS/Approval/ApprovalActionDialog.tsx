@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -12,9 +12,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, XCircle } from "lucide-react";
+import { CheckCircle, XCircle, AlertTriangle } from "lucide-react";
 
 import { useLOSPermissions } from "@/hooks/useLOSPermissions";
 
@@ -36,15 +35,39 @@ export default function ApprovalActionDialog({
   userId,
 }: ApprovalActionDialogProps) {
   const [comments, setComments] = useState("");
-  const [approvedAmount, setApprovedAmount] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { permissions } = useLOSPermissions();
 
+  // Fetch eligibility data - this is the source of truth for approved amount
+  const { data: eligibility, isLoading: eligibilityLoading } = useQuery({
+    queryKey: ["loan-eligibility", applicationId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("loan_eligibility")
+        .select("eligible_loan_amount, recommended_tenure_days, recommended_interest_rate")
+        .eq("loan_application_id", applicationId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: open && action === "approve",
+  });
+
   const actionMutation = useMutation({
     mutationFn: async () => {
       const now = new Date().toISOString();
-      const parsedAmount = action === "approve" && approvedAmount ? parseFloat(approvedAmount) : null;
+      
+      // For approval, use eligibility data as single source of truth
+      const approvedAmount = action === "approve" && eligibility 
+        ? eligibility.eligible_loan_amount 
+        : null;
+      const tenureDays = action === "approve" && eligibility 
+        ? eligibility.recommended_tenure_days 
+        : null;
+      const interestRate = action === "approve" && eligibility 
+        ? eligibility.recommended_interest_rate 
+        : null;
 
       // Create approval record (audit trail only)
       const { error: approvalError } = await supabase
@@ -56,13 +79,13 @@ export default function ApprovalActionDialog({
           approver_role: "credit_manager",
           approval_level: "final",
           approval_status: action === "approve" ? "approved" : "rejected",
-          approved_amount: parsedAmount,
+          approved_amount: approvedAmount,
           comments,
         });
 
       if (approvalError) throw approvalError;
 
-      // Update application - SINGLE SOURCE OF TRUTH for approved_amount
+      // Update application - use eligibility data for approved values
       const newStage = action === "approve" ? "sanctioned" : "rejected";
       const newStatus = action === "approve" ? "approved" : "rejected";
       const { error: updateError } = await supabase
@@ -70,7 +93,9 @@ export default function ApprovalActionDialog({
         .update({
           current_stage: newStage,
           status: newStatus,
-          approved_amount: parsedAmount,
+          approved_amount: approvedAmount,
+          tenure_days: tenureDays,
+          interest_rate: interestRate,
           approved_by: action === "approve" ? userId : null,
           updated_at: now,
         })
@@ -91,7 +116,6 @@ export default function ApprovalActionDialog({
 
       onOpenChange(false);
       setComments("");
-      setApprovedAmount("");
     },
     onError: (error: Error) => {
       toast({
@@ -151,23 +175,38 @@ export default function ApprovalActionDialog({
           </DialogTitle>
           <DialogDescription>
             {action === "approve"
-              ? "Provide approval details and approved loan amount."
+              ? "Review and confirm the approved loan details from eligibility assessment."
               : "Provide reason for rejection."}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           {action === "approve" && (
-            <div className="space-y-2">
-              <Label htmlFor="approved-amount">Approved Loan Amount *</Label>
-              <Input
-                id="approved-amount"
-                type="number"
-                placeholder="Enter approved amount"
-                value={approvedAmount}
-                onChange={(e) => setApprovedAmount(e.target.value)}
-              />
-            </div>
+            <>
+              {eligibilityLoading ? (
+                <p className="text-muted-foreground text-sm">Loading eligibility data...</p>
+              ) : eligibility ? (
+                <div className="rounded-lg border bg-muted/50 p-4 space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Eligible Amount:</span>
+                    <span className="font-semibold">₹{eligibility.eligible_loan_amount?.toLocaleString("en-IN")}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Tenure:</span>
+                    <span className="font-medium">{eligibility.recommended_tenure_days} days</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Interest Rate:</span>
+                    <span className="font-medium">{eligibility.recommended_interest_rate}%</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-yellow-500/50 bg-yellow-500/10 p-4 flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                  <p className="text-sm text-yellow-700">No eligibility assessment found. Please complete eligibility calculation first.</p>
+                </div>
+              )}
+            </>
           )}
 
           <div className="space-y-2">
@@ -197,7 +236,7 @@ export default function ApprovalActionDialog({
             onClick={() => actionMutation.mutate()}
             disabled={
               actionMutation.isPending ||
-              (action === "approve" && !approvedAmount) ||
+              (action === "approve" && !eligibility) ||
               (action === "reject" && !comments)
             }
           >
