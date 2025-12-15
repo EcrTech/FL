@@ -182,7 +182,13 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
             {/* Logo */}
             <div className="p-6 border-b border-border flex flex-col items-center bg-gradient-to-br from-primary/5 to-transparent">
               <img src={orgLogo || logo} alt="Logo" className="h-16 object-contain mb-3" />
-              <p className="text-sm font-medium text-foreground text-center">{userName}</p>
+              <Link 
+                to="/profile" 
+                className="text-sm font-medium text-foreground hover:text-primary transition-colors text-center"
+                onClick={() => setSidebarOpen(false)}
+              >
+                {userName}
+              </Link>
               <div className="mt-4 w-full">
                 <QuickDial />
               </div>
