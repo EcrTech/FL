@@ -80,18 +80,69 @@ export default function DocumentDataVerification({ applicationId }: DocumentData
     enabled: !!applicationId,
   });
 
+  const { data: verifications = [] } = useQuery({
+    queryKey: ["loan-verifications", applicationId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("loan_verifications")
+        .select("*")
+        .eq("loan_application_id", applicationId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!applicationId,
+  });
+
   const fieldComparisons = useMemo((): FieldComparison[] => {
     const primaryApplicant = application?.loan_applicants?.[0];
-    
+
     // Get OCR data from documents
     const getOcrData = (docType: string) => {
       const doc = documents.find((d) => d.document_type === docType);
       return doc?.ocr_data as Record<string, any> | null;
     };
 
-    const panData = getOcrData("pan_card");
-    const aadhaarData = getOcrData("aadhaar_card");
-    const salaryData = getOcrData("salary_slip_1") || getOcrData("salary_slip_2") || getOcrData("salary_slip_3");
+    // Get verification data from verifications table
+    const getVerificationData = (verType: string) => {
+      const ver = verifications.find((v: any) => v.verification_type === verType);
+      return ver?.response_data as Record<string, any> | null;
+    };
+
+    // Merge document OCR data with verification responses (same logic as ApplicationDetail)
+    const panDocData = getOcrData("pan_card");
+    const panVerData = getVerificationData("pan");
+    const panData: Record<string, any> | null = panDocData || panVerData
+      ? {
+          ...panVerData,
+          ...panDocData,
+          name: panDocData?.name || (panVerData as any)?.name_on_pan || panVerData?.name,
+          pan_number:
+            panDocData?.pan_number ||
+            (panVerData as any)?.pan_number ||
+            (panVerData as any)?.pan,
+          father_name: panDocData?.father_name || panVerData?.father_name,
+          dob: panDocData?.dob || panVerData?.dob,
+        }
+      : null;
+
+    const aadhaarDocData = getOcrData("aadhaar_card");
+    const aadhaarVerData = getVerificationData("aadhaar");
+    const aadhaarData: Record<string, any> | null = aadhaarDocData || aadhaarVerData
+      ? {
+          ...aadhaarVerData,
+          ...aadhaarDocData,
+          address:
+            aadhaarDocData?.address ||
+            aadhaarVerData?.verified_address ||
+            aadhaarVerData?.address?.combined ||
+            aadhaarVerData?.address,
+        }
+      : null;
+
+    const salaryData =
+      getOcrData("salary_slip_1") ||
+      getOcrData("salary_slip_2") ||
+      getOcrData("salary_slip_3");
     const form16Data = getOcrData("form_16_year_1") || getOcrData("form_16_year_2");
 
     // Build comparison fields
@@ -100,7 +151,12 @@ export default function DocumentDataVerification({ applicationId }: DocumentData
         field: "name",
         label: "Full Name",
         values: [
-          { source: "Application", value: primaryApplicant ? `${primaryApplicant.first_name || ""} ${primaryApplicant.last_name || ""}`.trim() : null },
+          {
+            source: "Application",
+            value: primaryApplicant
+              ? `${primaryApplicant.first_name || ""} ${primaryApplicant.last_name || ""}`.trim()
+              : null,
+          },
           { source: "PAN Card", value: panData?.name || null },
           { source: "Aadhaar", value: aadhaarData?.name || null },
           { source: "Salary Slip", value: salaryData?.employee_name || null },
@@ -112,7 +168,7 @@ export default function DocumentDataVerification({ applicationId }: DocumentData
         field: "dob",
         label: "Date of Birth",
         values: [
-          { source: "Application", value: primaryApplicant?.dob as string || null },
+          { source: "Application", value: (primaryApplicant?.dob as string) || null },
           { source: "PAN Card", value: panData?.dob || null },
           { source: "Aadhaar", value: aadhaarData?.dob || null },
         ],
@@ -122,7 +178,7 @@ export default function DocumentDataVerification({ applicationId }: DocumentData
         field: "pan",
         label: "PAN Number",
         values: [
-          { source: "Application", value: primaryApplicant?.pan_number as string || null },
+          { source: "Application", value: (primaryApplicant?.pan_number as string) || null },
           { source: "PAN Card", value: panData?.pan_number || null },
           { source: "Form 16", value: form16Data?.pan || null },
         ],
@@ -132,9 +188,14 @@ export default function DocumentDataVerification({ applicationId }: DocumentData
         field: "address",
         label: "Address",
         values: [
-          { source: "Application", value: typeof primaryApplicant?.current_address === "object" 
-            ? Object.values(primaryApplicant.current_address as Record<string, string>).filter(Boolean).join(", ") 
-            : primaryApplicant?.current_address as string || null 
+          {
+            source: "Application",
+            value:
+              typeof primaryApplicant?.current_address === "object"
+                ? Object.values(primaryApplicant.current_address as Record<string, string>)
+                    .filter(Boolean)
+                    .join(", ")
+                : ((primaryApplicant?.current_address as string) || null),
           },
           { source: "Aadhaar", value: aadhaarData?.address || null },
         ],
@@ -154,7 +215,7 @@ export default function DocumentDataVerification({ applicationId }: DocumentData
     // Calculate match status for each field
     return fields.map((field) => {
       const nonEmptyValues = field.values.filter((v) => v.value && v.value.trim() !== "");
-      
+
       if (nonEmptyValues.length < 2) {
         return { ...field, matchStatus: "insufficient" as const };
       }
@@ -162,9 +223,7 @@ export default function DocumentDataVerification({ applicationId }: DocumentData
       // Check if all values match
       const firstValue = nonEmptyValues[0].value!;
       const allMatch = nonEmptyValues.every((v) => normalize(v.value) === normalize(firstValue));
-      const anyMatch = nonEmptyValues.some((v, i) => 
-        i > 0 && isSimilar(v.value!, firstValue)
-      );
+      const anyMatch = nonEmptyValues.some((v, i) => i > 0 && isSimilar(v.value!, firstValue));
 
       if (allMatch) {
         return { ...field, matchStatus: "match" as const };
@@ -174,7 +233,7 @@ export default function DocumentDataVerification({ applicationId }: DocumentData
         return { ...field, matchStatus: "mismatch" as const };
       }
     });
-  }, [documents, application]);
+  }, [documents, application, verifications]);
 
   const getMatchIcon = (status: string) => {
     switch (status) {
