@@ -220,22 +220,14 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
   });
 
   // Fetch existing generated documents
-  const { data: generatedDocs } = useQuery({
-    queryKey: ["generated-documents", applicationId],
+  const { data: generatedDocs, refetch: refetchDocs } = useQuery({
+    queryKey: ["generated-documents", applicationId, sanction?.id],
     queryFn: async () => {
-      let query = supabase
+      const { data } = await supabase
         .from("loan_generated_documents")
         .select("*")
         .eq("loan_application_id", applicationId);
       
-      // Filter by sanction_id if it exists, otherwise get docs with null sanction_id
-      if (sanction?.id) {
-        query = query.eq("sanction_id", sanction.id);
-      } else {
-        query = query.is("sanction_id", null);
-      }
-      
-      const { data } = await query;
       return data || [];
     },
   });
@@ -269,6 +261,33 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
       toast.error(error.message);
     },
   });
+
+  const handleDownload = (docType: DocumentType) => {
+    const printRef = printRefs.current[docType];
+    if (printRef) {
+      const printContent = printRef.innerHTML;
+      const blob = new Blob([`
+        <html>
+          <head>
+            <title>${documentTypes.find(d => d.key === docType)?.label}</title>
+            <style>
+              body { margin: 0; padding: 20px; font-family: system-ui, sans-serif; }
+            </style>
+          </head>
+          <body>${printContent}</body>
+        </html>
+      `], { type: 'text/html' });
+      
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${docType}-${applicationId}.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  };
 
   const handlePrint = (docType: DocumentType) => {
     const printRef = printRefs.current[docType];
@@ -473,6 +492,7 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
                         size="sm"
                         variant="outline"
                         className="w-full"
+                        onClick={() => handleDownload(doc.key)}
                         disabled={!isGenerated}
                         title="Download"
                       >
