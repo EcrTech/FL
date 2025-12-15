@@ -15,7 +15,7 @@ interface EligibilityCalculatorProps {
 }
 
 const POLICY_RULES = [
-  { key: "age", name: "Age Check", description: "Age between 21-58 years", critical: true },
+  { key: "age", name: "Age Check", description: "Age between 21-58 years", critical: false },
   { key: "income", name: "Minimum Income", description: "Net monthly income ≥ ₹25,000", critical: true },
   { key: "employment", name: "Employment Stability", description: "Min 1 year in current company", critical: false },
   { key: "credit_score", name: "Credit Score", description: "CIBIL score ≥ 650", critical: true },
