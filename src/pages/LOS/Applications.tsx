@@ -122,7 +122,7 @@ export default function Applications() {
   });
 
   const pagination = usePagination({
-    defaultPageSize: 10,
+    defaultPageSize: 25,
     totalRecords: filteredApplications.length,
   });
 
