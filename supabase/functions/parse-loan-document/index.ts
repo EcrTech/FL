@@ -157,10 +157,16 @@ serve(async (req) => {
       throw new Error(`Failed to download document: ${downloadError.message}`);
     }
 
-    // Convert to base64
+    // Convert to base64 without using spread (avoids "Maximum call stack size" for large files)
     const arrayBuffer = await fileData.arrayBuffer();
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+    const bytes = new Uint8Array(arrayBuffer);
+    let binary = "";
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    const base64 = btoa(binary);
     
+
     // Detect file type from path or content
     const fileExtension = filePath.split('.').pop()?.toLowerCase() || '';
     const isPdf = fileExtension === 'pdf' || fileData.type === 'application/pdf';
