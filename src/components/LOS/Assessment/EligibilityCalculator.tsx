@@ -376,7 +376,6 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
         .update({
           current_stage: "approved",
           status: "approved",
-          remarks: remarks,
         })
         .eq("id", applicationId);
       
@@ -406,7 +405,6 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
         .update({
           current_stage: "rejected",
           status: "rejected",
-          remarks: remarks,
         })
         .eq("id", applicationId);
       
