@@ -192,14 +192,15 @@ export function PANVerificationStep({
         </Card>
       )}
 
-      {/* Verification Buttons */}
+      {/* Optional Verification Button */}
       {!isVerified && isValidPan && (
         <div className="space-y-3">
           {!accessToken ? (
             <Button
               onClick={authenticate}
               disabled={authenticating}
-              className="w-full h-12 font-heading font-semibold bg-[hsl(var(--ocean-500))] hover:bg-[hsl(var(--ocean-500))]/90 text-white rounded-xl"
+              variant="outline"
+              className="w-full h-12 font-heading font-semibold rounded-xl border-2 border-primary text-primary hover:bg-primary/10"
             >
               {authenticating ? (
                 <>
@@ -217,7 +218,8 @@ export function PANVerificationStep({
             <Button
               onClick={verifyPan}
               disabled={verifying}
-              className="w-full h-12 font-heading font-bold btn-electric rounded-xl"
+              variant="outline"
+              className="w-full h-12 font-heading font-semibold rounded-xl border-2 border-primary text-primary hover:bg-primary/10"
             >
               {verifying ? (
                 <>
@@ -232,21 +234,22 @@ export function PANVerificationStep({
               )}
             </Button>
           )}
-          
-          <Button
-            onClick={skipVerification}
-            variant="outline"
-            className="w-full h-12 font-heading font-semibold rounded-xl border-2"
-          >
-            Skip Verification & Continue
-          </Button>
         </div>
       )}
 
-      {/* Next Button */}
+      {/* Next Button - always enabled when PAN is valid */}
       <Button
-        onClick={onNext}
-        disabled={!isVerified}
+        onClick={() => {
+          if (!isVerified && isValidPan) {
+            // Save as unverified and continue
+            onVerified({
+              name: 'Pending Verification',
+              status: 'Not Verified',
+            });
+          }
+          onNext();
+        }}
+        disabled={!isValidPan}
         className="w-full h-14 text-lg font-heading font-bold btn-electric rounded-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
       >
         Continue to Aadhaar Verification
