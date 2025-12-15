@@ -208,6 +208,8 @@ Deno.serve(async (req) => {
           application_number: applicationNumber,
           product_type: formConfig.product_type || 'personal_loan',
           requested_amount: applicant.requestedAmount || 50000,
+          tenure_months: 12, // Default 12 months for referral applications
+          tenure_days: 365, // Default 365 days for referral applications
           current_stage: 'application_login',
           status: 'in_progress',
           source: 'referral_link',
