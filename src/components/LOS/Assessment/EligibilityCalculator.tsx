@@ -36,9 +36,35 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
     foir_percentage: "0",
     max_allowed_foir: "50",
     eligible_loan_amount: "",
-    recommended_tenure: "",
-    recommended_interest_rate: "12",
+    recommended_tenure: "30",
+    recommended_interest_rate: "1",
+    loan_amount: "",
   });
+
+  // Auto-calculate net income when gross income or deductions change
+  useEffect(() => {
+    const gross = parseFloat(formData.gross_income) || 0;
+    const deductions = parseFloat(formData.total_deductions) || 0;
+    const netIncome = gross - deductions;
+    if (gross > 0) {
+      setFormData(prev => ({ ...prev, net_income: netIncome > 0 ? netIncome.toString() : "0" }));
+    }
+  }, [formData.gross_income, formData.total_deductions]);
+
+  // Auto-calculate proposed EMI based on loan amount, tenure (days), and daily interest rate
+  useEffect(() => {
+    const loanAmount = parseFloat(formData.loan_amount) || 0;
+    const tenureDays = parseInt(formData.recommended_tenure) || 30;
+    const dailyInterestRate = parseFloat(formData.recommended_interest_rate) || 1;
+    
+    if (loanAmount > 0 && tenureDays > 0) {
+      // Simple interest calculation: Total Interest = Principal * Rate * Time
+      const totalInterest = loanAmount * (dailyInterestRate / 100) * tenureDays;
+      const totalRepayment = loanAmount + totalInterest;
+      const proposedEMI = totalRepayment; // Total amount to be repaid
+      setFormData(prev => ({ ...prev, proposed_emi: Math.round(proposedEMI).toString() }));
+    }
+  }, [formData.loan_amount, formData.recommended_tenure, formData.recommended_interest_rate]);
 
   const [policyChecks, setPolicyChecks] = useState<Record<string, { passed: boolean; details: string }>>({});
   const [hasCalculated, setHasCalculated] = useState(false);
@@ -92,8 +118,9 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
         foir_percentage: existingEligibility.foir_percentage?.toString() || "0",
         max_allowed_foir: existingEligibility.max_allowed_foir?.toString() || "50",
         eligible_loan_amount: existingEligibility.eligible_loan_amount?.toString() || "",
-        recommended_tenure: existingEligibility.recommended_tenure_days ? Math.round(existingEligibility.recommended_tenure_days / 30).toString() : "",
-        recommended_interest_rate: existingEligibility.recommended_interest_rate?.toString() || "12",
+        recommended_tenure: existingEligibility.recommended_tenure_days?.toString() || "30",
+        recommended_interest_rate: existingEligibility.recommended_interest_rate?.toString() || "1",
+        loan_amount: "",
       });
       setPolicyChecks(existingEligibility.policy_checks as any || {});
       setHasCalculated(true);
@@ -115,17 +142,18 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
     const netIncome = parseFloat(formData.net_income) || 0;
     const existingEMI = parseFloat(formData.existing_emi_obligations) || 0;
     const maxFOIR = parseFloat(formData.max_allowed_foir) || 50;
-    const interestRate = parseFloat(formData.recommended_interest_rate) || 12;
-    const tenure = parseInt(formData.recommended_tenure) || 36;
+    const dailyInterestRate = parseFloat(formData.recommended_interest_rate) || 1;
+    const tenureDays = parseInt(formData.recommended_tenure) || 30;
 
-    // Calculate max EMI based on FOIR
-    const maxEMI = (netIncome * maxFOIR / 100) - existingEMI;
+    // Calculate max repayment capacity based on FOIR
+    const maxRepayment = (netIncome * maxFOIR / 100) - existingEMI;
 
-    // Calculate loan amount using EMI formula: P = (EMI * n) / (1 + r/12)^n - 1) / (r/12 * (1 + r/12)^n)
-    const monthlyRate = interestRate / 12 / 100;
-    const eligibleAmount = maxEMI * ((Math.pow(1 + monthlyRate, tenure) - 1) / (monthlyRate * Math.pow(1 + monthlyRate, tenure)));
+    // For simple daily interest: Total = Principal * (1 + rate * days)
+    // So Principal = Total / (1 + rate * days)
+    const totalInterestMultiplier = 1 + (dailyInterestRate / 100) * tenureDays;
+    const eligibleAmount = maxRepayment / totalInterestMultiplier;
 
-    return Math.round(eligibleAmount);
+    return Math.round(eligibleAmount > 0 ? eligibleAmount : 0);
   };
 
   const runPolicyChecks = () => {
@@ -293,8 +321,9 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
               <Input
                 type="number"
                 value={formData.net_income}
-                onChange={(e) => setFormData({ ...formData, net_income: e.target.value })}
-                placeholder="75000"
+                readOnly
+                className="bg-muted"
+                placeholder="Auto-calculated"
               />
             </div>
           </div>
@@ -310,12 +339,12 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
               />
             </div>
             <div>
-              <Label>Proposed EMI (₹)</Label>
+              <Label>Loan Amount Requested (₹)</Label>
               <Input
                 type="number"
-                value={formData.proposed_emi}
-                onChange={(e) => setFormData({ ...formData, proposed_emi: e.target.value })}
-                placeholder="20000"
+                value={formData.loan_amount}
+                onChange={(e) => setFormData({ ...formData, loan_amount: e.target.value })}
+                placeholder="50000"
               />
             </div>
             <div>
@@ -329,24 +358,34 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
             </div>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-3">
             <div>
-              <Label>Recommended Tenure (months)</Label>
+              <Label>Recommended Tenure (days)</Label>
               <Input
                 type="number"
                 value={formData.recommended_tenure}
                 onChange={(e) => setFormData({ ...formData, recommended_tenure: e.target.value })}
-                placeholder="36"
+                placeholder="30"
               />
             </div>
             <div>
-              <Label>Interest Rate (% p.a.)</Label>
+              <Label>Interest Rate (% per day)</Label>
               <Input
                 type="number"
                 step="0.01"
                 value={formData.recommended_interest_rate}
                 onChange={(e) => setFormData({ ...formData, recommended_interest_rate: e.target.value })}
-                placeholder="12"
+                placeholder="1"
+              />
+            </div>
+            <div>
+              <Label>Total Repayment (₹)</Label>
+              <Input
+                type="number"
+                value={formData.proposed_emi}
+                readOnly
+                className="bg-muted"
+                placeholder="Auto-calculated"
               />
             </div>
           </div>
