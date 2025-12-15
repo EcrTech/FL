@@ -83,6 +83,7 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
   });
   const [videoKycOpen, setVideoKycOpen] = useState(false);
   const [cibilDialogOpen, setCibilDialogOpen] = useState(false);
+  const [fetchingCibil, setFetchingCibil] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   const { data: documents = [] } = useQuery({
@@ -227,6 +228,69 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
 
   const handleParse = (docType: string, docId: string, filePath: string) => {
     parseMutation.mutate({ docType, docId, filePath });
+  };
+
+  // Mock CIBIL fetch mutation
+  const cibilFetchMutation = useMutation({
+    mutationFn: async () => {
+      setFetchingCibil(true);
+      
+      // Simulate API call delay (1.5-2.5 seconds)
+      await new Promise((resolve) => setTimeout(resolve, 1500 + Math.random() * 1000));
+      
+      // Generate mock CIBIL data
+      const mockCibilData = {
+        credit_score: Math.floor(650 + Math.random() * 200), // 650-850
+        bureau_type: "CIBIL",
+        active_accounts: Math.floor(2 + Math.random() * 6),
+        total_outstanding: Math.floor(50000 + Math.random() * 500000),
+        total_overdue: Math.floor(Math.random() * 20000),
+        enquiry_last_30_days: Math.floor(Math.random() * 3),
+        enquiry_last_90_days: Math.floor(Math.random() * 5),
+        max_dpd_history: Math.floor(Math.random() * 30),
+        oldest_account_age_months: Math.floor(24 + Math.random() * 120),
+        credit_utilization: Math.floor(20 + Math.random() * 50),
+        fetched_at: new Date().toISOString(),
+      };
+
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Save to loan_verifications
+      const { error } = await supabase.from("loan_verifications").upsert({
+        loan_application_id: applicationId,
+        org_id: orgId,
+        verification_type: "credit_bureau",
+        status: "success",
+        verified_at: new Date().toISOString(),
+        verified_by: user?.id,
+        response_data: mockCibilData,
+        request_data: { pan_number: applicant?.pan_number || "XXXXX0000X", source: "mock_api" },
+      }, {
+        onConflict: "loan_application_id,verification_type",
+      });
+
+      if (error) throw error;
+      
+      return mockCibilData;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["loan-verifications", applicationId] });
+      toast({ 
+        title: "CIBIL Score Fetched", 
+        description: `Credit Score: ${data.credit_score} (${data.credit_score >= 750 ? "Excellent" : data.credit_score >= 700 ? "Good" : data.credit_score >= 650 ? "Fair" : "Poor"})`,
+      });
+      setFetchingCibil(false);
+      // Auto-expand the row to show details
+      setExpandedRows((prev) => new Set(prev).add("cibil_report"));
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to fetch CIBIL", description: error.message, variant: "destructive" });
+      setFetchingCibil(false);
+    },
+  });
+
+  const handleFetchCibil = () => {
+    cibilFetchMutation.mutate();
   };
 
   const handleViewDocument = async (filePath: string, fileName: string) => {
@@ -541,15 +605,32 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
 
     if (docType === "cibil_report") {
       return (
-        <Button
-          size="sm"
-          variant={verification?.status === "success" ? "outline" : "default"}
-          onClick={() => setCibilDialogOpen(true)}
-          className="gap-1"
-        >
-          <CreditCard className="h-4 w-4" />
-          {verification?.status === "success" ? "Update" : "Fetch"} CIBIL
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant={verification?.status === "success" ? "outline" : "default"}
+            onClick={handleFetchCibil}
+            disabled={fetchingCibil}
+            className="gap-1"
+          >
+            {fetchingCibil ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <CreditCard className="h-4 w-4" />
+            )}
+            {fetchingCibil ? "Fetching..." : verification?.status === "success" ? "Re-fetch" : "Fetch"} CIBIL
+          </Button>
+          {verification?.status === "success" && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setCibilDialogOpen(true)}
+              className="gap-1"
+            >
+              Manual Entry
+            </Button>
+          )}
+        </div>
       );
     }
 
