@@ -247,7 +247,7 @@ export default function EMIDashboard({ applicationId }: EMIDashboardProps) {
       )}
 
       {/* Generate or View Schedule */}
-      {emiStats && emiStats.totalEMIs === 0 ? (
+      {emiStats && emiStats.totalEMIs === 0 && application && sanction && disbursement ? (
         <EMIScheduleGenerator
           applicationId={applicationId}
           application={{
@@ -258,12 +258,12 @@ export default function EMIDashboard({ applicationId }: EMIDashboardProps) {
           sanction={{ id: sanction.id }}
           disbursement={disbursement}
         />
-      ) : (
+      ) : emiStats && emiStats.totalEMIs > 0 ? (
         <>
           <EMIScheduleTable applicationId={applicationId} />
           <PaymentHistoryTable applicationId={applicationId} />
         </>
-      )}
+      ) : null}
     </div>
   );
 }
