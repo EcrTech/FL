@@ -139,7 +139,7 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
       try {
         const session = await supabase.auth.getSession();
         const result = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/loan_applicants?loan_application_id=eq.${applicationId}&is_primary=eq.true&select=first_name,last_name,mobile,alternate_mobile,email,current_address,pan_number,aadhaar_number`,
+          `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/loan_applicants?loan_application_id=eq.${applicationId}&applicant_type=eq.primary&select=first_name,last_name,mobile,alternate_mobile,email,current_address,pan_number,aadhaar_number`,
           {
             headers: {
               'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
