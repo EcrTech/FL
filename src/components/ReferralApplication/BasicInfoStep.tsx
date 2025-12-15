@@ -146,7 +146,7 @@ export function BasicInfoStep({
   const allConsentsChecked = consents.householdIncome && consents.termsAndConditions && consents.aadhaarConsent;
   const isValidPhone = formData.phone.replace(/\D/g, '').length === 10;
   const isValidLoanAmount = formData.requestedAmount >= 5000 && formData.requestedAmount <= 100000;
-  const isValidTenure = formData.tenureDays >= 30 && formData.tenureDays <= 365;
+  const isValidTenure = formData.tenureDays >= 1 && formData.tenureDays <= 365;
   const canProceed = formData.name && isValidPhone && isValidLoanAmount && isValidTenure && allConsentsChecked;
 
   return (
@@ -207,22 +207,22 @@ export function BasicInfoStep({
           <Input
             id="tenureDays"
             type="number"
-            placeholder="Enter tenure in days (30 - 365)"
+            placeholder="Enter tenure in days (1 - 365)"
             value={formData.tenureDays || ''}
             onChange={(e) => {
               const value = parseInt(e.target.value) || 0;
               onUpdate({ tenureDays: value });
             }}
-            min={30}
+            min={1}
             max={365}
             className="h-12 bg-background border-2 border-border rounded-xl text-base font-body focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
           />
           <p className="text-xs text-muted-foreground font-body">
-            Minimum 30 days • Maximum 365 days
+            Minimum 1 day • Maximum 365 days
           </p>
-          {formData.tenureDays > 0 && (formData.tenureDays < 30 || formData.tenureDays > 365) && (
+          {formData.tenureDays > 0 && (formData.tenureDays < 1 || formData.tenureDays > 365) && (
             <p className="text-xs text-[hsl(var(--coral-500))] font-body">
-              Please enter a tenure between 30 and 365 days
+              Please enter a tenure between 1 and 365 days
             </p>
           )}
         </div>
