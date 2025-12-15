@@ -93,8 +93,8 @@ export default function Sanctions() {
                     <TableHead>Application No.</TableHead>
                     <TableHead>Applicant</TableHead>
                     <TableHead>Loan Type</TableHead>
-                    <TableHead>Requested Amount</TableHead>
-                    <TableHead>Tenure</TableHead>
+                    <TableHead>Approved Amount</TableHead>
+                    <TableHead>Approved Tenure</TableHead>
                     <TableHead>Approved Date</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -112,9 +112,9 @@ export default function Sanctions() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {formatCurrency(app.requested_amount || 0)}
+                        {app.approved_amount ? formatCurrency(app.approved_amount) : "N/A"}
                       </TableCell>
-                      <TableCell>{app.requested_tenure || "N/A"} months</TableCell>
+                      <TableCell>{app.approved_tenure ? `${app.approved_tenure} months` : "N/A"}</TableCell>
                       <TableCell>
                         {format(new Date(app.updated_at), "dd MMM yyyy")}
                       </TableCell>
