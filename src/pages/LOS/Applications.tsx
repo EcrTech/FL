@@ -10,10 +10,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Eye, Clock, FileText, Sparkles, UserPlus, Filter } from "lucide-react";
-import { differenceInHours } from "date-fns";
-import { format } from "date-fns";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Plus, Search, Eye, FileText, Sparkles, UserPlus } from "lucide-react";
+import { differenceInHours, format } from "date-fns";
 import { LoadingState } from "@/components/common/LoadingState";
+import { usePagination } from "@/hooks/usePagination";
+import PaginationControls from "@/components/common/PaginationControls";
 
 const STAGE_LABELS: Record<string, string> = {
   application_login: "Application Login",
@@ -70,6 +72,7 @@ export default function Applications() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [stageFilter, setStageFilter] = useState("all");
+
   const isFreshApplication = (createdAt: string) => {
     return differenceInHours(new Date(), new Date(createdAt)) < 48;
   };
@@ -98,13 +101,9 @@ export default function Applications() {
   });
 
   const filteredApplications = applications.filter((app) => {
-    // Filter by status
     if (statusFilter !== "all" && app.status !== statusFilter) return false;
-    
-    // Filter by stage
     if (stageFilter !== "all" && app.current_stage !== stageFilter) return false;
     
-    // Filter by search query
     const searchLower = searchQuery.toLowerCase();
     if (!searchLower) return true;
     
@@ -122,12 +121,32 @@ export default function Applications() {
     );
   });
 
+  const pagination = usePagination({
+    defaultPageSize: 10,
+    totalRecords: filteredApplications.length,
+  });
+
+  const paginatedApplications = filteredApplications.slice(
+    (pagination.currentPage - 1) * pagination.pageSize,
+    pagination.currentPage * pagination.pageSize
+  );
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
       currency: "INR",
       maximumFractionDigits: 0,
     }).format(amount);
+  };
+
+  const getApplicantName = (app: any) => {
+    if (app.loan_applicants?.[0]) {
+      return `${app.loan_applicants[0].first_name} ${app.loan_applicants[0].last_name || ""}`.trim();
+    }
+    if (app.contacts) {
+      return `${app.contacts.first_name} ${app.contacts.last_name || ""}`.trim();
+    }
+    return "Not linked";
   };
 
   if (isLoading) {
@@ -194,7 +213,7 @@ export default function Applications() {
           </Select>
         </div>
 
-        {/* Applications List */}
+        {/* Applications Table */}
         <Card>
           <CardHeader>
             <CardTitle>All Applications</CardTitle>
@@ -218,82 +237,86 @@ export default function Applications() {
                 </Button>
               </div>
             ) : (
-                <div className="space-y-4">
-                  {filteredApplications.map((app) => (
-                    <div
-                      key={app.id}
-                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
-                      onClick={() => navigate(`/los/applications/${app.id}`)}
-                    >
-                      <div className="flex-1 space-y-2">
-                        <div className="flex items-center gap-3 flex-wrap">
-                          <span className="font-mono font-semibold">
-                            {app.application_number}
-                          </span>
-                          {isFreshApplication(app.created_at) ? (
-                            <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white border-0">
-                              <Sparkles className="h-3 w-3 mr-1" />
-                              NEW
-                            </Badge>
-                          ) : (
-                            <Badge className={STATUS_COLORS[app.status] || "bg-muted"}>
-                              {app.status.replace("_", " ").toUpperCase()}
-                            </Badge>
-                          )}
+              <div className="space-y-4">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Application #</TableHead>
+                      <TableHead>Applicant</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Stage</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Tenure</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedApplications.map((app) => (
+                      <TableRow
+                        key={app.id}
+                        className="cursor-pointer"
+                        onClick={() => navigate(`/los/applications/${app.id}`)}
+                      >
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-medium">{app.application_number}</span>
+                            {isFreshApplication(app.created_at) && (
+                              <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white border-0">
+                                <Sparkles className="h-3 w-3 mr-1" />
+                                NEW
+                              </Badge>
+                            )}
+                            {app.source === "referral_link" && (
+                              <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 border-blue-500/20">
+                                <UserPlus className="h-3 w-3 mr-1" />
+                                Referral
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>{getApplicantName(app)}</TableCell>
+                        <TableCell>
+                          <Badge className={STATUS_COLORS[app.status] || "bg-muted"}>
+                            {app.status.replace("_", " ").toUpperCase()}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
                           <Badge variant="outline">
                             {STAGE_LABELS[app.current_stage] || app.current_stage}
                           </Badge>
-                          {app.source === "referral_link" && (
-                            <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 border-blue-500/20">
-                              <UserPlus className="h-3 w-3 mr-1" />
-                              Referral
-                            </Badge>
-                          )}
-                        </div>
+                        </TableCell>
+                        <TableCell>{formatCurrency(app.requested_amount)}</TableCell>
+                        <TableCell>{app.tenure_days} days</TableCell>
+                        <TableCell>{format(new Date(app.created_at), "MMM dd, yyyy")}</TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/los/applications/${app.id}`);
+                            }}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
 
-                        <div className="grid gap-2 md:grid-cols-3 text-sm text-muted-foreground">
-                          <div>
-                            <span className="font-medium">Applicant: </span>
-                            {app.loan_applicants?.[0]
-                              ? `${app.loan_applicants[0].first_name} ${app.loan_applicants[0].last_name || ""}`
-                              : app.contacts
-                                ? `${app.contacts.first_name} ${app.contacts.last_name || ""}`
-                                : "Not linked"}
-                          </div>
-                          <div>
-                            <span className="font-medium">Amount: </span>
-                            {formatCurrency(app.requested_amount)}
-                          </div>
-                          <div>
-                            <span className="font-medium">Tenure: </span>
-                            {app.tenure_days} days
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {format(new Date(app.created_at), "MMM dd, yyyy")}
-                          </div>
-                          {(app as any).assigned_profile && (
-                            <div>
-                              Assigned to: {(app as any).assigned_profile.first_name} {(app as any).assigned_profile.last_name}
-                            </div>
-                          )}
-                          {(app as any).referrer?.full_name && (
-                            <div className="text-blue-600">
-                              Referred by: {(app as any).referrer.full_name}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <Button variant="ghost" size="icon">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
+                <PaginationControls
+                  currentPage={pagination.currentPage}
+                  totalPages={pagination.totalPages}
+                  pageSize={pagination.pageSize}
+                  totalRecords={filteredApplications.length}
+                  startRecord={pagination.startRecord}
+                  endRecord={pagination.endRecord}
+                  onPageChange={pagination.setPage}
+                  onPageSizeChange={pagination.setPageSize}
+                />
+              </div>
             )}
           </CardContent>
         </Card>
