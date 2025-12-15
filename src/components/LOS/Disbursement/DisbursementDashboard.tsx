@@ -426,7 +426,7 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
                   <CardContent className="p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <FileText className="h-5 w-5 text-primary" />
+                        <FileText className={`h-5 w-5 ${isGenerated ? "text-green-600" : "text-primary"}`} />
                         <span className="font-medium text-sm">{doc.shortLabel}</span>
                       </div>
                       {isGenerated && (
