@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Calculator, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { Calculator, CheckCircle, XCircle, TrendingUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface EligibilityCalculatorProps {
@@ -107,7 +107,70 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
     enabled: !!applicationId,
   });
 
+  // Fetch salary slip documents for income calculation
+  const { data: salaryDocs = [] } = useQuery({
+    queryKey: ["loan-salary-docs", applicationId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("loan_documents")
+        .select("*")
+        .eq("loan_application_id", applicationId)
+        .in("document_type", ["salary_slip_1", "salary_slip_2", "salary_slip_3"]);
+
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!applicationId,
+    staleTime: 0,
+  });
+
+  // Calculate income averages from salary slips
+  const incomeFromSalarySlips = useMemo(() => {
+    const salaries: { gross: number; net: number }[] = [];
+
+    salaryDocs.forEach((doc: any) => {
+      if (doc.ocr_data) {
+        const ocrData = doc.ocr_data;
+        const gross = parseFloat(ocrData.gross_salary) || parseFloat(ocrData.gross_earnings) || 0;
+        const net = parseFloat(ocrData.net_salary) || parseFloat(ocrData.net_pay) || 0;
+        if (gross > 0 || net > 0) {
+          salaries.push({ gross, net });
+        }
+      }
+    });
+
+    if (salaries.length === 0) return null;
+
+    const avgGross = Math.round(salaries.reduce((sum, s) => sum + s.gross, 0) / salaries.length);
+    const avgNet = Math.round(salaries.reduce((sum, s) => sum + s.net, 0) / salaries.length);
+
+    return {
+      avgGross,
+      avgNet,
+      deductions: avgGross - avgNet,
+      slipsCount: salaries.length,
+    };
+  }, [salaryDocs]);
+
+  // Calculate maximum eligible amount for display
+  const maxEligibleAmount = useMemo(() => {
+    const netIncome = parseFloat(formData.net_income) || 0;
+    const existingEMI = parseFloat(formData.existing_emi_obligations) || 0;
+    const maxFOIR = parseFloat(formData.max_allowed_foir) || 50;
+    const dailyInterestRate = parseFloat(formData.recommended_interest_rate) || 1;
+    const tenureDays = parseInt(formData.recommended_tenure) || 30;
+
+    if (netIncome === 0) return 0;
+
+    const maxRepayment = (netIncome * maxFOIR / 100) - existingEMI;
+    const totalInterestMultiplier = 1 + (dailyInterestRate / 100) * tenureDays;
+    const eligibleAmount = maxRepayment / totalInterestMultiplier;
+
+    return Math.round(eligibleAmount > 0 ? eligibleAmount : 0);
+  }, [formData.net_income, formData.existing_emi_obligations, formData.max_allowed_foir, formData.recommended_interest_rate, formData.recommended_tenure]);
+
   useEffect(() => {
+    // Priority 1: Use existing saved eligibility
     if (existingEligibility) {
       setFormData({
         gross_income: existingEligibility.gross_income?.toString() || "",
@@ -120,12 +183,25 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
         eligible_loan_amount: existingEligibility.eligible_loan_amount?.toString() || "",
         recommended_tenure: existingEligibility.recommended_tenure_days?.toString() || "30",
         recommended_interest_rate: existingEligibility.recommended_interest_rate?.toString() || "1",
-        loan_amount: "",
+        loan_amount: application?.requested_amount?.toString() || "",
       });
       setPolicyChecks(existingEligibility.policy_checks as any || {});
       setHasCalculated(true);
+      return;
     }
-  }, [existingEligibility]);
+
+    // Priority 2: Auto-populate from salary slips and application data
+    if (incomeFromSalarySlips || application) {
+      setFormData(prev => ({
+        ...prev,
+        gross_income: incomeFromSalarySlips?.avgGross?.toString() || prev.gross_income,
+        net_income: incomeFromSalarySlips?.avgNet?.toString() || prev.net_income,
+        total_deductions: incomeFromSalarySlips?.deductions?.toString() || prev.total_deductions,
+        loan_amount: application?.requested_amount?.toString() || prev.loan_amount,
+        recommended_tenure: application?.tenure_days?.toString() || prev.recommended_tenure || "30",
+      }));
+    }
+  }, [existingEligibility, incomeFromSalarySlips, application]);
 
   const calculateFOIR = () => {
     const netIncome = parseFloat(formData.net_income) || 0;
@@ -288,12 +364,41 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
 
   return (
     <div className="space-y-6">
+      {/* Max Eligibility Banner */}
+      {formData.net_income && parseFloat(formData.net_income) > 0 && (
+        <Card className="border-primary/50 bg-primary/5">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-full bg-primary/10">
+                  <TrendingUp className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Maximum Eligible Loan Amount</p>
+                  <p className="text-2xl font-bold text-primary">
+                    ₹{maxEligibleAmount.toLocaleString()}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right text-sm text-muted-foreground">
+                <p>Based on {formData.max_allowed_foir}% FOIR</p>
+                <p>{formData.recommended_tenure} days @ {formData.recommended_interest_rate}%/day</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Income & Obligations</CardTitle>
-              <CardDescription>Enter applicant's income and existing obligations</CardDescription>
+              <CardDescription>
+                {incomeFromSalarySlips 
+                  ? `Auto-populated from ${incomeFromSalarySlips.slipsCount} salary slip(s)` 
+                  : "Enter applicant's income and existing obligations"}
+              </CardDescription>
             </div>
             <Calculator className="h-5 w-5 text-muted-foreground" />
           </div>
