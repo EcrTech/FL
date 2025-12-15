@@ -39,6 +39,7 @@ export default function ReferralLoanApplication() {
     name: "",
     email: "",
     phone: "",
+    requestedAmount: 0,
   });
 
   const [consents, setConsents] = useState({
@@ -138,6 +139,7 @@ export default function ReferralLoanApplication() {
           name: basicInfo.name,
           email: basicInfo.email,
           phone: basicInfo.phone,
+          requestedAmount: basicInfo.requestedAmount,
           pan: panNumber,
           panVerified,
           panName: panData?.name,

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Check, Loader2, User, Mail, Phone, Clock, ArrowRight } from "lucide-react";
+import { Check, Loader2, User, Mail, Phone, Clock, ArrowRight, IndianRupee } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -13,8 +13,9 @@ interface BasicInfoStepProps {
     name: string;
     email: string;
     phone: string;
+    requestedAmount: number;
   };
-  onUpdate: (data: Partial<{ name: string; email: string; phone: string }>) => void;
+  onUpdate: (data: Partial<{ name: string; email: string; phone: string; requestedAmount: number }>) => void;
   consents: {
     householdIncome: boolean;
     termsAndConditions: boolean;
@@ -143,7 +144,8 @@ export function BasicInfoStep({
 
   const allConsentsChecked = consents.householdIncome && consents.termsAndConditions && consents.aadhaarConsent;
   const isValidPhone = formData.phone.replace(/\D/g, '').length === 10;
-  const canProceed = formData.name && isValidPhone && allConsentsChecked;
+  const isValidLoanAmount = formData.requestedAmount >= 5000 && formData.requestedAmount <= 100000;
+  const canProceed = formData.name && isValidPhone && isValidLoanAmount && allConsentsChecked;
 
   return (
     <div className="space-y-8">
@@ -160,6 +162,40 @@ export function BasicInfoStep({
 
       {/* Form Fields */}
       <div className="space-y-6">
+        {/* Loan Amount Field - First and Mandatory */}
+        <div className="space-y-2">
+          <Label htmlFor="loanAmount" className="text-sm font-heading font-semibold text-foreground flex items-center gap-2">
+            <IndianRupee className="h-4 w-4 text-muted-foreground" />
+            Loan Amount Required <span className="text-[hsl(var(--coral-500))]">*</span>
+          </Label>
+          <div className="relative">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-heading font-semibold text-sm">
+              ₹
+            </div>
+            <Input
+              id="loanAmount"
+              type="number"
+              placeholder="Enter amount (₹5,000 - ₹1,00,000)"
+              value={formData.requestedAmount || ''}
+              onChange={(e) => {
+                const value = parseInt(e.target.value) || 0;
+                onUpdate({ requestedAmount: value });
+              }}
+              min={5000}
+              max={100000}
+              className="h-12 bg-background border-2 border-border rounded-xl pl-10 text-base font-body focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground font-body">
+            Minimum ₹5,000 • Maximum ₹1,00,000
+          </p>
+          {formData.requestedAmount > 0 && (formData.requestedAmount < 5000 || formData.requestedAmount > 100000) && (
+            <p className="text-xs text-[hsl(var(--coral-500))] font-body">
+              Please enter an amount between ₹5,000 and ₹1,00,000
+            </p>
+          )}
+        </div>
+
         {/* Name Field */}
         <div className="space-y-2">
           <Label htmlFor="name" className="text-sm font-heading font-semibold text-foreground">
