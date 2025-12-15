@@ -54,6 +54,7 @@ import LOSDashboard from "./pages/LOS/Dashboard";
 import MyReferrals from "./pages/LOS/MyReferrals";
 import Collections from "./pages/LOS/Collections";
 import Sanctions from "./pages/LOS/Sanctions";
+import SanctionDetail from "./pages/LOS/SanctionDetail";
 import ReferralLoanApplication from "./pages/ReferralLoanApplication";
 import NegativePinCodes from "./pages/NegativePinCodes";
 import Profile from "./pages/Profile";
@@ -314,6 +315,12 @@ const App = () => (
           <Route path="/los/sanctions" element={
             <ProtectedRoute>
               <Sanctions />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/los/sanctions/:id" element={
+            <ProtectedRoute>
+              <SanctionDetail />
             </ProtectedRoute>
           } />
           
