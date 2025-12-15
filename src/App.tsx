@@ -52,6 +52,7 @@ import ApplicationDetail from "./pages/LOS/ApplicationDetail";
 import ApprovalQueuePage from "./pages/LOS/ApprovalQueue";
 import LOSDashboard from "./pages/LOS/Dashboard";
 import MyReferrals from "./pages/LOS/MyReferrals";
+import Collections from "./pages/LOS/Collections";
 import ReferralLoanApplication from "./pages/ReferralLoanApplication";
 import NegativePinCodes from "./pages/NegativePinCodes";
 import Profile from "./pages/Profile";
@@ -312,6 +313,12 @@ const App = () => (
           <Route path="/los/my-referrals" element={
             <ProtectedRoute>
               <MyReferrals />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/los/collections" element={
+            <ProtectedRoute>
+              <Collections />
             </ProtectedRoute>
           } />
           
