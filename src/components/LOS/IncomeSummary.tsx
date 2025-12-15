@@ -46,7 +46,7 @@ export default function IncomeSummary({ applicationId, orgId }: IncomeSummaryPro
   const queryClient = useQueryClient();
   const [isCalculating, setIsCalculating] = useState(false);
 
-  const { data: documents = [] } = useQuery({
+  const { data: documents = [], refetch: refetchDocuments, isLoading: isLoadingDocs } = useQuery({
     queryKey: ["loan-documents", applicationId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -57,6 +57,7 @@ export default function IncomeSummary({ applicationId, orgId }: IncomeSummaryPro
       return data;
     },
     enabled: !!applicationId,
+    staleTime: 0, // Always consider data stale to get latest parsed data
   });
 
   const { data: incomeSummary } = useQuery({
@@ -275,8 +276,20 @@ export default function IncomeSummary({ applicationId, orgId }: IncomeSummaryPro
   if (!hasData) {
     return (
       <Card>
-        <CardHeader className="py-4">
+        <CardHeader className="py-4 flex flex-row items-center justify-between">
           <CardTitle className="text-base">Income Summary</CardTitle>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => refetchDocuments()}
+            disabled={isLoadingDocs}
+          >
+            {isLoadingDocs ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+          </Button>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
@@ -289,6 +302,24 @@ export default function IncomeSummary({ applicationId, orgId }: IncomeSummaryPro
 
   return (
     <div className="space-y-4">
+      {/* Header with Refresh Button */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Income Summary</h3>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => refetchDocuments()}
+          disabled={isLoadingDocs}
+        >
+          {isLoadingDocs ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <RefreshCw className="h-4 w-4 mr-2" />
+          )}
+          Refresh
+        </Button>
+      </div>
+      
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
