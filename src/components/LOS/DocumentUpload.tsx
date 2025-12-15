@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Upload, CheckCircle, XCircle, Eye, Shield, Loader2, Wand2, Video, CreditCard, ChevronDown, ChevronRight } from "lucide-react";
+import { Upload, CheckCircle, XCircle, Eye, Shield, Loader2, Wand2, Video, CreditCard, ChevronDown, ChevronRight, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -85,6 +85,7 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
   const [cibilDialogOpen, setCibilDialogOpen] = useState(false);
   const [fetchingCibil, setFetchingCibil] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [isParsingAll, setIsParsingAll] = useState(false);
 
   const { data: documents = [] } = useQuery({
     queryKey: ["loan-documents", applicationId],
@@ -228,6 +229,59 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
 
   const handleParse = (docType: string, docId: string, filePath: string) => {
     parseMutation.mutate({ docType, docId, filePath });
+  };
+
+  // Parse all unparsed documents
+  const handleParseAll = async () => {
+    const parseableDocTypes = REQUIRED_DOCUMENTS.filter((d) => d.parseable).map((d) => d.type);
+    const unparsedDocs = documents.filter((doc) => {
+      if (!parseableDocTypes.includes(doc.document_type)) return false;
+      const ocr = doc.ocr_data as Record<string, any> | null;
+      // Include if no OCR data or if it has a parse error or if all values are empty/0
+      if (!ocr || Object.keys(ocr).length === 0) return true;
+      if (ocr.parse_error) return true;
+      return false;
+    });
+
+    if (unparsedDocs.length === 0) {
+      toast({ title: "All documents already parsed", description: "No documents need parsing" });
+      return;
+    }
+
+    setIsParsingAll(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const doc of unparsedDocs) {
+      try {
+        const { data, error } = await supabase.functions.invoke("parse-loan-document", {
+          body: { documentId: doc.id, documentType: doc.document_type, filePath: doc.file_path },
+        });
+
+        if (error || !data.success) {
+          console.error(`Failed to parse ${doc.document_type}:`, error || data.error);
+          errorCount++;
+        } else {
+          successCount++;
+        }
+      } catch (err) {
+        console.error(`Error parsing ${doc.document_type}:`, err);
+        errorCount++;
+      }
+    }
+
+    setIsParsingAll(false);
+    queryClient.invalidateQueries({ queryKey: ["loan-documents", applicationId] });
+    
+    if (errorCount === 0) {
+      toast({ title: "All documents parsed", description: `Successfully parsed ${successCount} documents` });
+    } else {
+      toast({ 
+        title: "Parsing completed with errors", 
+        description: `Parsed ${successCount}, failed ${errorCount}`,
+        variant: errorCount > successCount ? "destructive" : "default"
+      });
+    }
   };
 
   // Mock CIBIL fetch mutation
@@ -644,9 +698,38 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
     return acc;
   }, {} as Record<string, typeof REQUIRED_DOCUMENTS>);
 
+  // Count documents that need parsing
+  const parseableDocTypes = REQUIRED_DOCUMENTS.filter((d) => d.parseable).map((d) => d.type);
+  const unparsedCount = documents.filter((doc) => {
+    if (!parseableDocTypes.includes(doc.document_type)) return false;
+    const ocr = doc.ocr_data as Record<string, any> | null;
+    if (!ocr || Object.keys(ocr).length === 0) return true;
+    if (ocr.parse_error) return true;
+    return false;
+  }).length;
+
   return (
     <TooltipProvider>
       <div className="space-y-4">
+        {/* Parse All Button */}
+        {unparsedCount > 0 && (
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleParseAll}
+              disabled={isParsingAll}
+              className="gap-2"
+            >
+              {isParsingAll ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
+              {isParsingAll ? "Parsing..." : `Parse All Documents (${unparsedCount})`}
+            </Button>
+          </div>
+        )}
         {Object.entries(groupedDocs).map(([category, docs]) => (
           <Card key={category}>
             <CardHeader className="py-3 px-4">

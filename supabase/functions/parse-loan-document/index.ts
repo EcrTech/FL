@@ -160,14 +160,19 @@ serve(async (req) => {
     // Convert to base64
     const arrayBuffer = await fileData.arrayBuffer();
     const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-    const mimeType = fileData.type || "image/jpeg";
+    
+    // Detect file type from path or content
+    const fileExtension = filePath.split('.').pop()?.toLowerCase() || '';
+    const isPdf = fileExtension === 'pdf' || fileData.type === 'application/pdf';
+    const mimeType = isPdf ? 'application/pdf' : (fileData.type || "image/jpeg");
 
-    console.log(`[ParseDocument] File size: ${arrayBuffer.byteLength}, MIME: ${mimeType}`);
+    console.log(`[ParseDocument] File size: ${arrayBuffer.byteLength}, MIME: ${mimeType}, isPDF: ${isPdf}`);
 
     // Get the appropriate prompt for this document type
     const prompt = DOCUMENT_PROMPTS[documentType] || `Extract all relevant information from this document and return as JSON.`;
 
     // Call Lovable AI with vision capabilities
+    // Gemini 2.5 Flash supports both images and PDFs natively
     console.log(`[ParseDocument] Calling Lovable AI for parsing...`);
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -194,7 +199,7 @@ serve(async (req) => {
             ],
           },
         ],
-        max_tokens: 2000,
+        max_tokens: 4000,
       }),
     });
 
@@ -222,7 +227,7 @@ serve(async (req) => {
       const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
       const jsonStr = jsonMatch[1]?.trim() || content.trim();
       parsedData = JSON.parse(jsonStr);
-      console.log(`[ParseDocument] Parsed data:`, JSON.stringify(parsedData).substring(0, 200));
+      console.log(`[ParseDocument] Parsed data:`, JSON.stringify(parsedData).substring(0, 500));
     } catch (parseError) {
       console.error(`[ParseDocument] JSON parse error:`, parseError);
       // Store raw content if JSON parsing fails
