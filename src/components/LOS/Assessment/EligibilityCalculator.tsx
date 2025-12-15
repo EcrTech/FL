@@ -664,7 +664,9 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
             </CardHeader>
             <CardContent>
               {(() => {
-                const approvedAmount = parseFloat(formData.eligible_loan_amount || "0");
+                const requestedAmount = parseFloat(formData.loan_amount || "0");
+                const eligibleAmount = parseFloat(formData.eligible_loan_amount || "0");
+                const approvedAmount = Math.min(requestedAmount, eligibleAmount);
                 const dailyRate = parseFloat(formData.recommended_interest_rate || "1") / 100;
                 const tenure = parseInt(formData.recommended_tenure || "30");
                 const interestAmount = Math.round(approvedAmount * dailyRate * tenure);
@@ -679,7 +681,7 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
                         ₹{approvedAmount.toLocaleString()}
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">
-                        Based on eligibility
+                        {approvedAmount === requestedAmount ? "As requested" : "Based on eligibility"}
                       </div>
                     </div>
                     <div className="p-4 bg-background rounded-lg border">
