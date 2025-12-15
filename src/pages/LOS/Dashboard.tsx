@@ -58,14 +58,16 @@ export default function LOSDashboard() {
           "credit_assessment",
         ]);
 
-      // Total sanctioned amount
-      const { data: sanctions } = await supabase
-        .from("loan_sanctions")
-        .select("sanctioned_amount")
-        .eq("status", "active");
+      // Total sanctioned/approved amount - single source of truth from loan_applications
+      const { data: approvedApps } = await supabase
+        .from("loan_applications")
+        .select("approved_amount")
+        .eq("org_id", orgId)
+        .eq("status", "approved")
+        .not("approved_amount", "is", null);
 
-      const totalSanctioned = sanctions?.reduce(
-        (sum, s) => sum + s.sanctioned_amount,
+      const totalSanctioned = approvedApps?.reduce(
+        (sum, app) => sum + (app.approved_amount || 0),
         0
       ) || 0;
 
