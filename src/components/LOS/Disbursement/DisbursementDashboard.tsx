@@ -242,7 +242,7 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
         .from("loan_generated_documents")
         .insert({
           loan_application_id: applicationId,
-          sanction_id: sanction!.id,
+          sanction_id: sanction?.id || null,
           org_id: application!.org_id,
           document_type: docType,
           document_number: docNumber,
