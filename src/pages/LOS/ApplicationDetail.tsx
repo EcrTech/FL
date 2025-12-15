@@ -137,7 +137,24 @@ export default function ApplicationDetail() {
   // Merge document OCR data with verification data
   const panDocData = getParsedData("pan_card");
   const panVerData = getVerificationData("pan");
-  const panData: Record<string, any> | null = panDocData || panVerData ? { ...panVerData, ...panDocData } : null;
+  const panData: Record<string, any> | null = panDocData || panVerData
+    ? {
+        ...panVerData,
+        ...panDocData,
+        // Normalize common PAN fields from different sources
+        name: panDocData?.name || panVerData?.name_on_pan || panVerData?.name,
+        pan_number:
+          panDocData?.pan_number ||
+          (panVerData as any)?.pan_number ||
+          (panVerData as any)?.pan,
+        father_name: panDocData?.father_name || panVerData?.father_name,
+        dob: panDocData?.dob || panVerData?.dob,
+        status:
+          panDocData?.status ||
+          (panVerData as any)?.pan_status ||
+          (panVerData as any)?.status,
+      }
+    : null;
 
   const aadhaarDocData = getParsedData("aadhaar_card");
   const aadhaarVerData = getVerificationData("aadhaar");
