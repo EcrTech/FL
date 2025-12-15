@@ -1,16 +1,16 @@
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrgContext } from "@/hooks/useOrgContext";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, User, FileText, Calculator, FileCheck, DollarSign, XCircle, CreditCard, CheckCircle, MapPin } from "lucide-react";
+import { ArrowLeft, User, FileText, XCircle, CheckCircle, MapPin, Send } from "lucide-react";
 import { LoadingState } from "@/components/common/LoadingState";
 import { format } from "date-fns";
+import { toast } from "sonner";
 import DocumentUpload from "@/components/LOS/DocumentUpload";
 import DocumentDataVerification from "@/components/LOS/DocumentDataVerification";
 import IncomeSummary from "@/components/LOS/IncomeSummary";
@@ -20,6 +20,7 @@ import ApprovalHistory from "@/components/LOS/Approval/ApprovalHistory";
 import SanctionDashboard from "@/components/LOS/Sanction/SanctionDashboard";
 import DisbursementDashboard from "@/components/LOS/Disbursement/DisbursementDashboard";
 import EMIDashboard from "@/components/LOS/EMI/EMIDashboard";
+import WorkflowTimeline from "@/components/LOS/WorkflowTimeline";
 
 const STAGE_LABELS: Record<string, string> = {
   application_login: "Application Login",
@@ -46,8 +47,11 @@ const STATUS_COLORS: Record<string, string> = {
 export default function ApplicationDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isReviewMode = searchParams.get("mode") === "review";
   const { orgId, isLoading: isOrgLoading } = useOrgContext();
   const [approvalAction, setApprovalAction] = useState<"approve" | "reject" | null>(null);
+  const queryClient = useQueryClient();
 
   const { data: userData } = useQuery({
     queryKey: ["current-user"],
@@ -92,6 +96,25 @@ export default function ApplicationDetail() {
       return data;
     },
     enabled: !!id,
+  });
+
+  // Send for approval mutation
+  const sendForApprovalMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("loan_applications")
+        .update({ current_stage: "approval_pending" })
+        .eq("id", id)
+        .eq("org_id", orgId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["loan-application", id] });
+      toast.success("Application sent for approval");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to send for approval");
+    },
   });
 
   const formatCurrency = (amount: number) => {
@@ -147,6 +170,8 @@ export default function ApplicationDetail() {
   const primaryApplicant = application.loan_applicants?.[0];
   const tenureDays = application.tenure_days;
 
+  const canSendForApproval = ["application_login", "document_collection", "field_verification", "credit_assessment"].includes(application.current_stage);
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -173,7 +198,26 @@ export default function ApplicationDetail() {
               </p>
             </div>
           </div>
+          {canSendForApproval && (
+            <Button
+              onClick={() => sendForApprovalMutation.mutate()}
+              disabled={sendForApprovalMutation.isPending}
+            >
+              <Send className="h-4 w-4 mr-2" />
+              {sendForApprovalMutation.isPending ? "Sending..." : "Send for Approval"}
+            </Button>
+          )}
         </div>
+
+        {/* Workflow Timeline */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Application Progress</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <WorkflowTimeline currentStage={application.current_stage} status={application.status} />
+          </CardContent>
+        </Card>
 
         {/* Quick Stats */}
         <div className="grid gap-4 md:grid-cols-5">
@@ -403,52 +447,58 @@ export default function ApplicationDetail() {
 
           {/* Documents Section */}
           <DocumentUpload applicationId={application.id} orgId={orgId} applicant={primaryApplicant} />
-          <IncomeSummary applicationId={application.id} orgId={orgId} />
 
-          {/* Assessment Section */}
-          <AssessmentDashboard applicationId={application.id} orgId={orgId} />
-          
-          {/* Approval Actions - Only shown when stage is approval_pending */}
-          {application.current_stage === "approval_pending" && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Approval Actions</CardTitle>
-                <CardDescription>
-                  Review and take action on this loan application
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex gap-4">
-                  <Button
-                    variant="default"
-                    onClick={() => setApprovalAction("approve")}
-                  >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Approve Application
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    onClick={() => setApprovalAction("reject")}
-                  >
-                    <XCircle className="h-4 w-4 mr-2" />
-                    Reject Application
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+          {/* Review Mode Sections - Only shown when accessed from Approval Queue */}
+          {isReviewMode && (
+            <>
+              <IncomeSummary applicationId={application.id} orgId={orgId} />
+
+              {/* Assessment Section */}
+              <AssessmentDashboard applicationId={application.id} orgId={orgId} />
+              
+              {/* Approval Actions - Only shown when stage is approval_pending */}
+              {application.current_stage === "approval_pending" && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Approval Actions</CardTitle>
+                    <CardDescription>
+                      Review and take action on this loan application
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex gap-4">
+                      <Button
+                        variant="default"
+                        onClick={() => setApprovalAction("approve")}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Approve Application
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        onClick={() => setApprovalAction("reject")}
+                      >
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Reject Application
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Approval History */}
+              <ApprovalHistory applicationId={id!} />
+
+              {/* Sanction Section */}
+              <SanctionDashboard applicationId={application.id} orgId={orgId} />
+
+              {/* Disbursement Section */}
+              <DisbursementDashboard applicationId={application.id} />
+
+              {/* EMI Section */}
+              <EMIDashboard applicationId={application.id} />
+            </>
           )}
-
-          {/* Approval History */}
-          <ApprovalHistory applicationId={id!} />
-
-          {/* Sanction Section */}
-          <SanctionDashboard applicationId={application.id} orgId={orgId} />
-
-          {/* Disbursement Section */}
-          <DisbursementDashboard applicationId={application.id} />
-
-          {/* EMI Section */}
-          <EMIDashboard applicationId={application.id} />
         </div>
       </div>
 
