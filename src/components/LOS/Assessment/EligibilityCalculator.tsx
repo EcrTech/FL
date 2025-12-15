@@ -325,7 +325,7 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
         foir_percentage: parseFloat(formData.foir_percentage) || 0,
         max_allowed_foir: parseFloat(formData.max_allowed_foir) || 50,
         eligible_loan_amount: parseFloat(formData.eligible_loan_amount) || 0,
-        recommended_tenure: parseInt(formData.recommended_tenure) || null,
+        recommended_tenure_days: parseInt(formData.recommended_tenure) || null,
         recommended_interest_rate: parseFloat(formData.recommended_interest_rate) || null,
         policy_checks: policyChecks,
         is_eligible: POLICY_RULES.filter(r => r.critical).every(r => policyChecks[r.key]?.passed),
