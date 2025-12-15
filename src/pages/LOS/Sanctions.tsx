@@ -112,9 +112,11 @@ export default function Sanctions() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {formatCurrency(app.approved_amount || app.requested_amount || 0)}
+                        {app.approved_amount ? formatCurrency(app.approved_amount) : "—"}
                       </TableCell>
-                      <TableCell>{app.tenure_months || (app.tenure_days ? Math.round(app.tenure_days / 30) : "N/A")} months</TableCell>
+                      <TableCell>
+                        {app.tenure_days ? `${Math.round(app.tenure_days / 30)} months` : "—"}
+                      </TableCell>
                       <TableCell>
                         {format(new Date(app.updated_at), "dd MMM yyyy")}
                       </TableCell>

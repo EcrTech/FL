@@ -376,13 +376,27 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       
-      // Then update application status
+      // Calculate the approved amount (lesser of requested and eligible)
+      const requestedAmount = parseFloat(formData.loan_amount) || 0;
+      const eligibleAmount = parseFloat(formData.eligible_loan_amount) || 0;
+      const approvedAmount = eligibleAmount > 0 ? Math.min(requestedAmount, eligibleAmount) : requestedAmount;
+      
+      // Get tenure in days (convert from months if needed)
+      const tenureDays = parseInt(formData.recommended_tenure) || null;
+      
+      // Get the recommended interest rate
+      const interestRate = parseFloat(formData.recommended_interest_rate) || null;
+      
+      // Update application with approved values - single source of truth
       const { error } = await supabase
         .from("loan_applications")
         .update({
           current_stage: "approved",
           status: "approved",
           approved_by: user?.id,
+          approved_amount: approvedAmount,
+          tenure_days: tenureDays,
+          interest_rate: interestRate,
         })
         .eq("id", applicationId)
         .eq("org_id", orgId);
