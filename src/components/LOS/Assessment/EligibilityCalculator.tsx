@@ -83,7 +83,8 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
             *,
             loan_employment_details(*)
           ),
-          loan_verifications(*)
+          loan_verifications(*),
+          approved_by_profile:profiles!loan_applications_approved_by_fkey(full_name)
         `)
         .eq("id", applicationId)
         .eq("org_id", orgId)
@@ -372,12 +373,16 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
       // First save the eligibility data
       await saveMutation.mutateAsync();
       
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
       // Then update application status
       const { error } = await supabase
         .from("loan_applications")
         .update({
           current_stage: "approved",
           status: "approved",
+          approved_by: user?.id,
         })
         .eq("id", applicationId);
       
@@ -401,12 +406,16 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
       // First save the eligibility data
       await saveMutation.mutateAsync();
       
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
       // Then update application status
       const { error } = await supabase
         .from("loan_applications")
         .update({
           current_stage: "rejected",
           status: "rejected",
+          approved_by: user?.id,
         })
         .eq("id", applicationId);
       
@@ -767,6 +776,9 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
                 <CardTitle>Decision</CardTitle>
                 <CardDescription>
                   Application has already been {application?.status?.toUpperCase()}
+                  {(application?.approved_by_profile as any)?.full_name && (
+                    <span> by {(application.approved_by_profile as any).full_name}</span>
+                  )}
                   {application?.updated_at && (
                     <span className="block mt-1">
                       on {new Date(application.updated_at).toLocaleDateString('en-IN', { 
