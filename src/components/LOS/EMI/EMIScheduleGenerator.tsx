@@ -7,11 +7,14 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface EMIScheduleGeneratorProps {
   applicationId: string;
+  // Single source of truth: loan details from loan_applications
+  application: {
+    approved_amount: number;
+    interest_rate: number;
+    tenure_days: number;
+  };
   sanction: {
     id: string;
-    sanctioned_amount: number;
-    interest_rate: number;
-    tenure_months: number;
   };
   disbursement: {
     disbursement_date: string;
@@ -20,22 +23,28 @@ interface EMIScheduleGeneratorProps {
 
 export default function EMIScheduleGenerator({
   applicationId,
+  application,
   sanction,
   disbursement,
 }: EMIScheduleGeneratorProps) {
   const { schedule, generateSchedule, isGenerating } = useEMISchedule(applicationId);
   const [emiAmount, setEmiAmount] = useState<number>(0);
 
+  // Calculate tenure in months from days
+  const tenureMonths = Math.round(application.tenure_days / 30);
+
   useEffect(() => {
-    // Calculate EMI preview
-    const monthlyRate = sanction.interest_rate / 12 / 100;
-    const emi =
-      (sanction.sanctioned_amount *
-        monthlyRate *
-        Math.pow(1 + monthlyRate, sanction.tenure_months)) /
-      (Math.pow(1 + monthlyRate, sanction.tenure_months) - 1);
-    setEmiAmount(Math.round(emi * 100) / 100);
-  }, [sanction]);
+    // Calculate EMI preview using values from loan_applications (single source of truth)
+    if (application.interest_rate > 0 && tenureMonths > 0) {
+      const monthlyRate = application.interest_rate / 12 / 100;
+      const emi =
+        (application.approved_amount *
+          monthlyRate *
+          Math.pow(1 + monthlyRate, tenureMonths)) /
+        (Math.pow(1 + monthlyRate, tenureMonths) - 1);
+      setEmiAmount(Math.round(emi * 100) / 100);
+    }
+  }, [application, tenureMonths]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
@@ -64,7 +73,7 @@ export default function EMIScheduleGenerator({
           Generate EMI Schedule
         </CardTitle>
         <CardDescription>
-          Create a repayment schedule based on the sanctioned loan terms
+          Create a repayment schedule based on the approved loan terms
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -72,18 +81,18 @@ export default function EMIScheduleGenerator({
           <div className="space-y-1">
             <div className="text-sm text-muted-foreground">Loan Amount</div>
             <div className="text-lg font-semibold">
-              {formatCurrency(sanction.sanctioned_amount)}
+              {formatCurrency(application.approved_amount)}
             </div>
           </div>
 
           <div className="space-y-1">
             <div className="text-sm text-muted-foreground">Interest Rate</div>
-            <div className="text-lg font-semibold">{sanction.interest_rate}% p.a.</div>
+            <div className="text-lg font-semibold">{application.interest_rate}% p.a.</div>
           </div>
 
           <div className="space-y-1">
             <div className="text-sm text-muted-foreground">Tenure</div>
-            <div className="text-lg font-semibold">{sanction.tenure_months} months</div>
+            <div className="text-lg font-semibold">{tenureMonths} months</div>
           </div>
 
           <div className="space-y-1">
@@ -113,12 +122,12 @@ export default function EMIScheduleGenerator({
         <div className="p-4 bg-muted rounded-lg space-y-2">
           <div className="text-sm font-medium">Total Repayment</div>
           <div className="text-2xl font-bold">
-            {formatCurrency(emiAmount * sanction.tenure_months)}
+            {formatCurrency(emiAmount * tenureMonths)}
           </div>
           <div className="text-xs text-muted-foreground">
             Interest:{" "}
             {formatCurrency(
-              emiAmount * sanction.tenure_months - sanction.sanctioned_amount
+              emiAmount * tenureMonths - application.approved_amount
             )}
           </div>
         </div>
@@ -128,9 +137,9 @@ export default function EMIScheduleGenerator({
             generateSchedule({
               applicationId,
               sanctionId: sanction.id,
-              loanAmount: sanction.sanctioned_amount,
-              interestRate: sanction.interest_rate,
-              tenureMonths: sanction.tenure_months,
+              loanAmount: application.approved_amount,
+              interestRate: application.interest_rate,
+              tenureMonths: tenureMonths,
               disbursementDate: disbursement.disbursement_date,
             })
           }

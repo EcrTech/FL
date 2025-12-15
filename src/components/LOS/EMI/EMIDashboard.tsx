@@ -17,12 +17,13 @@ interface EMIDashboardProps {
 export default function EMIDashboard({ applicationId }: EMIDashboardProps) {
   const { orgId } = useOrgContext();
 
+  // Single source of truth: read approved_amount, interest_rate, tenure_days from loan_applications
   const { data: application } = useQuery({
     queryKey: ["loan-application-basic", applicationId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("loan_applications")
-        .select("interest_rate, tenure_days")
+        .select("approved_amount, interest_rate, tenure_days")
         .eq("id", applicationId)
         .single();
       if (error) throw error;
@@ -156,12 +157,6 @@ export default function EMIDashboard({ applicationId }: EMIDashboardProps) {
     );
   }
 
-  const sanctionWithAppData = {
-    ...sanction,
-    interest_rate: application.interest_rate || sanction.sanctioned_rate,
-    tenure_months: application.tenure_days ? Math.round(application.tenure_days / 30) : 0,
-  };
-
   if (isLoading) {
     return <LoadingState message="Loading EMI dashboard..." />;
   }
@@ -266,7 +261,12 @@ export default function EMIDashboard({ applicationId }: EMIDashboardProps) {
       {emiStats && emiStats.totalEMIs === 0 ? (
         <EMIScheduleGenerator
           applicationId={applicationId}
-          sanction={sanctionWithAppData}
+          application={{
+            approved_amount: application.approved_amount || 0,
+            interest_rate: application.interest_rate || 0,
+            tenure_days: application.tenure_days || 0,
+          }}
+          sanction={{ id: sanction.id }}
           disbursement={disbursement}
         />
       ) : (

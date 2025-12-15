@@ -49,9 +49,9 @@ export function useEMISchedule(applicationId?: string) {
     mutationFn: async ({
       applicationId,
       sanctionId,
-      loanAmount,
-      interestRate,
-      tenureMonths,
+      loanAmount,      // From loan_applications.approved_amount (single source of truth)
+      interestRate,    // From loan_applications.interest_rate (single source of truth)
+      tenureMonths,    // Calculated from loan_applications.tenure_days (single source of truth)
       disbursementDate,
     }: {
       applicationId: string;
