@@ -145,17 +145,6 @@ export default function EMIDashboard({ applicationId }: EMIDashboardProps) {
     });
   };
 
-  if (!sanction || !disbursement || !application) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="text-center text-muted-foreground">
-            EMI tracking will be available after loan disbursement
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   if (isLoading) {
     return <LoadingState message="Loading EMI dashboard..." />;

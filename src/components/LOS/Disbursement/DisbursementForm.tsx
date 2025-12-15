@@ -101,17 +101,6 @@ export default function DisbursementForm({ applicationId }: DisbursementFormProp
     },
   });
 
-  if (!sanction) {
-    return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="text-center text-muted-foreground">
-            Sanction letter must be generated before disbursement
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   if (!permissions.canInitiateDisbursement) {
     return (
