@@ -91,26 +91,22 @@ export default function SanctionGenerator({ applicationId, orgId }: SanctionGene
     },
   });
 
-  if (existingSanction) {
-    return null;
-  }
-
-  if (!application?.approved_amount || application.status !== "approved") {
-    return (
-      <div className="text-center text-muted-foreground p-4">
-        Application must be approved before generating sanction letter
-      </div>
-    );
-  }
+  const isSanctioned = !!existingSanction;
+  const canSanction = application?.approved_amount && application.status === "approved";
 
   return (
     <Button
       onClick={() => generateSanctionMutation.mutate()}
-      disabled={generateSanctionMutation.isPending}
+      disabled={isSanctioned || !canSanction || generateSanctionMutation.isPending}
+      variant={isSanctioned ? "outline" : "default"}
       className="gap-2"
     >
       <FileText className="h-4 w-4" />
-      {generateSanctionMutation.isPending ? "Generating..." : "Generate Sanction"}
+      {generateSanctionMutation.isPending 
+        ? "Processing..." 
+        : isSanctioned 
+          ? "Sanctioned" 
+          : "Sanction"}
     </Button>
   );
 }
