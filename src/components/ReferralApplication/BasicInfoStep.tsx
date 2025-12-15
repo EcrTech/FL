@@ -142,7 +142,8 @@ export function BasicInfoStep({
   };
 
   const allConsentsChecked = consents.householdIncome && consents.termsAndConditions && consents.aadhaarConsent;
-  const canProceed = formData.name && allConsentsChecked;
+  const isValidPhone = formData.phone.replace(/\D/g, '').length === 10;
+  const canProceed = formData.name && isValidPhone && allConsentsChecked;
 
   return (
     <div className="space-y-8">
@@ -173,74 +174,11 @@ export function BasicInfoStep({
           />
         </div>
 
-        {/* Email Field with OTP */}
-        <div className="space-y-2">
-          <Label htmlFor="email" className="text-sm font-heading font-semibold text-foreground flex items-center gap-2">
-            <Mail className="h-4 w-4 text-muted-foreground" />
-            Email Address <span className="text-muted-foreground text-xs font-normal">(optional)</span>
-          </Label>
-          <div className="flex gap-3">
-            <div className="relative flex-1">
-              <Input
-                id="email"
-                type="email"
-                placeholder="Enter your email"
-                value={formData.email}
-                onChange={(e) => onUpdate({ email: e.target.value })}
-                disabled={verificationStatus.emailVerified}
-                className="h-12 bg-background border-2 border-border rounded-xl text-base font-body pr-28 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
-              />
-              {verificationStatus.emailVerified && (
-                <Badge className="absolute right-3 top-1/2 -translate-y-1/2 bg-[hsl(var(--success))] text-white border-0 font-heading">
-                  <Check className="h-3 w-3 mr-1" /> Verified
-                </Badge>
-              )}
-            </div>
-            {!verificationStatus.emailVerified && !emailOtpSent && (
-              <Button
-                type="button"
-                onClick={() => sendOtp('email')}
-                disabled={sendingEmailOtp || !formData.email}
-                className="h-12 px-6 btn-electric rounded-xl font-heading"
-              >
-                {sendingEmailOtp ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Send OTP'}
-              </Button>
-            )}
-          </div>
-
-          {/* Email OTP Input */}
-          {emailOtpSent && !verificationStatus.emailVerified && (
-            <div className="flex gap-3 mt-3 p-4 bg-[hsl(var(--electric-blue-100))] rounded-xl border border-[hsl(var(--electric-blue-400))]/20">
-              <Input
-                placeholder="Enter 6-digit OTP"
-                value={emailOtp}
-                onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                className="h-11 bg-white border-2 border-border rounded-xl font-body tracking-widest"
-                maxLength={6}
-              />
-              <Button
-                type="button"
-                onClick={() => verifyOtp('email')}
-                disabled={verifyingEmail || emailOtp.length !== 6}
-                className="h-11 px-5 btn-electric rounded-xl font-heading"
-              >
-                {verifyingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verify'}
-              </Button>
-              {emailTimer > 0 && (
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground font-body min-w-[60px]">
-                  <Clock className="h-3.5 w-3.5" />
-                  {formatTimer(emailTimer)}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Phone Field with OTP */}
+        {/* Phone Field with OTP - Now first and mandatory */}
         <div className="space-y-2">
           <Label htmlFor="phone" className="text-sm font-heading font-semibold text-foreground flex items-center gap-2">
             <Phone className="h-4 w-4 text-muted-foreground" />
-            Mobile Number <span className="text-muted-foreground text-xs font-normal">(optional)</span>
+            Mobile Number <span className="text-[hsl(var(--coral-500))]">*</span>
           </Label>
           <div className="flex gap-3">
             <div className="relative flex-1">
@@ -297,6 +235,69 @@ export function BasicInfoStep({
                 <div className="flex items-center gap-1.5 text-sm text-muted-foreground font-body min-w-[60px]">
                   <Clock className="h-3.5 w-3.5" />
                   {formatTimer(phoneTimer)}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Email Field with OTP - Now second and optional */}
+        <div className="space-y-2">
+          <Label htmlFor="email" className="text-sm font-heading font-semibold text-foreground flex items-center gap-2">
+            <Mail className="h-4 w-4 text-muted-foreground" />
+            Email Address <span className="text-muted-foreground text-xs font-normal">(optional)</span>
+          </Label>
+          <div className="flex gap-3">
+            <div className="relative flex-1">
+              <Input
+                id="email"
+                type="email"
+                placeholder="Enter your email"
+                value={formData.email}
+                onChange={(e) => onUpdate({ email: e.target.value })}
+                disabled={verificationStatus.emailVerified}
+                className="h-12 bg-background border-2 border-border rounded-xl text-base font-body pr-28 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+              />
+              {verificationStatus.emailVerified && (
+                <Badge className="absolute right-3 top-1/2 -translate-y-1/2 bg-[hsl(var(--success))] text-white border-0 font-heading">
+                  <Check className="h-3 w-3 mr-1" /> Verified
+                </Badge>
+              )}
+            </div>
+            {!verificationStatus.emailVerified && !emailOtpSent && (
+              <Button
+                type="button"
+                onClick={() => sendOtp('email')}
+                disabled={sendingEmailOtp || !formData.email}
+                className="h-12 px-6 btn-electric rounded-xl font-heading"
+              >
+                {sendingEmailOtp ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Send OTP'}
+              </Button>
+            )}
+          </div>
+
+          {/* Email OTP Input */}
+          {emailOtpSent && !verificationStatus.emailVerified && (
+            <div className="flex gap-3 mt-3 p-4 bg-[hsl(var(--electric-blue-100))] rounded-xl border border-[hsl(var(--electric-blue-400))]/20">
+              <Input
+                placeholder="Enter 6-digit OTP"
+                value={emailOtp}
+                onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                className="h-11 bg-white border-2 border-border rounded-xl font-body tracking-widest"
+                maxLength={6}
+              />
+              <Button
+                type="button"
+                onClick={() => verifyOtp('email')}
+                disabled={verifyingEmail || emailOtp.length !== 6}
+                className="h-11 px-5 btn-electric rounded-xl font-heading"
+              >
+                {verifyingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verify'}
+              </Button>
+              {emailTimer > 0 && (
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground font-body min-w-[60px]">
+                  <Clock className="h-3.5 w-3.5" />
+                  {formatTimer(emailTimer)}
                 </div>
               )}
             </div>
