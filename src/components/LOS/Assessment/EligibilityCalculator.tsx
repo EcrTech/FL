@@ -269,12 +269,19 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
       checks.employment = { passed: false, details: "Date of joining not available" };
     }
 
-    // Credit score
+    // Credit score - treat 0 as "not available" (pass with warning)
     const creditScore = (creditBureau?.response_data as any)?.credit_score || 0;
-    checks.credit_score = {
-      passed: creditScore >= 650,
-      details: `CIBIL score: ${creditScore}`
-    };
+    if (creditScore === 0) {
+      checks.credit_score = {
+        passed: true, // Don't fail eligibility if credit score not fetched
+        details: "CIBIL score: Not available (pending verification)"
+      };
+    } else {
+      checks.credit_score = {
+        passed: creditScore >= 650,
+        details: `CIBIL score: ${creditScore}`
+      };
+    }
 
     // FOIR check
     const foir = calculateFOIR();
