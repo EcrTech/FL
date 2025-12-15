@@ -17,9 +17,6 @@ import IncomeSummary from "@/components/LOS/IncomeSummary";
 import AssessmentDashboard from "@/components/LOS/Assessment/AssessmentDashboard";
 import ApprovalActionDialog from "@/components/LOS/Approval/ApprovalActionDialog";
 import ApprovalHistory from "@/components/LOS/Approval/ApprovalHistory";
-import SanctionDashboard from "@/components/LOS/Sanction/SanctionDashboard";
-import DisbursementDashboard from "@/components/LOS/Disbursement/DisbursementDashboard";
-import EMIDashboard from "@/components/LOS/EMI/EMIDashboard";
 
 const STAGE_LABELS: Record<string, string> = {
   application_login: "Application Login",
@@ -447,13 +444,16 @@ export default function ApplicationDetail() {
           {/* Documents Section */}
           <DocumentUpload applicationId={application.id} orgId={orgId} applicant={primaryApplicant} />
 
-          {/* Sections only visible in review mode */}
+          {/* Sections only visible in review mode - contextual based on stage */}
           {isReviewMode && (
             <>
-              <IncomeSummary applicationId={application.id} orgId={orgId} />
-
-              {/* Assessment Section */}
-              <AssessmentDashboard applicationId={application.id} orgId={orgId} />
+              {/* Income & Assessment - shown until approval */}
+              {!["sanctioned", "disbursement_pending", "disbursed", "closed"].includes(application.current_stage) && (
+                <>
+                  <IncomeSummary applicationId={application.id} orgId={orgId} />
+                  <AssessmentDashboard applicationId={application.id} orgId={orgId} />
+                </>
+              )}
               
               {/* Approval Actions - Only shown when stage is approval_pending */}
               {application.current_stage === "approval_pending" && (
@@ -485,17 +485,10 @@ export default function ApplicationDetail() {
                 </Card>
               )}
 
-              {/* Approval History */}
-              <ApprovalHistory applicationId={id!} />
-
-              {/* Sanction Section */}
-              <SanctionDashboard applicationId={application.id} orgId={orgId} />
-
-              {/* Disbursement Section */}
-              <DisbursementDashboard applicationId={application.id} />
-
-              {/* EMI Section */}
-              <EMIDashboard applicationId={application.id} />
+              {/* Approval History - shown for approval stages and beyond */}
+              {["approval_pending", "sanctioned", "disbursement_pending", "disbursed", "closed"].includes(application.current_stage) && (
+                <ApprovalHistory applicationId={id!} />
+              )}
             </>
           )}
         </div>

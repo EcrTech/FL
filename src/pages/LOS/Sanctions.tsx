@@ -104,7 +104,7 @@ export default function Sanctions() {
                     <TableRow 
                       key={app.id} 
                       className="cursor-pointer hover:bg-muted/50 transition-colors"
-                      onClick={() => navigate(`/los/applications/${app.id}?mode=review`)}
+                      onClick={() => navigate(`/los/sanctions/${app.id}`)}
                     >
                       <TableCell className="font-medium">
                         {app.application_number}
@@ -130,7 +130,7 @@ export default function Sanctions() {
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigate(`/los/applications/${app.id}?mode=review`);
+                            navigate(`/los/sanctions/${app.id}`);
                           }}
                         >
                           <Eye className="h-4 w-4 mr-1" />
