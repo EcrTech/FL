@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Settings,
   Users,
+  User,
   LogOut,
   Menu,
   X,
@@ -449,16 +450,16 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
               )}
             </nav>
 
-            {/* Sign out */}
+            {/* Profile link at bottom */}
             <div className="p-4 border-t border-border">
-              <Button
-                variant="ghost"
-                className="w-full justify-start"
-                onClick={handleSignOut}
+              <Link
+                to="/profile"
+                className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                onClick={() => setSidebarOpen(false)}
               >
-                <LogOut size={20} className="mr-3" />
-                Sign Out
-              </Button>
+                <User size={20} />
+                <span>My Profile</span>
+              </Link>
             </div>
           </div>
         </aside>

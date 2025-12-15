@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrgContext } from "@/hooks/useOrgContext";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
@@ -11,13 +12,14 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { LoadingState } from "@/components/common/LoadingState";
 import { QRCodeSVG } from "qrcode.react";
-import { Copy, Check, Link2, User, Lock, Bell, Save, Loader2 } from "lucide-react";
+import { Copy, Check, Link2, User, Lock, Bell, Save, Loader2, LogOut } from "lucide-react";
 import { toast } from "sonner";
 
 const REFERRAL_BASE_URL = "https://ps.in-sync.co.in/apply/ref";
 
 export default function Profile() {
   const { orgId } = useOrgContext();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [copied, setCopied] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -380,6 +382,30 @@ export default function Profile() {
                   <Save className="h-4 w-4 mr-2" />
                 )}
                 Save Preferences
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Sign Out */}
+          <Card className="border-destructive/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-destructive">
+                <LogOut className="h-5 w-5" />
+                Sign Out
+              </CardTitle>
+              <CardDescription>Sign out of your account</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                variant="destructive"
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  toast.success("Signed out successfully");
+                  navigate("/");
+                }}
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
               </Button>
             </CardContent>
           </Card>
