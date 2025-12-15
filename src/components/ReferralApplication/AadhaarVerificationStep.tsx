@@ -272,13 +272,14 @@ export function AadhaarVerificationStep({
         </Card>
       )}
 
-      {/* Verification Buttons */}
+      {/* Optional Verification Button */}
       {!otpSent && !isVerified && isValidAadhaar && (
         <div className="space-y-3">
           <Button
             onClick={sendAadhaarOtp}
             disabled={sendingOtp}
-            className="w-full h-14 text-base font-heading font-bold btn-electric rounded-xl"
+            variant="outline"
+            className="w-full h-12 font-heading font-semibold rounded-xl border-2 border-primary text-primary hover:bg-primary/10"
           >
             {sendingOtp ? (
               <>
@@ -292,21 +293,23 @@ export function AadhaarVerificationStep({
               </>
             )}
           </Button>
-          
-          <Button
-            onClick={skipVerification}
-            variant="outline"
-            className="w-full h-12 font-heading font-semibold rounded-xl border-2"
-          >
-            Skip Verification & Continue
-          </Button>
         </div>
       )}
 
-      {/* Next Button */}
+      {/* Next Button - always enabled when Aadhaar is valid */}
       <Button
-        onClick={onNext}
-        disabled={!isVerified}
+        onClick={() => {
+          if (!isVerified && isValidAadhaar) {
+            // Save as unverified and continue
+            onVerified({
+              name: 'Pending Verification',
+              address: 'Pending Verification',
+              dob: 'Pending Verification',
+            });
+          }
+          onNext();
+        }}
+        disabled={!isValidAadhaar}
         className="w-full h-14 text-lg font-heading font-bold btn-electric rounded-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
       >
         Continue to Video KYC
