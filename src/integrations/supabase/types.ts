@@ -3507,6 +3507,7 @@ export type Database = {
           status: string
           submitted_from_ip: string | null
           tenure_days: number
+          tenure_months: number | null
           updated_at: string
         }
         Insert: {
@@ -3532,6 +3533,7 @@ export type Database = {
           status?: string
           submitted_from_ip?: string | null
           tenure_days: number
+          tenure_months?: number | null
           updated_at?: string
         }
         Update: {
@@ -3557,6 +3559,7 @@ export type Database = {
           status?: string
           submitted_from_ip?: string | null
           tenure_days?: number
+          tenure_months?: number | null
           updated_at?: string
         }
         Relationships: [
