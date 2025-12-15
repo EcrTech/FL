@@ -26,7 +26,7 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
             <img 
               src={logo} 
               alt="Paisaa Saarthi Logo" 
-              className="w-[168px] h-[168px] object-contain transition-all duration-500 hover:scale-105 relative z-10"
+              className="w-[336px] h-[336px] object-contain transition-all duration-500 hover:scale-105 relative z-10"
               style={{ 
                 filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.15)) brightness(1.05)',
               }} 
