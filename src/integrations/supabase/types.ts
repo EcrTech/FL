@@ -4301,6 +4301,82 @@ export type Database = {
           },
         ]
       }
+      loan_generated_documents: {
+        Row: {
+          created_at: string | null
+          customer_signed: boolean | null
+          document_number: string
+          document_type: string
+          file_path: string | null
+          generated_at: string | null
+          generated_by: string | null
+          id: string
+          loan_application_id: string
+          org_id: string
+          sanction_id: string | null
+          signature_data: Json | null
+          signed_at: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          customer_signed?: boolean | null
+          document_number: string
+          document_type: string
+          file_path?: string | null
+          generated_at?: string | null
+          generated_by?: string | null
+          id?: string
+          loan_application_id: string
+          org_id: string
+          sanction_id?: string | null
+          signature_data?: Json | null
+          signed_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          customer_signed?: boolean | null
+          document_number?: string
+          document_type?: string
+          file_path?: string | null
+          generated_at?: string | null
+          generated_by?: string | null
+          id?: string
+          loan_application_id?: string
+          org_id?: string
+          sanction_id?: string | null
+          signature_data?: Json | null
+          signed_at?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loan_generated_documents_loan_application_id_fkey"
+            columns: ["loan_application_id"]
+            isOneToOne: false
+            referencedRelation: "loan_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_generated_documents_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_generated_documents_sanction_id_fkey"
+            columns: ["sanction_id"]
+            isOneToOne: false
+            referencedRelation: "loan_sanctions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       loan_income_summaries: {
         Row: {
           annual_average_income: number | null
@@ -5076,6 +5152,71 @@ export type Database = {
             foreignKeyName: "org_business_hours_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_loan_settings: {
+        Row: {
+          company_address: string | null
+          company_cin: string | null
+          company_name: string | null
+          company_phone: string | null
+          created_at: string | null
+          foreclosure_rate: number | null
+          grievance_email: string | null
+          grievance_phone: string | null
+          gst_on_processing_fee: number | null
+          id: string
+          insurance_charges: number | null
+          jurisdiction: string | null
+          logo_url: string | null
+          org_id: string
+          registered_office_address: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          company_address?: string | null
+          company_cin?: string | null
+          company_name?: string | null
+          company_phone?: string | null
+          created_at?: string | null
+          foreclosure_rate?: number | null
+          grievance_email?: string | null
+          grievance_phone?: string | null
+          gst_on_processing_fee?: number | null
+          id?: string
+          insurance_charges?: number | null
+          jurisdiction?: string | null
+          logo_url?: string | null
+          org_id: string
+          registered_office_address?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          company_address?: string | null
+          company_cin?: string | null
+          company_name?: string | null
+          company_phone?: string | null
+          created_at?: string | null
+          foreclosure_rate?: number | null
+          grievance_email?: string | null
+          grievance_phone?: string | null
+          gst_on_processing_fee?: number | null
+          id?: string
+          insurance_charges?: number | null
+          jurisdiction?: string | null
+          logo_url?: string | null
+          org_id?: string
+          registered_office_address?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_loan_settings_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: true
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
