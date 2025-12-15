@@ -8,7 +8,8 @@ import { ArrowLeft } from "lucide-react";
 import { LoadingState } from "@/components/common/LoadingState";
 import { format } from "date-fns";
 import DisbursementDashboard from "@/components/LOS/Disbursement/DisbursementDashboard";
-
+import SanctionGenerator from "@/components/LOS/Sanction/SanctionGenerator";
+import { useOrgContext } from "@/hooks/useOrgContext";
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-muted",
   in_progress: "bg-blue-500",
@@ -20,6 +21,7 @@ const STATUS_COLORS: Record<string, string> = {
 export default function SanctionDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { orgId } = useOrgContext();
 
   const { data: application, isLoading } = useQuery({
     queryKey: ["sanction-application", id],
@@ -94,6 +96,7 @@ export default function SanctionDetail() {
               </p>
             </div>
           </div>
+          <SanctionGenerator applicationId={application.id} orgId={orgId || ""} />
         </div>
 
         {/* Sanction Content - Only Loan Summary & Documents */}
