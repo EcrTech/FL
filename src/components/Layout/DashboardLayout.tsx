@@ -450,16 +450,27 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
               )}
             </nav>
 
-            {/* Profile link at bottom */}
+            {/* Profile and logout at bottom */}
             <div className="p-4 border-t border-border">
-              <Link
-                to="/profile"
-                className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
-                onClick={() => setSidebarOpen(false)}
-              >
-                <User size={20} />
-                <span>My Profile</span>
-              </Link>
+              <div className="flex items-center justify-between">
+                <Link
+                  to="/profile"
+                  className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 flex-1"
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <User size={20} />
+                  <span>My Profile</span>
+                </Link>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleSignOut}
+                  className="text-muted-foreground hover:text-destructive"
+                  title="Sign Out"
+                >
+                  <LogOut size={20} />
+                </Button>
+              </div>
             </div>
           </div>
         </aside>
