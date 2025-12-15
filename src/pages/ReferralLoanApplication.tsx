@@ -252,7 +252,7 @@ export default function ReferralLoanApplication() {
             <span className="hidden sm:inline">Back to Home</span>
           </a>
           <div className="flex items-center gap-3">
-            <img src={logo} alt="Paisaa Saarthi" className="h-12 drop-shadow-sm" />
+            <img src={logo} alt="Paisaa Saarthi" className="h-20 drop-shadow-sm" />
           </div>
           <div className="w-[100px] hidden sm:block" /> {/* Spacer for centering logo */}
         </div>
