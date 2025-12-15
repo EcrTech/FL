@@ -207,7 +207,7 @@ Deno.serve(async (req) => {
           org_id: formConfig.org_id,
           application_number: applicationNumber,
           product_type: formConfig.product_type || 'personal_loan',
-          requested_amount: applicant.requestedAmount || 100000, // Default amount, will be updated later
+          requested_amount: applicant.requestedAmount || 50000,
           current_stage: 'application_login',
           status: 'in_progress',
           source: 'referral_link',
