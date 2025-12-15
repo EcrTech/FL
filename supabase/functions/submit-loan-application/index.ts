@@ -89,7 +89,14 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json();
-    console.log(`[submit-loan-application] Processing application for slug: ${body.formSlug}`);
+    console.log(`[submit-loan-application] Processing application`, { 
+      formSlug: body.formSlug, 
+      referralCode: body.referralCode,
+      hasApplicant: !!body.applicant 
+    });
+
+    // Detect if this is a referral application (simpler format)
+    const isReferralApplication = !!body.applicant && !!body.referralCode;
 
     // Bot detection - check honeypot field
     if (body.honeypot) {
@@ -100,7 +107,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Bot detection - check form fill time (minimum 5 seconds)
+    // Bot detection - check form fill time (minimum 5 seconds) - skip for referral apps
     const formStartTime = body.formStartTime;
     if (formStartTime && Date.now() - formStartTime < 5000) {
       console.log('[submit-loan-application] Bot detected via timing');
@@ -153,7 +160,165 @@ Deno.serve(async (req) => {
       formConfig = formData;
     }
 
-    // Validate required fields
+    // Handle referral application (simple form) vs full public form
+    if (isReferralApplication) {
+      // Simpler validation for referral applications
+      const applicant = body.applicant;
+      const errors: string[] = [];
+
+      if (!applicant?.name?.trim()) {
+        errors.push('Full name is required');
+      }
+      if (!validatePhone(applicant?.phone)) {
+        errors.push('Invalid mobile number format');
+      }
+      // PAN and Aadhaar are optional for referral applications
+      if (applicant?.pan && !validatePAN(applicant.pan)) {
+        errors.push('Invalid PAN number format');
+      }
+      if (applicant?.aadhaar && !validateAadhaar(applicant.aadhaar)) {
+        errors.push('Invalid Aadhaar number format');
+      }
+      if (applicant?.email && !validateEmail(applicant.email)) {
+        errors.push('Invalid email format');
+      }
+
+      if (errors.length > 0) {
+        console.log(`[submit-loan-application] Referral validation errors:`, errors);
+        return new Response(
+          JSON.stringify({ error: 'Validation failed', details: errors }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Process referral application
+      const applicationNumber = generateApplicationNumber();
+      console.log(`[submit-loan-application] Creating referral application: ${applicationNumber}`);
+
+      // Parse name into first/last
+      const nameParts = applicant.name.trim().split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+
+      // Create loan application
+      const { data: application, error: appError } = await supabase
+        .from('loan_applications')
+        .insert({
+          org_id: formConfig.org_id,
+          application_number: applicationNumber,
+          product_type: formConfig.product_type || 'personal_loan',
+          current_stage: 'application_login',
+          status: 'in_progress',
+          source: 'referral_link',
+          referred_by: referrerUserId,
+          submitted_from_ip: clientIP
+        })
+        .select()
+        .single();
+
+      if (appError) {
+        console.error('[submit-loan-application] Error creating referral application:', appError);
+        throw appError;
+      }
+
+      console.log(`[submit-loan-application] Created referral application: ${application.id}`);
+
+      // Check for existing contact
+      const { data: existingContact } = await supabase
+        .from('contacts')
+        .select('id')
+        .eq('org_id', formConfig.org_id)
+        .eq('phone', applicant.phone)
+        .maybeSingle();
+
+      let contactId = existingContact?.id;
+
+      if (!existingContact) {
+        // Create new contact/lead
+        const { data: newContact, error: contactError } = await supabase
+          .from('contacts')
+          .insert({
+            org_id: formConfig.org_id,
+            first_name: firstName,
+            last_name: lastName || null,
+            phone: applicant.phone,
+            email: applicant.email || null,
+            source: 'referral_link',
+            status: 'in_progress',
+            referred_by: referrerUserId || null,
+            notes: `New Lead from Referral Application ${applicationNumber}`,
+          })
+          .select()
+          .single();
+
+        if (contactError) {
+          console.error('[submit-loan-application] Error creating contact:', contactError);
+        } else {
+          contactId = newContact.id;
+          console.log(`[submit-loan-application] Created new lead: ${newContact.id}`);
+        }
+      } else {
+        console.log(`[submit-loan-application] Contact already exists: ${existingContact.id}`);
+      }
+
+      // Update application with contact_id
+      if (contactId) {
+        await supabase
+          .from('loan_applications')
+          .update({ contact_id: contactId })
+          .eq('id', application.id);
+      }
+
+      // Create applicant record
+      const { error: applicantError } = await supabase
+        .from('loan_applicants')
+        .insert({
+          loan_application_id: application.id,
+          applicant_type: 'primary',
+          first_name: firstName,
+          last_name: lastName,
+          pan_number: applicant.pan?.toUpperCase() || null,
+          pan_verified: applicant.panVerified || false,
+          aadhaar_number: applicant.aadhaar?.replace(/\s/g, '') || null,
+          aadhaar_verified: applicant.aadhaarVerified || false,
+          mobile: applicant.phone,
+          email: applicant.email || null,
+          video_kyc_completed: applicant.videoKycCompleted || false
+        });
+
+      if (applicantError) {
+        console.error('[submit-loan-application] Referral applicant creation error:', applicantError);
+      }
+
+      // Update referral stats
+      if (body.referralCode) {
+        const { error: refUpdateError } = await supabase.rpc('increment_referral_count', { 
+          ref_code: body.referralCode 
+        });
+        
+        if (refUpdateError) {
+          // Try alternative update method
+          await supabase
+            .from('user_referral_codes')
+            .update({ updated_at: new Date().toISOString() })
+            .eq('referral_code', body.referralCode);
+        }
+      }
+
+      console.log(`[submit-loan-application] Referral application completed: ${applicationNumber}`);
+      
+      return new Response(
+        JSON.stringify({
+          success: true,
+          applicationNumber,
+          applicationId: application.id,
+          message: 'Referral application submitted successfully'
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Full public form validation (existing logic)
     const errors: string[] = [];
 
     // Personal details validation
