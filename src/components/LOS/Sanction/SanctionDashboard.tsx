@@ -100,7 +100,7 @@ export default function SanctionDashboard({ applicationId, orgId }: SanctionDash
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Tenure</p>
-              <p className="text-lg font-bold">{tenureMonths} months</p>
+              <p className="text-lg font-bold">{tenureDays} days</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Valid Until</p>
