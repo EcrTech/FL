@@ -419,21 +419,19 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground">{doc.label}</p>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-4 gap-2">
                       <Button
                         size="sm"
                         variant={isGenerated ? "outline" : "default"}
                         className="w-full"
                         onClick={() => generateMutation.mutate(doc.key)}
                         disabled={generateMutation.isPending || isGenerated}
+                        title="Generate"
                       >
                         {generateMutation.isPending ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
-                          <>
-                            <FileText className="h-4 w-4 mr-1" />
-                            Generate
-                          </>
+                          <FileText className="h-4 w-4" />
                         )}
                       </Button>
                       <Button
@@ -442,27 +440,27 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
                         className="w-full"
                         onClick={() => handlePrint(doc.key)}
                         disabled={!isGenerated}
+                        title="Print"
                       >
-                        <Printer className="h-4 w-4 mr-1" />
-                        Print
+                        <Printer className="h-4 w-4" />
                       </Button>
                       <Button
                         size="sm"
                         variant="outline"
                         className="w-full"
                         disabled={!isGenerated}
+                        title="Download"
                       >
-                        <Download className="h-4 w-4 mr-1" />
-                        Download
+                        <Download className="h-4 w-4" />
                       </Button>
                       <Button
                         size="sm"
                         variant="outline"
                         className="w-full"
                         disabled={!isGenerated}
+                        title="Send"
                       >
-                        <Send className="h-4 w-4 mr-1" />
-                        Send
+                        <Send className="h-4 w-4" />
                       </Button>
                     </div>
                   </CardContent>
