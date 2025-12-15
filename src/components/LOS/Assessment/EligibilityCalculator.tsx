@@ -317,6 +317,15 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      const eligibleAmount = parseFloat(formData.eligible_loan_amount) || 0;
+      const dailyInterestRate = parseFloat(formData.recommended_interest_rate) || 1;
+      const tenureDays = parseInt(formData.recommended_tenure) || 30;
+      
+      // Calculate loan values using consistent formula (single source of truth)
+      const totalInterest = eligibleAmount * (dailyInterestRate / 100) * tenureDays;
+      const totalRepayment = eligibleAmount + totalInterest;
+      const dailyEmi = Math.round(totalRepayment / tenureDays);
+      
       const eligibilityData = {
         loan_application_id: applicationId,
         calculation_date: new Date().toISOString(),
@@ -327,14 +336,19 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
         proposed_emi: parseFloat(formData.proposed_emi) || 0,
         foir_percentage: parseFloat(formData.foir_percentage) || 0,
         max_allowed_foir: parseFloat(formData.max_allowed_foir) || 50,
-        eligible_loan_amount: parseFloat(formData.eligible_loan_amount) || 0,
-        recommended_tenure_days: parseInt(formData.recommended_tenure) || null,
-        recommended_interest_rate: parseFloat(formData.recommended_interest_rate) || null,
+        eligible_loan_amount: eligibleAmount,
+        recommended_tenure_days: tenureDays,
+        recommended_interest_rate: dailyInterestRate,
+        // Store calculated values - single source of truth
+        total_interest: Math.round(totalInterest * 100) / 100,
+        total_repayment: Math.round(totalRepayment * 100) / 100,
+        daily_emi: dailyEmi,
         policy_checks: policyChecks,
         is_eligible: POLICY_RULES.filter(r => r.critical).every(r => policyChecks[r.key]?.passed),
         calculation_details: {
           foir_formula: "(Existing EMI + Proposed EMI) / Net Income * 100",
-          eligible_amount_formula: "Based on FOIR and tenure"
+          eligible_amount_formula: "Based on FOIR and tenure",
+          interest_formula: "Principal × (Daily Rate / 100) × Tenure Days"
         }
       };
 

@@ -204,6 +204,21 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
     enabled: !!application?.org_id,
   });
 
+  // Fetch loan eligibility data (single source of truth for calculated values)
+  const { data: eligibility } = useQuery({
+    queryKey: ["loan-eligibility", applicationId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("loan_eligibility")
+        .select("*")
+        .eq("loan_application_id", applicationId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+  });
+
   // Fetch existing generated documents
   const { data: generatedDocs } = useQuery({
     queryKey: ["generated-documents", applicationId, sanction?.id],
@@ -299,16 +314,19 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
     );
   }
 
-  // Calculate loan summary values
-  const loanAmount = sanction?.sanctioned_amount || application.approved_amount || application.requested_amount || 0;
-  const interestRate = sanction?.sanctioned_rate || application.interest_rate || 0;
-  const tenureDays = sanction?.sanctioned_tenure_days || application.tenure_days || 30;
+  // Calculate loan summary values - use stored eligibility values (single source of truth)
+  const loanAmount = sanction?.sanctioned_amount || application.approved_amount || eligibility?.eligible_loan_amount || application.requested_amount || 0;
+  const interestRate = sanction?.sanctioned_rate || application.interest_rate || eligibility?.recommended_interest_rate || 0;
+  const tenureDays = sanction?.sanctioned_tenure_days || application.tenure_days || eligibility?.recommended_tenure_days || 30;
   const tenureMonths = application.tenure_months || Math.round(tenureDays / 30);
   
-  // Simple interest calculation for daily loans
-  const interestAmount = Math.round(loanAmount * (interestRate / 100) * (tenureDays / 365));
-  const totalRepayment = loanAmount + interestAmount;
-  const dailyEMI = Math.round(totalRepayment / tenureDays);
+  // Use stored values from eligibility (single source of truth), with fallback calculation
+  const calculatedInterest = loanAmount * (interestRate / 100) * tenureDays;
+  const calculatedRepayment = loanAmount + calculatedInterest;
+  
+  const interestAmount = eligibility?.total_interest ?? Math.round(calculatedInterest * 100) / 100;
+  const totalRepayment = eligibility?.total_repayment ?? Math.round(calculatedRepayment * 100) / 100;
+  const dailyEMI = eligibility?.daily_emi ?? Math.round(calculatedRepayment / tenureDays);
   
   // For monthly EMI documents
   const processingFee = sanction?.processing_fee || 0;
