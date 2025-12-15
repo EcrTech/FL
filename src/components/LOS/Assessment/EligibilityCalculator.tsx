@@ -161,16 +161,18 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
     const applicant = application?.loan_applicants?.[0] as any;
     const employment = applicant?.loan_employment_details?.[0] || applicant?.loan_employment_details;
     const creditBureau = application?.loan_verifications?.find((v: any) => v.verification_type === "credit_bureau");
+    const panVerification = application?.loan_verifications?.find((v: any) => v.verification_type === "pan");
 
-    // Age check
-    if (applicant?.dob) {
-      const age = Math.floor((Date.now() - new Date(applicant.dob as string).getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+    // Age check - use applicant DOB first, then fall back to PAN card DOB
+    const applicantDob = applicant?.dob || (panVerification?.response_data as any)?.dob;
+    if (applicantDob) {
+      const age = Math.floor((Date.now() - new Date(applicantDob as string).getTime()) / (1000 * 60 * 60 * 24 * 365.25));
       checks.age = {
         passed: age >= 21 && age <= 58,
-        details: `Applicant age: ${age} years`
+        details: `Applicant age: ${age} years${!applicant?.dob ? ' (from PAN)' : ''}`
       };
     } else {
-      checks.age = { passed: false, details: "DOB not available" };
+      checks.age = { passed: false, details: "DOB not available - upload PAN card" };
     }
 
     // Income check
