@@ -190,7 +190,12 @@ export default function SanctionGenerator({ applicationId, orgId }: SanctionGene
 
         <Button
           onClick={() => generateSanctionMutation.mutate()}
-          disabled={!processingFee || !terms || generateSanctionMutation.isPending}
+          disabled={
+            !interestRate ||
+            !processingFee ||
+            !terms ||
+            generateSanctionMutation.isPending
+          }
         >
           {generateSanctionMutation.isPending ? "Generating..." : "Generate Sanction Letter"}
         </Button>
