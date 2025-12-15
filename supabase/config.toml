@@ -29,3 +29,12 @@ verify_jwt = false
 
 [functions.parse-pan-document]
 verify_jwt = false
+
+[functions.esign-verify-token]
+verify_jwt = false
+
+[functions.esign-initiate-aadhaar]
+verify_jwt = false
+
+[functions.esign-complete-sign]
+verify_jwt = false
