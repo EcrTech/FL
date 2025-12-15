@@ -3487,6 +3487,7 @@ export type Database = {
         Row: {
           application_number: string
           approved_amount: number | null
+          approved_by: string | null
           assigned_to: string | null
           contact_id: string | null
           created_at: string
@@ -3513,6 +3514,7 @@ export type Database = {
         Insert: {
           application_number: string
           approved_amount?: number | null
+          approved_by?: string | null
           assigned_to?: string | null
           contact_id?: string | null
           created_at?: string
@@ -3539,6 +3541,7 @@ export type Database = {
         Update: {
           application_number?: string
           approved_amount?: number | null
+          approved_by?: string | null
           assigned_to?: string | null
           contact_id?: string | null
           created_at?: string
@@ -3563,6 +3566,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "loan_applications_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "loan_applications_assigned_to_fkey"
             columns: ["assigned_to"]
