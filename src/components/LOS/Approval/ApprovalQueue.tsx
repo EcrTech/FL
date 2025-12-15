@@ -130,7 +130,7 @@ export default function ApprovalQueue({ orgId, userId }: ApprovalQueueProps) {
                 </div>
 
                 <div className="mt-4 flex justify-end">
-                  <Button onClick={() => navigate(`/los/applications/${app.id}`)}>
+                  <Button onClick={() => navigate(`/los/applications/${app.id}?mode=review`)}>
                     Review Application
                   </Button>
                 </div>
