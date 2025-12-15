@@ -73,7 +73,7 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
   const [remarksError, setRemarksError] = useState("");
 
   const { data: application } = useQuery({
-    queryKey: ["loan-application-full", applicationId],
+    queryKey: ["loan-application", applicationId, orgId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("loan_applications")
@@ -86,12 +86,13 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
           loan_verifications(*)
         `)
         .eq("id", applicationId)
-        .single();
+        .eq("org_id", orgId)
+        .maybeSingle();
 
       if (error) throw error;
       return data;
     },
-    enabled: !!applicationId,
+    enabled: !!applicationId && !!orgId,
   });
 
   const { data: existingEligibility } = useQuery({
@@ -110,6 +111,7 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
     enabled: !!applicationId,
   });
 
+  const isFinalized = application?.status === "approved" || application?.status === "rejected";
   // Fetch salary slip documents for income calculation
   const { data: salaryDocs = [] } = useQuery({
     queryKey: ["loan-salary-docs", applicationId],
@@ -715,49 +717,60 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Decision</CardTitle>
-              <CardDescription>Provide remarks and approve or reject the application</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label>Remarks <span className="text-destructive">*</span></Label>
-                <Textarea
-                  value={remarks}
-                  onChange={(e) => {
-                    setRemarks(e.target.value);
-                    if (e.target.value.trim()) setRemarksError("");
-                  }}
-                  placeholder="Enter remarks before approval or rejection..."
-                  className={remarksError ? "border-destructive" : ""}
-                  rows={3}
-                />
-                {remarksError && (
-                  <p className="text-sm text-destructive mt-1">{remarksError}</p>
-                )}
-              </div>
-              <div className="flex gap-3">
-                <Button
-                  onClick={handleApprove}
-                  disabled={approveMutation.isPending || rejectMutation.isPending}
-                  className="flex-1 bg-green-600 hover:bg-green-700"
-                >
-                  <ThumbsUp className="mr-2 h-4 w-4" />
-                  {approveMutation.isPending ? "Approving..." : "Approve"}
-                </Button>
-                <Button
-                  onClick={handleReject}
-                  disabled={approveMutation.isPending || rejectMutation.isPending}
-                  variant="destructive"
-                  className="flex-1"
-                >
-                  <ThumbsDown className="mr-2 h-4 w-4" />
-                  {rejectMutation.isPending ? "Rejecting..." : "Reject"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          {!isFinalized ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Decision</CardTitle>
+                <CardDescription>Provide remarks and approve or reject the application</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label>Remarks <span className="text-destructive">*</span></Label>
+                  <Textarea
+                    value={remarks}
+                    onChange={(e) => {
+                      setRemarks(e.target.value);
+                      if (e.target.value.trim()) setRemarksError("");
+                    }}
+                    placeholder="Enter remarks before approval or rejection..."
+                    className={remarksError ? "border-destructive" : ""}
+                    rows={3}
+                  />
+                  {remarksError && (
+                    <p className="text-sm text-destructive mt-1">{remarksError}</p>
+                  )}
+                </div>
+                <div className="flex gap-3">
+                  <Button
+                    onClick={handleApprove}
+                    disabled={approveMutation.isPending || rejectMutation.isPending}
+                    className="flex-1 bg-green-600 hover:bg-green-700"
+                  >
+                    <ThumbsUp className="mr-2 h-4 w-4" />
+                    {approveMutation.isPending ? "Approving..." : "Approve"}
+                  </Button>
+                  <Button
+                    onClick={handleReject}
+                    disabled={approveMutation.isPending || rejectMutation.isPending}
+                    variant="destructive"
+                    className="flex-1"
+                  >
+                    <ThumbsDown className="mr-2 h-4 w-4" />
+                    {rejectMutation.isPending ? "Rejecting..." : "Reject"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>Decision</CardTitle>
+                <CardDescription>
+                  Application has already been {application?.status?.toUpperCase()}.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          )}
         </>
       )}
     </div>
