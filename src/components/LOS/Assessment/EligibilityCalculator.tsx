@@ -247,7 +247,7 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
         recommended_tenure: parseInt(formData.recommended_tenure) || null,
         recommended_interest_rate: parseFloat(formData.recommended_interest_rate) || null,
         policy_checks: policyChecks,
-        is_eligible: Object.values(policyChecks).filter(c => POLICY_RULES.find(r => r.critical)?.key ? c.passed : true).every(c => c.passed),
+        is_eligible: POLICY_RULES.filter(r => r.critical).every(r => policyChecks[r.key]?.passed),
         calculation_details: {
           foir_formula: "(Existing EMI + Proposed EMI) / Net Income * 100",
           eligible_amount_formula: "Based on FOIR and tenure"
