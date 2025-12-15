@@ -138,6 +138,19 @@ export function AadhaarVerificationStep({
     }
   };
 
+  const skipVerification = () => {
+    if (!isValidAadhaar) {
+      toast.error("Please enter a valid 12-digit Aadhaar number to continue");
+      return;
+    }
+    onVerified({
+      name: 'Pending Verification',
+      address: 'Pending Verification',
+      dob: 'Pending Verification',
+    });
+    toast.info("Aadhaar saved. Verification can be done later.");
+  };
+
   return (
     <div className="space-y-8">
       {/* Section Header */}
@@ -146,8 +159,8 @@ export function AadhaarVerificationStep({
           <FileCheck className="h-6 w-6 text-primary" />
         </div>
         <div>
-          <h3 className="text-xl font-heading font-bold text-foreground">Aadhaar Verification</h3>
-          <p className="text-sm text-muted-foreground font-body">Complete eKYC via UIDAI</p>
+          <h3 className="text-xl font-heading font-bold text-foreground">Aadhaar Details</h3>
+          <p className="text-sm text-muted-foreground font-body">Enter your Aadhaar number and optionally verify via OTP</p>
         </div>
       </div>
 
@@ -177,7 +190,7 @@ export function AadhaarVerificationStep({
           />
           {isVerified && (
             <Badge className="absolute right-3 top-1/2 -translate-y-1/2 bg-[hsl(var(--success))] text-white border-0 font-heading">
-              <Check className="h-3 w-3 mr-1" /> Verified
+              <Check className="h-3 w-3 mr-1" /> {verifiedData?.name === 'Pending Verification' ? 'Saved' : 'Verified'}
             </Badge>
           )}
         </div>
@@ -187,6 +200,9 @@ export function AadhaarVerificationStep({
             Please enter a valid 12-digit Aadhaar number
           </p>
         )}
+        <p className="text-xs text-muted-foreground font-body">
+          12-digit unique identification number
+        </p>
       </div>
 
       {/* OTP Input */}
@@ -220,48 +236,71 @@ export function AadhaarVerificationStep({
 
       {/* Verified Details */}
       {isVerified && verifiedData && (
-        <Card className="bg-[hsl(var(--success))]/5 border-2 border-[hsl(var(--success))]/20 rounded-xl overflow-hidden">
+        <Card className={`rounded-xl overflow-hidden ${verifiedData.name === 'Pending Verification' ? 'bg-muted/50 border-2 border-border' : 'bg-[hsl(var(--success))]/5 border-2 border-[hsl(var(--success))]/20'}`}>
           <CardContent className="p-5">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-[hsl(var(--success))] rounded-full flex items-center justify-center">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${verifiedData.name === 'Pending Verification' ? 'bg-muted-foreground' : 'bg-[hsl(var(--success))]'}`}>
                 <ShieldCheck className="h-5 w-5 text-white" />
               </div>
-              <span className="font-heading font-bold text-[hsl(var(--success))]">Aadhaar Verified Successfully</span>
+              <span className={`font-heading font-bold ${verifiedData.name === 'Pending Verification' ? 'text-muted-foreground' : 'text-[hsl(var(--success))]'}`}>
+                {verifiedData.name === 'Pending Verification' ? 'Aadhaar Saved (Pending Verification)' : 'Aadhaar Verified Successfully'}
+              </span>
             </div>
             <div className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-muted-foreground font-body text-sm">Name</span>
-                <span className="font-heading font-semibold text-foreground">{verifiedData.name}</span>
+                <span className="text-muted-foreground font-body text-sm">Aadhaar Number</span>
+                <span className="font-heading font-semibold text-foreground">{getMaskedAadhaar()}</span>
               </div>
-              <div className="flex justify-between items-start">
-                <span className="text-muted-foreground font-body text-sm">Address</span>
-                <span className="font-body text-foreground text-right max-w-[220px] text-sm">{verifiedData.address}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground font-body text-sm">Date of Birth</span>
-                <span className="font-heading font-semibold text-foreground">{verifiedData.dob}</span>
-              </div>
+              {verifiedData.name !== 'Pending Verification' && (
+                <>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground font-body text-sm">Name</span>
+                    <span className="font-heading font-semibold text-foreground">{verifiedData.name}</span>
+                  </div>
+                  <div className="flex justify-between items-start">
+                    <span className="text-muted-foreground font-body text-sm">Address</span>
+                    <span className="font-body text-foreground text-right max-w-[220px] text-sm">{verifiedData.address}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground font-body text-sm">Date of Birth</span>
+                    <span className="font-heading font-semibold text-foreground">{verifiedData.dob}</span>
+                  </div>
+                </>
+              )}
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Send OTP Button */}
-      {!otpSent && !isVerified && (
-        <Button
-          onClick={sendAadhaarOtp}
-          disabled={sendingOtp || !isValidAadhaar}
-          className="w-full h-14 text-base font-heading font-bold btn-electric rounded-xl"
-        >
-          {sendingOtp ? (
-            <>
-              <Loader2 className="h-5 w-5 animate-spin mr-2" />
-              Sending OTP...
-            </>
-          ) : (
-            'Send OTP to Aadhaar-linked Mobile'
-          )}
-        </Button>
+      {/* Verification Buttons */}
+      {!otpSent && !isVerified && isValidAadhaar && (
+        <div className="space-y-3">
+          <Button
+            onClick={sendAadhaarOtp}
+            disabled={sendingOtp}
+            className="w-full h-14 text-base font-heading font-bold btn-electric rounded-xl"
+          >
+            {sendingOtp ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                Sending OTP...
+              </>
+            ) : (
+              <>
+                <ShieldCheck className="h-5 w-5 mr-2" />
+                Verify via OTP (Optional)
+              </>
+            )}
+          </Button>
+          
+          <Button
+            onClick={skipVerification}
+            variant="outline"
+            className="w-full h-12 font-heading font-semibold rounded-xl border-2"
+          >
+            Skip Verification & Continue
+          </Button>
+        </div>
       )}
 
       {/* Next Button */}
