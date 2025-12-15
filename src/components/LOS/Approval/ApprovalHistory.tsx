@@ -144,7 +144,7 @@ export default function ApprovalHistory({ applicationId }: ApprovalHistoryProps)
         });
       }
 
-      // 6. Fetch approval actions
+      // 6. Fetch approval actions (if table is used)
       const { data: approvals } = await supabase
         .from("loan_approvals")
         .select(`
@@ -165,12 +165,55 @@ export default function ApprovalHistory({ applicationId }: ApprovalHistoryProps)
           events.push({
             id: `approval-${a.id}`,
             type: "approval",
-            title: a.approval_status === "approved" ? "Application Approved" : a.approval_status === "rejected" ? "Application Rejected" : "Approval Pending",
+            title:
+              a.approval_status === "approved"
+                ? "Application Approved"
+                : a.approval_status === "rejected"
+                ? "Application Rejected"
+                : "Approval Pending",
             description: a.comments || undefined,
-            status: a.approval_status === "approved" ? "success" : a.approval_status === "rejected" ? "failed" : "pending",
+            status:
+              a.approval_status === "approved"
+                ? "success"
+                : a.approval_status === "rejected"
+                ? "failed"
+                : "pending",
             timestamp: a.created_at,
             actor: actorName,
           });
+        });
+      }
+
+      // 7. Fallback: derive approval from current application status (covers cases where loan_approvals has no rows)
+      if (application?.status === "approved" || application?.status === "rejected") {
+        const { data: approvedByProfile } = application.approved_by
+          ? await supabase
+              .from("profiles")
+              .select("first_name,last_name")
+              .eq("id", application.approved_by)
+              .maybeSingle()
+          : { data: null };
+
+        const actorName = approvedByProfile
+          ? [approvedByProfile.first_name, approvedByProfile.last_name].filter(Boolean).join(" ")
+          : undefined;
+
+        // Prefer the stage history time if available; else fallback to application.updated_at
+        const approvalTime =
+          (stageHistory || [])
+            .filter((s: any) => s.to_stage === application.status)
+            .sort((a: any, b: any) => new Date(b.moved_at).getTime() - new Date(a.moved_at).getTime())[0]?.moved_at ||
+          application.updated_at ||
+          application.created_at;
+
+        events.push({
+          id: `app-final-${application.id}`,
+          type: "approval",
+          title: application.status === "approved" ? "Application Approved" : "Application Rejected",
+          description: "Final decision recorded",
+          status: application.status === "approved" ? "success" : "failed",
+          timestamp: approvalTime,
+          actor: actorName,
         });
       }
 
