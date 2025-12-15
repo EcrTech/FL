@@ -44,8 +44,9 @@ export default function ApprovalActionDialog({
   const actionMutation = useMutation({
     mutationFn: async () => {
       const now = new Date().toISOString();
+      const parsedAmount = action === "approve" && approvedAmount ? parseFloat(approvedAmount) : null;
 
-      // Create approval record
+      // Create approval record (audit trail only)
       const { error: approvalError } = await supabase
         .from("loan_approvals")
         .insert({
@@ -55,18 +56,22 @@ export default function ApprovalActionDialog({
           approver_role: "credit_manager",
           approval_level: "final",
           approval_status: action === "approve" ? "approved" : "rejected",
-          approved_amount: action === "approve" && approvedAmount ? parseFloat(approvedAmount) : null,
+          approved_amount: parsedAmount,
           comments,
         });
 
       if (approvalError) throw approvalError;
 
-      // Update application stage
+      // Update application - SINGLE SOURCE OF TRUTH for approved_amount
       const newStage = action === "approve" ? "sanctioned" : "rejected";
+      const newStatus = action === "approve" ? "approved" : "rejected";
       const { error: updateError } = await supabase
         .from("loan_applications")
         .update({
           current_stage: newStage,
+          status: newStatus,
+          approved_amount: parsedAmount,
+          approved_by: action === "approve" ? userId : null,
           updated_at: now,
         })
         .eq("id", applicationId);

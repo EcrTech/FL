@@ -23,12 +23,13 @@ export default function SanctionViewer({ applicationId }: SanctionViewerProps) {
     },
   });
 
+  // Single source of truth: read approved_amount, interest_rate, tenure_days from loan_applications
   const { data: application } = useQuery({
     queryKey: ["loan-application-basic", applicationId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("loan_applications")
-        .select("*, loan_applicants(*)")
+        .select("approved_amount, interest_rate, tenure_days, loan_applicants(*)")
         .eq("id", applicationId)
         .single();
       if (error) throw error;
@@ -49,10 +50,12 @@ export default function SanctionViewer({ applicationId }: SanctionViewerProps) {
     }).format(amount);
   };
 
+  // Use single source of truth from loan_applications
   const calculateEMI = () => {
-    const P = sanction.sanctioned_amount;
-    const r = sanction.sanctioned_rate / 12 / 100;
-    const n = Math.round(sanction.sanctioned_tenure_days / 30); // Convert days to months
+    const P = application?.approved_amount || 0;
+    const r = (application?.interest_rate || 0) / 12 / 100;
+    const n = Math.round((application?.tenure_days || 0) / 30); // Convert days to months
+    if (r === 0 || n === 0) return 0;
     const emi = (P * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
     return emi;
   };
@@ -114,16 +117,16 @@ export default function SanctionViewer({ applicationId }: SanctionViewerProps) {
                 <div className="p-4 bg-muted rounded-lg">
                   <div className="text-sm text-muted-foreground">Sanctioned Amount</div>
                   <div className="text-2xl font-bold text-primary">
-                    {formatCurrency(sanction.sanctioned_amount)}
+                    {formatCurrency(application?.approved_amount || 0)}
                   </div>
                 </div>
                 <div className="p-4 bg-muted rounded-lg">
                   <div className="text-sm text-muted-foreground">Interest Rate</div>
-                  <div className="text-2xl font-bold">{sanction.sanctioned_rate}% p.a.</div>
+                  <div className="text-2xl font-bold">{application?.interest_rate || 0}% p.a.</div>
                 </div>
                 <div className="p-4 bg-muted rounded-lg">
                   <div className="text-sm text-muted-foreground">Tenure</div>
-                  <div className="text-2xl font-bold">{sanction.sanctioned_tenure_days} days</div>
+                  <div className="text-2xl font-bold">{application?.tenure_days || 0} days</div>
                 </div>
               </div>
             </div>

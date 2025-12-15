@@ -25,12 +25,26 @@ export default function DisbursementForm({ applicationId }: DisbursementFormProp
   const [paymentMode, setPaymentMode] = useState("neft");
   const { permissions } = useLOSPermissions();
 
+  // Single source of truth: read approved_amount from loan_applications
+  const { data: application } = useQuery({
+    queryKey: ["loan-application-basic", applicationId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("loan_applications")
+        .select("approved_amount")
+        .eq("id", applicationId)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const { data: sanction } = useQuery({
     queryKey: ["loan-sanction", applicationId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("loan_sanctions")
-        .select("*")
+        .select("id, processing_fee")
         .eq("loan_application_id", applicationId)
         .maybeSingle();
       if (error) throw error;
@@ -41,14 +55,17 @@ export default function DisbursementForm({ applicationId }: DisbursementFormProp
   const initiateDisbursementMutation = useMutation({
     mutationFn: async () => {
       if (!sanction) throw new Error("No sanction found");
+      if (!application?.approved_amount) throw new Error("No approved amount found");
 
       const disbursementNumber = `DISB${Date.now()}`;
+      // Calculate net disbursement from single source of truth
+      const netDisbursementAmount = application.approved_amount - (sanction.processing_fee || 0);
 
       const { error } = await supabase.from("loan_disbursements").insert({
         loan_application_id: applicationId,
         sanction_id: sanction.id,
         disbursement_number: disbursementNumber,
-        disbursement_amount: sanction.net_disbursement_amount,
+        disbursement_amount: netDisbursementAmount,
         beneficiary_name: beneficiaryName,
         account_number: accountNumber,
         ifsc_code: ifscCode,
@@ -131,10 +148,10 @@ export default function DisbursementForm({ applicationId }: DisbursementFormProp
         <div className="p-4 bg-primary/10 rounded-lg">
           <div className="text-sm text-muted-foreground">Disbursement Amount</div>
           <div className="text-2xl font-bold text-primary">
-            {formatCurrency(sanction.net_disbursement_amount)}
+            {formatCurrency((application?.approved_amount || 0) - (sanction.processing_fee || 0))}
           </div>
           <div className="text-xs text-muted-foreground mt-1">
-            Sanctioned: {formatCurrency(sanction.sanctioned_amount)} - 
+            Approved: {formatCurrency(application?.approved_amount || 0)} - 
             Processing Fee: {formatCurrency(sanction.processing_fee || 0)}
           </div>
         </div>

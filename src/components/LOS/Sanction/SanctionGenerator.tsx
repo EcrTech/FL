@@ -25,6 +25,7 @@ export default function SanctionGenerator({ applicationId, orgId }: SanctionGene
   const [terms, setTerms] = useState("");
   const { permissions } = useLOSPermissions();
 
+  // Single source of truth: read approved_amount, tenure_days, interest_rate from loan_applications
   const { data: application } = useQuery({
     queryKey: ["loan-application-basic", applicationId],
     queryFn: async () => {
@@ -34,21 +35,6 @@ export default function SanctionGenerator({ applicationId, orgId }: SanctionGene
         .eq("id", applicationId)
         .single();
       if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: approval } = useQuery({
-    queryKey: ["loan-approvals", applicationId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("loan_approvals")
-        .select("*")
-        .eq("loan_application_id", applicationId)
-        .eq("approval_status", "approved")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
       return data;
     },
   });
@@ -67,23 +53,29 @@ export default function SanctionGenerator({ applicationId, orgId }: SanctionGene
 
   const generateSanctionMutation = useMutation({
     mutationFn: async () => {
-      if (!approval?.approved_amount) {
-        throw new Error("No approved amount found");
+      // Single source of truth: read from loan_applications
+      if (!application?.approved_amount) {
+        throw new Error("No approved amount found in loan application");
       }
 
       const sanctionNumber = `SL${Date.now()}`;
       const validUntil = new Date();
       validUntil.setDate(validUntil.getDate() + 30); // Valid for 30 days
 
+      // Use values from loan_applications (single source of truth)
+      const approvedAmount = application.approved_amount;
+      const tenureDays = application.tenure_days || 0;
+      const rate = application.interest_rate || parseFloat(interestRate);
+
       const { error } = await supabase.from("loan_sanctions").insert([{
         loan_application_id: applicationId,
         sanction_number: sanctionNumber,
         sanction_date: new Date().toISOString(),
-        sanctioned_amount: approval.approved_amount,
-        sanctioned_rate: parseFloat(interestRate),
-        sanctioned_tenure_days: application?.tenure_days || 0,
+        sanctioned_amount: approvedAmount,
+        sanctioned_rate: rate,
+        sanctioned_tenure_days: tenureDays,
         processing_fee: parseFloat(processingFee),
-        net_disbursement_amount: approval.approved_amount - parseFloat(processingFee),
+        net_disbursement_amount: approvedAmount - parseFloat(processingFee),
         conditions: { terms: terms },
         validity_date: validUntil.toISOString(),
         status: "active",
@@ -119,7 +111,8 @@ export default function SanctionGenerator({ applicationId, orgId }: SanctionGene
     return null; // Show viewer instead
   }
 
-  if (!approval) {
+  // Check if application is approved (single source of truth)
+  if (!application?.approved_amount || application.status !== "approved") {
     return (
       <Card>
         <CardContent className="p-6">
@@ -160,7 +153,7 @@ export default function SanctionGenerator({ applicationId, orgId }: SanctionGene
             <Label htmlFor="approved-amount">Approved Amount</Label>
             <Input
               id="approved-amount"
-              value={`₹${approval.approved_amount?.toLocaleString("en-IN")}`}
+              value={`₹${application.approved_amount?.toLocaleString("en-IN")}`}
               disabled
             />
           </div>
@@ -169,20 +162,17 @@ export default function SanctionGenerator({ applicationId, orgId }: SanctionGene
             <Label htmlFor="tenure">Tenure (Days)</Label>
             <Input
               id="tenure"
-              value={application?.tenure_days}
+              value={application.tenure_days}
               disabled
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="interest-rate">Interest Rate (% p.a.) *</Label>
+            <Label htmlFor="interest-rate">Interest Rate (% p.a.)</Label>
             <Input
               id="interest-rate"
-              type="number"
-              step="0.01"
-              placeholder="e.g., 10.5"
-              value={interestRate}
-              onChange={(e) => setInterestRate(e.target.value)}
+              value={application.interest_rate ? `${application.interest_rate}%` : "Not set"}
+              disabled
             />
           </div>
 
