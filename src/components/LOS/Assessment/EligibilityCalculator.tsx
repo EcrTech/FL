@@ -382,7 +382,7 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["loan-application-full", applicationId] });
+      queryClient.invalidateQueries({ queryKey: ["loan-application", applicationId, orgId] });
       toast({ title: "Application approved successfully" });
     },
     onError: (error: any) => {
@@ -411,7 +411,7 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["loan-application-full", applicationId] });
+      queryClient.invalidateQueries({ queryKey: ["loan-application", applicationId, orgId] });
       toast({ title: "Application rejected" });
     },
     onError: (error: any) => {
