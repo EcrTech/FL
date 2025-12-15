@@ -34,7 +34,7 @@ export default function ApprovalHistory({ applicationId }: ApprovalHistoryProps)
     return (
       <Card>
         <CardContent className="p-6">
-          <div className="text-center text-muted-foreground">Loading approval history...</div>
+          <div className="text-center text-muted-foreground">Loading case history...</div>
         </CardContent>
       </Card>
     );
@@ -44,7 +44,7 @@ export default function ApprovalHistory({ applicationId }: ApprovalHistoryProps)
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Approval History</CardTitle>
+          <CardTitle>Case History</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center text-muted-foreground py-8">
@@ -58,7 +58,7 @@ export default function ApprovalHistory({ applicationId }: ApprovalHistoryProps)
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Approval History</CardTitle>
+        <CardTitle>Case History</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
