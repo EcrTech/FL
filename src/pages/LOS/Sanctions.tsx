@@ -115,7 +115,7 @@ export default function Sanctions() {
                         {app.approved_amount ? formatCurrency(app.approved_amount) : "—"}
                       </TableCell>
                       <TableCell>
-                        {app.tenure_days ? `${Math.round(app.tenure_days / 30)} months` : "—"}
+                        {app.tenure_days ? `${app.tenure_days} days` : "—"}
                       </TableCell>
                       <TableCell>
                         {format(new Date(app.updated_at), "dd MMM yyyy")}
