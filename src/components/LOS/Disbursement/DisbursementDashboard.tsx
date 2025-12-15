@@ -221,16 +221,23 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
 
   // Fetch existing generated documents
   const { data: generatedDocs } = useQuery({
-    queryKey: ["generated-documents", applicationId, sanction?.id],
+    queryKey: ["generated-documents", applicationId],
     queryFn: async () => {
-      const { data } = await supabase
+      let query = supabase
         .from("loan_generated_documents")
         .select("*")
-        .eq("loan_application_id", applicationId)
-        .eq("sanction_id", sanction!.id);
+        .eq("loan_application_id", applicationId);
+      
+      // Filter by sanction_id if it exists, otherwise get docs with null sanction_id
+      if (sanction?.id) {
+        query = query.eq("sanction_id", sanction.id);
+      } else {
+        query = query.is("sanction_id", null);
+      }
+      
+      const { data } = await query;
       return data || [];
     },
-    enabled: !!sanction?.id,
   });
 
   // Generate document mutation
