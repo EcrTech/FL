@@ -125,21 +125,22 @@ export function VideoKYCStep({
         {/* Section Header */}
         <div className="flex items-center gap-4 pb-5 border-b border-border">
           <div className="w-12 h-12 rounded-xl bg-[hsl(var(--success))]/10 flex items-center justify-center">
-            <Video className="h-6 w-6 text-[hsl(var(--success))]" />
+            <Check className="h-6 w-6 text-[hsl(var(--success))]" />
           </div>
           <div>
-            <h3 className="text-xl font-heading font-bold text-foreground">Video KYC</h3>
-            <p className="text-sm text-muted-foreground font-body">Identity verification complete</p>
+            <h3 className="text-xl font-heading font-bold text-foreground">Application Submitted</h3>
+            <p className="text-sm text-muted-foreground font-body">Your loan application is complete</p>
           </div>
         </div>
 
         <Card className="bg-[hsl(var(--success))]/5 border-2 border-[hsl(var(--success))]/20 rounded-xl">
-          <CardContent className="pt-8 pb-8 text-center">
-            <div className="w-20 h-20 bg-[hsl(var(--success))] rounded-full flex items-center justify-center mx-auto mb-5 shadow-lg">
-              <Check className="h-10 w-10 text-white" />
+          <CardContent className="pt-10 pb-10 text-center">
+            <div className="w-24 h-24 bg-[hsl(var(--success))] rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+              <Check className="h-12 w-12 text-white" />
             </div>
-            <h3 className="text-2xl font-heading font-bold text-[hsl(var(--success))] mb-2">Video KYC Completed</h3>
-            <p className="text-muted-foreground font-body">Your video verification has been recorded successfully.</p>
+            <h3 className="text-2xl font-heading font-bold text-[hsl(var(--success))] mb-3">Application Submitted Successfully!</h3>
+            <p className="text-muted-foreground font-body mb-4">Thank you for completing your loan application.</p>
+            <p className="text-sm text-muted-foreground font-body">Our team will review your application and contact you shortly.</p>
           </CardContent>
         </Card>
       </div>
@@ -172,7 +173,23 @@ export function VideoKYCStep({
         <Card className="border-2 border-[hsl(var(--coral-500))]/20 rounded-xl overflow-hidden">
           <div className="h-1.5 bg-gradient-to-r from-[hsl(var(--coral-500))] to-[hsl(var(--coral-400))]" />
           <CardContent className="p-6">
-            <h4 className="text-lg font-heading font-bold text-foreground mb-5">Before You Begin</h4>
+            <h4 className="text-lg font-heading font-bold text-foreground mb-5">Mandatory Instructions for Video KYC</h4>
+            
+            <div className="bg-[hsl(var(--coral-500))]/5 border border-[hsl(var(--coral-500))]/20 rounded-xl p-5 mb-6">
+              <p className="font-heading font-bold text-foreground mb-4">During the recording, you must:</p>
+              <ol className="space-y-3 list-decimal list-inside">
+                <li className="text-foreground font-body">
+                  <span className="font-semibold">Speak your full name and Date of Birth</span> clearly
+                </li>
+                <li className="text-foreground font-body">
+                  <span className="font-semibold">Show the front and back of your Aadhaar card</span> to the camera
+                </li>
+                <li className="text-foreground font-body">
+                  <span className="font-semibold">Stop recording</span> after you have completed the above steps
+                </li>
+              </ol>
+            </div>
+
             <ul className="space-y-4">
               <li className="flex items-start gap-4">
                 <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -189,7 +206,7 @@ export function VideoKYCStep({
                 </div>
                 <div>
                   <p className="font-heading font-semibold text-foreground">Clear Audio</p>
-                  <p className="text-sm text-muted-foreground font-body">Allow camera and microphone access when prompted</p>
+                  <p className="text-sm text-muted-foreground font-body">Speak clearly when stating your name and DOB</p>
                 </div>
               </li>
               <li className="flex items-start gap-4">
@@ -197,17 +214,8 @@ export function VideoKYCStep({
                   <Video className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <p className="font-heading font-semibold text-foreground">Short Recording</p>
-                  <p className="text-sm text-muted-foreground font-body">You will need to record a video (minimum 10 seconds)</p>
-                </div>
-              </li>
-              <li className="flex items-start gap-4">
-                <div className="w-10 h-10 bg-[hsl(var(--coral-500))]/10 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <AlertCircle className="h-5 w-5 text-[hsl(var(--coral-500))]" />
-                </div>
-                <div>
-                  <p className="font-heading font-semibold text-foreground">State Your Name</p>
-                  <p className="text-sm text-muted-foreground font-body">Please state your name clearly during the recording</p>
+                  <p className="font-heading font-semibold text-foreground">Keep Aadhaar Ready</p>
+                  <p className="text-sm text-muted-foreground font-body">Have your Aadhaar card ready to show both sides</p>
                 </div>
               </li>
             </ul>
@@ -224,8 +232,8 @@ export function VideoKYCStep({
                 </>
               ) : (
                 <>
-                  <Camera className="h-5 w-5 mr-2" />
-                  Allow Camera & Microphone
+                  <Play className="h-5 w-5 mr-2" />
+                  Start Video KYC
                 </>
               )}
             </Button>
@@ -268,9 +276,12 @@ export function VideoKYCStep({
           {step === 'permissions' && (
             <Card className="bg-[hsl(var(--electric-blue-100))] border-0 rounded-xl">
               <CardContent className="p-5">
-                <p className="text-sm text-foreground font-body">
-                  <span className="font-heading font-semibold">Please say:</span> "My name is <span className="text-primary font-semibold">{applicantName || 'your name'}</span> and I am applying for a personal loan."
-                </p>
+                <p className="text-sm text-foreground font-body font-semibold mb-2">Remember to:</p>
+                <ol className="text-sm text-foreground font-body list-decimal list-inside space-y-1">
+                  <li>Speak your <span className="text-primary font-semibold">Name</span> and <span className="text-primary font-semibold">Date of Birth</span></li>
+                  <li>Show <span className="text-primary font-semibold">front and back of Aadhaar</span></li>
+                  <li>Click <span className="text-primary font-semibold">Stop Recording</span> when done</li>
+                </ol>
               </CardContent>
             </Card>
           )}
