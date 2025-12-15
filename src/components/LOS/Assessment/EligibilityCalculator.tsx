@@ -663,48 +663,55 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
               <CardDescription>Final loan amount and repayment details</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <div className="p-4 bg-background rounded-lg border">
-                  <div className="text-sm text-muted-foreground">Approved Loan Amount</div>
-                  <div className="text-2xl font-bold text-primary">
-                    ₹{parseFloat(formData.loan_amount || "0").toLocaleString()}
+              {(() => {
+                const approvedAmount = parseFloat(formData.eligible_loan_amount || "0");
+                const dailyRate = parseFloat(formData.recommended_interest_rate || "1") / 100;
+                const tenure = parseInt(formData.recommended_tenure || "30");
+                const interestAmount = Math.round(approvedAmount * dailyRate * tenure);
+                const totalRepayment = Math.round(approvedAmount + interestAmount);
+                const dailyEMI = tenure > 0 ? Math.round(totalRepayment / tenure) : 0;
+
+                return (
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <div className="p-4 bg-background rounded-lg border border-primary/50">
+                      <div className="text-sm text-muted-foreground">Approved Loan Amount</div>
+                      <div className="text-2xl font-bold text-primary">
+                        ₹{approvedAmount.toLocaleString()}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Based on eligibility
+                      </div>
+                    </div>
+                    <div className="p-4 bg-background rounded-lg border">
+                      <div className="text-sm text-muted-foreground">Interest Amount</div>
+                      <div className="text-2xl font-bold">
+                        ₹{interestAmount.toLocaleString()}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        @ {formData.recommended_interest_rate}% per day × {tenure} days
+                      </div>
+                    </div>
+                    <div className="p-4 bg-background rounded-lg border">
+                      <div className="text-sm text-muted-foreground">Total Repayment</div>
+                      <div className="text-2xl font-bold">
+                        ₹{totalRepayment.toLocaleString()}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Principal + Interest
+                      </div>
+                    </div>
+                    <div className="p-4 bg-background rounded-lg border">
+                      <div className="text-sm text-muted-foreground">Daily EMI</div>
+                      <div className="text-2xl font-bold">
+                        ₹{dailyEMI.toLocaleString()}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Over {tenure} days
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div className="p-4 bg-background rounded-lg border">
-                  <div className="text-sm text-muted-foreground">Interest Amount</div>
-                  <div className="text-2xl font-bold">
-                    ₹{Math.round(
-                      parseFloat(formData.loan_amount || "0") * 
-                      (parseFloat(formData.recommended_interest_rate || "1") / 100) * 
-                      parseInt(formData.recommended_tenure || "30")
-                    ).toLocaleString()}
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    @ {formData.recommended_interest_rate}% per day × {formData.recommended_tenure} days
-                  </div>
-                </div>
-                <div className="p-4 bg-background rounded-lg border">
-                  <div className="text-sm text-muted-foreground">Total Repayment</div>
-                  <div className="text-2xl font-bold">
-                    ₹{parseFloat(formData.proposed_emi || "0").toLocaleString()}
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    Principal + Interest
-                  </div>
-                </div>
-                <div className="p-4 bg-background rounded-lg border">
-                  <div className="text-sm text-muted-foreground">Daily EMI</div>
-                  <div className="text-2xl font-bold">
-                    ₹{Math.round(
-                      parseFloat(formData.proposed_emi || "0") / 
-                      parseInt(formData.recommended_tenure || "30")
-                    ).toLocaleString()}
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    Over {formData.recommended_tenure} days
-                  </div>
-                </div>
-              </div>
+                );
+              })()}
             </CardContent>
           </Card>
 
