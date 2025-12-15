@@ -766,7 +766,20 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
               <CardHeader>
                 <CardTitle>Decision</CardTitle>
                 <CardDescription>
-                  Application has already been {application?.status?.toUpperCase()}.
+                  Application has already been {application?.status?.toUpperCase()}
+                  {application?.updated_at && (
+                    <span className="block mt-1">
+                      on {new Date(application.updated_at).toLocaleDateString('en-IN', { 
+                        day: '2-digit', 
+                        month: 'short', 
+                        year: 'numeric' 
+                      })} at {new Date(application.updated_at).toLocaleTimeString('en-IN', { 
+                        hour: '2-digit', 
+                        minute: '2-digit',
+                        hour12: true 
+                      })}
+                    </span>
+                  )}
                 </CardDescription>
               </CardHeader>
             </Card>
