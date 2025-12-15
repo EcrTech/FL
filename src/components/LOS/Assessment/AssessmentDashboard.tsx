@@ -133,16 +133,11 @@ export default function AssessmentDashboard({ applicationId, orgId }: Assessment
 
               {isEligible && application?.current_stage === "credit_assessment" && (
                 <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="h-5 w-5 text-green-600" />
-                      <p className="font-medium text-green-900">
-                        Assessment complete! Ready for approval.
-                      </p>
-                    </div>
-                    <Button onClick={() => updateStageMutation.mutate("approval_pending")}>
-                      Move to Approval
-                    </Button>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <p className="font-medium text-green-900">
+                      Assessment complete! Use the Income Summary section to move to Approval Queue.
+                    </p>
                   </div>
                 </div>
               )}
