@@ -1,25 +1,20 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrgContext } from "@/hooks/useOrgContext";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { LoadingState } from "@/components/common/LoadingState";
 import { QRCodeSVG } from "qrcode.react";
-import { Copy, Check, QrCode, Link2, Users, Eye } from "lucide-react";
-import { format } from "date-fns";
-import { useNavigate } from "react-router-dom";
+import { Copy, Check, QrCode, Link2 } from "lucide-react";
 import { toast } from "sonner";
 
 const REFERRAL_BASE_URL = "https://ps.in-sync.co.in/apply/ref";
 
 export default function MyReferrals() {
   const { orgId } = useOrgContext();
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const [copied, setCopied] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -65,31 +60,6 @@ export default function MyReferrals() {
     enabled: !!userId && !!orgId,
   });
 
-  // Fetch referred applications
-  const { data: referredApps = [], isLoading: appsLoading } = useQuery({
-    queryKey: ["referred-applications", userId, orgId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("loan_applications")
-        .select(`
-          id,
-          application_number,
-          requested_amount,
-          status,
-          current_stage,
-          created_at,
-          loan_applicants(first_name, last_name)
-        `)
-        .eq("org_id", orgId)
-        .eq("referred_by", userId)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!userId && !!orgId,
-  });
-
   const referralLink = referralData?.referral_code
     ? `${REFERRAL_BASE_URL}/${referralData.referral_code}`
     : "";
@@ -99,25 +69,6 @@ export default function MyReferrals() {
     setCopied(true);
     toast.success("Referral link copied!");
     setTimeout(() => setCopied(false), 2000);
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      draft: "bg-muted",
-      in_progress: "bg-blue-500",
-      approved: "bg-green-500",
-      rejected: "bg-red-500",
-      disbursed: "bg-purple-500",
-    };
-    return colors[status] || "bg-muted";
   };
 
   if (referralLoading) {
@@ -207,59 +158,6 @@ export default function MyReferrals() {
           </Card>
         </div>
 
-        {/* Referred Applications */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Your Referred Applications</CardTitle>
-            <CardDescription>
-              {referredApps.length} application{referredApps.length !== 1 ? "s" : ""} referred by you
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {appsLoading ? (
-              <LoadingState message="Loading applications..." />
-            ) : referredApps.length === 0 ? (
-              <div className="text-center py-8">
-                <Users className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No referrals yet</h3>
-                <p className="text-muted-foreground">
-                  Share your link to start referring loan applicants
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {referredApps.map((app: any) => (
-                  <div
-                    key={app.id}
-                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
-                    onClick={() => navigate(`/los/applications/${app.id}`)}
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono font-semibold">{app.application_number}</span>
-                        <Badge className={getStatusColor(app.status)}>
-                          {app.status.replace("_", " ").toUpperCase()}
-                        </Badge>
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {app.loan_applicants?.[0]
-                          ? `${app.loan_applicants[0].first_name} ${app.loan_applicants[0].last_name || ""}`
-                          : "Applicant"}{" "}
-                        • {formatCurrency(app.requested_amount)}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Applied {format(new Date(app.created_at), "MMM dd, yyyy")}
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="icon">
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </div>
     </DashboardLayout>
   );
