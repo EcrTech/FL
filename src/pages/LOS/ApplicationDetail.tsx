@@ -70,7 +70,8 @@ export default function ApplicationDetail() {
           *,
           contacts(first_name, last_name, email, phone),
           assigned_profile:profiles!assigned_to(first_name, last_name),
-          loan_applicants(*)
+          loan_applicants(*),
+          loan_verifications(*)
         `)
         .eq("id", id)
         .eq("org_id", orgId)
@@ -93,22 +94,9 @@ export default function ApplicationDetail() {
       if (error) throw error;
       return data;
     },
-    enabled: !!id,
+    enabled: !!id && !!orgId,
   });
 
-  // Fetch verification data (for address from Aadhaar, DOB from PAN, etc.)
-  const { data: verifications = [] } = useQuery({
-    queryKey: ["loan-verifications-display", id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("loan_verifications")
-        .select("*")
-        .eq("loan_application_id", id);
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!id,
-  });
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
@@ -139,7 +127,8 @@ export default function ApplicationDetail() {
     return doc?.ocr_data as Record<string, any> | null;
   };
 
-  // Get verification data
+  // Get verification data from application (loaded with loan_verifications relation)
+  const verifications = (application as any)?.loan_verifications || [];
   const getVerificationData = (verType: string) => {
     const ver = verifications.find((v: any) => v.verification_type === verType);
     return ver?.response_data as Record<string, any> | null;
@@ -155,8 +144,12 @@ export default function ApplicationDetail() {
   const aadhaarData: Record<string, any> | null = aadhaarDocData || aadhaarVerData ? { 
     ...aadhaarVerData, 
     ...aadhaarDocData,
-    // Ensure address from verification is available
-    address: aadhaarDocData?.address || aadhaarVerData?.verified_address || aadhaarVerData?.address
+    // Ensure address from verification is available, including nested structures
+    address:
+      aadhaarDocData?.address ||
+      aadhaarVerData?.verified_address ||
+      aadhaarVerData?.address?.combined ||
+      aadhaarVerData?.address
   } : null;
 
   if (isLoading || isOrgLoading) {
