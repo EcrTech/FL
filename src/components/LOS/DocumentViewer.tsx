@@ -55,8 +55,13 @@ export default function DocumentViewer({ applicationId }: DocumentViewerProps) {
         .createSignedUrl(doc.file_path, 3600); // 1 hour expiry
 
       if (data?.signedUrl) {
-        setPreviewUrl(data.signedUrl);
-        setSelectedDoc(doc);
+        // For PDFs, open in new tab since Chrome blocks cross-origin iframe PDFs
+        if (isPdfFile(doc.file_name)) {
+          window.open(data.signedUrl, "_blank");
+        } else {
+          setPreviewUrl(data.signedUrl);
+          setSelectedDoc(doc);
+        }
       }
     } catch (err) {
       console.error("Error getting signed URL:", err);
