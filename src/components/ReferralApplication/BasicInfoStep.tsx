@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Check, Loader2, User, Mail, Phone, Clock, ArrowRight, IndianRupee } from "lucide-react";
+import { Check, Loader2, User, Mail, Phone, Clock, ArrowRight, IndianRupee, Calendar } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -14,8 +14,9 @@ interface BasicInfoStepProps {
     email: string;
     phone: string;
     requestedAmount: number;
+    tenureDays: number;
   };
-  onUpdate: (data: Partial<{ name: string; email: string; phone: string; requestedAmount: number }>) => void;
+  onUpdate: (data: Partial<{ name: string; email: string; phone: string; requestedAmount: number; tenureDays: number }>) => void;
   consents: {
     householdIncome: boolean;
     termsAndConditions: boolean;
@@ -145,7 +146,8 @@ export function BasicInfoStep({
   const allConsentsChecked = consents.householdIncome && consents.termsAndConditions && consents.aadhaarConsent;
   const isValidPhone = formData.phone.replace(/\D/g, '').length === 10;
   const isValidLoanAmount = formData.requestedAmount >= 5000 && formData.requestedAmount <= 100000;
-  const canProceed = formData.name && isValidPhone && isValidLoanAmount && allConsentsChecked;
+  const isValidTenure = formData.tenureDays >= 30 && formData.tenureDays <= 365;
+  const canProceed = formData.name && isValidPhone && isValidLoanAmount && isValidTenure && allConsentsChecked;
 
   return (
     <div className="space-y-8">
@@ -192,6 +194,35 @@ export function BasicInfoStep({
           {formData.requestedAmount > 0 && (formData.requestedAmount < 5000 || formData.requestedAmount > 100000) && (
             <p className="text-xs text-[hsl(var(--coral-500))] font-body">
               Please enter an amount between ₹5,000 and ₹1,00,000
+            </p>
+          )}
+        </div>
+
+        {/* Tenure Days Field - Mandatory */}
+        <div className="space-y-2">
+          <Label htmlFor="tenureDays" className="text-sm font-heading font-semibold text-foreground flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            Tenure (Number of Days) <span className="text-[hsl(var(--coral-500))]">*</span>
+          </Label>
+          <Input
+            id="tenureDays"
+            type="number"
+            placeholder="Enter tenure in days (30 - 365)"
+            value={formData.tenureDays || ''}
+            onChange={(e) => {
+              const value = parseInt(e.target.value) || 0;
+              onUpdate({ tenureDays: value });
+            }}
+            min={30}
+            max={365}
+            className="h-12 bg-background border-2 border-border rounded-xl text-base font-body focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+          />
+          <p className="text-xs text-muted-foreground font-body">
+            Minimum 30 days • Maximum 365 days
+          </p>
+          {formData.tenureDays > 0 && (formData.tenureDays < 30 || formData.tenureDays > 365) && (
+            <p className="text-xs text-[hsl(var(--coral-500))] font-body">
+              Please enter a tenure between 30 and 365 days
             </p>
           )}
         </div>
