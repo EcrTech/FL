@@ -4,9 +4,19 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Check, Loader2, AlertCircle, ArrowLeft, ArrowRight, FileCheck, ShieldCheck, Clock } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Check, Loader2, AlertCircle, ArrowLeft, ArrowRight, FileCheck, ShieldCheck, Clock, MapPin } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
+interface CommunicationAddress {
+  addressLine1: string;
+  addressLine2: string;
+  city: string;
+  state: string;
+  pincode: string;
+}
 
 interface AadhaarVerificationStepProps {
   aadhaarNumber: string;
@@ -16,7 +26,21 @@ interface AadhaarVerificationStepProps {
   onBack: () => void;
   isVerified: boolean;
   verifiedData?: { name: string; address: string; dob: string };
+  communicationAddress?: CommunicationAddress;
+  onCommunicationAddressChange?: (address: CommunicationAddress | null) => void;
+  isDifferentAddress?: boolean;
+  onDifferentAddressChange?: (isDifferent: boolean) => void;
 }
+
+const INDIAN_STATES = [
+  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
+  "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka",
+  "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram",
+  "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu",
+  "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal",
+  "Andaman and Nicobar Islands", "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu",
+  "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"
+];
 
 export function AadhaarVerificationStep({
   aadhaarNumber,
@@ -26,6 +50,10 @@ export function AadhaarVerificationStep({
   onBack,
   isVerified,
   verifiedData,
+  communicationAddress,
+  onCommunicationAddressChange,
+  isDifferentAddress = false,
+  onDifferentAddressChange,
 }: AadhaarVerificationStepProps) {
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState("");
@@ -33,6 +61,11 @@ export function AadhaarVerificationStep({
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [timer, setTimer] = useState(0);
+  
+  const [localDifferentAddress, setLocalDifferentAddress] = useState(isDifferentAddress);
+  const [localCommAddress, setLocalCommAddress] = useState<CommunicationAddress>(
+    communicationAddress || { addressLine1: "", addressLine2: "", city: "", state: "", pincode: "" }
+  );
 
   const isValidAadhaar = /^\d{12}$/.test(aadhaarNumber.replace(/\s/g, ''));
 
@@ -272,6 +305,145 @@ export function AadhaarVerificationStep({
         </Card>
       )}
 
+      {/* Communication Address Checkbox */}
+      {isVerified && (
+        <div className="space-y-4">
+          <div className="flex items-start space-x-3 p-4 bg-muted/30 rounded-xl border border-border">
+            <Checkbox
+              id="differentAddress"
+              checked={localDifferentAddress}
+              onCheckedChange={(checked) => {
+                const isChecked = checked === true;
+                setLocalDifferentAddress(isChecked);
+                onDifferentAddressChange?.(isChecked);
+                if (!isChecked) {
+                  onCommunicationAddressChange?.(null);
+                }
+              }}
+              className="mt-0.5"
+            />
+            <div className="space-y-1">
+              <Label 
+                htmlFor="differentAddress" 
+                className="text-sm font-heading font-semibold text-foreground cursor-pointer"
+              >
+                Communication address is different from Aadhaar address
+              </Label>
+              <p className="text-xs text-muted-foreground font-body">
+                Check this if you want loan-related documents sent to a different address
+              </p>
+            </div>
+          </div>
+
+          {/* Communication Address Form */}
+          {localDifferentAddress && (
+            <Card className="rounded-xl border-2 border-primary/20 bg-primary/5">
+              <CardContent className="p-5 space-y-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <MapPin className="h-4 w-4 text-primary" />
+                  </div>
+                  <span className="font-heading font-bold text-foreground">Communication Address</span>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-heading font-medium text-foreground">
+                    Address Line 1 <span className="text-[hsl(var(--coral-500))]">*</span>
+                  </Label>
+                  <Input
+                    placeholder="House/Flat No., Building Name"
+                    value={localCommAddress.addressLine1}
+                    onChange={(e) => {
+                      const updated = { ...localCommAddress, addressLine1: e.target.value };
+                      setLocalCommAddress(updated);
+                      onCommunicationAddressChange?.(updated);
+                    }}
+                    className="h-12 bg-background border-2 border-border rounded-xl"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-heading font-medium text-foreground">
+                    Address Line 2
+                  </Label>
+                  <Input
+                    placeholder="Street, Locality, Landmark"
+                    value={localCommAddress.addressLine2}
+                    onChange={(e) => {
+                      const updated = { ...localCommAddress, addressLine2: e.target.value };
+                      setLocalCommAddress(updated);
+                      onCommunicationAddressChange?.(updated);
+                    }}
+                    className="h-12 bg-background border-2 border-border rounded-xl"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-heading font-medium text-foreground">
+                      City <span className="text-[hsl(var(--coral-500))]">*</span>
+                    </Label>
+                    <Input
+                      placeholder="City"
+                      value={localCommAddress.city}
+                      onChange={(e) => {
+                        const updated = { ...localCommAddress, city: e.target.value };
+                        setLocalCommAddress(updated);
+                        onCommunicationAddressChange?.(updated);
+                      }}
+                      className="h-12 bg-background border-2 border-border rounded-xl"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm font-heading font-medium text-foreground">
+                      PIN Code <span className="text-[hsl(var(--coral-500))]">*</span>
+                    </Label>
+                    <Input
+                      placeholder="6-digit PIN"
+                      value={localCommAddress.pincode}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                        const updated = { ...localCommAddress, pincode: value };
+                        setLocalCommAddress(updated);
+                        onCommunicationAddressChange?.(updated);
+                      }}
+                      className="h-12 bg-background border-2 border-border rounded-xl"
+                      maxLength={6}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-heading font-medium text-foreground">
+                    State <span className="text-[hsl(var(--coral-500))]">*</span>
+                  </Label>
+                  <Select
+                    value={localCommAddress.state}
+                    onValueChange={(value) => {
+                      const updated = { ...localCommAddress, state: value };
+                      setLocalCommAddress(updated);
+                      onCommunicationAddressChange?.(updated);
+                    }}
+                  >
+                    <SelectTrigger className="h-12 bg-background border-2 border-border rounded-xl">
+                      <SelectValue placeholder="Select State" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {INDIAN_STATES.map((state) => (
+                        <SelectItem key={state} value={state}>
+                          {state}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
       {/* Optional Verification Button */}
       {!otpSent && !isVerified && isValidAadhaar && (
         <div className="space-y-3">
@@ -306,6 +478,17 @@ export function AadhaarVerificationStep({
               address: 'Pending Verification',
               dob: 'Pending Verification',
             });
+          }
+          // Validate communication address if checkbox is checked
+          if (localDifferentAddress) {
+            if (!localCommAddress.addressLine1 || !localCommAddress.city || !localCommAddress.state || !localCommAddress.pincode) {
+              toast.error("Please fill all required communication address fields");
+              return;
+            }
+            if (localCommAddress.pincode.length !== 6) {
+              toast.error("Please enter a valid 6-digit PIN code");
+              return;
+            }
           }
           onNext();
         }}
