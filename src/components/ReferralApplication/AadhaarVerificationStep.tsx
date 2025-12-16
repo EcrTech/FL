@@ -305,8 +305,8 @@ export function AadhaarVerificationStep({
         </Card>
       )}
 
-      {/* Communication Address Checkbox */}
-      {isVerified && (
+      {/* Communication Address Checkbox - show when valid Aadhaar entered */}
+      {isValidAadhaar && (
         <div className="space-y-4">
           <div className="flex items-start space-x-3 p-4 bg-muted/30 rounded-xl border border-border">
             <Checkbox
