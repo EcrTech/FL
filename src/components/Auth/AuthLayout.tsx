@@ -11,7 +11,7 @@ interface AuthLayoutProps {
 export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
   return (
     <div 
-      className="min-h-screen flex items-center justify-center px-4 py-8 bg-cover bg-center bg-no-repeat"
+      className="min-h-screen flex items-center justify-start px-4 py-8 pl-16 lg:pl-24 bg-cover bg-center bg-no-repeat"
       style={{ 
         backgroundImage: `url(${backgroundImage})`,
       }}
