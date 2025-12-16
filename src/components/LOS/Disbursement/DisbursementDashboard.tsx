@@ -350,8 +350,11 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
   const dailyEMI = eligibility?.daily_emi ?? Math.round(calculatedRepayment / tenureDays);
   
   // For monthly EMI documents
-  const processingFee = sanction?.processing_fee || 0;
+  // Processing fee is 10% of loan amount (standard)
+  const processingFeeRate = 10; // 10%
+  const processingFee = sanction?.processing_fee || Math.round(loanAmount * (processingFeeRate / 100));
   const gstOnProcessingFee = processingFee * ((orgSettings?.gst_on_processing_fee || 18) / 100);
+  const netDisbursal = loanAmount - processingFee;
   const monthlyEMI = calculateEMI(loanAmount, interestRate, tenureMonths);
   const totalMonthlyRepayment = monthlyEMI * tenureMonths;
   const totalInterest = totalMonthlyRepayment - loanAmount;
@@ -390,7 +393,7 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
           </div>
         </CardHeader>
         <CardContent className="pt-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <div className="p-4 rounded-lg bg-muted/50 space-y-1">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Banknote className="h-4 w-4" />
@@ -407,6 +410,24 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
               </div>
               <p className="text-2xl font-bold">{formatCurrency(interestAmount)}</p>
               <p className="text-xs text-muted-foreground">@ {interestRate}% × {tenureDays} days</p>
+            </div>
+            
+            <div className="p-4 rounded-lg bg-muted/50 space-y-1">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Calculator className="h-4 w-4" />
+                <span className="text-sm">Processing Fee</span>
+              </div>
+              <p className="text-2xl font-bold">{formatCurrency(processingFee)}</p>
+              <p className="text-xs text-muted-foreground">@ {processingFeeRate}% of loan</p>
+            </div>
+            
+            <div className="p-4 rounded-lg bg-primary/10 space-y-1 border border-primary/20">
+              <div className="flex items-center gap-2 text-primary">
+                <Banknote className="h-4 w-4" />
+                <span className="text-sm font-medium">Net Disbursal</span>
+              </div>
+              <p className="text-2xl font-bold text-primary">{formatCurrency(netDisbursal)}</p>
+              <p className="text-xs text-muted-foreground">After deductions</p>
             </div>
             
             <div className="p-4 rounded-lg bg-muted/50 space-y-1">
