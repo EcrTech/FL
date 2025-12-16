@@ -17,7 +17,7 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
       }}
     >
       {/* Overlay for better readability */}
-      <div className="absolute inset-0 bg-background/40 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-background/40" />
       
       {/* Login Form */}
       <div className="relative z-10 w-full max-w-md">
