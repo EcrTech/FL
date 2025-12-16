@@ -288,6 +288,15 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                 <span>Sanctions</span>
               </Link>
 
+              <Link
+                to="/los/disbursals"
+                className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                onClick={() => setSidebarOpen(false)}
+              >
+                <CreditCard size={20} />
+                <span>Disbursals</span>
+              </Link>
+
               {isAdmin && (
                 <Link
                   to="/los/negative-pincodes"
