@@ -145,7 +145,7 @@ export function BasicInfoStep({
 
   const allConsentsChecked = consents.householdIncome && consents.termsAndConditions && consents.aadhaarConsent;
   const isValidPhone = formData.phone.replace(/\D/g, '').length === 10;
-  const isValidLoanAmount = formData.requestedAmount >= 5000 && formData.requestedAmount <= 100000;
+  const isValidLoanAmount = formData.requestedAmount >= 15000 && formData.requestedAmount <= 100000;
   const isValidTenure = formData.tenureDays >= 1 && formData.tenureDays <= 365;
   const canProceed = formData.name && isValidPhone && isValidLoanAmount && isValidTenure && allConsentsChecked;
 
@@ -177,23 +177,23 @@ export function BasicInfoStep({
             <Input
               id="loanAmount"
               type="number"
-              placeholder="Enter amount (₹5,000 - ₹1,00,000)"
+              placeholder="Enter amount (₹15,000 - ₹1,00,000)"
               value={formData.requestedAmount || ''}
               onChange={(e) => {
                 const value = parseInt(e.target.value) || 0;
                 onUpdate({ requestedAmount: value });
               }}
-              min={5000}
+              min={15000}
               max={100000}
               className="h-12 bg-background border-2 border-border rounded-xl pl-10 text-base font-body focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
             />
           </div>
           <p className="text-xs text-muted-foreground font-body">
-            Minimum ₹5,000 • Maximum ₹1,00,000
+            Minimum ₹15,000 • Maximum ₹1,00,000
           </p>
-          {formData.requestedAmount > 0 && (formData.requestedAmount < 5000 || formData.requestedAmount > 100000) && (
+          {formData.requestedAmount > 0 && (formData.requestedAmount < 15000 || formData.requestedAmount > 100000) && (
             <p className="text-xs text-[hsl(var(--coral-500))] font-body">
-              Please enter an amount between ₹5,000 and ₹1,00,000
+              Please enter an amount between ₹15,000 and ₹1,00,000
             </p>
           )}
         </div>
