@@ -294,7 +294,7 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                 onClick={() => setSidebarOpen(false)}
               >
                 <CreditCard size={20} />
-                <span>Approvals</span>
+                <span>Disbursals</span>
               </Link>
 
               {isAdmin && (
