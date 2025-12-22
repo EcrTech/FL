@@ -276,7 +276,7 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                 onClick={() => setSidebarOpen(false)}
               >
                 <List size={20} />
-                <span>Approval Queue</span>
+                <span>Approvals</span>
               </Link>
 
               <Link
