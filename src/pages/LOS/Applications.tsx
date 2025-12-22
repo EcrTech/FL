@@ -221,9 +221,9 @@ export default function Applications() {
               {filteredApplications.length} application{filteredApplications.length !== 1 ? "s" : ""}
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             {filteredApplications.length === 0 ? (
-              <div className="text-center py-12">
+              <div className="text-center py-12 px-6">
                 <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
                 <h3 className="text-lg font-semibold mb-2">No applications found</h3>
                 <p className="text-muted-foreground mb-4">
@@ -238,84 +238,97 @@ export default function Applications() {
               </div>
             ) : (
               <div className="space-y-4">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Application #</TableHead>
-                      <TableHead>Applicant</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Stage</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Tenure</TableHead>
-                      <TableHead>Created</TableHead>
-                      <TableHead className="text-right">Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedApplications.map((app) => (
-                      <TableRow
-                        key={app.id}
-                        className="cursor-pointer"
-                        onClick={() => navigate(`/los/applications/${app.id}`)}
-                      >
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-medium">{app.application_number}</span>
-                            {isFreshApplication(app.created_at) && (
-                              <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white border-0">
-                                <Sparkles className="h-3 w-3 mr-1" />
-                                NEW
-                              </Badge>
-                            )}
-                            {app.source === "referral_link" && (
-                              <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 border-blue-500/20">
-                                <UserPlus className="h-3 w-3 mr-1" />
-                                Referral
-                              </Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>{getApplicantName(app)}</TableCell>
-                        <TableCell>
-                          <Badge className={STATUS_COLORS[app.status] || "bg-muted"}>
-                            {app.status.replace("_", " ").toUpperCase()}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">
-                            {STAGE_LABELS[app.current_stage] || app.current_stage}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{formatCurrency(app.requested_amount)}</TableCell>
-                        <TableCell>{app.tenure_days} days</TableCell>
-                        <TableCell>{format(new Date(app.created_at), "MMM dd, yyyy")}</TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`/los/applications/${app.id}`);
-                            }}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50 hover:bg-muted/50">
+                        <TableHead className="font-semibold text-foreground">Application #</TableHead>
+                        <TableHead className="font-semibold text-foreground">Applicant</TableHead>
+                        <TableHead className="font-semibold text-foreground">Status</TableHead>
+                        <TableHead className="font-semibold text-foreground">Stage</TableHead>
+                        <TableHead className="font-semibold text-foreground">Amount</TableHead>
+                        <TableHead className="font-semibold text-foreground">Tenure</TableHead>
+                        <TableHead className="font-semibold text-foreground">Created</TableHead>
+                        <TableHead className="font-semibold text-foreground text-center">Action</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {paginatedApplications.map((app) => (
+                        <TableRow
+                          key={app.id}
+                          className="cursor-pointer hover:bg-muted/30 border-b"
+                          onClick={() => navigate(`/los/applications/${app.id}`)}
+                        >
+                          <TableCell className="py-4">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-mono font-medium text-foreground">{app.application_number}</span>
+                              {isFreshApplication(app.created_at) && (
+                                <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white border-0 text-xs">
+                                  <Sparkles className="h-3 w-3 mr-1" />
+                                  NEW
+                                </Badge>
+                              )}
+                              {app.source === "referral_link" && (
+                                <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 border-blue-500/20 text-xs">
+                                  <UserPlus className="h-3 w-3 mr-1" />
+                                  Referral
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-4">
+                            <span className="font-medium">{getApplicantName(app)}</span>
+                          </TableCell>
+                          <TableCell className="py-4">
+                            <Badge className={`${STATUS_COLORS[app.status] || "bg-muted"} text-white px-3 py-1`}>
+                              {app.status.replace("_", " ").toUpperCase()}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-4">
+                            <Badge variant="outline" className="px-3 py-1">
+                              {STAGE_LABELS[app.current_stage] || app.current_stage}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-4 font-medium text-green-600">
+                            {formatCurrency(app.requested_amount)}
+                          </TableCell>
+                          <TableCell className="py-4 text-muted-foreground">
+                            {app.tenure_days} days
+                          </TableCell>
+                          <TableCell className="py-4 text-muted-foreground">
+                            {format(new Date(app.created_at), "MMM dd, yyyy")}
+                          </TableCell>
+                          <TableCell className="py-4 text-center">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/los/applications/${app.id}`);
+                              }}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
 
-                <PaginationControls
-                  currentPage={pagination.currentPage}
-                  totalPages={pagination.totalPages}
-                  pageSize={pagination.pageSize}
-                  totalRecords={filteredApplications.length}
-                  startRecord={pagination.startRecord}
-                  endRecord={pagination.endRecord}
-                  onPageChange={pagination.setPage}
-                  onPageSizeChange={pagination.setPageSize}
-                />
+                <div className="px-6 pb-4">
+                  <PaginationControls
+                    currentPage={pagination.currentPage}
+                    totalPages={pagination.totalPages}
+                    pageSize={pagination.pageSize}
+                    totalRecords={filteredApplications.length}
+                    startRecord={pagination.startRecord}
+                    endRecord={pagination.endRecord}
+                    onPageChange={pagination.setPage}
+                    onPageSizeChange={pagination.setPageSize}
+                  />
+                </div>
               </div>
             )}
           </CardContent>
