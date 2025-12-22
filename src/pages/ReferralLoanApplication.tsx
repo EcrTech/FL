@@ -8,7 +8,7 @@ import { BasicInfoStep } from "@/components/ReferralApplication/BasicInfoStep";
 import { PANVerificationStep } from "@/components/ReferralApplication/PANVerificationStep";
 import { AadhaarVerificationStep } from "@/components/ReferralApplication/AadhaarVerificationStep";
 import { VideoKYCStep } from "@/components/ReferralApplication/VideoKYCStep";
-import logo from "@/assets/paisarthi-logo.png";
+import logo from "@/assets/insync-logo.png";
 
 interface ReferrerInfo {
   name: string;
