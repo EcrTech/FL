@@ -511,7 +511,7 @@ export default function PipelineBoard() {
                             value={app.status || "new"}
                             onValueChange={(value) => handleStatusChange(app.id, value)}
                           >
-                            <SelectTrigger className="h-7 w-[100px] text-xs">
+                            <SelectTrigger className="h-7 w-[120px] text-xs">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
