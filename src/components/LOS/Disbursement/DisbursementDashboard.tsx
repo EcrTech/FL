@@ -139,13 +139,15 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
     aadhaar_number?: string;
   }
   
-  const { data: applicant } = useQuery<ApplicantData | null>({
+  const { data: applicant, isLoading: loadingApplicant } = useQuery<ApplicantData | null>({
     queryKey: ["primary-applicant", applicationId],
     queryFn: async () => {
       try {
         const session = await supabase.auth.getSession();
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/loan_applicants?loan_application_id=eq.${applicationId}&applicant_type=eq.primary&select=first_name,last_name,mobile,alternate_mobile,email,current_address,pan_number,aadhaar_number`;
+        console.log("Fetching applicant from:", url);
         const result = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/loan_applicants?loan_application_id=eq.${applicationId}&applicant_type=eq.primary&select=first_name,last_name,mobile,alternate_mobile,email,current_address,pan_number,aadhaar_number`,
+          url,
           {
             headers: {
               'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
@@ -154,8 +156,10 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
           }
         );
         const jsonData = await result.json();
+        console.log("Applicant data response:", jsonData);
         return jsonData?.[0] || null;
-      } catch {
+      } catch (error) {
+        console.error("Error fetching applicant:", error);
         return null;
       }
     },
