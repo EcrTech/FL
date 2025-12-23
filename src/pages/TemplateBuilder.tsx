@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { useNotification } from "@/hooks/useNotification";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft, Plus, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Upload, Link, Phone, Copy, Workflow, MessageSquare, Check, CheckCheck } from "lucide-react";
 import { useOrgContext } from "@/hooks/useOrgContext";
 
 interface Button {
@@ -269,40 +269,108 @@ export default function TemplateBuilder() {
   };
 
   const renderPreview = () => {
+    const quickReplyButtons = buttons.filter(b => b.type === "QUICK_REPLY");
+    const ctaButtons = buttons.filter(b => b.type !== "QUICK_REPLY");
+
     return (
-      <div className="bg-muted p-4 rounded-lg max-w-sm">
-        <div className="bg-background rounded-lg p-4 shadow-md">
-          {headerType !== 'none' && (
-            <div className="mb-3">
-              {headerType === 'text' ? (
-                <p className="font-semibold text-lg">{headerContent || "Header text here"}</p>
-              ) : (
-                <div className="bg-muted h-32 rounded flex items-center justify-center text-muted-foreground">
-                  {headerType.toUpperCase()} Preview
+      <div className="flex justify-center">
+        {/* Phone Frame */}
+        <div className="relative bg-[#1f2c34] rounded-[40px] p-3 shadow-2xl w-[320px]">
+          {/* Phone Notch */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-[#1f2c34] rounded-b-2xl z-10" />
+          
+          {/* Phone Screen */}
+          <div className="bg-[#0b141a] rounded-[28px] overflow-hidden">
+            {/* WhatsApp Header */}
+            <div className="bg-[#1f2c34] text-white px-4 py-3 flex items-center gap-3 border-b border-[#2a3942]">
+              <div className="w-10 h-10 bg-[#25D366] rounded-full flex items-center justify-center">
+                <MessageSquare className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium text-sm">Template Preview</p>
+                <p className="text-xs text-[#8696a0]">WhatsApp Business</p>
+              </div>
+            </div>
+            
+            {/* Chat Area with WhatsApp pattern */}
+            <div 
+              className="p-3 min-h-[400px]"
+              style={{
+                backgroundColor: '#0b141a',
+                backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23182229' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+              }}
+            >
+              {/* Message Bubble */}
+              <div className="bg-[#005c4b] rounded-lg p-3 shadow-md max-w-[85%] ml-auto relative">
+                {/* Message tail */}
+                <div className="absolute -right-2 top-0 w-4 h-4 overflow-hidden">
+                  <div className="bg-[#005c4b] w-4 h-4 transform rotate-45 translate-x-[-50%]" />
+                </div>
+                
+                {/* Header */}
+                {headerType !== 'none' && (
+                  <div className="mb-2">
+                    {headerType === 'text' ? (
+                      <p className="font-semibold text-white text-sm">{headerContent || "Header text here"}</p>
+                    ) : (
+                      <div className="bg-[#1f2c34] h-28 rounded-lg flex items-center justify-center text-[#8696a0] text-xs">
+                        <div className="text-center">
+                          <Upload className="w-6 h-6 mx-auto mb-1" />
+                          {headerType.toUpperCase()}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* Body */}
+                <div className="text-white text-sm whitespace-pre-wrap mb-1">
+                  {bodyContent || "Your message body will appear here. Use variables like {{1}} for dynamic content."}
+                </div>
+                
+                {/* Footer & Timestamp */}
+                <div className="flex items-center justify-end gap-1 mt-1">
+                  {footerText && (
+                    <span className="text-[#8696a0] text-xs mr-auto">{footerText}</span>
+                  )}
+                  <span className="text-[#8696a0] text-[10px]">12:00 PM</span>
+                  <CheckCheck className="w-4 h-4 text-[#53bdeb]" />
+                </div>
+                
+                {/* CTA Buttons (URL, Phone, Copy Code, Flow) */}
+                {ctaButtons.length > 0 && (
+                  <div className="border-t border-[#1f2c34] mt-3 pt-2 -mx-3 -mb-3 px-3 pb-3 space-y-1">
+                    {ctaButtons.map((btn, idx) => (
+                      <div 
+                        key={idx} 
+                        className="flex items-center justify-center gap-2 py-2 text-[#53bdeb] hover:bg-[#1f2c34] rounded cursor-pointer transition-colors text-sm"
+                      >
+                        {btn.type === "URL" && <Link className="w-4 h-4" />}
+                        {btn.type === "PHONE_NUMBER" && <Phone className="w-4 h-4" />}
+                        {btn.type === "COPY_CODE" && <Copy className="w-4 h-4" />}
+                        {btn.type === "FLOW" && <Workflow className="w-4 h-4" />}
+                        <span>{btn.text || `Button ${idx + 1}`}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              
+              {/* Quick Reply Buttons (outside bubble) */}
+              {quickReplyButtons.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2 justify-end max-w-[85%] ml-auto">
+                  {quickReplyButtons.map((btn, idx) => (
+                    <div 
+                      key={idx} 
+                      className="bg-[#1f2c34] border border-[#2a3942] rounded-full px-4 py-2 text-[#53bdeb] text-sm hover:bg-[#2a3942] cursor-pointer transition-colors"
+                    >
+                      {btn.text || `Reply ${idx + 1}`}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
-          )}
-          
-          <div className="mb-3 whitespace-pre-wrap">
-            {bodyContent || "Your message body will appear here. Use variables like {{1}} for dynamic content."}
           </div>
-          
-          {footerText && (
-            <div className="text-sm text-muted-foreground mb-3">
-              {footerText}
-            </div>
-          )}
-          
-          {buttons.length > 0 && (
-            <div className="space-y-2">
-              {buttons.map((btn, idx) => (
-                <div key={idx} className="border border-primary rounded py-2 px-3 text-center text-primary hover:bg-primary/10 cursor-pointer transition-colors">
-                  {btn.text || `Button ${idx + 1}`}
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
     );
@@ -541,53 +609,86 @@ export default function TemplateBuilder() {
                 <CardDescription>Add call-to-action or quick reply buttons (max 10 total)</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex flex-wrap gap-2">
+                {/* Quick Reply Section */}
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">Quick Reply</Label>
                   <Button 
                     type="button" 
                     variant="outline" 
                     onClick={() => addButton("QUICK_REPLY")} 
                     disabled={buttons.length >= 10}
+                    className="w-full justify-start border-dashed"
                   >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Quick Reply
-                  </Button>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => addButton("URL")} 
-                    disabled={buttons.filter(b => b.type === "URL").length >= 2}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    URL ({buttons.filter(b => b.type === "URL").length}/2)
-                  </Button>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => addButton("PHONE_NUMBER")} 
-                    disabled={buttons.filter(b => b.type === "PHONE_NUMBER").length >= 1}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Phone ({buttons.filter(b => b.type === "PHONE_NUMBER").length}/1)
-                  </Button>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => addButton("COPY_CODE")} 
-                    disabled={buttons.filter(b => b.type === "COPY_CODE").length >= 1}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Copy Code ({buttons.filter(b => b.type === "COPY_CODE").length}/1)
-                  </Button>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => addButton("FLOW")} 
-                    disabled={buttons.filter(b => b.type === "FLOW").length >= 1}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Flow ({buttons.filter(b => b.type === "FLOW").length}/1)
+                    <MessageSquare className="h-4 w-4 mr-2 text-muted-foreground" />
+                    <span className="flex-1 text-left">Add Quick Reply</span>
+                    <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                      {buttons.filter(b => b.type === "QUICK_REPLY").length}/10
+                    </span>
                   </Button>
                 </div>
+
+                <Separator />
+
+                {/* CTA Buttons Section */}
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">Call to Action</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => addButton("URL")} 
+                      disabled={buttons.filter(b => b.type === "URL").length >= 2}
+                      className="justify-start border-dashed"
+                    >
+                      <Link className="h-4 w-4 mr-2 text-muted-foreground" />
+                      <span className="flex-1 text-left text-sm">URL</span>
+                      <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                        {buttons.filter(b => b.type === "URL").length}/2
+                      </span>
+                    </Button>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => addButton("PHONE_NUMBER")} 
+                      disabled={buttons.filter(b => b.type === "PHONE_NUMBER").length >= 1}
+                      className="justify-start border-dashed"
+                    >
+                      <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
+                      <span className="flex-1 text-left text-sm">Phone</span>
+                      <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                        {buttons.filter(b => b.type === "PHONE_NUMBER").length}/1
+                      </span>
+                    </Button>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => addButton("COPY_CODE")} 
+                      disabled={buttons.filter(b => b.type === "COPY_CODE").length >= 1}
+                      className="justify-start border-dashed"
+                    >
+                      <Copy className="h-4 w-4 mr-2 text-muted-foreground" />
+                      <span className="flex-1 text-left text-sm">Copy Code</span>
+                      <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                        {buttons.filter(b => b.type === "COPY_CODE").length}/1
+                      </span>
+                    </Button>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => addButton("FLOW")} 
+                      disabled={buttons.filter(b => b.type === "FLOW").length >= 1}
+                      className="justify-start border-dashed"
+                    >
+                      <Workflow className="h-4 w-4 mr-2 text-muted-foreground" />
+                      <span className="flex-1 text-left text-sm">Flow</span>
+                      <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                        {buttons.filter(b => b.type === "FLOW").length}/1
+                      </span>
+                    </Button>
+                  </div>
+                </div>
+
+                {buttons.length > 0 && <Separator />}
 
                 {buttons.map((btn, idx) => (
                   <Card key={idx}>
@@ -698,15 +799,13 @@ export default function TemplateBuilder() {
 
           {/* Preview Section */}
           <div className="space-y-6">
-            <Card className="sticky top-6">
-              <CardHeader>
-                <CardTitle>Preview</CardTitle>
-                <CardDescription>How your template will appear on WhatsApp</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {renderPreview()}
-              </CardContent>
-            </Card>
+            <div className="sticky top-6">
+              <div className="text-center mb-4">
+                <h3 className="text-lg font-semibold">Template Preview</h3>
+                <p className="text-sm text-muted-foreground">How your template will appear on WhatsApp</p>
+              </div>
+              {renderPreview()}
+            </div>
           </div>
         </div>
       </div>
