@@ -52,13 +52,9 @@ async function executeBulkWhatsApp(supabaseClient: any, job: QueueJob) {
 }
 
 async function executeTemplateSync(supabaseClient: any, job: QueueJob) {
-  // Call the sync-gupshup-templates function
-  const { data, error } = await supabaseClient.functions.invoke('sync-gupshup-templates', {
-    body: { skip_rate_limit: true }
-  });
-
-  if (error) throw error;
-  return data;
+  // Template sync is now handled locally - no external API call needed
+  console.log('Template sync operation - templates are managed locally');
+  return { success: true, message: 'Templates are managed locally' };
 }
 
 async function executeContactImport(supabaseClient: any, job: QueueJob) {

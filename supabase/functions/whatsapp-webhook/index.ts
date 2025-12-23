@@ -7,20 +7,17 @@ const corsHeaders = {
 
 const RATE_LIMIT_WEBHOOKS_PER_MINUTE = 100;
 
-interface GupshupWebhookPayload {
-  type: string;
-  payload: {
-    id: string;
-    gsId: string;
-    mobile: string;
-    status: string;
-    timestamp: number;
-    type: string;
-    text?: string;
-    caption?: string;
-    name?: string;
-    url?: string;
-  };
+interface ExotelWebhookPayload {
+  sid?: string;
+  id?: string;
+  to?: string;
+  from?: string;
+  body?: string;
+  status?: string;
+  direction?: string;
+  timestamp?: string;
+  error_code?: string;
+  error_message?: string;
 }
 
 // Rate limiting for webhook calls (IP-based)
@@ -38,13 +35,11 @@ async function checkWebhookRateLimit(supabaseClient: any, ipAddress: string): Pr
 }
 
 // Validate webhook payload structure
-function validateWebhookPayload(payload: any): payload is GupshupWebhookPayload {
+function validateWebhookPayload(payload: any): payload is ExotelWebhookPayload {
   return (
     payload &&
-    typeof payload.type === 'string' &&
-    payload.payload &&
-    typeof payload.payload.gsId === 'string' &&
-    typeof payload.payload.status === 'string'
+    (typeof payload.sid === 'string' || typeof payload.id === 'string') &&
+    (typeof payload.to === 'string' || typeof payload.from === 'string')
   );
 }
 
@@ -76,6 +71,8 @@ Deno.serve(async (req) => {
 
     const payload: any = await req.json();
     
+    console.log('Received Exotel webhook:', JSON.stringify(payload, null, 2));
+
     // Validate payload structure
     if (!validateWebhookPayload(payload)) {
       console.error('Invalid webhook payload structure:', payload);
@@ -96,21 +93,22 @@ Deno.serve(async (req) => {
         operation: 'webhook_whatsapp',
         ip_address: clientIp,
       });
-    
-    console.log('Received Gupshup webhook:', JSON.stringify(payload, null, 2));
 
-    // Extract information
-    const { type, payload: webhookData } = payload;
+    const messageId = payload.sid || payload.id;
+    const status = payload.status?.toLowerCase();
+    const direction = payload.direction?.toLowerCase();
     
     // Handle inbound messages (new messages from customers)
-    if (type === 'message' && webhookData.text) {
-      console.log('Received inbound message:', webhookData);
+    if (direction === 'inbound' && payload.body) {
+      console.log('Received inbound message:', payload);
+      
+      const phoneNumber = payload.from?.replace(/[^\d+]/g, '') || '';
       
       // Find existing contact by phone number
       const { data: contacts } = await supabaseClient
         .from('contacts')
         .select('id, org_id')
-        .eq('phone', webhookData.mobile)
+        .eq('phone', phoneNumber)
         .limit(1);
       
       let contactId = contacts?.[0]?.id;
@@ -118,7 +116,7 @@ Deno.serve(async (req) => {
       
       // If contact doesn't exist, try to auto-create
       if (!contactId || !orgId) {
-        console.log('Contact not found for phone:', webhookData.mobile);
+        console.log('Contact not found for phone:', phoneNumber);
         
         // Get active WhatsApp settings to determine org
         const { data: whatsappSettings } = await supabaseClient
@@ -136,29 +134,18 @@ Deno.serve(async (req) => {
         }
         
         orgId = whatsappSettings[0].org_id;
-        console.log('Creating new contact for phone:', webhookData.mobile, 'in org:', orgId);
+        console.log('Creating new contact for phone:', phoneNumber, 'in org:', orgId);
         
-        // Parse name from webhook
-        let firstName = '';
-        let lastName = '';
-        
-        if (webhookData.name) {
-          const nameParts = webhookData.name.trim().split(' ');
-          firstName = nameParts[0] || '';
-          lastName = nameParts.slice(1).join(' ') || '';
-        } else {
-          // Use phone number as name if no name provided
-          firstName = webhookData.mobile;
-        }
+        // Use phone number as name since Exotel doesn't provide name
+        const firstName = phoneNumber;
         
         // Create new contact
         const { data: newContact, error: createError } = await supabaseClient
           .from('contacts')
           .insert({
             org_id: orgId,
-            phone: webhookData.mobile,
+            phone: phoneNumber,
             first_name: firstName,
-            last_name: lastName || null,
             source: 'whatsapp_inbound',
             status: 'new',
           })
@@ -183,16 +170,13 @@ Deno.serve(async (req) => {
         .insert({
           org_id: orgId,
           contact_id: contactId,
-          conversation_id: webhookData.mobile,
+          conversation_id: phoneNumber,
           direction: 'inbound',
-          message_content: webhookData.text || webhookData.caption || '',
-          sender_name: webhookData.name,
-          phone_number: webhookData.mobile,
-          media_url: webhookData.url,
-          media_type: webhookData.type,
-          gupshup_message_id: webhookData.id,
+          message_content: payload.body || '',
+          phone_number: phoneNumber,
+          exotel_message_id: messageId,
           status: 'received',
-          sent_at: new Date(webhookData.timestamp),
+          sent_at: payload.timestamp ? new Date(payload.timestamp) : new Date(),
         });
       
       if (insertError) {
@@ -203,7 +187,7 @@ Deno.serve(async (req) => {
         );
       }
       
-      console.log('Stored inbound message from:', webhookData.mobile);
+      console.log('Stored inbound message from:', phoneNumber);
       
       return new Response(
         JSON.stringify({ success: true, message: 'Inbound message stored' }),
@@ -212,19 +196,18 @@ Deno.serve(async (req) => {
     }
     
     // Handle status updates for outbound messages
-    if (type === 'message-event' && webhookData.gsId) {
-      const messageStatus = webhookData.status.toLowerCase();
-      const timestamp = new Date(webhookData.timestamp);
+    if (status && messageId) {
+      const timestamp = payload.timestamp ? new Date(payload.timestamp) : new Date();
 
-      // Find the message by gupshup_message_id
+      // Find the message by exotel_message_id
       const { data: message, error: fetchError } = await supabaseClient
         .from('whatsapp_messages')
         .select('*')
-        .eq('gupshup_message_id', webhookData.gsId)
+        .eq('exotel_message_id', messageId)
         .single();
 
       if (fetchError || !message) {
-        console.error('Message not found:', webhookData.gsId, fetchError);
+        console.error('Message not found:', messageId, fetchError);
         return new Response(
           JSON.stringify({ error: 'Message not found' }),
           {
@@ -235,17 +218,17 @@ Deno.serve(async (req) => {
       }
 
       // Prepare update data based on status
-      const updateData: any = { status: messageStatus };
+      const updateData: any = { status: status };
 
-      if (messageStatus === 'delivered' || messageStatus === 'sent') {
+      if (status === 'delivered' || status === 'sent') {
         updateData.delivered_at = timestamp.toISOString();
-      } else if (messageStatus === 'read') {
+      } else if (status === 'read') {
         updateData.read_at = timestamp.toISOString();
         if (!message.delivered_at) {
           updateData.delivered_at = timestamp.toISOString();
         }
-      } else if (messageStatus === 'failed') {
-        updateData.error_message = webhookData.type || 'Message delivery failed';
+      } else if (status === 'failed' || status === 'undelivered') {
+        updateData.error_message = payload.error_message || payload.error_code || 'Message delivery failed';
       }
 
       // Update the message status
@@ -265,7 +248,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      console.log(`Updated message ${message.id} to status: ${messageStatus}`);
+      console.log(`Updated message ${message.id} to status: ${status}`);
 
       return new Response(
         JSON.stringify({ success: true, message: 'Status updated' }),

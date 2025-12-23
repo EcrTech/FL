@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
 
     console.log('✓ Organization verified:', profile.org_id);
 
-    // Get WhatsApp settings
+    // Get WhatsApp settings with Exotel credentials
     const { data: whatsappSettings } = await supabaseClient
       .from('whatsapp_settings')
       .select('*')
@@ -121,6 +121,14 @@ Deno.serve(async (req) => {
     if (!whatsappSettings) {
       return new Response(JSON.stringify({ error: 'WhatsApp not configured for this organization' }), {
         status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Validate Exotel credentials
+    if (!whatsappSettings.exotel_sid || !whatsappSettings.exotel_api_key || !whatsappSettings.exotel_api_token) {
+      return new Response(JSON.stringify({ error: 'Exotel credentials not configured' }), {
+        status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -159,46 +167,40 @@ Deno.serve(async (req) => {
       };
     }
 
-    // Format phone number (remove + if present, ensure it starts with country code)
-    const formattedPhone = phoneNumber.replace(/\+/g, '');
-
-    // Send message via Gupshup
-    const gupshupPayload: any = {
-      channel: 'whatsapp',
-      source: whatsappSettings.whatsapp_source_number,
-      destination: formattedPhone,
-      'src.name': whatsappSettings.app_name,
-    };
-
-    if (templateData) {
-      // Template message
-      gupshupPayload.message = JSON.stringify({
-        type: 'template',
-        template: templateData,
-      });
-    } else {
-      // Simple text message
-      gupshupPayload.message = JSON.stringify({
-        type: 'text',
-        text: messageContent,
-      });
+    // Format phone number (ensure it starts with country code, add + if needed)
+    let formattedPhone = phoneNumber.replace(/[^\d]/g, '');
+    if (!formattedPhone.startsWith('+')) {
+      formattedPhone = '+' + formattedPhone;
     }
 
-    console.log('Sending WhatsApp message:', gupshupPayload);
+    // Build Exotel API URL
+    const exotelSubdomain = whatsappSettings.exotel_subdomain || 'api.exotel.com';
+    const exotelUrl = `https://${exotelSubdomain}/v2/accounts/${whatsappSettings.exotel_sid}/messages`;
 
-    const gupshupResponse = await fetch('https://api.gupshup.io/sm/api/v1/msg', {
+    // Prepare Exotel payload
+    const exotelPayload = {
+      to: formattedPhone,
+      body: messageContent,
+      from: whatsappSettings.whatsapp_source_number,
+      channel: 'whatsapp',
+    };
+
+    console.log('Sending WhatsApp message via Exotel:', { to: formattedPhone, bodyLength: messageContent.length });
+
+    // Send via Exotel API
+    const exotelResponse = await fetch(exotelUrl, {
       method: 'POST',
       headers: {
-        'apikey': whatsappSettings.gupshup_api_key,
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${btoa(`${whatsappSettings.exotel_api_key}:${whatsappSettings.exotel_api_token}`)}`,
       },
-      body: new URLSearchParams(gupshupPayload).toString(),
+      body: JSON.stringify(exotelPayload),
     });
 
-    const gupshupResult = await gupshupResponse.json();
-    console.log('Gupshup response:', gupshupResult);
+    const exotelResult = await exotelResponse.json();
+    console.log('Exotel response:', exotelResult);
 
-    if (!gupshupResponse.ok || gupshupResult.status === 'error') {
+    if (!exotelResponse.ok) {
       // Log failed message
       await supabaseClient.from('whatsapp_messages').insert({
         org_id: profile.org_id,
@@ -209,13 +211,13 @@ Deno.serve(async (req) => {
         message_content: messageContent,
         template_variables: templateVariables || null,
         status: 'failed',
-        error_message: gupshupResult.message || 'Failed to send message',
+        error_message: exotelResult.message || 'Failed to send message',
       });
 
       return new Response(
-        JSON.stringify({ error: gupshupResult.message || 'Failed to send message' }),
+        JSON.stringify({ error: exotelResult.message || 'Failed to send message' }),
         {
-          status: gupshupResponse.status,
+          status: exotelResponse.status,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
@@ -232,7 +234,7 @@ Deno.serve(async (req) => {
         phone_number: formattedPhone,
         message_content: messageContent,
         template_variables: templateVariables || null,
-        gupshup_message_id: gupshupResult.messageId,
+        exotel_message_id: exotelResult.sid || exotelResult.id,
         status: 'sent',
       })
       .select()
@@ -254,7 +256,6 @@ Deno.serve(async (req) => {
 
     if (deductError || !deductResult?.success) {
       console.warn('Wallet deduction failed:', deductError || deductResult);
-      // Message was sent, but wallet deduction failed - log but don't fail the request
     }
 
     // Log activity
@@ -270,7 +271,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        messageId: gupshupResult.messageId,
+        messageId: exotelResult.sid || exotelResult.id,
         message: messageRecord,
       }),
       {
