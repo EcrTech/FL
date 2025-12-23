@@ -13,10 +13,8 @@ import { addMonths } from "date-fns";
 import html2pdf from "html2pdf.js";
 
 // Document template imports
-import KFSDocument from "../Sanction/templates/KFSDocument";
 import SanctionLetterDocument from "../Sanction/templates/SanctionLetterDocument";
 import LoanAgreementDocument from "../Sanction/templates/LoanAgreementDocument";
-import DPNDocument from "../Sanction/templates/DPNDocument";
 
 // ESign imports
 import { RequestESignButton } from "../ESign/RequestESignButton";
@@ -27,13 +25,11 @@ interface DisbursementDashboardProps {
   applicationId: string;
 }
 
-type DocumentType = "kfs" | "sanction_letter" | "loan_agreement" | "dpn";
+type DocumentType = "sanction_letter" | "loan_agreement";
 
 const documentTypes: { key: DocumentType; label: string; shortLabel: string }[] = [
-  { key: "kfs", label: "Key Fact Statement", shortLabel: "KFS" },
   { key: "sanction_letter", label: "Sanction Letter", shortLabel: "Sanction" },
   { key: "loan_agreement", label: "Loan Agreement", shortLabel: "Agreement" },
-  { key: "dpn", label: "Demand Promissory Note", shortLabel: "DPN" },
 ];
 
 const formatCurrency = (amount: number) => {
@@ -94,10 +90,8 @@ const formatAddress = (addressJson: unknown): string => {
 
 export default function DisbursementDashboard({ applicationId }: DisbursementDashboardProps) {
   const printRefs = useRef<Record<DocumentType, HTMLDivElement | null>>({
-    kfs: null,
     sanction_letter: null,
     loan_agreement: null,
-    dpn: null,
   });
   const queryClient = useQueryClient();
 
@@ -536,35 +530,6 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
       <div className="hidden">
         {applicant && sanction && (
           <>
-            <div ref={(el) => { printRefs.current.kfs = el; }}>
-              <KFSDocument
-                companyName={orgSettings?.company_name || "Paisaa Saarthi"}
-                companyAddress={orgSettings?.company_address}
-                companyCIN={orgSettings?.company_cin}
-                documentNumber={generatedDocs?.find(d => d.document_type === "kfs")?.document_number || "KFS-DRAFT"}
-                documentDate={new Date()}
-                borrowerName={borrowerName}
-                borrowerAddress={borrowerAddress}
-                borrowerPhone={borrowerPhone}
-                borrowerEmail={applicant.email || undefined}
-                loanAmount={loanAmount}
-                tenure={tenureMonths}
-                interestRate={interestRate}
-                emi={monthlyEMI}
-                processingFee={processingFee}
-                gstOnProcessingFee={gstOnProcessingFee}
-                totalInterest={totalInterest}
-                totalRepayment={totalMonthlyRepayment}
-                apr={interestRate}
-                emiSchedule={emiSchedule}
-                foreclosureRate={orgSettings?.foreclosure_rate || 4}
-                bounceCharges={500}
-                penalInterest={24}
-                grievanceEmail={orgSettings?.grievance_email}
-                grievancePhone={orgSettings?.grievance_phone}
-              />
-            </div>
-
             <div ref={(el) => { printRefs.current.sanction_letter = el; }}>
               <SanctionLetterDocument
                 companyName={orgSettings?.company_name || "Paisaa Saarthi"}
@@ -611,23 +576,6 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
                 bankName={bankDetails?.bank_name}
                 accountNumber={bankDetails?.account_number}
                 ifscCode={bankDetails?.ifsc_code}
-              />
-            </div>
-
-            <div ref={(el) => { printRefs.current.dpn = el; }}>
-              <DPNDocument
-                companyName={orgSettings?.company_name || "Paisaa Saarthi"}
-                companyAddress={orgSettings?.company_address}
-                companyCIN={orgSettings?.company_cin}
-                jurisdiction={orgSettings?.jurisdiction}
-                documentNumber={generatedDocs?.find(d => d.document_type === "dpn")?.document_number || "DPN-DRAFT"}
-                documentDate={new Date()}
-                borrowerName={borrowerName}
-                borrowerAddress={borrowerAddress}
-                loanAmount={loanAmount}
-                tenure={tenureMonths}
-                interestRate={interestRate}
-                totalRepayment={totalMonthlyRepayment}
               />
             </div>
           </>
