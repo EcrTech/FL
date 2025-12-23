@@ -15,6 +15,7 @@ import html2pdf from "html2pdf.js";
 // Document template imports
 import SanctionLetterDocument from "../Sanction/templates/SanctionLetterDocument";
 import LoanAgreementDocument from "../Sanction/templates/LoanAgreementDocument";
+import DailyRepaymentScheduleDocument from "../Sanction/templates/DailyRepaymentScheduleDocument";
 import UploadSignedDocumentDialog from "../Sanction/UploadSignedDocumentDialog";
 
 // ESign imports
@@ -26,11 +27,12 @@ interface DisbursementDashboardProps {
   applicationId: string;
 }
 
-type DocumentType = "sanction_letter" | "loan_agreement";
+type DocumentType = "sanction_letter" | "loan_agreement" | "daily_schedule";
 
 const documentTypes: { key: DocumentType; label: string; shortLabel: string }[] = [
   { key: "sanction_letter", label: "Sanction Letter", shortLabel: "Sanction" },
   { key: "loan_agreement", label: "Loan Agreement", shortLabel: "Agreement" },
+  { key: "daily_schedule", label: "Daily Repayment Schedule", shortLabel: "Repayment" },
 ];
 
 const formatCurrency = (amount: number) => {
@@ -93,6 +95,7 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
   const printRefs = useRef<Record<DocumentType, HTMLDivElement | null>>({
     sanction_letter: null,
     loan_agreement: null,
+    daily_schedule: null,
   });
   const queryClient = useQueryClient();
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
@@ -457,7 +460,7 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {documentTypes.map((doc) => {
               const isGenerated = isDocGenerated(doc.key);
               const docRecord = generatedDocs?.find(d => d.document_type === doc.key);
@@ -614,6 +617,27 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
                 bankName={bankDetails?.bank_name}
                 accountNumber={bankDetails?.account_number}
                 ifscCode={bankDetails?.ifsc_code}
+              />
+            </div>
+
+            <div ref={(el) => { printRefs.current.daily_schedule = el; }}>
+              <DailyRepaymentScheduleDocument
+                companyName={orgSettings?.company_name || "Paisaa Saarthi"}
+                companyAddress={orgSettings?.company_address}
+                companyCIN={orgSettings?.company_cin}
+                documentNumber={generatedDocs?.find(d => d.document_type === "daily_schedule")?.document_number || "DRS-DRAFT"}
+                documentDate={new Date()}
+                borrowerName={borrowerName}
+                borrowerAddress={borrowerAddress}
+                borrowerPhone={borrowerPhone}
+                loanAmount={loanAmount}
+                dailyInterestRate={interestRate / 365}
+                tenureDays={tenureDays}
+                disbursementDate={new Date()}
+                bankName={bankDetails?.bank_name}
+                accountNumber={bankDetails?.account_number}
+                grievanceEmail={orgSettings?.grievance_email}
+                grievancePhone={orgSettings?.grievance_phone}
               />
             </div>
           </>
