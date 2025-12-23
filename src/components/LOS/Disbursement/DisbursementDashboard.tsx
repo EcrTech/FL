@@ -270,18 +270,22 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
 
   const handleDownload = (docType: DocumentType) => {
     const printRef = printRefs.current[docType];
-    if (printRef) {
-      const docLabel = documentTypes.find(d => d.key === docType)?.label || docType;
-      const opt = {
-        margin: 10,
-        filename: `${docLabel.replace(/\s+/g, '-')}-${applicationId}.pdf`,
-        image: { type: 'jpeg' as const, quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const }
-      };
-      
-      html2pdf().set(opt).from(printRef).save();
+    if (!printRef) {
+      toast.error("Document template not available. Please ensure applicant and sanction data are loaded.");
+      console.error("Print ref not found for:", docType, "applicant:", !!applicant, "sanction:", !!sanction);
+      return;
     }
+    
+    const docLabel = documentTypes.find(d => d.key === docType)?.label || docType;
+    const opt = {
+      margin: 10,
+      filename: `${docLabel.replace(/\s+/g, '-')}-${applicationId}.pdf`,
+      image: { type: 'jpeg' as const, quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const }
+    };
+    
+    html2pdf().set(opt).from(printRef).save();
   };
 
   const handlePrint = (docType: DocumentType) => {
