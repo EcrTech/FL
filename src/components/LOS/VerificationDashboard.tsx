@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, Clock, Edit, AlertCircle, Eye } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Edit, AlertCircle, Eye, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import PANVerificationDialog from "./Verification/PANVerificationDialog";
 import AadhaarVerificationDialog from "./Verification/AadhaarVerificationDialog";
@@ -381,7 +381,7 @@ export default function VerificationDashboard({ applicationId, orgId }: Verifica
                   </div>
                 )}
 
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   {verification && status !== "pending" && (
                     <Button
                       variant="outline"
@@ -392,13 +392,25 @@ export default function VerificationDashboard({ applicationId, orgId }: Verifica
                       View Details
                     </Button>
                   )}
+                  {verificationType.type === "credit_bureau" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedVerification({ type: verificationType.type, data: verification })}
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload CIBIL
+                    </Button>
+                  )}
                   <Button
                     variant={status === "pending" ? "default" : "outline"}
                     size="sm"
                     onClick={() => setSelectedVerification({ type: verificationType.type, data: verification })}
                   >
                     <Edit className="h-4 w-4 mr-2" />
-                    {status === "pending" ? "Start Verification" : "Update"}
+                    {verificationType.type === "credit_bureau" 
+                      ? (status === "pending" ? "Fetch CIBIL" : "Update") 
+                      : (status === "pending" ? "Start Verification" : "Update")}
                   </Button>
                 </div>
               </CardContent>
