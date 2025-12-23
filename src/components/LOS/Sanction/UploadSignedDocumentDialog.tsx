@@ -90,23 +90,15 @@ export default function UploadSignedDocumentDialog({
         console.error('Update error:', updateError);
       }
 
-      // Update sanction status if both documents are signed
-      const { data: docs } = await supabase
-        .from("loan_generated_documents")
-        .select("customer_signed, document_type")
-        .eq("sanction_id", sanctionId);
-
-      const allSigned = docs?.every(d => d.customer_signed);
-      if (allSigned) {
-        await supabase
-          .from("loan_sanctions")
-          .update({ 
-            status: 'signed',
-            customer_accepted: true,
-            accepted_at: new Date().toISOString()
-          })
-          .eq("id", sanctionId);
-      }
+      // Update sanction status to signed when document is uploaded
+      await supabase
+        .from("loan_sanctions")
+        .update({ 
+          status: 'signed',
+          customer_accepted: true,
+          accepted_at: new Date().toISOString()
+        })
+        .eq("id", sanctionId);
 
       toast.success("Signed document uploaded successfully");
       onSuccess();
