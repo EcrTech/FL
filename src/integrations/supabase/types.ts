@@ -4060,7 +4060,11 @@ export type Database = {
           id: string
           ifsc_code: string
           loan_application_id: string
+          org_id: string | null
           payment_mode: string | null
+          proof_document_path: string | null
+          proof_uploaded_at: string | null
+          proof_uploaded_by: string | null
           sanction_id: string | null
           status: string
           updated_at: string
@@ -4078,7 +4082,11 @@ export type Database = {
           id?: string
           ifsc_code: string
           loan_application_id: string
+          org_id?: string | null
           payment_mode?: string | null
+          proof_document_path?: string | null
+          proof_uploaded_at?: string | null
+          proof_uploaded_by?: string | null
           sanction_id?: string | null
           status?: string
           updated_at?: string
@@ -4096,7 +4104,11 @@ export type Database = {
           id?: string
           ifsc_code?: string
           loan_application_id?: string
+          org_id?: string | null
           payment_mode?: string | null
+          proof_document_path?: string | null
+          proof_uploaded_at?: string | null
+          proof_uploaded_by?: string | null
           sanction_id?: string | null
           status?: string
           updated_at?: string
@@ -4108,6 +4120,13 @@ export type Database = {
             columns: ["loan_application_id"]
             isOneToOne: false
             referencedRelation: "loan_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_disbursements_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
           {

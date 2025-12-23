@@ -8,10 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
-import { CheckCircle, XCircle, Clock, Building2 } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Building2, Upload, FileCheck, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 
 import { useLOSPermissions } from "@/hooks/useLOSPermissions";
+import ProofUploadDialog from "./ProofUploadDialog";
 
 interface DisbursementStatusProps {
   applicationId: string;
@@ -23,6 +24,7 @@ export default function DisbursementStatus({ applicationId }: DisbursementStatus
   const [utrNumber, setUtrNumber] = useState("");
   const [failureReason, setFailureReason] = useState("");
   const [showUpdateForm, setShowUpdateForm] = useState(false);
+  const [showProofUpload, setShowProofUpload] = useState(false);
   const { permissions } = useLOSPermissions();
 
   const { data: disbursement } = useQuery({
@@ -43,7 +45,7 @@ export default function DisbursementStatus({ applicationId }: DisbursementStatus
     mutationFn: async (status: "completed" | "failed") => {
       if (!disbursement) throw new Error("No disbursement found");
 
-      const updateData: any = {
+      const updateData: Record<string, unknown> = {
         status,
         updated_at: new Date().toISOString(),
       };
@@ -64,6 +66,7 @@ export default function DisbursementStatus({ applicationId }: DisbursementStatus
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["loan-disbursements", applicationId] });
+      queryClient.invalidateQueries({ queryKey: ["all-disbursements"] });
       toast({ title: "Disbursement status updated" });
       setShowUpdateForm(false);
       setUtrNumber("");
@@ -77,6 +80,22 @@ export default function DisbursementStatus({ applicationId }: DisbursementStatus
       });
     },
   });
+
+  const getProofDocumentUrl = async (path: string) => {
+    const { data } = await supabase.storage
+      .from("loan-documents")
+      .createSignedUrl(path, 3600);
+    return data?.signedUrl;
+  };
+
+  const handleViewProof = async () => {
+    if (disbursement?.proof_document_path) {
+      const url = await getProofDocumentUrl(disbursement.proof_document_path);
+      if (url) {
+        window.open(url, "_blank");
+      }
+    }
+  };
 
   if (!disbursement) {
     return null;
@@ -97,7 +116,6 @@ export default function DisbursementStatus({ applicationId }: DisbursementStatus
   };
 
   const config = statusConfig[disbursement.status as keyof typeof statusConfig];
-  const StatusIcon = config.icon;
 
   return (
     <div className="space-y-6">
@@ -170,6 +188,44 @@ export default function DisbursementStatus({ applicationId }: DisbursementStatus
             </div>
           )}
 
+          {/* Proof of Disbursement Section */}
+          <div>
+            <h4 className="font-medium mb-3">Proof of Disbursement</h4>
+            {disbursement.proof_document_path ? (
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileCheck className="h-5 w-5 text-green-600" />
+                  <div>
+                    <div className="font-medium text-green-700">Proof Uploaded</div>
+                    {disbursement.proof_uploaded_at && (
+                      <div className="text-xs text-muted-foreground">
+                        Uploaded on {format(new Date(disbursement.proof_uploaded_at), "MMM dd, yyyy 'at' h:mm a")}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleViewProof}>
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  View Proof
+                </Button>
+              </div>
+            ) : (
+              <div className="p-4 border border-dashed rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="text-muted-foreground">
+                    No proof uploaded yet
+                  </div>
+                  {disbursement.status === "completed" && permissions.canUpdateDisbursementStatus && (
+                    <Button variant="secondary" onClick={() => setShowProofUpload(true)}>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload Proof
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           {disbursement.status === "pending" && !showUpdateForm && permissions.canUpdateDisbursementStatus && (
             <div className="flex gap-4">
               <Button onClick={() => setShowUpdateForm(true)}>
@@ -233,6 +289,17 @@ export default function DisbursementStatus({ applicationId }: DisbursementStatus
           )}
         </CardContent>
       </Card>
+
+      {/* Proof Upload Dialog */}
+      <ProofUploadDialog
+        open={showProofUpload}
+        onOpenChange={setShowProofUpload}
+        disbursementId={disbursement.id}
+        applicationId={applicationId}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["loan-disbursements", applicationId] });
+        }}
+      />
     </div>
   );
 }
