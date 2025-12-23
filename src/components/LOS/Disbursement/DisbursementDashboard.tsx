@@ -577,7 +577,7 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
 
       {/* Hidden document templates for printing */}
       <div className="hidden">
-        {applicant && sanction && (
+        {sanction && (
           <>
             <div ref={(el) => { printRefs.current.sanction_letter = el; }}>
               <SanctionLetterDocument
@@ -586,8 +586,8 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
                 companyCIN={orgSettings?.company_cin}
                 documentNumber={generatedDocs?.find(d => d.document_type === "sanction_letter")?.document_number || "SL-DRAFT"}
                 documentDate={new Date()}
-                borrowerName={borrowerName}
-                borrowerAddress={borrowerAddress}
+                borrowerName={borrowerName || "N/A"}
+                borrowerAddress={borrowerAddress || "N/A"}
                 loanAmount={loanAmount}
                 tenure={tenureMonths}
                 interestRate={interestRate}
@@ -608,11 +608,11 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
                 jurisdiction={orgSettings?.jurisdiction}
                 documentNumber={generatedDocs?.find(d => d.document_type === "loan_agreement")?.document_number || "LA-DRAFT"}
                 documentDate={new Date()}
-                borrowerName={borrowerName}
-                borrowerAddress={borrowerAddress}
-                borrowerPhone={borrowerPhone}
-                borrowerPAN={applicant.pan_number}
-                borrowerAadhaar={applicant.aadhaar_number}
+                borrowerName={borrowerName || "N/A"}
+                borrowerAddress={borrowerAddress || "N/A"}
+                borrowerPhone={borrowerPhone || "N/A"}
+                borrowerPAN={applicant?.pan_number}
+                borrowerAadhaar={applicant?.aadhaar_number}
                 loanAmount={loanAmount}
                 tenure={tenureMonths}
                 interestRate={interestRate}
@@ -635,9 +635,9 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
                 companyCIN={orgSettings?.company_cin}
                 documentNumber={generatedDocs?.find(d => d.document_type === "daily_schedule")?.document_number || "DRS-DRAFT"}
                 documentDate={new Date()}
-                borrowerName={borrowerName}
-                borrowerAddress={borrowerAddress}
-                borrowerPhone={borrowerPhone}
+                borrowerName={borrowerName || "N/A"}
+                borrowerAddress={borrowerAddress || "N/A"}
+                borrowerPhone={borrowerPhone || "N/A"}
                 loanAmount={loanAmount}
                 dailyInterestRate={interestRate / 365}
                 tenureDays={tenureDays}
