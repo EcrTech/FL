@@ -350,7 +350,7 @@ export default function Sanctions() {
                                 </Button>
                               )}
                               
-                              {app.documents_emailed_at && app.sanction_status !== 'signed' && (
+                              {app.sanction_id && app.sanction_status !== 'signed' && (
                                 <Button
                                   size="sm"
                                   variant="outline"
