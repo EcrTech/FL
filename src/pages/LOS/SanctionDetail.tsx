@@ -1,15 +1,18 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Upload } from "lucide-react";
 import { LoadingState } from "@/components/common/LoadingState";
 import { format } from "date-fns";
 import DisbursementDashboard from "@/components/LOS/Disbursement/DisbursementDashboard";
 import SanctionGenerator from "@/components/LOS/Sanction/SanctionGenerator";
+import UploadSignedDocumentDialog from "@/components/LOS/Sanction/UploadSignedDocumentDialog";
 import { useOrgContext } from "@/hooks/useOrgContext";
+
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-muted",
   in_progress: "bg-blue-500",
@@ -22,6 +25,8 @@ export default function SanctionDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { orgId } = useOrgContext();
+  const queryClient = useQueryClient();
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
 
   const { data: application, isLoading } = useQuery({
     queryKey: ["sanction-application", id],
@@ -36,6 +41,19 @@ export default function SanctionDetail() {
         .maybeSingle();
 
       if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
+
+  const { data: sanction } = useQuery({
+    queryKey: ["loan-sanction-detail", id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("loan_sanctions")
+        .select("*")
+        .eq("loan_application_id", id)
+        .maybeSingle();
       return data;
     },
     enabled: !!id,
@@ -68,6 +86,7 @@ export default function SanctionDetail() {
   }
 
   const primaryApplicant = application.loan_applicants?.[0];
+  const canUploadSigned = sanction?.documents_emailed_at && sanction?.status !== 'signed';
 
   return (
     <DashboardLayout>
@@ -86,6 +105,9 @@ export default function SanctionDetail() {
                 <Badge className={STATUS_COLORS[application.status]}>
                   {application.status.replace("_", " ").toUpperCase()}
                 </Badge>
+                {sanction?.status === 'signed' && (
+                  <Badge className="bg-green-500">Documents Signed</Badge>
+                )}
               </div>
               <p className="text-muted-foreground mt-1">
                 {primaryApplicant && `${primaryApplicant.first_name} ${primaryApplicant.last_name || ""}`}
@@ -96,12 +118,33 @@ export default function SanctionDetail() {
               </p>
             </div>
           </div>
-          <SanctionGenerator applicationId={application.id} orgId={orgId || ""} />
+          <div className="flex items-center gap-2">
+            {canUploadSigned && (
+              <Button variant="outline" onClick={() => setUploadDialogOpen(true)}>
+                <Upload className="h-4 w-4 mr-2" />
+                Upload Signed Document
+              </Button>
+            )}
+            <SanctionGenerator applicationId={application.id} orgId={orgId || ""} />
+          </div>
         </div>
 
         {/* Sanction Content - Only Loan Summary & Documents */}
         <DisbursementDashboard applicationId={application.id} />
       </div>
+
+      {sanction && (
+        <UploadSignedDocumentDialog
+          open={uploadDialogOpen}
+          onOpenChange={setUploadDialogOpen}
+          applicationId={application.id}
+          sanctionId={sanction.id}
+          orgId={orgId!}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ["loan-sanction-detail", id] });
+          }}
+        />
+      )}
     </DashboardLayout>
   );
 }
