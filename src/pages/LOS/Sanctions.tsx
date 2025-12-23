@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrgContext } from "@/hooks/useOrgContext";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
@@ -6,24 +7,40 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Eye, CheckCircle, Loader2 } from "lucide-react";
+import { Eye, CheckCircle, Loader2, Send, Upload, FileCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
+import { toast } from "sonner";
+import { calculateLoanDetails, formatCurrency } from "@/utils/loanCalculations";
+import UploadSignedDocumentDialog from "@/components/LOS/Sanction/UploadSignedDocumentDialog";
 
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(amount);
-};
+interface SanctionApplication {
+  id: string;
+  application_number: string;
+  product_type: string;
+  approved_amount: number;
+  tenure_days: number;
+  interest_rate: number;
+  updated_at: string;
+  applicant_name: string;
+  applicant_email: string;
+  sanction_id: string | null;
+  sanction_status: string | null;
+  sanction_number: string | null;
+  documents_emailed_at: string | null;
+}
 
 export default function Sanctions() {
   const { orgId } = useOrgContext();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  
+  const [sanctioningId, setSanctioningId] = useState<string | null>(null);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [selectedApp, setSelectedApp] = useState<SanctionApplication | null>(null);
 
   const { data: applications, isLoading } = useQuery({
-    queryKey: ["approved-applications", orgId],
+    queryKey: ["approved-applications-with-sanctions", orgId],
     queryFn: async () => {
       // Fetch approved applications
       const { data: applicationsData, error } = await supabase
@@ -36,27 +53,172 @@ export default function Sanctions() {
       if (error) throw error;
       if (!applicationsData || applicationsData.length === 0) return [];
 
-      // Fetch primary applicants
       const applicationIds = applicationsData.map((a: any) => a.id);
+      
+      // Fetch primary applicants with email
       const { data: applicants } = await supabase
         .from("loan_applicants")
-        .select("loan_application_id, first_name, last_name")
+        .select("loan_application_id, first_name, last_name, email")
         .in("loan_application_id", applicationIds)
         .eq("applicant_type", "primary");
+
+      // Fetch sanctions
+      const { data: sanctions } = await supabase
+        .from("loan_sanctions")
+        .select("id, loan_application_id, status, sanction_number, documents_emailed_at")
+        .in("loan_application_id", applicationIds);
 
       // Merge the data
       return applicationsData.map((app: any) => {
         const applicant = applicants?.find((a) => a.loan_application_id === app.id);
+        const sanction = sanctions?.find((s) => s.loan_application_id === app.id);
         return {
           ...app,
           applicant_name: applicant
             ? [applicant.first_name, applicant.last_name].filter(Boolean).join(" ")
             : "N/A",
+          applicant_email: applicant?.email || "",
+          sanction_id: sanction?.id || null,
+          sanction_status: sanction?.status || null,
+          sanction_number: sanction?.sanction_number || null,
+          documents_emailed_at: sanction?.documents_emailed_at || null,
         };
-      });
+      }) as SanctionApplication[];
     },
     enabled: !!orgId,
   });
+
+  const sanctionMutation = useMutation({
+    mutationFn: async (app: SanctionApplication) => {
+      if (!app.applicant_email) {
+        throw new Error("Customer email not found. Please update applicant details.");
+      }
+
+      // Calculate loan details
+      const loanCalc = calculateLoanDetails(
+        app.approved_amount,
+        app.interest_rate || 1,
+        app.tenure_days
+      );
+      
+      const processingFee = Math.round(app.approved_amount * 0.1);
+      const netDisbursement = app.approved_amount - processingFee;
+
+      // Create or get sanction record
+      let sanctionId = app.sanction_id;
+      let sanctionNumber = app.sanction_number;
+
+      if (!sanctionId) {
+        // Create sanction record
+        sanctionNumber = `SAN-${Date.now().toString(36).toUpperCase()}`;
+        const { data: newSanction, error: sanctionError } = await supabase
+          .from("loan_sanctions")
+          .insert({
+            loan_application_id: app.id,
+            sanction_number: sanctionNumber,
+            sanction_date: new Date().toISOString().split('T')[0],
+            sanctioned_amount: app.approved_amount,
+            sanctioned_tenure_days: app.tenure_days,
+            sanctioned_rate: app.interest_rate || 1,
+            processing_fee: processingFee,
+            gst_amount: Math.round(processingFee * 0.18),
+            net_disbursement_amount: netDisbursement,
+            validity_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            status: 'pending'
+          })
+          .select()
+          .single();
+
+        if (sanctionError) throw sanctionError;
+        sanctionId = newSanction.id;
+      }
+
+      // Generate document HTML
+      const sanctionLetterHtml = generateSanctionLetterHtml({
+        sanctionNumber: sanctionNumber!,
+        customerName: app.applicant_name,
+        applicationNumber: app.application_number,
+        approvedAmount: app.approved_amount,
+        tenure: app.tenure_days,
+        interestRate: app.interest_rate || 1,
+        processingFee,
+        netDisbursement,
+        totalInterest: loanCalc.totalInterest,
+        totalRepayment: loanCalc.totalRepayment,
+        dailyEMI: loanCalc.dailyEMI,
+      });
+
+      const loanAgreementHtml = generateLoanAgreementHtml({
+        sanctionNumber: sanctionNumber!,
+        customerName: app.applicant_name,
+        applicationNumber: app.application_number,
+        approvedAmount: app.approved_amount,
+        tenure: app.tenure_days,
+        interestRate: app.interest_rate || 1,
+        processingFee,
+        netDisbursement,
+        totalInterest: loanCalc.totalInterest,
+        totalRepayment: loanCalc.totalRepayment,
+        dailyEMI: loanCalc.dailyEMI,
+      });
+
+      // Send email via edge function
+      const { data, error } = await supabase.functions.invoke('send-sanction-documents', {
+        body: {
+          applicationId: app.id,
+          sanctionId,
+          customerEmail: app.applicant_email,
+          customerName: app.applicant_name,
+          sanctionLetterHtml,
+          loanAgreementHtml,
+          loanDetails: {
+            applicationNumber: app.application_number,
+            sanctionNumber: sanctionNumber!,
+            approvedAmount: app.approved_amount,
+            tenure: app.tenure_days,
+            interestRate: app.interest_rate || 1,
+            processingFee,
+            netDisbursement,
+          }
+        }
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Sanction documents sent successfully!");
+      queryClient.invalidateQueries({ queryKey: ["approved-applications-with-sanctions"] });
+      setSanctioningId(null);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to send sanction documents");
+      setSanctioningId(null);
+    }
+  });
+
+  const handleSanction = (app: SanctionApplication) => {
+    setSanctioningId(app.id);
+    sanctionMutation.mutate(app);
+  };
+
+  const handleUploadSigned = (app: SanctionApplication) => {
+    setSelectedApp(app);
+    setUploadDialogOpen(true);
+  };
+
+  const getStatusBadge = (app: SanctionApplication) => {
+    if (app.sanction_status === 'signed') {
+      return <Badge className="bg-green-500">Signed</Badge>;
+    }
+    if (app.documents_emailed_at) {
+      return <Badge className="bg-blue-500">Emailed</Badge>;
+    }
+    if (app.sanction_id) {
+      return <Badge variant="outline">Pending</Badge>;
+    }
+    return <Badge variant="secondary">New</Badge>;
+  };
 
   return (
     <DashboardLayout>
@@ -87,64 +249,309 @@ export default function Sanctions() {
                 <p className="text-muted-foreground">No applications pending sanction at this time.</p>
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Application No.</TableHead>
-                    <TableHead>Applicant</TableHead>
-                    <TableHead>Loan Type</TableHead>
-                    <TableHead>Approved Amount</TableHead>
-                    <TableHead>Approved Tenure</TableHead>
-                    <TableHead>Approved Date</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {applications.map((app) => (
-                    <TableRow 
-                      key={app.id} 
-                      className="cursor-pointer hover:bg-muted/50 transition-colors"
-                      onClick={() => navigate(`/los/sanctions/${app.id}`)}
-                    >
-                      <TableCell className="font-medium">
-                        {app.application_number}
-                      </TableCell>
-                      <TableCell>{app.applicant_name}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {app.product_type || "N/A"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {app.approved_amount ? formatCurrency(app.approved_amount) : "—"}
-                      </TableCell>
-                      <TableCell>
-                        {app.tenure_days ? `${app.tenure_days} days` : "—"}
-                      </TableCell>
-                      <TableCell>
-                        {format(new Date(app.updated_at), "dd MMM yyyy")}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/los/sanctions/${app.id}`);
-                          }}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          View
-                        </Button>
-                      </TableCell>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Application No.</TableHead>
+                      <TableHead>Applicant</TableHead>
+                      <TableHead>Loan Type</TableHead>
+                      <TableHead className="text-right">Approved Amount</TableHead>
+                      <TableHead className="text-right">Tenure</TableHead>
+                      <TableHead className="text-right">Interest Rate</TableHead>
+                      <TableHead className="text-right">Processing Fee</TableHead>
+                      <TableHead className="text-right">Net Disbursal</TableHead>
+                      <TableHead className="text-right">Total Interest</TableHead>
+                      <TableHead className="text-right">Total Repayment</TableHead>
+                      <TableHead className="text-right">Daily EMI</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {applications.map((app) => {
+                      const loanCalc = calculateLoanDetails(
+                        app.approved_amount || 0,
+                        app.interest_rate || 1,
+                        app.tenure_days || 0
+                      );
+                      const processingFee = Math.round((app.approved_amount || 0) * 0.1);
+                      const netDisbursement = (app.approved_amount || 0) - processingFee;
+                      const isSanctioning = sanctioningId === app.id;
+
+                      return (
+                        <TableRow key={app.id}>
+                          <TableCell className="font-medium">
+                            {app.application_number}
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <div>{app.applicant_name}</div>
+                              <div className="text-xs text-muted-foreground">{app.applicant_email}</div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">
+                              {app.product_type || "N/A"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-semibold text-primary">
+                            {app.approved_amount ? formatCurrency(app.approved_amount) : "—"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {app.tenure_days ? `${app.tenure_days} days` : "—"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {app.interest_rate ? `${app.interest_rate}%` : "1%"}
+                          </TableCell>
+                          <TableCell className="text-right text-amber-600">
+                            {formatCurrency(processingFee)}
+                          </TableCell>
+                          <TableCell className="text-right text-green-600 font-medium">
+                            {formatCurrency(netDisbursement)}
+                          </TableCell>
+                          <TableCell className="text-right text-red-500">
+                            {formatCurrency(loanCalc.totalInterest)}
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">
+                            {formatCurrency(loanCalc.totalRepayment)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {formatCurrency(loanCalc.dailyEMI)}
+                          </TableCell>
+                          <TableCell>
+                            {getStatusBadge(app)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => navigate(`/los/sanctions/${app.id}`)}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              
+                              {!app.documents_emailed_at && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleSanction(app)}
+                                  disabled={isSanctioning || !app.applicant_email}
+                                  title={!app.applicant_email ? "Customer email required" : "Send sanction documents"}
+                                >
+                                  {isSanctioning ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <>
+                                      <Send className="h-4 w-4 mr-1" />
+                                      Sanction
+                                    </>
+                                  )}
+                                </Button>
+                              )}
+                              
+                              {app.documents_emailed_at && app.sanction_status !== 'signed' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleUploadSigned(app)}
+                                >
+                                  <Upload className="h-4 w-4 mr-1" />
+                                  Upload Signed
+                                </Button>
+                              )}
+                              
+                              {app.sanction_status === 'signed' && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-green-600"
+                                  disabled
+                                >
+                                  <FileCheck className="h-4 w-4 mr-1" />
+                                  Completed
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </CardContent>
         </Card>
       </div>
+
+      {selectedApp && (
+        <UploadSignedDocumentDialog
+          open={uploadDialogOpen}
+          onOpenChange={setUploadDialogOpen}
+          applicationId={selectedApp.id}
+          sanctionId={selectedApp.sanction_id!}
+          orgId={orgId!}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ["approved-applications-with-sanctions"] });
+          }}
+        />
+      )}
     </DashboardLayout>
   );
+}
+
+// Generate Sanction Letter HTML
+function generateSanctionLetterHtml(data: {
+  sanctionNumber: string;
+  customerName: string;
+  applicationNumber: string;
+  approvedAmount: number;
+  tenure: number;
+  interestRate: number;
+  processingFee: number;
+  netDisbursement: number;
+  totalInterest: number;
+  totalRepayment: number;
+  dailyEMI: number;
+}) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 40px; color: #333; }
+        .header { text-align: center; border-bottom: 2px solid #1a365d; padding-bottom: 20px; margin-bottom: 30px; }
+        .header h1 { color: #1a365d; margin: 0; }
+        .header p { color: #666; margin: 5px 0; }
+        .content { line-height: 1.8; }
+        .details-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        .details-table td { padding: 10px; border: 1px solid #ddd; }
+        .details-table td:first-child { background: #f8f9fa; font-weight: bold; width: 40%; }
+        .amount { color: #059669; font-weight: bold; }
+        .footer { margin-top: 50px; }
+        .signature { margin-top: 100px; border-top: 1px solid #333; width: 200px; text-align: center; padding-top: 5px; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>SANCTION LETTER</h1>
+        <p>Sanction No: ${data.sanctionNumber}</p>
+        <p>Date: ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+      </div>
+      
+      <div class="content">
+        <p>Dear <strong>${data.customerName}</strong>,</p>
+        
+        <p>We are pleased to inform you that your loan application (Application No: <strong>${data.applicationNumber}</strong>) has been sanctioned. The details of the sanctioned loan are as follows:</p>
+        
+        <table class="details-table">
+          <tr><td>Sanctioned Amount</td><td class="amount">₹${data.approvedAmount.toLocaleString('en-IN')}</td></tr>
+          <tr><td>Loan Tenure</td><td>${data.tenure} Days</td></tr>
+          <tr><td>Interest Rate</td><td>${data.interestRate}% per day</td></tr>
+          <tr><td>Processing Fee (10%)</td><td>₹${data.processingFee.toLocaleString('en-IN')}</td></tr>
+          <tr><td>Net Disbursement Amount</td><td class="amount">₹${data.netDisbursement.toLocaleString('en-IN')}</td></tr>
+          <tr><td>Total Interest Payable</td><td>₹${data.totalInterest.toLocaleString('en-IN')}</td></tr>
+          <tr><td>Total Repayment Amount</td><td>₹${data.totalRepayment.toLocaleString('en-IN')}</td></tr>
+          <tr><td>Daily EMI</td><td>₹${data.dailyEMI.toLocaleString('en-IN')}</td></tr>
+        </table>
+        
+        <p>This sanction is valid for 30 days from the date of issue. Please sign and return the Loan Agreement to proceed with disbursement.</p>
+        
+        <p><strong>Terms & Conditions:</strong></p>
+        <ul>
+          <li>The loan amount will be disbursed after receipt of signed loan agreement.</li>
+          <li>Processing fee is non-refundable and will be deducted from the sanctioned amount.</li>
+          <li>Any delay in EMI payment will attract penal charges as per the loan agreement.</li>
+        </ul>
+      </div>
+      
+      <div class="footer">
+        <p>For any queries, please contact our loan department.</p>
+        <div class="signature">Authorized Signatory</div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+// Generate Loan Agreement HTML
+function generateLoanAgreementHtml(data: {
+  sanctionNumber: string;
+  customerName: string;
+  applicationNumber: string;
+  approvedAmount: number;
+  tenure: number;
+  interestRate: number;
+  processingFee: number;
+  netDisbursement: number;
+  totalInterest: number;
+  totalRepayment: number;
+  dailyEMI: number;
+}) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 40px; color: #333; line-height: 1.6; }
+        .header { text-align: center; border-bottom: 2px solid #1a365d; padding-bottom: 20px; margin-bottom: 30px; }
+        .header h1 { color: #1a365d; margin: 0; }
+        h2 { color: #1a365d; border-bottom: 1px solid #ddd; padding-bottom: 10px; }
+        .details-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        .details-table td { padding: 10px; border: 1px solid #ddd; }
+        .details-table td:first-child { background: #f8f9fa; font-weight: bold; width: 40%; }
+        .clause { margin: 15px 0; padding-left: 20px; }
+        .signatures { display: flex; justify-content: space-between; margin-top: 80px; }
+        .sign-box { text-align: center; width: 200px; }
+        .sign-line { border-top: 1px solid #333; margin-top: 60px; padding-top: 5px; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>LOAN AGREEMENT</h1>
+        <p>Agreement Reference: ${data.sanctionNumber}</p>
+        <p>Date: ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+      </div>
+      
+      <p>This Loan Agreement ("Agreement") is entered into on this day between:</p>
+      <p><strong>LENDER:</strong> The Company (hereinafter referred to as "Lender")</p>
+      <p><strong>BORROWER:</strong> ${data.customerName} (hereinafter referred to as "Borrower")</p>
+      
+      <h2>1. LOAN DETAILS</h2>
+      <table class="details-table">
+        <tr><td>Application Number</td><td>${data.applicationNumber}</td></tr>
+        <tr><td>Loan Amount</td><td>₹${data.approvedAmount.toLocaleString('en-IN')}</td></tr>
+        <tr><td>Tenure</td><td>${data.tenure} Days</td></tr>
+        <tr><td>Interest Rate</td><td>${data.interestRate}% per day (Simple Interest)</td></tr>
+        <tr><td>Processing Fee</td><td>₹${data.processingFee.toLocaleString('en-IN')}</td></tr>
+        <tr><td>Net Disbursement</td><td>₹${data.netDisbursement.toLocaleString('en-IN')}</td></tr>
+        <tr><td>Total Interest</td><td>₹${data.totalInterest.toLocaleString('en-IN')}</td></tr>
+        <tr><td>Total Amount Payable</td><td>₹${data.totalRepayment.toLocaleString('en-IN')}</td></tr>
+        <tr><td>Daily EMI</td><td>₹${data.dailyEMI.toLocaleString('en-IN')}</td></tr>
+      </table>
+      
+      <h2>2. TERMS AND CONDITIONS</h2>
+      <div class="clause"><strong>2.1</strong> The Borrower agrees to repay the loan amount along with interest as per the repayment schedule.</div>
+      <div class="clause"><strong>2.2</strong> The processing fee is non-refundable and shall be deducted from the loan amount at the time of disbursement.</div>
+      <div class="clause"><strong>2.3</strong> In case of delay in payment, penal interest @ 2% per day shall be applicable on the overdue amount.</div>
+      <div class="clause"><strong>2.4</strong> The Borrower authorizes the Lender to recover the dues through any legal means in case of default.</div>
+      <div class="clause"><strong>2.5</strong> Prepayment of loan is allowed without any prepayment charges after completion of minimum tenure.</div>
+      
+      <h2>3. DECLARATION</h2>
+      <p>The Borrower hereby declares that all information provided is true and correct. The Borrower has read, understood, and agrees to all terms and conditions of this Agreement.</p>
+      
+      <div class="signatures">
+        <div class="sign-box">
+          <div class="sign-line">Borrower's Signature</div>
+          <p>${data.customerName}</p>
+        </div>
+        <div class="sign-box">
+          <div class="sign-line">Lender's Signature</div>
+          <p>Authorized Signatory</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
 }

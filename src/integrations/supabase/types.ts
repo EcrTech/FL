@@ -4929,6 +4929,8 @@ export type Database = {
           conditions: Json | null
           created_at: string
           customer_accepted: boolean | null
+          customer_email: string | null
+          documents_emailed_at: string | null
           gst_amount: number | null
           id: string
           loan_application_id: string
@@ -4949,6 +4951,8 @@ export type Database = {
           conditions?: Json | null
           created_at?: string
           customer_accepted?: boolean | null
+          customer_email?: string | null
+          documents_emailed_at?: string | null
           gst_amount?: number | null
           id?: string
           loan_application_id: string
@@ -4969,6 +4973,8 @@ export type Database = {
           conditions?: Json | null
           created_at?: string
           customer_accepted?: boolean | null
+          customer_email?: string | null
+          documents_emailed_at?: string | null
           gst_amount?: number | null
           id?: string
           loan_application_id?: string
