@@ -19,6 +19,10 @@ interface Button {
   url?: string;
   phone_code?: string;
   phone_number?: string;
+  example_code?: string;
+  flow_id?: string;
+  flow_action?: string;
+  navigate_screen?: string;
 }
 
 export default function TemplateBuilder() {
@@ -87,8 +91,29 @@ export default function TemplateBuilder() {
   };
 
   const addButton = (type: string) => {
-    if (buttons.length >= 3) {
-      notify.error("Button Limit Reached", "You can add a maximum of 3 buttons");
+    const copyCodeCount = buttons.filter(b => b.type === "COPY_CODE").length;
+    const flowCount = buttons.filter(b => b.type === "FLOW").length;
+    const phoneCount = buttons.filter(b => b.type === "PHONE_NUMBER").length;
+    const urlCount = buttons.filter(b => b.type === "URL").length;
+    
+    if (type === "COPY_CODE" && copyCodeCount >= 1) {
+      notify.error("Limit Reached", "Only 1 Copy Code button allowed");
+      return;
+    }
+    if (type === "FLOW" && flowCount >= 1) {
+      notify.error("Limit Reached", "Only 1 Flow button allowed");
+      return;
+    }
+    if (type === "PHONE_NUMBER" && phoneCount >= 1) {
+      notify.error("Limit Reached", "Only 1 Phone button allowed");
+      return;
+    }
+    if (type === "URL" && urlCount >= 2) {
+      notify.error("Limit Reached", "Maximum 2 URL buttons allowed");
+      return;
+    }
+    if (buttons.length >= 10) {
+      notify.error("Button Limit Reached", "Maximum 10 buttons allowed");
       return;
     }
 
@@ -98,7 +123,9 @@ export default function TemplateBuilder() {
         type,
         text: "",
         ...(type === "URL" && { url: "" }),
-        ...(type === "PHONE_NUMBER" && { phone_code: "+1", phone_number: "" }),
+        ...(type === "PHONE_NUMBER" && { phone_code: "+91", phone_number: "" }),
+        ...(type === "COPY_CODE" && { example_code: "" }),
+        ...(type === "FLOW" && { flow_id: "", flow_action: "navigate", navigate_screen: "" }),
       },
     ]);
   };
@@ -203,10 +230,17 @@ export default function TemplateBuilder() {
         content: bodyContent,
         footer_text: footerText || null,
         buttons: buttons.length > 0 ? buttons.map(btn => ({
-          ...btn,
+          type: btn.type,
+          text: btn.text,
+          ...(btn.type === "URL" && { url: btn.url }),
           ...(btn.type === "PHONE_NUMBER" && { 
-            phone_number: (btn.phone_code || "+1") + (btn.phone_number || ""),
-            phone_code: undefined 
+            phone_number: (btn.phone_code || "+91") + (btn.phone_number || ""),
+          }),
+          ...(btn.type === "COPY_CODE" && { example_code: btn.example_code }),
+          ...(btn.type === "FLOW" && { 
+            flow_id: btn.flow_id,
+            flow_action: btn.flow_action,
+            navigate_screen: btn.navigate_screen,
           }),
         })) : null,
         sample_values: {
@@ -504,21 +538,54 @@ export default function TemplateBuilder() {
             <Card>
               <CardHeader>
                 <CardTitle>Buttons (Optional)</CardTitle>
-                <CardDescription>Add call-to-action or quick reply buttons (max 3)</CardDescription>
+                <CardDescription>Add call-to-action or quick reply buttons (max 10 total)</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex gap-2">
-                  <Button type="button" variant="outline" onClick={() => addButton("URL")} disabled={buttons.length >= 3}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    URL Button
-                  </Button>
-                  <Button type="button" variant="outline" onClick={() => addButton("PHONE_NUMBER")} disabled={buttons.length >= 3}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Phone Button
-                  </Button>
-                  <Button type="button" variant="outline" onClick={() => addButton("QUICK_REPLY")} disabled={buttons.length >= 3}>
+                <div className="flex flex-wrap gap-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => addButton("QUICK_REPLY")} 
+                    disabled={buttons.length >= 10}
+                  >
                     <Plus className="h-4 w-4 mr-2" />
                     Quick Reply
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => addButton("URL")} 
+                    disabled={buttons.filter(b => b.type === "URL").length >= 2}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    URL ({buttons.filter(b => b.type === "URL").length}/2)
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => addButton("PHONE_NUMBER")} 
+                    disabled={buttons.filter(b => b.type === "PHONE_NUMBER").length >= 1}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Phone ({buttons.filter(b => b.type === "PHONE_NUMBER").length}/1)
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => addButton("COPY_CODE")} 
+                    disabled={buttons.filter(b => b.type === "COPY_CODE").length >= 1}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Copy Code ({buttons.filter(b => b.type === "COPY_CODE").length}/1)
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => addButton("FLOW")} 
+                    disabled={buttons.filter(b => b.type === "FLOW").length >= 1}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Flow ({buttons.filter(b => b.type === "FLOW").length}/1)
                   </Button>
                 </div>
 
@@ -547,7 +614,7 @@ export default function TemplateBuilder() {
                       {btn.type === "PHONE_NUMBER" && (
                         <div className="flex gap-2">
                           <Select 
-                            value={btn.phone_code || "+1"}
+                            value={btn.phone_code || "+91"}
                             onValueChange={(code) => {
                               updateButton(idx, 'phone_code', code);
                             }}
@@ -577,6 +644,39 @@ export default function TemplateBuilder() {
                               updateButton(idx, 'phone_number', cleanedValue);
                             }}
                             className="flex-1"
+                          />
+                        </div>
+                      )}
+                      {btn.type === "COPY_CODE" && (
+                        <Input
+                          placeholder="Example code (e.g., 123456)"
+                          value={btn.example_code || ""}
+                          onChange={(e) => updateButton(idx, 'example_code', e.target.value)}
+                        />
+                      )}
+                      {btn.type === "FLOW" && (
+                        <div className="space-y-2">
+                          <Input
+                            placeholder="Flow ID"
+                            value={btn.flow_id || ""}
+                            onChange={(e) => updateButton(idx, 'flow_id', e.target.value)}
+                          />
+                          <Select 
+                            value={btn.flow_action || "navigate"}
+                            onValueChange={(action) => updateButton(idx, 'flow_action', action)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Flow Action" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="navigate">Navigate</SelectItem>
+                              <SelectItem value="data_exchange">Data Exchange</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            placeholder="Navigate Screen (optional)"
+                            value={btn.navigate_screen || ""}
+                            onChange={(e) => updateButton(idx, 'navigate_screen', e.target.value)}
                           />
                         </div>
                       )}
