@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,7 @@ interface UploadSignedDocumentDialogProps {
   applicationId: string;
   sanctionId: string;
   orgId: string;
+  documentType?: string;
   onSuccess: () => void;
 }
 
@@ -23,11 +24,19 @@ export default function UploadSignedDocumentDialog({
   applicationId,
   sanctionId,
   orgId,
+  documentType: initialDocType,
   onSuccess,
 }: UploadSignedDocumentDialogProps) {
-  const [documentType, setDocumentType] = useState<string>("");
+  const [documentType, setDocumentType] = useState<string>(initialDocType || "");
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+
+  // Update documentType when initialDocType changes
+  useEffect(() => {
+    if (initialDocType) {
+      setDocumentType(initialDocType);
+    }
+  }, [initialDocType]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -65,11 +74,6 @@ export default function UploadSignedDocumentDialog({
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from("loan-documents")
-        .getPublicUrl(fileName);
-
       // Update the document record
       const { error: updateError } = await supabase
         .from("loan_generated_documents")
@@ -80,7 +84,7 @@ export default function UploadSignedDocumentDialog({
           status: 'signed'
         })
         .eq("sanction_id", sanctionId)
-        .eq("document_type", documentType === 'sanction_letter' ? 'sanction_letter' : 'loan_agreement');
+        .eq("document_type", documentType);
 
       if (updateError) {
         console.error('Update error:', updateError);
@@ -108,7 +112,9 @@ export default function UploadSignedDocumentDialog({
       onSuccess();
       onOpenChange(false);
       setFile(null);
-      setDocumentType("");
+      if (!initialDocType) {
+        setDocumentType("");
+      }
     } catch (error: any) {
       console.error('Upload error:', error);
       toast.error(error.message || "Failed to upload document");
@@ -117,29 +123,34 @@ export default function UploadSignedDocumentDialog({
     }
   };
 
+  const docTypeLabel = documentType === 'sanction_letter' ? 'Sanction Letter' : 
+                       documentType === 'loan_agreement' ? 'Loan Agreement' : '';
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileCheck className="h-5 w-5" />
-            Upload Signed Document
+            Upload Signed {docTypeLabel || 'Document'}
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label>Document Type</Label>
-            <Select value={documentType} onValueChange={setDocumentType}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select document type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="sanction_letter">Sanction Letter</SelectItem>
-                <SelectItem value="loan_agreement">Loan Agreement</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {!initialDocType && (
+            <div className="space-y-2">
+              <Label>Document Type</Label>
+              <Select value={documentType} onValueChange={setDocumentType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select document type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sanction_letter">Sanction Letter</SelectItem>
+                  <SelectItem value="loan_agreement">Loan Agreement</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>Signed Document</Label>

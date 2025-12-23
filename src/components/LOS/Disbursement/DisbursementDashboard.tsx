@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { 
   FileText, Download, Printer, Loader2, Send, Check, 
-  TrendingUp, Banknote, Calculator, Calendar 
+  TrendingUp, Banknote, Calculator, Calendar, Upload, FileCheck
 } from "lucide-react";
 import { addMonths } from "date-fns";
 import html2pdf from "html2pdf.js";
@@ -15,6 +15,7 @@ import html2pdf from "html2pdf.js";
 // Document template imports
 import SanctionLetterDocument from "../Sanction/templates/SanctionLetterDocument";
 import LoanAgreementDocument from "../Sanction/templates/LoanAgreementDocument";
+import UploadSignedDocumentDialog from "../Sanction/UploadSignedDocumentDialog";
 
 // ESign imports
 import { RequestESignButton } from "../ESign/RequestESignButton";
@@ -94,6 +95,8 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
     loan_agreement: null,
   });
   const queryClient = useQueryClient();
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [selectedDocType, setSelectedDocType] = useState<DocumentType | null>(null);
 
   // Fetch application data
   const { data: application, isLoading: loadingApp } = useQuery({
@@ -454,25 +457,38 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {documentTypes.map((doc) => {
               const isGenerated = isDocGenerated(doc.key);
+              const docRecord = generatedDocs?.find(d => d.document_type === doc.key);
+              const isSigned = docRecord?.customer_signed;
+              
               return (
                 <Card key={doc.key} className="border-2">
                   <CardContent className="p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <FileText className={`h-5 w-5 ${isGenerated ? "text-green-600" : "text-primary"}`} />
+                        <FileText className={`h-5 w-5 ${isSigned ? "text-green-600" : isGenerated ? "text-blue-600" : "text-primary"}`} />
                         <span className="font-medium text-sm">{doc.shortLabel}</span>
                       </div>
-                      {isGenerated && (
-                        <Badge variant="outline" className="gap-1 text-xs">
-                          <Check className="h-3 w-3" />
-                          Generated
-                        </Badge>
-                      )}
+                      <div className="flex gap-1">
+                        {isGenerated && !isSigned && (
+                          <Badge variant="outline" className="gap-1 text-xs">
+                            <Check className="h-3 w-3" />
+                            Generated
+                          </Badge>
+                        )}
+                        {isSigned && (
+                          <Badge className="gap-1 text-xs bg-green-500">
+                            <FileCheck className="h-3 w-3" />
+                            Signed
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                     <p className="text-xs text-muted-foreground">{doc.label}</p>
+                    
+                    {/* Action buttons row 1 */}
                     <div className="grid grid-cols-4 gap-2">
                       <Button
                         size="sm"
@@ -518,6 +534,28 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
                         <Send className="h-4 w-4" />
                       </Button>
                     </div>
+                    
+                    {/* Upload signed button */}
+                    {isGenerated && !isSigned && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="w-full"
+                        onClick={() => {
+                          setSelectedDocType(doc.key);
+                          setUploadDialogOpen(true);
+                        }}
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Upload Signed Document
+                      </Button>
+                    )}
+                    
+                    {isSigned && (
+                      <div className="text-xs text-green-600 text-center py-1">
+                        ✓ Signed document received
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               );
@@ -581,6 +619,25 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
           </>
         )}
       </div>
+
+      {/* Upload Signed Document Dialog */}
+      {sanction && selectedDocType && (
+        <UploadSignedDocumentDialog
+          open={uploadDialogOpen}
+          onOpenChange={(open) => {
+            setUploadDialogOpen(open);
+            if (!open) setSelectedDocType(null);
+          }}
+          applicationId={applicationId}
+          sanctionId={sanction.id}
+          orgId={application.org_id}
+          documentType={selectedDocType}
+          onSuccess={() => {
+            refetchDocs();
+            queryClient.invalidateQueries({ queryKey: ["loan-sanction", applicationId] });
+          }}
+        />
+      )}
     </div>
   );
 }
