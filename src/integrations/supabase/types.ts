@@ -7151,7 +7151,7 @@ export type Database = {
           delivered_at: string | null
           direction: string
           error_message: string | null
-          gupshup_message_id: string | null
+          exotel_message_id: string | null
           id: string
           media_type: string | null
           media_url: string | null
@@ -7175,7 +7175,7 @@ export type Database = {
           delivered_at?: string | null
           direction?: string
           error_message?: string | null
-          gupshup_message_id?: string | null
+          exotel_message_id?: string | null
           id?: string
           media_type?: string | null
           media_url?: string | null
@@ -7199,7 +7199,7 @@ export type Database = {
           delivered_at?: string | null
           direction?: string
           error_message?: string | null
-          gupshup_message_id?: string | null
+          exotel_message_id?: string | null
           id?: string
           media_type?: string | null
           media_url?: string | null
@@ -7256,9 +7256,11 @@ export type Database = {
       }
       whatsapp_settings: {
         Row: {
-          app_name: string
           created_at: string | null
-          gupshup_api_key: string
+          exotel_api_key: string | null
+          exotel_api_token: string | null
+          exotel_sid: string | null
+          exotel_subdomain: string | null
           id: string
           is_active: boolean | null
           org_id: string
@@ -7267,9 +7269,11 @@ export type Database = {
           whatsapp_source_number: string
         }
         Insert: {
-          app_name: string
           created_at?: string | null
-          gupshup_api_key: string
+          exotel_api_key?: string | null
+          exotel_api_token?: string | null
+          exotel_sid?: string | null
+          exotel_subdomain?: string | null
           id?: string
           is_active?: boolean | null
           org_id: string
@@ -7278,9 +7282,11 @@ export type Database = {
           whatsapp_source_number: string
         }
         Update: {
-          app_name?: string
           created_at?: string | null
-          gupshup_api_key?: string
+          exotel_api_key?: string | null
+          exotel_api_token?: string | null
+          exotel_sid?: string | null
+          exotel_subdomain?: string | null
           id?: string
           is_active?: boolean | null
           org_id?: string

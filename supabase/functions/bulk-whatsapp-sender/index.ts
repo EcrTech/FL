@@ -104,15 +104,20 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Get campaign details
+    // Get campaign details with Exotel settings
     const { data: campaign, error: campaignError } = await supabaseClient
       .from('whatsapp_bulk_campaigns')
-      .select('*, whatsapp_settings!inner(gupshup_api_key, whatsapp_source_number, app_name)')
+      .select('*, whatsapp_settings!inner(exotel_sid, exotel_api_key, exotel_api_token, exotel_subdomain, whatsapp_source_number)')
       .eq('id', campaignId)
       .single();
 
     if (campaignError || !campaign) {
       throw new Error(`Campaign not found: ${campaignError?.message}`);
+    }
+
+    // Validate Exotel credentials
+    if (!campaign.whatsapp_settings.exotel_sid || !campaign.whatsapp_settings.exotel_api_key || !campaign.whatsapp_settings.exotel_api_token) {
+      throw new Error('Exotel credentials not configured');
     }
 
     // Check rate limit (skip if called from queue processor)
@@ -223,6 +228,11 @@ Deno.serve(async (req) => {
     let totalSent = 0;
     let totalFailed = 0;
 
+    // Build Exotel API URL
+    const exotelSubdomain = campaign.whatsapp_settings.exotel_subdomain || 'api.exotel.com';
+    const exotelUrl = `https://${exotelSubdomain}/v2/accounts/${campaign.whatsapp_settings.exotel_sid}/messages`;
+    const authHeader = `Basic ${btoa(`${campaign.whatsapp_settings.exotel_api_key}:${campaign.whatsapp_settings.exotel_api_token}`)}`;
+
     // Process in batches with parallel execution
     console.log(`Processing ${recipients.length} recipients in batches of ${batchSize}`);
     
@@ -235,7 +245,10 @@ Deno.serve(async (req) => {
         batch.map(async (recipient) => {
           try {
             // Format phone number
-            const phoneNumber = recipient.phone_number.replace(/[^\d]/g, '');
+            let phoneNumber = recipient.phone_number.replace(/[^\d]/g, '');
+            if (!phoneNumber.startsWith('+')) {
+              phoneNumber = '+' + phoneNumber;
+            }
             
             // Replace variables in message content
             const personalizedMessage = replaceVariables(
@@ -246,31 +259,27 @@ Deno.serve(async (req) => {
               phoneNumber
             );
             
-            // Prepare Gupshup payload
-            const gupshupPayload = new URLSearchParams({
+            // Prepare Exotel payload
+            const exotelPayload = {
+              to: phoneNumber,
+              body: personalizedMessage,
+              from: campaign.whatsapp_settings.whatsapp_source_number,
               channel: 'whatsapp',
-              source: campaign.whatsapp_settings.whatsapp_source_number,
-              destination: phoneNumber,
-              message: JSON.stringify({
-                type: 'text',
-                text: personalizedMessage,
-              }),
-              'src.name': campaign.whatsapp_settings.app_name,
-            });
+            };
 
-            // Send to Gupshup
-            const gupshupResponse = await fetch('https://api.gupshup.io/sm/api/v1/msg', {
+            // Send to Exotel
+            const exotelResponse = await fetch(exotelUrl, {
               method: 'POST',
               headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'apikey': campaign.whatsapp_settings.gupshup_api_key,
+                'Content-Type': 'application/json',
+                'Authorization': authHeader,
               },
-              body: gupshupPayload.toString(),
+              body: JSON.stringify(exotelPayload),
             });
 
-            const responseData = await gupshupResponse.json();
+            const responseData = await exotelResponse.json();
 
-            if (gupshupResponse.ok && responseData.status === 'submitted') {
+            if (exotelResponse.ok) {
               // Insert message record
               const { data: message } = await supabaseClient
                 .from('whatsapp_messages')
@@ -282,7 +291,7 @@ Deno.serve(async (req) => {
                   template_id: campaign.template_id,
                   sent_by: campaign.created_by,
                   status: 'sent',
-                  gupshup_message_id: responseData.messageId,
+                  exotel_message_id: responseData.sid || responseData.id,
                 })
                 .select()
                 .single();

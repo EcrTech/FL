@@ -106,28 +106,8 @@ const Templates = () => {
   const loading = loadingWhatsApp || loadingEmail;
 
   const handleSync = async () => {
-    setSyncing(true);
-    try {
-      const response = await supabase.functions.invoke("sync-gupshup-templates");
-
-      if (response.error) throw response.error;
-
-      // Check if queued
-      if (response.data?.status === 'queued') {
-        setQueuedJobId(response.data.job_id);
-        setQueueStatus('queued');
-        
-        notify.info("Sync Queued", `Your template sync has been queued. Estimated wait: ${response.data.estimated_wait_minutes} minutes. Position: ${response.data.position_in_queue}`);
-      } else {
-        // Immediate sync - React Query will refetch automatically
-        notify.success("Success", `Synced ${response.data.synced} templates from Gupshup`);
-        setSyncing(false);
-      }
-    } catch (error: any) {
-      console.error("Error syncing templates:", error);
-      notify.error("Error", error.message || "Failed to sync templates");
-      setSyncing(false);
-    }
+    // Templates are now managed locally - no external sync needed
+    notify.info("Info", "Templates are managed locally. Create templates directly in this app.");
   };
 
   const handleCreateEmail = () => {

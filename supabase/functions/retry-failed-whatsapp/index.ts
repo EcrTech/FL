@@ -44,14 +44,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Find recipients that need retry
+    // Find recipients that need retry with Exotel settings
     const { data: recipients, error: recipientsError } = await supabaseClient
       .from('whatsapp_campaign_recipients')
       .select(`
         *,
         campaign:whatsapp_bulk_campaigns!inner(
           *,
-          whatsapp_settings!inner(gupshup_api_key, whatsapp_source_number, app_name)
+          whatsapp_settings!inner(exotel_sid, exotel_api_key, exotel_api_token, exotel_subdomain, whatsapp_source_number)
         )
       `)
       .in('status', ['failed', 'retrying'])
@@ -78,35 +78,43 @@ Deno.serve(async (req) => {
       try {
         const campaign = recipient.campaign;
         
-        // Format phone number
-        const phoneNumber = recipient.phone_number.replace(/[^\d]/g, '');
+        // Validate Exotel credentials
+        if (!campaign.whatsapp_settings.exotel_sid || !campaign.whatsapp_settings.exotel_api_key || !campaign.whatsapp_settings.exotel_api_token) {
+          throw new Error('Exotel credentials not configured');
+        }
         
-        // Prepare Gupshup payload
-        const gupshupPayload = new URLSearchParams({
+        // Format phone number
+        let phoneNumber = recipient.phone_number.replace(/[^\d]/g, '');
+        if (!phoneNumber.startsWith('+')) {
+          phoneNumber = '+' + phoneNumber;
+        }
+        
+        // Build Exotel API URL
+        const exotelSubdomain = campaign.whatsapp_settings.exotel_subdomain || 'api.exotel.com';
+        const exotelUrl = `https://${exotelSubdomain}/v2/accounts/${campaign.whatsapp_settings.exotel_sid}/messages`;
+        
+        // Prepare Exotel payload
+        const exotelPayload = {
+          to: phoneNumber,
+          body: campaign.message_content,
+          from: campaign.whatsapp_settings.whatsapp_source_number,
           channel: 'whatsapp',
-          source: campaign.whatsapp_settings.whatsapp_source_number,
-          destination: phoneNumber,
-          message: JSON.stringify({
-            type: 'text',
-            text: campaign.message_content,
-          }),
-          'src.name': campaign.whatsapp_settings.app_name,
-        });
+        };
 
-        // Send to Gupshup
-        const gupshupResponse = await fetch('https://api.gupshup.io/sm/api/v1/msg', {
+        // Send to Exotel
+        const exotelResponse = await fetch(exotelUrl, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'apikey': campaign.whatsapp_settings.gupshup_api_key,
+            'Content-Type': 'application/json',
+            'Authorization': `Basic ${btoa(`${campaign.whatsapp_settings.exotel_api_key}:${campaign.whatsapp_settings.exotel_api_token}`)}`,
           },
-          body: gupshupPayload.toString(),
+          body: JSON.stringify(exotelPayload),
         });
 
-        const responseData = await gupshupResponse.json();
+        const responseData = await exotelResponse.json();
         console.log('Retry response for recipient', recipient.id, ':', responseData);
 
-        if (gupshupResponse.ok && responseData.status === 'submitted') {
+        if (exotelResponse.ok) {
           // Insert message record
           const { data: message } = await supabaseClient
             .from('whatsapp_messages')
@@ -118,7 +126,7 @@ Deno.serve(async (req) => {
               template_id: campaign.template_id,
               sent_by: campaign.created_by,
               status: 'sent',
-              gupshup_message_id: responseData.messageId,
+              exotel_message_id: responseData.sid || responseData.id,
             })
             .select()
             .single();
