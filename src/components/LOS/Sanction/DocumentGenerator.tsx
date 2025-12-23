@@ -12,6 +12,7 @@ import KFSDocument from "./templates/KFSDocument";
 import SanctionLetterDocument from "./templates/SanctionLetterDocument";
 import LoanAgreementDocument from "./templates/LoanAgreementDocument";
 import DPNDocument from "./templates/DPNDocument";
+import DailyRepaymentScheduleDocument from "./templates/DailyRepaymentScheduleDocument";
 
 interface DocumentGeneratorProps {
   applicationId: string;
@@ -19,13 +20,14 @@ interface DocumentGeneratorProps {
   orgId: string;
 }
 
-type DocumentType = "kfs" | "sanction_letter" | "loan_agreement" | "dpn";
+type DocumentType = "kfs" | "sanction_letter" | "loan_agreement" | "dpn" | "daily_schedule";
 
 const documentTypes: { key: DocumentType; label: string; icon: typeof FileText }[] = [
   { key: "kfs", label: "Key Fact Statement", icon: FileText },
   { key: "sanction_letter", label: "Sanction Letter", icon: FileText },
   { key: "loan_agreement", label: "Loan Agreement", icon: FileText },
   { key: "dpn", label: "Demand Promissory Note", icon: FileText },
+  { key: "daily_schedule", label: "Daily Repayment Schedule", icon: FileText },
 ];
 
 // Calculate EMI
@@ -318,7 +320,7 @@ export default function DocumentGenerator({ applicationId, sanctionId, orgId }: 
       </CardHeader>
       <CardContent>
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DocumentType)}>
-          <TabsList className="grid grid-cols-4 mb-4">
+          <TabsList className="grid grid-cols-5 mb-4">
             {documentTypes.map((doc) => (
               <TabsTrigger key={doc.key} value={doc.key} className="relative">
                 <span className="text-xs sm:text-sm">{doc.label}</span>
@@ -463,6 +465,27 @@ export default function DocumentGenerator({ applicationId, sanctionId, orgId }: 
                 tenure={tenureMonths}
                 interestRate={interestRate}
                 totalRepayment={totalRepayment}
+              />
+            </TabsContent>
+
+            <TabsContent value="daily_schedule" className="m-0">
+              <DailyRepaymentScheduleDocument
+                companyName={orgSettings?.company_name || "Paisaa Saarthi"}
+                companyAddress={orgSettings?.company_address}
+                companyCIN={orgSettings?.company_cin}
+                documentNumber={generatedDocs?.find(d => d.document_type === "daily_schedule")?.document_number || "DRS-DRAFT"}
+                documentDate={new Date()}
+                borrowerName={borrowerName}
+                borrowerAddress={borrowerAddress}
+                borrowerPhone={borrowerPhone}
+                loanAmount={loanAmount}
+                dailyInterestRate={interestRate / 365} // Convert annual rate to daily
+                tenureDays={tenureDays}
+                disbursementDate={new Date()}
+                bankName={bankDetails?.bank_name}
+                accountNumber={bankDetails?.account_number}
+                grievanceEmail={orgSettings?.grievance_email}
+                grievancePhone={orgSettings?.grievance_phone}
               />
             </TabsContent>
           </div>
