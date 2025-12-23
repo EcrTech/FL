@@ -182,40 +182,53 @@ export default function TemplateBuilder() {
       return;
     }
 
+    if (!orgId) {
+      notify.error("Error", "Organization not found");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('create-gupshup-template', {
-        body: {
-          template_name: templateName,
-          category,
-          language,
-          header_type: headerType === 'none' ? null : headerType,
-          header_content: headerType === 'text' ? headerContent : (headerType !== 'none' ? mediaUrl : null),
-          body_content: bodyContent,
-          footer_text: footerText || null,
-          buttons: buttons.length > 0 ? buttons.map(btn => ({
-            ...btn,
-            ...(btn.type === "PHONE_NUMBER" && { 
-              phone_number: (btn.phone_code || "+1") + (btn.phone_number || ""),
-              phone_code: undefined 
-            }),
-          })) : null,
-          sample_values: {
-            ...(sampleHeader.length > 0 && { header: sampleHeader }),
-            ...(sampleBody.length > 0 && { body: sampleBody }),
-          },
+      // Save template locally to database
+      const templateData = {
+        org_id: orgId,
+        template_id: `local_${Date.now()}`,
+        template_name: templateName,
+        template_type: 'whatsapp',
+        category,
+        language,
+        header_type: headerType === 'none' ? null : headerType,
+        header_content: headerType === 'text' ? headerContent : (headerType !== 'none' ? mediaUrl : null),
+        content: bodyContent,
+        footer_text: footerText || null,
+        buttons: buttons.length > 0 ? buttons.map(btn => ({
+          ...btn,
+          ...(btn.type === "PHONE_NUMBER" && { 
+            phone_number: (btn.phone_code || "+1") + (btn.phone_number || ""),
+            phone_code: undefined 
+          }),
+        })) : null,
+        sample_values: {
+          ...(sampleHeader.length > 0 && { header: sampleHeader }),
+          ...(sampleBody.length > 0 && { body: sampleBody }),
         },
-      });
+        status: 'draft',
+        submission_status: 'pending',
+      };
+
+      const { error } = await supabase
+        .from('communication_templates')
+        .insert(templateData);
 
       if (error) throw error;
 
-      notify.success("Template Submitted", data.message || "Template submitted successfully for WhatsApp approval");
+      notify.success("Template Created", "Template saved successfully. Submit it to WhatsApp for approval via their Business Manager.");
 
       navigate('/templates');
     } catch (error: any) {
-      console.error('Error submitting template:', error);
-      notify.error("Submission Failed", error);
+      console.error('Error saving template:', error);
+      notify.error("Save Failed", error);
     } finally {
       setLoading(false);
     }
