@@ -240,7 +240,7 @@ export default function ReferralLoanApplication() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-gradient-to-r from-[hsl(var(--electric-blue-50))] via-card to-[hsl(var(--coral-50))] border-b border-border sticky top-0 z-50 shadow-sm">
+      <header className="bg-muted/80 border-b border-border sticky top-0 z-50 shadow-sm backdrop-blur-sm">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <a 
             href="/" 
