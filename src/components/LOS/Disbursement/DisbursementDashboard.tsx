@@ -373,11 +373,32 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
   const borrowerAddress = applicant ? formatAddress(applicant.current_address) : "";
   const borrowerPhone = applicant?.mobile || applicant?.alternate_mobile || "";
 
-  const conditionsText = sanction?.conditions 
-    ? (typeof sanction.conditions === 'string' 
-        ? sanction.conditions 
-        : JSON.stringify(sanction.conditions, null, 2))
-    : null;
+  // Parse conditions - handle string, array, or empty object
+  const parseConditions = (): string[] | null => {
+    if (!sanction?.conditions) return null;
+    
+    // If it's a string, split by newlines
+    if (typeof sanction.conditions === 'string') {
+      const lines = sanction.conditions.split("\n").filter(Boolean);
+      return lines.length > 0 ? lines : null;
+    }
+    
+    // If it's an array, use it directly (cast to string[])
+    if (Array.isArray(sanction.conditions)) {
+      const stringArray = sanction.conditions.map(item => String(item)).filter(Boolean);
+      return stringArray.length > 0 ? stringArray : null;
+    }
+    
+    // If it's an empty object or object with no meaningful content, return null
+    if (typeof sanction.conditions === 'object') {
+      const keys = Object.keys(sanction.conditions);
+      if (keys.length === 0) return null;
+    }
+    
+    return null;
+  };
+  
+  const conditionsArray = parseConditions();
 
   const defaultTerms = [
     "The loan is granted subject to satisfactory completion of all documentation.",
@@ -610,7 +631,7 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
                 processingFee={processingFee}
                 gstOnProcessingFee={gstOnProcessingFee}
                 validUntil={new Date(sanction.validity_date)}
-                termsAndConditions={conditionsText ? conditionsText.split("\n").filter(Boolean) : defaultTerms}
+                termsAndConditions={conditionsArray || defaultTerms}
               />
             </div>
 
