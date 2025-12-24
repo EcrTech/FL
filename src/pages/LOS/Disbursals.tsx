@@ -62,7 +62,7 @@ export default function Disbursals() {
           loan_sanctions!inner(id)
         `)
         .eq("org_id", orgId)
-        .in("current_stage", ["sanction", "sanctioned"])
+        .in("current_stage", ["sanction", "sanctioned", "disbursement_pending"])
         .order("created_at", { ascending: false });
 
       if (!applications) return [];
