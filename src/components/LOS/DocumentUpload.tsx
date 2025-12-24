@@ -662,6 +662,15 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
         <div className="flex gap-2">
           <Button
             size="sm"
+            variant="outline"
+            onClick={() => setCibilDialogOpen(true)}
+            className="gap-1"
+          >
+            <Upload className="h-4 w-4" />
+            Upload CIBIL
+          </Button>
+          <Button
+            size="sm"
             variant={verification?.status === "success" ? "outline" : "default"}
             onClick={handleFetchCibil}
             disabled={fetchingCibil}
@@ -674,16 +683,6 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
             )}
             {fetchingCibil ? "Fetching..." : verification?.status === "success" ? "Re-fetch" : "Fetch"} CIBIL
           </Button>
-          {verification?.status === "success" && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setCibilDialogOpen(true)}
-              className="gap-1"
-            >
-              Manual Entry
-            </Button>
-          )}
         </div>
       );
     }
