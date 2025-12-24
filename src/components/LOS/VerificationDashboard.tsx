@@ -381,7 +381,7 @@ export default function VerificationDashboard({ applicationId, orgId }: Verifica
                   </div>
                 )}
 
-                <div className="flex gap-2 flex-wrap">
+                <div className="flex gap-2 flex-wrap items-center">
                   {verification && status !== "pending" && (
                     <Button
                       variant="outline"
@@ -392,23 +392,26 @@ export default function VerificationDashboard({ applicationId, orgId }: Verifica
                       View Details
                     </Button>
                   )}
-                  <Button
-                    variant={status === "pending" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setSelectedVerification({ type: verificationType.type, data: verification })}
-                  >
-                    {verificationType.type === "credit_bureau" ? (
-                      <>
-                        <Upload className="h-4 w-4 mr-2" />
-                        {status === "pending" ? "Upload CIBIL" : "Update"}
-                      </>
-                    ) : (
-                      <>
-                        <Edit className="h-4 w-4 mr-2" />
-                        {status === "pending" ? "Start Verification" : "Update"}
-                      </>
-                    )}
-                  </Button>
+                  {verificationType.type === "credit_bureau" ? (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => setSelectedVerification({ type: verificationType.type, data: verification })}
+                      className="bg-primary hover:bg-primary/90"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload CIBIL Report
+                    </Button>
+                  ) : (
+                    <Button
+                      variant={status === "pending" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setSelectedVerification({ type: verificationType.type, data: verification })}
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      {status === "pending" ? "Start Verification" : "Update"}
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
