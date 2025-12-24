@@ -214,12 +214,51 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
       if (error) throw error;
       if (!data.success) throw new Error(data.error || "Parsing failed");
       
-      return data;
+      return { ...data, docType };
     },
-    onSuccess: () => {
+    onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ["loan-documents", applicationId] });
       toast({ title: "Document parsed successfully", description: "Data extracted using AI" });
       setParsingDoc(null);
+
+      // Auto-trigger bank verification after bank_statement OCR
+      if (data.docType === "bank_statement" && data.data) {
+        const { account_number, ifsc_code, account_holder_name } = data.data;
+        if (account_number && ifsc_code) {
+          try {
+            // First authenticate with Sandbox
+            const { data: authData, error: authError } = await supabase.functions.invoke("sandbox-authenticate");
+            if (authError || !authData?.access_token) {
+              console.error("[DocumentUpload] Bank verification auth failed:", authError);
+              return;
+            }
+
+            // Auto-verify bank account using penny-less verification
+            const { data: verifyResult, error: verifyError } = await supabase.functions.invoke("sandbox-bank-verify", {
+              body: {
+                accountNumber: account_number,
+                ifscCode: ifsc_code,
+                applicationId,
+                orgId,
+                accessToken: authData.access_token,
+                verifyType: "pennyless",
+              },
+            });
+
+            if (verifyError) {
+              console.error("[DocumentUpload] Bank verification failed:", verifyError);
+            } else if (verifyResult?.success) {
+              queryClient.invalidateQueries({ queryKey: ["loan-verifications", applicationId] });
+              toast({ 
+                title: "Bank account verified", 
+                description: `Account holder: ${verifyResult.data?.account_holder_name || account_holder_name || "Verified"}` 
+              });
+            }
+          } catch (err) {
+            console.error("[DocumentUpload] Auto bank verification error:", err);
+          }
+        }
+      }
     },
     onError: (error: any) => {
       toast({ title: "Parsing failed", description: error.message, variant: "destructive" });

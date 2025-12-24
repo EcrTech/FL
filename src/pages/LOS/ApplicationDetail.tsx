@@ -17,6 +17,8 @@ import IncomeSummary from "@/components/LOS/IncomeSummary";
 import AssessmentDashboard from "@/components/LOS/Assessment/AssessmentDashboard";
 import ApprovalActionDialog from "@/components/LOS/Approval/ApprovalActionDialog";
 import ApprovalHistory from "@/components/LOS/Approval/ApprovalHistory";
+import DisbursementForm from "@/components/LOS/Disbursement/DisbursementForm";
+import DisbursementStatus from "@/components/LOS/Disbursement/DisbursementStatus";
 
 const STAGE_LABELS: Record<string, string> = {
   application_login: "Application Login",
@@ -489,7 +491,17 @@ export default function ApplicationDetail() {
               {["approval_pending", "sanctioned", "disbursement_pending", "disbursed", "closed"].includes(application.current_stage) && (
                 <ApprovalHistory applicationId={id!} />
               )}
+
+              {/* Disbursement Section */}
+              {application.current_stage === "disbursement_pending" && (
+                <DisbursementForm applicationId={id!} />
+              )}
             </>
+          )}
+
+          {/* Disbursement Status - always visible for disbursed applications */}
+          {application.current_stage === "disbursed" && (
+            <DisbursementStatus applicationId={id!} />
           )}
         </div>
       </div>

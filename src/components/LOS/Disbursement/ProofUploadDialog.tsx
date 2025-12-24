@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Upload, Loader2, FileCheck, X } from "lucide-react";
+import { Upload, Loader2, FileCheck, X, Sparkles } from "lucide-react";
 
 interface ProofUploadDialogProps {
   open: boolean;
@@ -51,23 +51,90 @@ export default function ProofUploadDialog({
 
       if (uploadError) throw uploadError;
 
-      // Update disbursement record
+      // Parse the uploaded document to extract UTR number and date
+      let extractedUtr: string | null = null;
+      let extractedDate: string | null = null;
+
+      try {
+        // Create a temporary document record for parsing
+        const { data: docInsert, error: docError } = await supabase
+          .from("loan_documents")
+          .insert({
+            loan_application_id: applicationId,
+            document_type: "disbursement_proof",
+            document_category: "other",
+            file_path: filePath,
+            file_name: file.name,
+            file_size: file.size,
+            mime_type: file.type,
+            upload_status: "uploaded",
+            verification_status: "pending",
+          })
+          .select("id")
+          .single();
+
+        if (!docError && docInsert) {
+          // Parse the document to extract UTR data
+          const { data: parseResult, error: parseError } = await supabase.functions.invoke(
+            "parse-loan-document",
+            {
+              body: {
+                documentId: docInsert.id,
+                documentType: "disbursement_proof",
+                filePath,
+              },
+            }
+          );
+
+          if (!parseError && parseResult?.success && parseResult.data) {
+            extractedUtr = parseResult.data.utr_number || null;
+            extractedDate = parseResult.data.transaction_date || null;
+            console.log("[ProofUpload] Extracted UTR:", extractedUtr, "Date:", extractedDate);
+          }
+        }
+      } catch (parseErr) {
+        console.error("[ProofUpload] Error parsing UTR proof:", parseErr);
+        // Continue even if parsing fails - manual entry is still possible
+      }
+
+      // Update disbursement record with extracted data
+      const updateData: Record<string, unknown> = {
+        proof_document_path: filePath,
+        proof_uploaded_at: new Date().toISOString(),
+        proof_uploaded_by: userId,
+        updated_at: new Date().toISOString(),
+        status: "completed",
+      };
+
+      // Add extracted UTR data if available
+      if (extractedUtr) {
+        updateData.utr_number = extractedUtr;
+      }
+      if (extractedDate) {
+        updateData.disbursement_date = extractedDate;
+      } else {
+        updateData.disbursement_date = new Date().toISOString();
+      }
+
       const { error: updateError } = await supabase
         .from("loan_disbursements")
-        .update({
-          proof_document_path: filePath,
-          proof_uploaded_at: new Date().toISOString(),
-          proof_uploaded_by: userId,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq("id", disbursementId);
 
       if (updateError) throw updateError;
+
+      return { extractedUtr, extractedDate };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["loan-disbursements"] });
       queryClient.invalidateQueries({ queryKey: ["all-disbursements"] });
-      toast.success("Proof of disbursement uploaded successfully");
+      
+      if (data.extractedUtr) {
+        toast.success(`Disbursement completed! UTR: ${data.extractedUtr}`);
+      } else {
+        toast.success("Proof uploaded and disbursement marked as completed");
+      }
+      
       setFile(null);
       onOpenChange(false);
       onSuccess?.();
@@ -108,14 +175,24 @@ export default function ProofUploadDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5" />
-            Upload Proof of Disbursement
+            Upload UTR Proof
           </DialogTitle>
           <DialogDescription>
-            Upload a screenshot or document showing proof of the fund transfer (e.g., bank statement, UTR confirmation).
+            Upload the UTR confirmation or bank transfer proof. The UTR number and date will be automatically extracted.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          <div className="p-3 bg-primary/10 rounded-lg flex items-start gap-2">
+            <Sparkles className="h-4 w-4 text-primary mt-0.5" />
+            <div className="text-sm">
+              <span className="font-medium">AI-Powered Extraction</span>
+              <p className="text-muted-foreground text-xs mt-0.5">
+                UTR number and transaction date will be automatically extracted from the uploaded document.
+              </p>
+            </div>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="proof-file">Proof Document</Label>
             <Input
@@ -154,12 +231,12 @@ export default function ProofUploadDialog({
               {uploadMutation.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Uploading...
+                  Processing...
                 </>
               ) : (
                 <>
                   <Upload className="h-4 w-4 mr-2" />
-                  Upload Proof
+                  Upload & Complete
                 </>
               )}
             </Button>

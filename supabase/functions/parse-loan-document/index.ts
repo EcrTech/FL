@@ -139,6 +139,26 @@ Return ONLY valid JSON with these fields. Use 0 for missing numeric values.`,
 - tax_paid: Tax already paid/TDS (number only)
 - refund_due: Refund due if any (number only, 0 if not applicable)
 Return ONLY valid JSON with these fields. Use 0 for missing numeric values.`,
+
+  disbursement_proof: `Extract the following from this UTR/disbursement proof document (bank transfer screenshot, NEFT/RTGS confirmation, payment receipt):
+- utr_number: The UTR (Unique Transaction Reference) number or transaction reference ID
+- transaction_date: The date of the transaction (YYYY-MM-DD format)
+- amount: The transferred amount (number only)
+- beneficiary_name: Name of the beneficiary/payee
+- beneficiary_account: Beneficiary account number if visible
+- bank_name: Bank name if visible
+- transaction_status: Transaction status (e.g., "Success", "Completed", "Processed")
+Return ONLY valid JSON with these fields. Use null for missing values.`,
+
+  utr_proof: `Extract the following from this UTR/disbursement proof document (bank transfer screenshot, NEFT/RTGS confirmation, payment receipt):
+- utr_number: The UTR (Unique Transaction Reference) number or transaction reference ID
+- transaction_date: The date of the transaction (YYYY-MM-DD format)
+- amount: The transferred amount (number only)
+- beneficiary_name: Name of the beneficiary/payee
+- beneficiary_account: Beneficiary account number if visible
+- bank_name: Bank name if visible
+- transaction_status: Transaction status (e.g., "Success", "Completed", "Processed")
+Return ONLY valid JSON with these fields. Use null for missing values.`,
 };
 
 serve(async (req) => {
