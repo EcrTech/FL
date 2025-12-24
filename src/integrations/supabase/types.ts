@@ -6926,6 +6926,69 @@ export type Database = {
           },
         ]
       }
+      videokyc_recordings: {
+        Row: {
+          access_token: string | null
+          applicant_email: string | null
+          applicant_name: string
+          applicant_phone: string | null
+          application_id: string
+          completed_at: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          org_id: string
+          recording_url: string | null
+          status: string | null
+          token_expires_at: string | null
+        }
+        Insert: {
+          access_token?: string | null
+          applicant_email?: string | null
+          applicant_name: string
+          applicant_phone?: string | null
+          application_id: string
+          completed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          org_id: string
+          recording_url?: string | null
+          status?: string | null
+          token_expires_at?: string | null
+        }
+        Update: {
+          access_token?: string | null
+          applicant_email?: string | null
+          applicant_name?: string
+          applicant_phone?: string | null
+          application_id?: string
+          completed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          org_id?: string
+          recording_url?: string | null
+          status?: string | null
+          token_expires_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "videokyc_recordings_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "loan_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "videokyc_recordings_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wallet_transactions: {
         Row: {
           admin_reason: string | null

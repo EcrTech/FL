@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, Clock, Edit, AlertCircle, Eye, Upload } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Edit, AlertCircle, Eye, Upload, Video } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import PANVerificationDialog from "./Verification/PANVerificationDialog";
 import AadhaarVerificationDialog from "./Verification/AadhaarVerificationDialog";
@@ -14,6 +14,8 @@ import CreditBureauDialog from "./Verification/CreditBureauDialog";
 import { VideoKYCDialog } from "./Verification/VideoKYCDialog";
 import BankAccountVerificationDialog from "./Verification/BankAccountVerificationDialog";
 import VerificationDetailsDialog from "./Verification/VerificationDetailsDialog";
+import { VideoKYCRetryButton } from "./Verification/VideoKYCRetryButton";
+import { VideoKYCViewDialog } from "./Verification/VideoKYCViewDialog";
 
 interface VerificationDashboardProps {
   applicationId: string;
@@ -77,6 +79,8 @@ export default function VerificationDashboard({ applicationId, orgId }: Verifica
   const queryClient = useQueryClient();
   const [selectedVerification, setSelectedVerification] = useState<{ type: string; data: any } | null>(null);
   const [detailsVerification, setDetailsVerification] = useState<{ verification: any; type: typeof VERIFICATION_TYPES[0] } | null>(null);
+  const [videoKYCViewOpen, setVideoKYCViewOpen] = useState(false);
+  const [videoKYCRecordingUrl, setVideoKYCRecordingUrl] = useState<string | null>(null);
 
   const { data: verifications = [], isLoading } = useQuery({
     queryKey: ["loan-verifications", applicationId],
@@ -392,7 +396,35 @@ export default function VerificationDashboard({ applicationId, orgId }: Verifica
                       View Details
                     </Button>
                   )}
-                  {verificationType.type === "credit_bureau" ? (
+                  
+                  {/* Special handling for VideoKYC */}
+                  {verificationType.type === "video_kyc" ? (
+                    <>
+                      {status === "success" && verification?.response_data && (verification.response_data as Record<string, any>).recording_url && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setVideoKYCRecordingUrl((verification.response_data as Record<string, any>).recording_url);
+                            setVideoKYCViewOpen(true);
+                          }}
+                        >
+                          <Video className="h-4 w-4 mr-2" />
+                          View Recording
+                        </Button>
+                      )}
+                      {(status === "pending" || status === "failed") && primaryApplicant && (
+                        <VideoKYCRetryButton
+                          applicationId={applicationId}
+                          orgId={orgId}
+                          applicantName={`${primaryApplicant.first_name || ''} ${primaryApplicant.last_name || ''}`.trim()}
+                          applicantPhone={(primaryApplicant as any).mobile_number || (primaryApplicant as any).phone}
+                          applicantEmail={primaryApplicant.email}
+                          onSuccess={() => queryClient.invalidateQueries({ queryKey: ["loan-verifications", applicationId] })}
+                        />
+                      )}
+                    </>
+                  ) : verificationType.type === "credit_bureau" ? (
                     <Button
                       variant="default"
                       size="sm"
@@ -506,6 +538,16 @@ export default function VerificationDashboard({ applicationId, orgId }: Verifica
           orgId={orgId}
           applicant={primaryApplicant}
           existingVerification={selectedVerification.data}
+        />
+      )}
+
+      {/* VideoKYC View Dialog */}
+      {videoKYCRecordingUrl && (
+        <VideoKYCViewDialog
+          open={videoKYCViewOpen}
+          onOpenChange={setVideoKYCViewOpen}
+          recordingUrl={videoKYCRecordingUrl}
+          applicantName={primaryApplicant ? `${primaryApplicant.first_name || ''} ${primaryApplicant.last_name || ''}`.trim() : undefined}
         />
       )}
     </div>

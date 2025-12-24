@@ -56,3 +56,12 @@ verify_jwt = true
 
 [functions.videosdk-stop-recording]
 verify_jwt = true
+
+[functions.videokyc-create-retry-link]
+verify_jwt = true
+
+[functions.videokyc-verify-token]
+verify_jwt = false
+
+[functions.videokyc-upload-recording]
+verify_jwt = false
