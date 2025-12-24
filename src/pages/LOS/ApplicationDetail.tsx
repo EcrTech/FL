@@ -310,7 +310,7 @@ export default function ApplicationDetail() {
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Date of Birth</label>
                     <p className="text-sm">
-                      {primaryApplicant.dob
+                      {primaryApplicant.dob && !isNaN(new Date(primaryApplicant.dob as string).getTime())
                         ? format(new Date(primaryApplicant.dob as string), "MMM dd, yyyy")
                         : "N/A"}
                     </p>
@@ -378,7 +378,7 @@ export default function ApplicationDetail() {
                             <span className="font-medium">{panData.father_name}</span>
                           </div>
                         )}
-                        {panData.dob && (
+                        {panData.dob && !isNaN(new Date(panData.dob).getTime()) && (
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">DOB</span>
                             <span className="font-medium">
@@ -416,7 +416,7 @@ export default function ApplicationDetail() {
                             <span className="font-medium">{aadhaarData.gender}</span>
                           </div>
                         )}
-                        {aadhaarData.dob && (
+                        {aadhaarData.dob && !isNaN(new Date(aadhaarData.dob).getTime()) && (
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">DOB</span>
                             <span className="font-medium">
