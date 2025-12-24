@@ -22,6 +22,24 @@ Return ONLY valid JSON with these fields.`,
 - address: Full address as shown
 Return ONLY valid JSON with these fields.`,
 
+  bank_statement: `Extract the following from this bank statement:
+- account_number: Bank account number
+- account_holder_name: Account holder name exactly as shown
+- ifsc_code: IFSC code of the branch
+- bank_name: Name of the bank
+- branch_name: Branch name and address
+- statement_period_from: Statement start date (YYYY-MM-DD)
+- statement_period_to: Statement end date (YYYY-MM-DD)
+- opening_balance: Opening balance (number only)
+- closing_balance: Closing balance (number only)
+- total_credits: Total credits/deposits (number only)
+- total_debits: Total debits/withdrawals (number only)
+- average_monthly_balance: Average monthly balance if visible (number only)
+- salary_credits: Total salary/regular income credits (number only)
+- emi_debits: Total EMI/loan debits (number only)
+- bounce_count: Number of bounced transactions/insufficient fund instances (number only, 0 if none)
+Return ONLY valid JSON with these fields. Use 0 or null for missing values.`,
+
   salary_slip_1: `Extract the following from this salary slip:
 - employee_name: Employee full name
 - employee_id: Employee ID if visible
