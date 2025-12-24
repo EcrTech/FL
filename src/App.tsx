@@ -60,6 +60,7 @@ import ReferralLoanApplication from "./pages/ReferralLoanApplication";
 import NegativePinCodes from "./pages/NegativePinCodes";
 import Profile from "./pages/Profile";
 import ESignDocument from "./pages/ESignDocument";
+import VideoKYC from "./pages/VideoKYC";
 import ProtectedRoute from "./components/Auth/ProtectedRoute";
 
 const App = () => (
@@ -75,6 +76,7 @@ const App = () => (
           <Route path="/apply/:slug" element={<PublicLoanApplication />} />
           <Route path="/apply/ref/:referralCode" element={<ReferralLoanApplication />} />
           <Route path="/esign/:token" element={<ESignDocument />} />
+          <Route path="/videokyc/:token" element={<VideoKYC />} />
           
           <Route path="/dashboard" element={
             <ProtectedRoute>
