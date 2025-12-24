@@ -562,10 +562,25 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
                       </Button>
                     )}
                     
-                    {isSigned && (
-                      <div className="text-xs text-green-600 text-center py-1">
-                        ✓ Signed document received
-                      </div>
+                    {isSigned && docRecord?.signed_document_path && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full text-green-600 border-green-200 hover:bg-green-50"
+                        onClick={async () => {
+                          const { data } = await supabase.storage
+                            .from("loan-documents")
+                            .createSignedUrl(docRecord.signed_document_path!, 60);
+                          if (data?.signedUrl) {
+                            window.open(data.signedUrl, "_blank");
+                          } else {
+                            toast.error("Failed to get document URL");
+                          }
+                        }}
+                      >
+                        <FileCheck className="h-4 w-4 mr-2" />
+                        View Signed Document
+                      </Button>
                     )}
                   </CardContent>
                 </Card>
