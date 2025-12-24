@@ -3,14 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
-import { CheckCircle, XCircle, Clock, Building2, Upload, FileCheck, ExternalLink } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Building2, Upload, FileCheck, ExternalLink, Sparkles } from "lucide-react";
 import { format } from "date-fns";
-
 import { useLOSPermissions } from "@/hooks/useLOSPermissions";
 import ProofUploadDialog from "./ProofUploadDialog";
 
@@ -21,9 +17,6 @@ interface DisbursementStatusProps {
 export default function DisbursementStatus({ applicationId }: DisbursementStatusProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [utrNumber, setUtrNumber] = useState("");
-  const [failureReason, setFailureReason] = useState("");
-  const [showUpdateForm, setShowUpdateForm] = useState(false);
   const [showProofUpload, setShowProofUpload] = useState(false);
   const { permissions } = useLOSPermissions();
 
@@ -38,46 +31,6 @@ export default function DisbursementStatus({ applicationId }: DisbursementStatus
         .limit(1)
         .maybeSingle();
       return data;
-    },
-  });
-
-  const updateStatusMutation = useMutation({
-    mutationFn: async (status: "completed" | "failed") => {
-      if (!disbursement) throw new Error("No disbursement found");
-
-      const updateData: Record<string, unknown> = {
-        status,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (status === "completed") {
-        updateData.utr_number = utrNumber;
-        updateData.disbursement_date = new Date().toISOString();
-      } else if (status === "failed") {
-        updateData.failure_reason = failureReason;
-      }
-
-      const { error } = await supabase
-        .from("loan_disbursements")
-        .update(updateData)
-        .eq("id", disbursement.id);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["loan-disbursements", applicationId] });
-      queryClient.invalidateQueries({ queryKey: ["all-disbursements"] });
-      toast({ title: "Disbursement status updated" });
-      setShowUpdateForm(false);
-      setUtrNumber("");
-      setFailureReason("");
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
     },
   });
 
@@ -130,6 +83,7 @@ export default function DisbursementStatus({ applicationId }: DisbursementStatus
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* Summary Cards */}
           <div className="grid gap-4 md:grid-cols-3">
             <div className="p-4 bg-muted rounded-lg">
               <div className="text-sm text-muted-foreground">Disbursement Number</div>
@@ -147,6 +101,41 @@ export default function DisbursementStatus({ applicationId }: DisbursementStatus
             </div>
           </div>
 
+          {/* UTR Details - Prominent Display */}
+          {disbursement.utr_number && (
+            <div className="p-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
+              <div className="flex items-start gap-3">
+                <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="font-medium text-green-700 dark:text-green-400">Transaction Completed</span>
+                    {disbursement.proof_document_path && (
+                      <Badge className="bg-primary/10 text-primary border-primary/20 gap-1">
+                        <Sparkles className="h-3 w-3" />
+                        Extracted from proof
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div>
+                      <div className="text-sm text-muted-foreground">UTR Number</div>
+                      <div className="font-mono font-bold text-lg">{disbursement.utr_number}</div>
+                    </div>
+                    {disbursement.disbursement_date && (
+                      <div>
+                        <div className="text-sm text-muted-foreground">Transaction Date</div>
+                        <div className="font-medium text-lg">
+                          {format(new Date(disbursement.disbursement_date), "MMM dd, yyyy")}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Bank Details */}
           <div>
             <h4 className="font-medium mb-3">Bank Details</h4>
             <div className="grid gap-4 md:grid-cols-2 p-4 border rounded-lg">
@@ -169,20 +158,8 @@ export default function DisbursementStatus({ applicationId }: DisbursementStatus
             </div>
           </div>
 
-          {disbursement.utr_number && (
-            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-              <div className="text-sm text-muted-foreground">UTR Number</div>
-              <div className="font-medium font-mono">{disbursement.utr_number}</div>
-              {disbursement.disbursement_date && (
-                <div className="text-xs text-muted-foreground mt-1">
-                  Completed on {format(new Date(disbursement.disbursement_date), "MMM dd, yyyy")}
-                </div>
-              )}
-            </div>
-          )}
-
           {disbursement.failure_reason && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="p-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg">
               <div className="text-sm text-muted-foreground">Failure Reason</div>
               <div className="text-sm">{disbursement.failure_reason}</div>
             </div>
@@ -192,11 +169,11 @@ export default function DisbursementStatus({ applicationId }: DisbursementStatus
           <div>
             <h4 className="font-medium mb-3">Proof of Disbursement</h4>
             {disbursement.proof_document_path ? (
-              <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between">
+              <div className="p-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <FileCheck className="h-5 w-5 text-green-600" />
                   <div>
-                    <div className="font-medium text-green-700">Proof Uploaded</div>
+                    <div className="font-medium text-green-700 dark:text-green-400">Proof Uploaded</div>
                     {disbursement.proof_uploaded_at && (
                       <div className="text-xs text-muted-foreground">
                         Uploaded on {format(new Date(disbursement.proof_uploaded_at), "MMM dd, yyyy 'at' h:mm a")}
@@ -215,78 +192,16 @@ export default function DisbursementStatus({ applicationId }: DisbursementStatus
                   <div className="text-muted-foreground">
                     No proof uploaded yet
                   </div>
-                  {disbursement.status === "completed" && permissions.canUpdateDisbursementStatus && (
+                  {disbursement.status === "pending" && permissions.canUpdateDisbursementStatus && (
                     <Button variant="secondary" onClick={() => setShowProofUpload(true)}>
                       <Upload className="h-4 w-4 mr-2" />
-                      Upload Proof
+                      Upload UTR Proof
                     </Button>
                   )}
                 </div>
               </div>
             )}
           </div>
-
-          {disbursement.status === "pending" && !showUpdateForm && permissions.canUpdateDisbursementStatus && (
-            <div className="flex gap-4">
-              <Button onClick={() => setShowUpdateForm(true)}>
-                Update Status
-              </Button>
-            </div>
-          )}
-
-          {showUpdateForm && (
-            <div className="space-y-4 p-4 border rounded-lg">
-              <h4 className="font-medium">Update Disbursement Status</h4>
-              
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="utr">UTR Number (for completion)</Label>
-                  <Input
-                    id="utr"
-                    placeholder="Enter UTR/reference number"
-                    value={utrNumber}
-                    onChange={(e) => setUtrNumber(e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="failure">Failure Reason (if failed)</Label>
-                  <Textarea
-                    id="failure"
-                    placeholder="Enter reason for failure"
-                    value={failureReason}
-                    onChange={(e) => setFailureReason(e.target.value)}
-                    rows={3}
-                  />
-                </div>
-
-                <div className="flex gap-4">
-                  <Button
-                    variant="default"
-                    onClick={() => updateStatusMutation.mutate("completed")}
-                    disabled={!utrNumber || updateStatusMutation.isPending}
-                  >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Mark Completed
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    onClick={() => updateStatusMutation.mutate("failed")}
-                    disabled={!failureReason || updateStatusMutation.isPending}
-                  >
-                    <XCircle className="h-4 w-4 mr-2" />
-                    Mark Failed
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowUpdateForm(false)}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
 
