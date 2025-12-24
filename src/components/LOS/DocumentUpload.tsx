@@ -50,9 +50,9 @@ const REQUIRED_DOCUMENTS = [
   { type: "form_16_year_2", name: "Form 16 (Previous Year)", category: "income", mandatory: true, verifiable: false, parseable: true },
   { type: "itr_year_1", name: "ITR (Current Year)", category: "income", mandatory: false, verifiable: false, parseable: true },
   { type: "itr_year_2", name: "ITR (Previous Year)", category: "income", mandatory: false, verifiable: false, parseable: true },
-  { type: "bank_statement", name: "Bank Statement (6 months)", category: "bank", mandatory: true, verifiable: false, parseable: false },
-  { type: "offer_letter", name: "Offer Letter", category: "employment", mandatory: true, verifiable: false, parseable: false },
-  { type: "employee_id", name: "Employee ID Card", category: "employment", mandatory: false, verifiable: false, parseable: false },
+  { type: "bank_statement", name: "Bank Statement (6 months)", category: "bank", mandatory: true, verifiable: false, parseable: true },
+  { type: "offer_letter", name: "Offer Letter", category: "employment", mandatory: true, verifiable: false, parseable: true },
+  { type: "employee_id", name: "Employee ID Card", category: "employment", mandatory: false, verifiable: false, parseable: true },
   { type: "passport_photo", name: "Passport Size Photo", category: "photo", mandatory: true, verifiable: false, parseable: false },
 ];
 
