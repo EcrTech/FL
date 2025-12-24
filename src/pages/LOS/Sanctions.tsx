@@ -280,7 +280,11 @@ export default function Sanctions() {
                       const isSanctioning = sanctioningId === app.id;
 
                       return (
-                        <TableRow key={app.id}>
+                        <TableRow 
+                          key={app.id} 
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => navigate(`/los/sanctions/${app.id}`)}
+                        >
                           <TableCell className="font-medium">
                             {app.application_number}
                           </TableCell>
@@ -322,7 +326,7 @@ export default function Sanctions() {
                           <TableCell>
                             {getStatusBadge(app)}
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-end gap-2">
                               <Button
                                 variant="ghost"
