@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, X, Loader2 } from "lucide-react";
+import { Upload, FileText, X, Loader2, Sparkles, CheckCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 interface CreditBureauDialogProps {
   open: boolean;
@@ -43,10 +44,14 @@ export default function CreditBureauDialog({
     status: existingVerification?.status || "success",
     remarks: existingVerification?.remarks || "",
     report_file_path: existingVerification?.response_data?.report_file_path || "",
+    name_on_report: existingVerification?.response_data?.name_on_report || "",
+    pan_on_report: existingVerification?.response_data?.pan_on_report || "",
   });
 
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
+  const [parsedSuccessfully, setParsedSuccessfully] = useState(false);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -60,10 +65,11 @@ export default function CreditBureauDialog({
         return;
       }
       setUploadedFile(file);
+      setParsedSuccessfully(false);
     }
   };
 
-  const uploadFile = async () => {
+  const uploadAndParseFile = async () => {
     if (!uploadedFile) return null;
 
     setIsUploading(true);
@@ -71,38 +77,78 @@ export default function CreditBureauDialog({
       const fileExt = uploadedFile.name.split('.').pop();
       const fileName = `${applicationId}/cibil_report_${Date.now()}.${fileExt}`;
       
-      const { data, error } = await supabase.storage
+      // Upload file to storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
         .from("loan-documents")
         .upload(fileName, uploadedFile, {
           cacheControl: "3600",
           upsert: true,
         });
 
-      if (error) throw error;
-      return data.path;
+      if (uploadError) throw uploadError;
+      
+      setIsUploading(false);
+      setIsParsing(true);
+
+      // Call edge function to parse the report with AI
+      const { data: parseResult, error: parseError } = await supabase.functions
+        .invoke("parse-cibil-report", {
+          body: { 
+            filePath: uploadData.path,
+            applicationId 
+          }
+        });
+
+      if (parseError) {
+        console.error("Parse error:", parseError);
+        throw new Error("Failed to parse CIBIL report");
+      }
+
+      if (!parseResult.success) {
+        throw new Error(parseResult.error || "Failed to parse report");
+      }
+
+      // Update form with parsed data
+      const parsed = parseResult.data;
+      setFormData(prev => ({
+        ...prev,
+        bureau_type: parsed.bureau_type || prev.bureau_type,
+        credit_score: parsed.credit_score?.toString() || prev.credit_score,
+        active_accounts: parsed.active_accounts?.toString() || prev.active_accounts,
+        total_outstanding: parsed.total_outstanding?.toString() || prev.total_outstanding,
+        total_overdue: parsed.total_overdue?.toString() || prev.total_overdue,
+        enquiry_count_30d: parsed.enquiry_count_30d?.toString() || prev.enquiry_count_30d,
+        enquiry_count_90d: parsed.enquiry_count_90d?.toString() || prev.enquiry_count_90d,
+        dpd_history: parsed.dpd_history || prev.dpd_history,
+        remarks: parsed.remarks || prev.remarks,
+        report_file_path: uploadData.path,
+        name_on_report: parsed.name_on_report || prev.name_on_report,
+        pan_on_report: parsed.pan_on_report || prev.pan_on_report,
+        status: "success",
+      }));
+
+      setParsedSuccessfully(true);
+      toast({
+        title: "Report parsed successfully",
+        description: `Credit score: ${parsed.credit_score || "Not found"}`,
+      });
+
+      return uploadData.path;
     } catch (error: any) {
       toast({
-        title: "Upload failed",
+        title: "Error processing report",
         description: error.message,
         variant: "destructive",
       });
       return null;
     } finally {
       setIsUploading(false);
+      setIsParsing(false);
     }
   };
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      let reportFilePath = formData.report_file_path;
-      
-      if (uploadedFile) {
-        const uploadedPath = await uploadFile();
-        if (uploadedPath) {
-          reportFilePath = uploadedPath;
-        }
-      }
-
       const verificationData = {
         loan_application_id: applicationId,
         applicant_id: applicant?.id,
@@ -119,7 +165,9 @@ export default function CreditBureauDialog({
           enquiry_count_30d: parseInt(formData.enquiry_count_30d) || 0,
           enquiry_count_90d: parseInt(formData.enquiry_count_90d) || 0,
           dpd_history: formData.dpd_history,
-          report_file_path: reportFilePath,
+          report_file_path: formData.report_file_path,
+          name_on_report: formData.name_on_report,
+          pan_on_report: formData.pan_on_report,
         },
         remarks: formData.remarks,
         verified_at: new Date().toISOString(),
@@ -154,6 +202,7 @@ export default function CreditBureauDialog({
 
   const removeFile = () => {
     setUploadedFile(null);
+    setParsedSuccessfully(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -165,16 +214,19 @@ export default function CreditBureauDialog({
         <DialogHeader>
           <DialogTitle>Credit Bureau Check</DialogTitle>
           <DialogDescription>
-            Upload CIBIL report or enter credit bureau data manually
+            Upload CIBIL report for AI parsing or enter data manually
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           {/* File Upload Section */}
-          <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4">
-            <Label className="text-base font-medium">Upload CIBIL Report</Label>
+          <div className="border-2 border-dashed border-primary/30 rounded-lg p-4 bg-primary/5">
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              <Label className="text-base font-medium">Upload CIBIL Report (AI Parsed)</Label>
+            </div>
             <p className="text-sm text-muted-foreground mb-3">
-              Upload the CIBIL/Credit Bureau report PDF
+              Upload the CIBIL/Credit Bureau report and AI will automatically extract the details
             </p>
             
             <input
@@ -191,26 +243,59 @@ export default function CreditBureauDialog({
                 variant="outline"
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full"
+                className="w-full border-primary/30 hover:bg-primary/10"
               >
                 <Upload className="h-4 w-4 mr-2" />
-                Choose File
+                Choose CIBIL Report File
               </Button>
             ) : (
-              <div className="flex items-center justify-between p-3 bg-muted rounded-md">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-primary" />
-                  <span className="text-sm font-medium">
-                    {uploadedFile ? uploadedFile.name : "CIBIL Report Uploaded"}
-                  </span>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-3 bg-background rounded-md border">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-primary" />
+                    <span className="text-sm font-medium">
+                      {uploadedFile ? uploadedFile.name : "CIBIL Report Uploaded"}
+                    </span>
+                    {parsedSuccessfully && (
+                      <Badge variant="default" className="bg-green-500">
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Parsed
+                      </Badge>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={removeFile}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={removeFile}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
+                
+                {uploadedFile && !parsedSuccessfully && (
+                  <Button
+                    onClick={uploadAndParseFile}
+                    disabled={isUploading || isParsing}
+                    className="w-full"
+                  >
+                    {isUploading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : isParsing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        AI Parsing Report...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Parse with AI
+                      </>
+                    )}
+                  </Button>
+                )}
               </div>
             )}
           </div>
@@ -221,37 +306,59 @@ export default function CreditBureauDialog({
             </div>
             <div className="relative flex justify-center text-xs uppercase">
               <span className="bg-background px-2 text-muted-foreground">
-                Report Details
+                Report Details {parsedSuccessfully && "(Auto-filled from report)"}
               </span>
             </div>
           </div>
 
-          <div>
-            <Label>Bureau Type</Label>
-            <Select value={formData.bureau_type} onValueChange={(value) => setFormData({ ...formData, bureau_type: value })}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="cibil">CIBIL</SelectItem>
-                <SelectItem value="experian">Experian</SelectItem>
-                <SelectItem value="equifax">Equifax</SelectItem>
-                <SelectItem value="crif">CRIF</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Bureau Type</Label>
+              <Select value={formData.bureau_type} onValueChange={(value) => setFormData({ ...formData, bureau_type: value })}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cibil">CIBIL</SelectItem>
+                  <SelectItem value="experian">Experian</SelectItem>
+                  <SelectItem value="equifax">Equifax</SelectItem>
+                  <SelectItem value="crif">CRIF</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Credit Score</Label>
+              <Input
+                type="number"
+                value={formData.credit_score}
+                onChange={(e) => setFormData({ ...formData, credit_score: e.target.value })}
+                placeholder="750"
+                min="300"
+                max="900"
+              />
+            </div>
           </div>
 
-          <div>
-            <Label>Credit Score</Label>
-            <Input
-              type="number"
-              value={formData.credit_score}
-              onChange={(e) => setFormData({ ...formData, credit_score: e.target.value })}
-              placeholder="750"
-              min="300"
-              max="900"
-            />
-          </div>
+          {formData.name_on_report && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Name on Report</Label>
+                <Input
+                  value={formData.name_on_report}
+                  onChange={(e) => setFormData({ ...formData, name_on_report: e.target.value })}
+                  placeholder="Name as per report"
+                />
+              </div>
+              <div>
+                <Label>PAN on Report</Label>
+                <Input
+                  value={formData.pan_on_report}
+                  onChange={(e) => setFormData({ ...formData, pan_on_report: e.target.value })}
+                  placeholder="PAN number"
+                />
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -346,12 +453,12 @@ export default function CreditBureauDialog({
           </Button>
           <Button 
             onClick={() => saveMutation.mutate()} 
-            disabled={saveMutation.isPending || isUploading}
+            disabled={saveMutation.isPending || isUploading || isParsing}
           >
-            {(saveMutation.isPending || isUploading) ? (
+            {saveMutation.isPending ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                {isUploading ? "Uploading..." : "Saving..."}
+                Saving...
               </>
             ) : (
               "Save Verification"

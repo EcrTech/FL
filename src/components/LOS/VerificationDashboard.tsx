@@ -392,25 +392,22 @@ export default function VerificationDashboard({ applicationId, orgId }: Verifica
                       View Details
                     </Button>
                   )}
-                  {verificationType.type === "credit_bureau" && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setSelectedVerification({ type: verificationType.type, data: verification })}
-                    >
-                      <Upload className="h-4 w-4 mr-2" />
-                      Upload CIBIL
-                    </Button>
-                  )}
                   <Button
                     variant={status === "pending" ? "default" : "outline"}
                     size="sm"
                     onClick={() => setSelectedVerification({ type: verificationType.type, data: verification })}
                   >
-                    <Edit className="h-4 w-4 mr-2" />
-                    {verificationType.type === "credit_bureau" 
-                      ? (status === "pending" ? "Fetch CIBIL" : "Update") 
-                      : (status === "pending" ? "Start Verification" : "Update")}
+                    {verificationType.type === "credit_bureau" ? (
+                      <>
+                        <Upload className="h-4 w-4 mr-2" />
+                        {status === "pending" ? "Upload CIBIL" : "Update"}
+                      </>
+                    ) : (
+                      <>
+                        <Edit className="h-4 w-4 mr-2" />
+                        {status === "pending" ? "Start Verification" : "Update"}
+                      </>
+                    )}
                   </Button>
                 </div>
               </CardContent>
