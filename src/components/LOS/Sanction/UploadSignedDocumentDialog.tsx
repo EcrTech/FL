@@ -74,27 +74,30 @@ export default function UploadSignedDocumentDialog({
 
       if (uploadError) throw uploadError;
 
-      // Update the document record
+      // Update the document record - match by application_id and document_type
+      // since sanction_id might be null on some records
       const { error: updateError } = await supabase
         .from("loan_generated_documents")
         .update({
           signed_document_path: fileName,
           customer_signed: true,
           signed_at: new Date().toISOString(),
-          status: 'signed'
+          status: 'signed',
+          sanction_id: sanctionId // Also set sanction_id if it was missing
         })
-        .eq("sanction_id", sanctionId)
+        .eq("loan_application_id", applicationId)
         .eq("document_type", documentType);
 
       if (updateError) {
         console.error('Update error:', updateError);
+        throw updateError;
       }
 
-      // Update sanction status if both documents are signed
+      // Update sanction status if all documents are signed
       const { data: docs } = await supabase
         .from("loan_generated_documents")
         .select("customer_signed, document_type")
-        .eq("sanction_id", sanctionId);
+        .eq("loan_application_id", applicationId);
 
       const allSigned = docs?.every(d => d.customer_signed);
       if (allSigned) {
