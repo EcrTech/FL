@@ -257,12 +257,6 @@ export default function ReferralLoanApplication() {
           {/* Decorative gradient background */}
           <div className="absolute inset-0 -mx-4 -mt-4 h-40 bg-gradient-to-b from-primary/5 via-primary/3 to-transparent rounded-3xl -z-10" />
           
-          {referrerInfo?.name && (
-            <div className="inline-flex items-center gap-2.5 mb-5 bg-gradient-to-r from-primary/10 to-accent/10 text-primary px-5 py-2.5 rounded-full text-sm font-semibold font-heading border border-primary/20 shadow-sm">
-              <User className="h-4 w-4" />
-              <span>Referred by <span className="text-accent">{referrerInfo.name}</span></span>
-            </div>
-          )}
           
           <p className="text-lg text-muted-foreground font-body max-w-md mx-auto">
             Complete 4 simple steps to submit your application
