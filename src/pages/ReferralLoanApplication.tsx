@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, CheckCircle, User, CreditCard, FileCheck, Video, ArrowLeft, Shield } from "lucide-react";
+import { Loader2, CheckCircle, User, CreditCard, FileCheck, Video, Shield } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { BasicInfoStep } from "@/components/ReferralApplication/BasicInfoStep";
 import { PANVerificationStep } from "@/components/ReferralApplication/PANVerificationStep";
@@ -240,39 +240,32 @@ export default function ReferralLoanApplication() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-muted/80 border-b border-border sticky top-0 z-50 shadow-sm backdrop-blur-sm">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <a 
-            href="/" 
-            className="flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors font-heading group"
-          >
-            <div className="p-1.5 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors">
-              <ArrowLeft className="h-4 w-4" />
-            </div>
-            <span className="hidden sm:inline">Back to Home</span>
-          </a>
-          <div className="flex items-center gap-3">
-            <img src={logo} alt="Paisaa Saarthi" className="h-20 drop-shadow-sm" />
-          </div>
-          <div className="w-[100px] hidden sm:block" /> {/* Spacer for centering logo */}
+      <header className="bg-card/95 border-b border-border sticky top-0 z-50 shadow-sm backdrop-blur-md">
+        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-center">
+          <img src={logo} alt="In-sync" className="h-14 drop-shadow-sm" />
         </div>
       </header>
 
       {/* Main Content */}
       <main className="max-w-2xl mx-auto px-4 py-8 md:py-12">
         {/* Hero Section */}
-        <div className="text-center mb-10">
-          <h1 className="text-3xl md:text-4xl font-heading font-extrabold text-foreground mb-3">
-            Apply for a Loan
-          </h1>
-          <p className="text-lg text-muted-foreground font-body">
-            Complete 4 simple steps to submit your application
-          </p>
+        <div className="text-center mb-10 relative">
+          {/* Decorative gradient background */}
+          <div className="absolute inset-0 -mx-4 -mt-4 h-40 bg-gradient-to-b from-primary/5 via-primary/3 to-transparent rounded-3xl -z-10" />
+          
           {referrerInfo?.name && (
-            <div className="inline-flex items-center gap-2 mt-5 bg-[hsl(var(--coral-500))]/10 text-[hsl(var(--coral-600))] px-5 py-2.5 rounded-full text-sm font-semibold font-heading border border-[hsl(var(--coral-400))]/20">
-              Referred by {referrerInfo.name}
+            <div className="inline-flex items-center gap-2.5 mb-5 bg-gradient-to-r from-primary/10 to-accent/10 text-primary px-5 py-2.5 rounded-full text-sm font-semibold font-heading border border-primary/20 shadow-sm">
+              <User className="h-4 w-4" />
+              <span>Referred by <span className="text-accent">{referrerInfo.name}</span></span>
             </div>
           )}
+          
+          <h1 className="text-4xl md:text-5xl font-heading font-black text-foreground mb-4 tracking-tight">
+            Apply for a <span className="text-primary">Loan</span>
+          </h1>
+          <p className="text-lg text-muted-foreground font-body max-w-md mx-auto">
+            Complete 4 simple steps to submit your application
+          </p>
         </div>
 
         {/* Progress Bar */}
