@@ -241,8 +241,12 @@ export default function ReferralLoanApplication() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="bg-card/95 border-b border-border sticky top-0 z-50 shadow-sm backdrop-blur-md">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-center">
-          <img src={logo} alt="In-sync" className="h-14 drop-shadow-sm" />
+        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+          <img src={logo} alt="In-sync" className="h-12 drop-shadow-sm" />
+          <h1 className="text-xl md:text-2xl font-heading font-bold text-foreground">
+            Apply for a <span className="text-primary">Loan</span>
+          </h1>
+          <div className="w-12" /> {/* Spacer for balance */}
         </div>
       </header>
 
@@ -260,9 +264,6 @@ export default function ReferralLoanApplication() {
             </div>
           )}
           
-          <h1 className="text-4xl md:text-5xl font-heading font-black text-foreground mb-4 tracking-tight">
-            Apply for a <span className="text-primary">Loan</span>
-          </h1>
           <p className="text-lg text-muted-foreground font-body max-w-md mx-auto">
             Complete 4 simple steps to submit your application
           </p>
