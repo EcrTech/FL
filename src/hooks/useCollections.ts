@@ -1,0 +1,179 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useOrgContext } from "./useOrgContext";
+import { useToast } from "./use-toast";
+
+export interface CollectionRecord {
+  id: string;
+  loan_application_id: string;
+  application_number: string;
+  applicant_name: string;
+  applicant_phone: string;
+  emi_number: number;
+  due_date: string;
+  total_emi: number;
+  principal: number;
+  interest: number;
+  amount_paid: number;
+  status: string;
+  loan_amount: number;
+  disbursement_date: string;
+  contact_id?: string;
+}
+
+export function useCollections() {
+  const { orgId } = useOrgContext();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: collections, isLoading } = useQuery({
+    queryKey: ["collections", orgId],
+    queryFn: async () => {
+      // Get all EMI schedules for disbursed loans
+      const { data, error } = await supabase
+        .from("loan_repayment_schedule")
+        .select(`
+          id,
+          loan_application_id,
+          emi_number,
+          due_date,
+          total_emi,
+          principal,
+          interest,
+          amount_paid,
+          status,
+          loan_applications:loan_application_id(
+            application_number,
+            loan_amount,
+            contact_id,
+            loan_applicants(first_name, last_name, phone),
+            loan_disbursements(disbursement_date)
+          )
+        `)
+        .eq("org_id", orgId!)
+        .order("due_date", { ascending: true });
+
+      if (error) throw error;
+
+      // Transform data for table display
+      const records: CollectionRecord[] = (data || []).map((item: any) => {
+        const applicant = item.loan_applications?.loan_applicants?.[0];
+        const disbursement = item.loan_applications?.loan_disbursements?.[0];
+        
+        return {
+          id: item.id,
+          loan_application_id: item.loan_application_id,
+          application_number: item.loan_applications?.application_number || "N/A",
+          applicant_name: applicant 
+            ? `${applicant.first_name} ${applicant.last_name || ""}`.trim() 
+            : "N/A",
+          applicant_phone: applicant?.phone || "",
+          emi_number: item.emi_number,
+          due_date: item.due_date,
+          total_emi: item.total_emi,
+          principal: item.principal,
+          interest: item.interest,
+          amount_paid: item.amount_paid || 0,
+          status: item.status,
+          loan_amount: item.loan_applications?.loan_amount || 0,
+          disbursement_date: disbursement?.disbursement_date || "",
+          contact_id: item.loan_applications?.contact_id,
+        };
+      });
+
+      return records;
+    },
+    enabled: !!orgId,
+  });
+
+  const recordPaymentMutation = useMutation({
+    mutationFn: async (payment: {
+      scheduleId: string;
+      applicationId: string;
+      paymentDate: string;
+      paymentAmount: number;
+      principalPaid: number;
+      interestPaid: number;
+      lateFeePaid: number;
+      paymentMethod: string;
+      transactionReference?: string;
+      notes?: string;
+    }) => {
+      const { data: user } = await supabase.auth.getUser();
+      const paymentNumber = `PMT${Date.now()}`;
+
+      // Insert payment record
+      const { error: paymentError } = await supabase
+        .from("loan_payments")
+        .insert({
+          loan_application_id: payment.applicationId,
+          schedule_id: payment.scheduleId,
+          org_id: orgId!,
+          payment_number: paymentNumber,
+          payment_date: payment.paymentDate,
+          payment_amount: payment.paymentAmount,
+          principal_paid: payment.principalPaid,
+          interest_paid: payment.interestPaid,
+          late_fee_paid: payment.lateFeePaid,
+          payment_method: payment.paymentMethod,
+          transaction_reference: payment.transactionReference,
+          notes: payment.notes,
+          created_by: user?.user?.id,
+        });
+
+      if (paymentError) throw paymentError;
+
+      // Update schedule status
+      const { data: scheduleItem } = await supabase
+        .from("loan_repayment_schedule")
+        .select("total_emi, amount_paid")
+        .eq("id", payment.scheduleId)
+        .single();
+
+      if (scheduleItem) {
+        const newAmountPaid = (scheduleItem.amount_paid || 0) + payment.paymentAmount;
+        const newStatus =
+          newAmountPaid >= scheduleItem.total_emi
+            ? "paid"
+            : newAmountPaid > 0
+            ? "partially_paid"
+            : "pending";
+
+        const updateData: Record<string, any> = {
+          amount_paid: newAmountPaid,
+          status: newStatus,
+        };
+
+        if (newStatus === "paid") {
+          updateData.payment_date = payment.paymentDate;
+        }
+
+        const { error: updateError } = await supabase
+          .from("loan_repayment_schedule")
+          .update(updateData)
+          .eq("id", payment.scheduleId);
+
+        if (updateError) throw updateError;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["collections"] });
+      queryClient.invalidateQueries({ queryKey: ["emi-stats"] });
+      toast({ title: "Payment recorded successfully" });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error recording payment",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  return {
+    collections: collections || [],
+    isLoading,
+    recordPayment: recordPaymentMutation.mutate,
+    isRecording: recordPaymentMutation.isPending,
+  };
+}
