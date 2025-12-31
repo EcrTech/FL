@@ -1,14 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrgContext } from "@/hooks/useOrgContext";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, User, FileText, Calculator, FileCheck, DollarSign, XCircle, CreditCard, CheckCircle, MapPin } from "lucide-react";
+import { ArrowLeft, User, FileText, Calculator, FileCheck, DollarSign, XCircle, CreditCard, CheckCircle, MapPin, Edit2, Save, X } from "lucide-react";
+import { toast } from "sonner";
 import { LoadingState } from "@/components/common/LoadingState";
 import { format } from "date-fns";
 import DocumentUpload from "@/components/LOS/DocumentUpload";
@@ -42,6 +44,254 @@ const STATUS_COLORS: Record<string, string> = {
   disbursed: "bg-purple-500",
 };
 
+// Referrals Section Component
+interface ReferralsSectionProps {
+  primaryApplicant: any;
+  applicationId: string;
+  orgId: string;
+  isEditingReferrals: boolean;
+  setIsEditingReferrals: (value: boolean) => void;
+  referralData: {
+    professional_ref_name: string;
+    professional_ref_mobile: string;
+    professional_ref_email: string;
+    professional_ref_address: string;
+    personal_ref_name: string;
+    personal_ref_mobile: string;
+    personal_ref_email: string;
+    personal_ref_address: string;
+  };
+  setReferralData: (data: any) => void;
+  queryClient: any;
+}
+
+function ReferralsSection({
+  primaryApplicant,
+  applicationId,
+  orgId,
+  isEditingReferrals,
+  setIsEditingReferrals,
+  referralData,
+  setReferralData,
+  queryClient,
+}: ReferralsSectionProps) {
+  useEffect(() => {
+    if (primaryApplicant) {
+      setReferralData({
+        professional_ref_name: primaryApplicant.professional_ref_name || "",
+        professional_ref_mobile: primaryApplicant.professional_ref_mobile || "",
+        professional_ref_email: primaryApplicant.professional_ref_email || "",
+        professional_ref_address: primaryApplicant.professional_ref_address || "",
+        personal_ref_name: primaryApplicant.personal_ref_name || "",
+        personal_ref_mobile: primaryApplicant.personal_ref_mobile || "",
+        personal_ref_email: primaryApplicant.personal_ref_email || "",
+        personal_ref_address: primaryApplicant.personal_ref_address || "",
+      });
+    }
+  }, [primaryApplicant, setReferralData]);
+
+  const saveReferralsMutation = useMutation({
+    mutationFn: async (data: typeof referralData) => {
+      if (!primaryApplicant?.id) {
+        throw new Error("No applicant record found");
+      }
+      const { error } = await supabase
+        .from("loan_applicants")
+        .update(data)
+        .eq("id", primaryApplicant.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Referral information saved successfully");
+      setIsEditingReferrals(false);
+      queryClient.invalidateQueries({ queryKey: ["loan-application", applicationId, orgId] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to save referral information");
+    },
+  });
+
+  const handleSave = () => {
+    saveReferralsMutation.mutate(referralData);
+  };
+
+  const handleCancel = () => {
+    if (primaryApplicant) {
+      setReferralData({
+        professional_ref_name: primaryApplicant.professional_ref_name || "",
+        professional_ref_mobile: primaryApplicant.professional_ref_mobile || "",
+        professional_ref_email: primaryApplicant.professional_ref_email || "",
+        professional_ref_address: primaryApplicant.professional_ref_address || "",
+        personal_ref_name: primaryApplicant.personal_ref_name || "",
+        personal_ref_mobile: primaryApplicant.personal_ref_mobile || "",
+        personal_ref_email: primaryApplicant.personal_ref_email || "",
+        personal_ref_address: primaryApplicant.personal_ref_address || "",
+      });
+    }
+    setIsEditingReferrals(false);
+  };
+
+  return (
+    <div className="border-t pt-4 mt-4">
+      <div className="flex items-center justify-between mb-4">
+        <h4 className="text-sm font-medium text-muted-foreground">Referrals</h4>
+        {primaryApplicant && !isEditingReferrals && (
+          <Button variant="ghost" size="sm" onClick={() => setIsEditingReferrals(true)}>
+            <Edit2 className="h-4 w-4 mr-1" />
+            Edit
+          </Button>
+        )}
+        {isEditingReferrals && (
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={handleCancel}>
+              <X className="h-4 w-4 mr-1" />
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleSave} disabled={saveReferralsMutation.isPending}>
+              <Save className="h-4 w-4 mr-1" />
+              {saveReferralsMutation.isPending ? "Saving..." : "Save"}
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {!primaryApplicant && (
+        <p className="text-sm text-muted-foreground">No applicant record found. Referral information cannot be added.</p>
+      )}
+
+      {primaryApplicant && (
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Professional Reference */}
+          <div className="p-4 rounded-lg border bg-muted/30">
+            <h5 className="text-sm font-medium mb-3">Professional Reference</h5>
+            <div className="grid gap-3">
+              {isEditingReferrals ? (
+                <>
+                  <div>
+                    <Label className="text-xs">Name</Label>
+                    <Input
+                      value={referralData.professional_ref_name}
+                      onChange={(e) => setReferralData({ ...referralData, professional_ref_name: e.target.value })}
+                      placeholder="Enter name"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Mobile</Label>
+                    <Input
+                      value={referralData.professional_ref_mobile}
+                      onChange={(e) => setReferralData({ ...referralData, professional_ref_mobile: e.target.value })}
+                      placeholder="Enter mobile"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Email</Label>
+                    <Input
+                      type="email"
+                      value={referralData.professional_ref_email}
+                      onChange={(e) => setReferralData({ ...referralData, professional_ref_email: e.target.value })}
+                      placeholder="Enter email"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Address</Label>
+                    <Input
+                      value={referralData.professional_ref_address}
+                      onChange={(e) => setReferralData({ ...referralData, professional_ref_address: e.target.value })}
+                      placeholder="Enter address"
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Name</label>
+                    <p className="text-sm">{primaryApplicant.professional_ref_name || "N/A"}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Mobile</label>
+                    <p className="text-sm">{primaryApplicant.professional_ref_mobile || "N/A"}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Email</label>
+                    <p className="text-sm">{primaryApplicant.professional_ref_email || "N/A"}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Address</label>
+                    <p className="text-sm">{primaryApplicant.professional_ref_address || "N/A"}</p>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Personal Reference */}
+          <div className="p-4 rounded-lg border bg-muted/30">
+            <h5 className="text-sm font-medium mb-3">Personal Reference</h5>
+            <div className="grid gap-3">
+              {isEditingReferrals ? (
+                <>
+                  <div>
+                    <Label className="text-xs">Name</Label>
+                    <Input
+                      value={referralData.personal_ref_name}
+                      onChange={(e) => setReferralData({ ...referralData, personal_ref_name: e.target.value })}
+                      placeholder="Enter name"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Mobile</Label>
+                    <Input
+                      value={referralData.personal_ref_mobile}
+                      onChange={(e) => setReferralData({ ...referralData, personal_ref_mobile: e.target.value })}
+                      placeholder="Enter mobile"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Email</Label>
+                    <Input
+                      type="email"
+                      value={referralData.personal_ref_email}
+                      onChange={(e) => setReferralData({ ...referralData, personal_ref_email: e.target.value })}
+                      placeholder="Enter email"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Address</Label>
+                    <Input
+                      value={referralData.personal_ref_address}
+                      onChange={(e) => setReferralData({ ...referralData, personal_ref_address: e.target.value })}
+                      placeholder="Enter address"
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Name</label>
+                    <p className="text-sm">{primaryApplicant.personal_ref_name || "N/A"}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Mobile</label>
+                    <p className="text-sm">{primaryApplicant.personal_ref_mobile || "N/A"}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Email</label>
+                    <p className="text-sm">{primaryApplicant.personal_ref_email || "N/A"}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground">Address</label>
+                    <p className="text-sm">{primaryApplicant.personal_ref_address || "N/A"}</p>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ApplicationDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -49,6 +299,18 @@ export default function ApplicationDetail() {
   const isReviewMode = searchParams.get("mode") === "review";
   const { orgId, isLoading: isOrgLoading } = useOrgContext();
   const [approvalAction, setApprovalAction] = useState<"approve" | "reject" | null>(null);
+  const [isEditingReferrals, setIsEditingReferrals] = useState(false);
+  const [referralData, setReferralData] = useState({
+    professional_ref_name: "",
+    professional_ref_mobile: "",
+    professional_ref_email: "",
+    professional_ref_address: "",
+    personal_ref_name: "",
+    personal_ref_mobile: "",
+    personal_ref_email: "",
+    personal_ref_address: "",
+  });
+  const queryClient = useQueryClient();
 
   const { data: userData } = useQuery({
     queryKey: ["current-user"],
@@ -342,57 +604,17 @@ export default function ApplicationDetail() {
                 <p className="text-sm text-muted-foreground">No applicant details available. Please add applicant information.</p>
               )}
 
-              {/* Referrals Section - Always visible */}
-              <div className="border-t pt-4 mt-4">
-                <h4 className="text-sm font-medium text-muted-foreground mb-4">Referrals</h4>
-                <div className="grid gap-6 md:grid-cols-2">
-                  {/* Professional Reference */}
-                  <div className="p-4 rounded-lg border bg-muted/30">
-                    <h5 className="text-sm font-medium mb-3">Professional Reference</h5>
-                    <div className="grid gap-3">
-                      <div>
-                        <label className="text-xs text-muted-foreground">Name</label>
-                        <p className="text-sm">{(primaryApplicant as any)?.professional_ref_name || "N/A"}</p>
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground">Mobile</label>
-                        <p className="text-sm">{(primaryApplicant as any)?.professional_ref_mobile || "N/A"}</p>
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground">Email</label>
-                        <p className="text-sm">{(primaryApplicant as any)?.professional_ref_email || "N/A"}</p>
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground">Address</label>
-                        <p className="text-sm">{(primaryApplicant as any)?.professional_ref_address || "N/A"}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Personal Reference */}
-                  <div className="p-4 rounded-lg border bg-muted/30">
-                    <h5 className="text-sm font-medium mb-3">Personal Reference</h5>
-                    <div className="grid gap-3">
-                      <div>
-                        <label className="text-xs text-muted-foreground">Name</label>
-                        <p className="text-sm">{(primaryApplicant as any)?.personal_ref_name || "N/A"}</p>
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground">Mobile</label>
-                        <p className="text-sm">{(primaryApplicant as any)?.personal_ref_mobile || "N/A"}</p>
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground">Email</label>
-                        <p className="text-sm">{(primaryApplicant as any)?.personal_ref_email || "N/A"}</p>
-                      </div>
-                      <div>
-                        <label className="text-xs text-muted-foreground">Address</label>
-                        <p className="text-sm">{(primaryApplicant as any)?.personal_ref_address || "N/A"}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              {/* Referrals Section - Always visible with edit capability */}
+              <ReferralsSection
+                primaryApplicant={primaryApplicant}
+                applicationId={id!}
+                orgId={orgId!}
+                isEditingReferrals={isEditingReferrals}
+                setIsEditingReferrals={setIsEditingReferrals}
+                referralData={referralData}
+                setReferralData={setReferralData}
+                queryClient={queryClient}
+              />
             </CardContent>
           </Card>
 
