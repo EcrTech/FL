@@ -301,43 +301,97 @@ export default function ApplicationDetail() {
             </CardHeader>
             <CardContent className="space-y-4">
               {primaryApplicant && (
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Full Name</label>
-                    <p className="text-sm">
-                      {primaryApplicant.first_name} {primaryApplicant.middle_name || ""}{" "}
-                      {primaryApplicant.last_name || ""}
-                    </p>
+                <>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Full Name</label>
+                      <p className="text-sm">
+                        {primaryApplicant.first_name} {primaryApplicant.middle_name || ""}{" "}
+                        {primaryApplicant.last_name || ""}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Date of Birth</label>
+                      <p className="text-sm">
+                        {primaryApplicant.dob && !isNaN(new Date(primaryApplicant.dob as string).getTime())
+                          ? format(new Date(primaryApplicant.dob as string), "MMM dd, yyyy")
+                          : "N/A"}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Gender</label>
+                      <p className="text-sm">{(primaryApplicant.gender as string) || "N/A"}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Marital Status</label>
+                      <p className="text-sm">{(primaryApplicant.marital_status as string) || "N/A"}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">PAN Number</label>
+                      <p className="text-sm font-mono">{(primaryApplicant.pan_number as string) || "N/A"}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">Mobile</label>
+                      <p className="text-sm">{(primaryApplicant.mobile as string) || "N/A"}</p>
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="text-sm font-medium text-muted-foreground">Current Address</label>
+                      <p className="text-sm">{formatAddress(primaryApplicant.current_address)}</p>
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Date of Birth</label>
-                    <p className="text-sm">
-                      {primaryApplicant.dob && !isNaN(new Date(primaryApplicant.dob as string).getTime())
-                        ? format(new Date(primaryApplicant.dob as string), "MMM dd, yyyy")
-                        : "N/A"}
-                    </p>
+
+                  {/* Referrals Section */}
+                  <div className="border-t pt-4 mt-4">
+                    <h4 className="text-sm font-medium text-muted-foreground mb-4">Referrals</h4>
+                    <div className="grid gap-6 md:grid-cols-2">
+                      {/* Professional Reference */}
+                      <div className="p-4 rounded-lg border bg-muted/30">
+                        <h5 className="text-sm font-medium mb-3">Professional Reference</h5>
+                        <div className="grid gap-3">
+                          <div>
+                            <label className="text-xs text-muted-foreground">Name</label>
+                            <p className="text-sm">{(primaryApplicant as any)?.professional_ref_name || "N/A"}</p>
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted-foreground">Mobile</label>
+                            <p className="text-sm">{(primaryApplicant as any)?.professional_ref_mobile || "N/A"}</p>
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted-foreground">Email</label>
+                            <p className="text-sm">{(primaryApplicant as any)?.professional_ref_email || "N/A"}</p>
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted-foreground">Address</label>
+                            <p className="text-sm">{(primaryApplicant as any)?.professional_ref_address || "N/A"}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Personal Reference */}
+                      <div className="p-4 rounded-lg border bg-muted/30">
+                        <h5 className="text-sm font-medium mb-3">Personal Reference</h5>
+                        <div className="grid gap-3">
+                          <div>
+                            <label className="text-xs text-muted-foreground">Name</label>
+                            <p className="text-sm">{(primaryApplicant as any)?.personal_ref_name || "N/A"}</p>
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted-foreground">Mobile</label>
+                            <p className="text-sm">{(primaryApplicant as any)?.personal_ref_mobile || "N/A"}</p>
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted-foreground">Email</label>
+                            <p className="text-sm">{(primaryApplicant as any)?.personal_ref_email || "N/A"}</p>
+                          </div>
+                          <div>
+                            <label className="text-xs text-muted-foreground">Address</label>
+                            <p className="text-sm">{(primaryApplicant as any)?.personal_ref_address || "N/A"}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Gender</label>
-                    <p className="text-sm">{(primaryApplicant.gender as string) || "N/A"}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Marital Status</label>
-                    <p className="text-sm">{(primaryApplicant.marital_status as string) || "N/A"}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">PAN Number</label>
-                    <p className="text-sm font-mono">{(primaryApplicant.pan_number as string) || "N/A"}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Mobile</label>
-                    <p className="text-sm">{(primaryApplicant.mobile as string) || "N/A"}</p>
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="text-sm font-medium text-muted-foreground">Current Address</label>
-                    <p className="text-sm">{formatAddress(primaryApplicant.current_address)}</p>
-                  </div>
-                </div>
+                </>
               )}
             </CardContent>
           </Card>
