@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +19,30 @@ export default function NewApplication() {
   const notify = useNotification();
   const queryClient = useQueryClient();
   const [currentTab, setCurrentTab] = useState("basic");
+  const [geolocation, setGeolocation] = useState<{
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+  } | null>(null);
+
+  // Capture geolocation on mount
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setGeolocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+          });
+        },
+        (error) => {
+          console.warn("Geolocation error:", error.message);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    }
+  }, []);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -106,6 +130,10 @@ export default function NewApplication() {
           current_stage: "application_login",
           status: "in_progress",
           created_by: userData.user?.id || null,
+          source: "agent",
+          latitude: geolocation?.latitude || null,
+          longitude: geolocation?.longitude || null,
+          geolocation_accuracy: geolocation?.accuracy || null,
         }])
         .select()
         .single();

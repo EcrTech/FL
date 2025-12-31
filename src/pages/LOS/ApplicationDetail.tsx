@@ -506,7 +506,9 @@ export default function ApplicationDetail() {
             <CardContent>
               <div className="text-sm font-medium">
                 {primaryApplicant
-                  ? `${primaryApplicant.first_name} ${primaryApplicant.last_name || ""}`
+                  ? `${primaryApplicant.first_name} ${primaryApplicant.last_name || ""}`.trim()
+                  : application.contacts
+                  ? `${application.contacts.first_name} ${application.contacts.last_name || ""}`.trim()
                   : "N/A"}
               </div>
             </CardContent>
