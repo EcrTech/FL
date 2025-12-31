@@ -3474,6 +3474,14 @@ export type Database = {
           mother_name: string | null
           pan_number: string | null
           permanent_address: Json | null
+          personal_ref_address: string | null
+          personal_ref_email: string | null
+          personal_ref_mobile: string | null
+          personal_ref_name: string | null
+          professional_ref_address: string | null
+          professional_ref_email: string | null
+          professional_ref_mobile: string | null
+          professional_ref_name: string | null
           residence_type: string | null
           updated_at: string
           years_at_current_address: number | null
@@ -3500,6 +3508,14 @@ export type Database = {
           mother_name?: string | null
           pan_number?: string | null
           permanent_address?: Json | null
+          personal_ref_address?: string | null
+          personal_ref_email?: string | null
+          personal_ref_mobile?: string | null
+          personal_ref_name?: string | null
+          professional_ref_address?: string | null
+          professional_ref_email?: string | null
+          professional_ref_mobile?: string | null
+          professional_ref_name?: string | null
           residence_type?: string | null
           updated_at?: string
           years_at_current_address?: number | null
@@ -3526,6 +3542,14 @@ export type Database = {
           mother_name?: string | null
           pan_number?: string | null
           permanent_address?: Json | null
+          personal_ref_address?: string | null
+          personal_ref_email?: string | null
+          personal_ref_mobile?: string | null
+          personal_ref_name?: string | null
+          professional_ref_address?: string | null
+          professional_ref_email?: string | null
+          professional_ref_mobile?: string | null
+          professional_ref_name?: string | null
           residence_type?: string | null
           updated_at?: string
           years_at_current_address?: number | null
