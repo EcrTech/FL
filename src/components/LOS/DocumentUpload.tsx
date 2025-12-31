@@ -601,28 +601,55 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
     );
   };
 
+  // Manual approval mutation (for documents without API verification)
+  const approveMutation = useMutation({
+    mutationFn: async ({ docId }: { docId: string }) => {
+      const { error: updateError } = await supabase
+        .from("loan_documents")
+        .update({
+          verification_status: "verified",
+          verified_at: new Date().toISOString(),
+        })
+        .eq("id", docId);
+
+      if (updateError) throw updateError;
+      return { success: true };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["loan-documents", applicationId] });
+      toast({ title: "Document approved successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Approval failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleApprove = (docId: string) => {
+    approveMutation.mutate({ docId });
+  };
+
   const getVerifyIcon = (docType: string, document: any) => {
     const docConfig = REQUIRED_DOCUMENTS.find((d) => d.type === docType);
-    
-    if (!docConfig?.verifiable) return null;
+    const isApiVerifiable = docConfig?.verifiable;
 
     if (!document) {
       return (
         <Tooltip>
           <TooltipTrigger asChild>
             <Button size="icon" variant="ghost" className="h-8 w-8" disabled>
-              <Shield className="h-4 w-4 text-muted-foreground/40" />
+              <CheckCircle className="h-4 w-4 text-muted-foreground/40" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Upload document first to verify</TooltipContent>
+          <TooltipContent>Upload document first to approve</TooltipContent>
         </Tooltip>
       );
     }
 
     const isVerifying = verifyingDoc === docType;
+    const isApproving = approveMutation.isPending;
     const status = document.verification_status;
 
-    if (isVerifying) {
+    if (isVerifying || isApproving) {
       return (
         <Tooltip>
           <TooltipTrigger asChild>
@@ -630,7 +657,7 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
               <Loader2 className="h-4 w-4 animate-spin text-primary" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Verifying...</TooltipContent>
+          <TooltipContent>{isApiVerifiable ? "Verifying..." : "Approving..."}</TooltipContent>
         </Tooltip>
       );
     }
@@ -661,6 +688,26 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
       );
     }
 
+    // For API-verifiable docs (PAN, Aadhaar), use API verification
+    if (isApiVerifiable) {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8"
+              onClick={() => handleVerify(docType, document.id)}
+            >
+              <Shield className="h-4 w-4 text-muted-foreground hover:text-primary" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Verify via API</TooltipContent>
+        </Tooltip>
+      );
+    }
+
+    // For other docs, allow manual approval
     return (
       <Tooltip>
         <TooltipTrigger asChild>
@@ -668,12 +715,12 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
             size="icon"
             variant="ghost"
             className="h-8 w-8"
-            onClick={() => handleVerify(docType, document.id)}
+            onClick={() => handleApprove(document.id)}
           >
-            <Shield className="h-4 w-4 text-muted-foreground hover:text-primary" />
+            <CheckCircle className="h-4 w-4 text-muted-foreground hover:text-green-500" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>Click to verify via API</TooltipContent>
+        <TooltipContent>Mark as verified</TooltipContent>
       </Tooltip>
     );
   };
