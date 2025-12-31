@@ -214,7 +214,10 @@ Deno.serve(async (req) => {
           status: 'in_progress',
           source: 'referral_link',
           referred_by: referrerUserId,
-          submitted_from_ip: clientIP
+          submitted_from_ip: clientIP,
+          latitude: body.geolocation?.latitude || null,
+          longitude: body.geolocation?.longitude || null,
+          geolocation_accuracy: body.geolocation?.accuracy || null,
         })
         .select()
         .single();

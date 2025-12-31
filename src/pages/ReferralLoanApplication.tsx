@@ -34,6 +34,30 @@ export default function ReferralLoanApplication() {
   const [submitting, setSubmitting] = useState(false);
   const [applicationNumber, setApplicationNumber] = useState<string | null>(null);
   const [submissionSuccess, setSubmissionSuccess] = useState(false);
+  const [geolocation, setGeolocation] = useState<{
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+  } | null>(null);
+
+  // Capture geolocation on mount
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setGeolocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+          });
+        },
+        (error) => {
+          console.warn("Geolocation error:", error.message);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    }
+  }, []);
 
   // Form data
   const [basicInfo, setBasicInfo] = useState({
@@ -156,6 +180,7 @@ export default function ReferralLoanApplication() {
         consents,
         referrerInfo,
         referralCode,
+        geolocation,
       };
 
       const { data, error: submitError } = await supabase.functions.invoke("submit-loan-application", {
