@@ -121,6 +121,7 @@ serve(async (req) => {
         .limit(1)
         .single();
       
+      let smsSent = false;
       if (exotelSettings) {
         const formattedPhone = identifier.replace(/^\+91/, '').replace(/\D/g, '');
         const smsMessage = `Your OTP for Paisaa Saarthi loan application is: ${otpCode}. Valid for 5 minutes. Do not share this with anyone.`;
@@ -148,10 +149,28 @@ serve(async (req) => {
           const errorText = await smsResponse.text();
           console.error('Exotel SMS error:', errorText);
         } else {
+          smsSent = true;
           console.log(`[send-public-otp] SMS OTP sent via Exotel to: ${formattedPhone.substring(0, 4)}***`);
         }
       } else {
         console.warn('Exotel not configured - SMS OTP not sent');
+      }
+
+      // If SMS not sent, log the OTP for testing and return it in response
+      if (!smsSent) {
+        console.log(`[send-public-otp] TEST MODE - OTP for ${identifier}: ${otpCode}`);
+        console.log(`[send-public-otp] OTP sent to ${identifierType}: ${identifier.substring(0, 3)}***`);
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            sessionId,
+            message: 'SMS not configured - Test Mode',
+            isTestMode: true,
+            testOtp: otpCode 
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
     }
 

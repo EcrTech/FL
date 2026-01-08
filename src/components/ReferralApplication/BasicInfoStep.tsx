@@ -52,6 +52,7 @@ export function BasicInfoStep({
   const [verifyingPhone, setVerifyingPhone] = useState(false);
   const [emailTimer, setEmailTimer] = useState(0);
   const [phoneTimer, setPhoneTimer] = useState(0);
+  const [phoneTestOtp, setPhoneTestOtp] = useState<string | null>(null);
 
   const startTimer = (type: 'email' | 'phone') => {
     const setTimer = type === 'email' ? setEmailTimer : setPhoneTimer;
@@ -104,7 +105,14 @@ export function BasicInfoStep({
       setSessionId(data.sessionId);
       setOtpSent(true);
       startTimer(type);
-      toast.success(`OTP sent to your ${type}`);
+      
+      // Handle test mode for phone OTP
+      if (type === 'phone' && data.isTestMode && data.testOtp) {
+        setPhoneTestOtp(data.testOtp);
+        toast.success(`Test Mode: SMS not configured. Use OTP: ${data.testOtp}`);
+      } else {
+        toast.success(`OTP sent to your ${type}`);
+      }
     } catch (error: any) {
       console.error('Error sending OTP:', error);
       toast.error(error.message || `Failed to send OTP to ${type}`);
@@ -282,28 +290,35 @@ export function BasicInfoStep({
 
           {/* Phone OTP Input */}
           {phoneOtpSent && !verificationStatus.phoneVerified && (
-            <div className="flex gap-3 mt-3 p-4 bg-[hsl(var(--electric-blue-100))] rounded-xl border border-[hsl(var(--electric-blue-400))]/20">
-              <Input
-                placeholder="Enter 6-digit OTP"
-                value={phoneOtp}
-                onChange={(e) => setPhoneOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                className="h-11 bg-white border-2 border-border rounded-xl font-body tracking-widest"
-                maxLength={6}
-              />
-              <Button
-                type="button"
-                onClick={() => verifyOtp('phone')}
-                disabled={verifyingPhone || phoneOtp.length !== 6}
-                className="h-11 px-5 btn-electric rounded-xl font-heading"
-              >
-                {verifyingPhone ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verify'}
-              </Button>
-              {phoneTimer > 0 && (
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground font-body min-w-[60px]">
-                  <Clock className="h-3.5 w-3.5" />
-                  {formatTimer(phoneTimer)}
+            <div className="space-y-2 mt-3">
+              {phoneTestOtp && (
+                <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-lg">
+                  <strong>Test Mode:</strong> SMS not configured. Use OTP: <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono font-bold">{phoneTestOtp}</code>
                 </div>
               )}
+              <div className="flex gap-3 p-4 bg-[hsl(var(--electric-blue-100))] rounded-xl border border-[hsl(var(--electric-blue-400))]/20">
+                <Input
+                  placeholder="Enter 6-digit OTP"
+                  value={phoneOtp}
+                  onChange={(e) => setPhoneOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  className="h-11 bg-white border-2 border-border rounded-xl font-body tracking-widest"
+                  maxLength={6}
+                />
+                <Button
+                  type="button"
+                  onClick={() => verifyOtp('phone')}
+                  disabled={verifyingPhone || phoneOtp.length !== 6}
+                  className="h-11 px-5 btn-electric rounded-xl font-heading"
+                >
+                  {verifyingPhone ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verify'}
+                </Button>
+                {phoneTimer > 0 && (
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground font-body min-w-[60px]">
+                    <Clock className="h-3.5 w-3.5" />
+                    {formatTimer(phoneTimer)}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
