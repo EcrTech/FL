@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, CheckCircle, User, CreditCard, FileCheck, Video, Shield } from "lucide-react";
+import { Loader2, CheckCircle, User, CreditCard, FileCheck, Video, Shield, MapPin, RefreshCw, AlertTriangle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { BasicInfoStep } from "@/components/ReferralApplication/BasicInfoStep";
 import { PANVerificationStep } from "@/components/ReferralApplication/PANVerificationStep";
@@ -39,24 +39,50 @@ export default function ReferralLoanApplication() {
     longitude: number;
     accuracy: number;
   } | null>(null);
+  const [locationLoading, setLocationLoading] = useState(true);
+  const [locationError, setLocationError] = useState<string | null>(null);
+
+  // Capture geolocation function
+  const captureGeolocation = () => {
+    setLocationLoading(true);
+    setLocationError(null);
+
+    if (!navigator.geolocation) {
+      setLocationError("Geolocation is not supported by your browser");
+      setLocationLoading(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setGeolocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+        });
+        setLocationLoading(false);
+        setLocationError(null);
+      },
+      (error) => {
+        console.warn("Geolocation error:", error.message);
+        let errorMessage = "Failed to capture location";
+        if (error.code === error.PERMISSION_DENIED) {
+          errorMessage = "Location access denied. Please enable location permissions in your browser settings.";
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          errorMessage = "Location information is unavailable";
+        } else if (error.code === error.TIMEOUT) {
+          errorMessage = "Location request timed out. Please try again.";
+        }
+        setLocationError(errorMessage);
+        setLocationLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  };
 
   // Capture geolocation on mount
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setGeolocation({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-          });
-        },
-        (error) => {
-          console.warn("Geolocation error:", error.message);
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
-    }
+    captureGeolocation();
   }, []);
 
   // Form data
@@ -153,6 +179,11 @@ export default function ReferralLoanApplication() {
   };
 
   const handleVideoKycComplete = async () => {
+    // Final check for geolocation before submission
+    if (!geolocation) {
+      toast.error("Location is required to submit the application. Please enable location access.");
+      return;
+    }
     setVideoKycCompleted(true);
     await submitApplication();
   };
@@ -286,6 +317,35 @@ export default function ReferralLoanApplication() {
           <p className="text-lg text-muted-foreground font-body max-w-md mx-auto">
             Complete 4 simple steps to submit your application
           </p>
+
+          {/* Location Status Indicator */}
+          <div className="mt-4">
+            {locationLoading ? (
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-muted rounded-full text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Capturing location...</span>
+              </div>
+            ) : geolocation ? (
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-[hsl(var(--success))]/10 rounded-full text-sm text-[hsl(var(--success))]">
+                <MapPin className="h-4 w-4" />
+                <span>Location captured</span>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-destructive/10 rounded-full text-sm text-destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <span>{locationError || "Location required"}</span>
+                </div>
+                <button
+                  onClick={captureGeolocation}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-full text-sm font-medium hover:bg-primary/90 transition-colors"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  <span>Retry Location Capture</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Progress Bar */}
