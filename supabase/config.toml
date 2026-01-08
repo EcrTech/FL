@@ -68,3 +68,9 @@ verify_jwt = false
 
 [functions.videokyc-upload-recording]
 verify_jwt = false
+
+[functions.sandbox-aadhaar-okyc]
+verify_jwt = true
+
+[functions.sandbox-pan-verify]
+verify_jwt = true

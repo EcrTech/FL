@@ -72,13 +72,25 @@ serve(async (req) => {
       }
 
       const otpData = await otpResponse.json();
-      console.log('[Aadhaar OKYC] OTP sent successfully');
+      console.log('[Aadhaar OKYC] OTP response:', JSON.stringify(otpData));
+
+      // Check if we're in sandbox test mode (test OTP provided in response)
+      const isTestMode = otpData.data?.test_otp || otpData.code === 200;
+      const testOtp = otpData.data?.test_otp || null;
+      
+      if (isTestMode) {
+        console.log('[Aadhaar OKYC] Running in TEST MODE. Test OTP may be: 123456');
+      }
 
       return new Response(
         JSON.stringify({
           success: true,
           request_id: otpData.data?.request_id,
-          message: 'OTP sent to registered mobile number',
+          message: isTestMode 
+            ? 'OTP sent (Test Mode - use test OTP: 123456)' 
+            : 'OTP sent to registered mobile number',
+          is_test_mode: isTestMode,
+          test_otp: testOtp || (isTestMode ? '123456' : null),
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
