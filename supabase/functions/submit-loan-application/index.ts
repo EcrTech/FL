@@ -183,6 +183,11 @@ Deno.serve(async (req) => {
         errors.push('Invalid email format');
       }
 
+      // Geolocation is mandatory for referral applications
+      if (!body.geolocation?.latitude || !body.geolocation?.longitude) {
+        errors.push('Location access is required. Please enable location permissions and try again.');
+      }
+
       if (errors.length > 0) {
         console.log(`[submit-loan-application] Referral validation errors:`, errors);
         return new Response(
