@@ -43,6 +43,8 @@ export default function AadhaarVerificationDialog({
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [otpRequestId, setOtpRequestId] = useState<string | null>(null);
   const [otpValue, setOtpValue] = useState("");
+  const [isTestMode, setIsTestMode] = useState(false);
+  const [testOtp, setTestOtp] = useState<string | null>(null);
 
   // Authenticate with Sandbox
   const authMutation = useMutation({
@@ -88,6 +90,8 @@ export default function AadhaarVerificationDialog({
     },
     onSuccess: (data) => {
       setOtpRequestId(data.request_id);
+      setIsTestMode(data.is_test_mode || false);
+      setTestOtp(data.test_otp || null);
       toast({
         title: "OTP Sent",
         description: data.message || "OTP sent to registered mobile number",
@@ -242,6 +246,12 @@ export default function AadhaarVerificationDialog({
                   </Button>
                 ) : (
                   <div className="space-y-2">
+                    {isTestMode && (
+                      <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm p-3 rounded-md">
+                        <strong>Test Mode:</strong> OTPs are not sent to real numbers. 
+                        Use test OTP: <code className="bg-amber-100 px-1 rounded font-mono">{testOtp || '123456'}</code>
+                      </div>
+                    )}
                     <Label>Enter OTP</Label>
                     <Input
                       value={otpValue}
@@ -262,6 +272,8 @@ export default function AadhaarVerificationDialog({
                         onClick={() => {
                           setOtpRequestId(null);
                           setOtpValue("");
+                          setIsTestMode(false);
+                          setTestOtp(null);
                         }}
                         variant="outline"
                       >
