@@ -604,152 +604,110 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
 
   return (
     <TooltipProvider>
-      <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {Object.entries(groupedDocs).map(([category, docs]) => (
-          <Card key={category}>
+          <Card key={category} className="h-fit">
             <CardHeader className="py-3 px-4">
               <CardTitle className="text-sm font-medium">
                 {DOCUMENT_CATEGORIES[category as keyof typeof DOCUMENT_CATEGORIES]}
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[50%]">Document</TableHead>
-                    <TableHead className="w-[20%]">Status</TableHead>
-                    <TableHead className="text-right w-[30%]">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {docs.map((doc) => {
-                    const document = getDocument(doc.type);
-                    const isVerificationDoc = (doc as any).isVerification;
-                    const verificationType = DOC_TO_VERIFICATION_TYPE[doc.type];
-                    const verification = verificationType ? getVerification(verificationType) : null;
-                    const status = isVerificationDoc 
-                      ? (verification?.status || "pending") 
-                      : (document?.verification_status || "pending");
-                    const isUploading = uploadingDoc === doc.type;
-                    const isExpanded = expandedRows.has(doc.type);
-                    const hasVerificationDetails = verification?.status === "success" && verification?.response_data;
+            <CardContent className="p-3 pt-0 space-y-2">
+              {docs.map((doc) => {
+                const document = getDocument(doc.type);
+                const verificationType = DOC_TO_VERIFICATION_TYPE[doc.type];
+                const verification = verificationType ? getVerification(verificationType) : null;
+                const status = document?.verification_status || "pending";
+                const isUploading = uploadingDoc === doc.type;
+                const isVerified = status === "verified";
 
-                    return (
-                      <Collapsible key={doc.type} asChild open={isExpanded}>
-                        <>
-                          <TableRow className={cn(hasVerificationDetails && "cursor-pointer hover:bg-muted/50")} onClick={() => hasVerificationDetails && toggleRowExpanded(doc.type)}>
-                            <TableCell className="py-2">
-                              <div className="flex items-center gap-2">
-                                {hasVerificationDetails && (
-                                  <CollapsibleTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                    <Button variant="ghost" size="icon" className="h-5 w-5 p-0">
-                                      {isExpanded ? (
-                                        <ChevronDown className="h-4 w-4" />
-                                      ) : (
-                                        <ChevronRight className="h-4 w-4" />
-                                      )}
-                                    </Button>
-                                  </CollapsibleTrigger>
+                return (
+                  <div
+                    key={doc.type}
+                    className={cn(
+                      "flex items-center justify-between gap-2 p-2 rounded-md border transition-colors",
+                      isVerified 
+                        ? "border-green-500/50 bg-green-50/50 dark:bg-green-950/20" 
+                        : "border-border bg-muted/30"
+                    )}
+                  >
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      {/* Status indicator */}
+                      {isVerified ? (
+                        <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
+                      ) : (
+                        <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30 flex-shrink-0" />
+                      )}
+                      <span className="text-sm truncate">{doc.name}</span>
+                      {doc.mandatory && (
+                        <Badge variant="outline" className="text-[10px] px-1 py-0 flex-shrink-0">
+                          Req
+                        </Badge>
+                      )}
+                    </div>
+                    
+                    {/* Action buttons */}
+                    <div className="flex items-center gap-0.5 flex-shrink-0">
+                      {/* View */}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            disabled={!document}
+                            onClick={() => document && handleViewDocument(document.file_path, document.file_name)}
+                          >
+                            <Eye className={cn("h-3.5 w-3.5", !document && "text-muted-foreground/40")} />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>{document ? "View" : "No document"}</TooltipContent>
+                      </Tooltip>
+
+                      {/* Parse */}
+                      {getParseIcon(doc.type, document)}
+
+                      {/* Verify */}
+                      {getVerifyIcon(doc.type, document)}
+
+                      {/* Upload */}
+                      <label htmlFor={`file-${doc.type}`}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7"
+                              disabled={isUploading}
+                              asChild
+                            >
+                              <span>
+                                {isUploading ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <Upload className="h-3.5 w-3.5" />
                                 )}
-                                <span className="text-sm">{doc.name}</span>
-                                {doc.mandatory && (
-                                  <Badge variant="outline" className="text-xs px-1 py-0">
-                                    Req
-                                  </Badge>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="py-2">
-                              {getStatusBadge(status)}
-                              {verification?.verified_at && (
-                                <span className="text-xs text-muted-foreground ml-2">
-                                  {format(new Date(verification.verified_at), "MMM d, h:mm a")}
-                                </span>
-                              )}
-                            </TableCell>
-                            <TableCell className="py-2 text-right" onClick={(e) => e.stopPropagation()}>
-                              <div className="flex items-center justify-end gap-1">
-                                {!isVerificationDoc && (
-                                  <>
-                                    {/* Eye icon - View document */}
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button
-                                          size="icon"
-                                          variant="ghost"
-                                          className="h-8 w-8"
-                                          disabled={!document}
-                                          onClick={() => document && handleViewDocument(document.file_path, document.file_name)}
-                                        >
-                                          <Eye className={cn("h-4 w-4", !document && "text-muted-foreground/40")} />
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>{document ? "View document" : "No document uploaded"}</TooltipContent>
-                                    </Tooltip>
-
-                                    {/* Parse icon */}
-                                    {getParseIcon(doc.type, document)}
-
-                                    {/* Verify icon */}
-                                    {getVerifyIcon(doc.type, document)}
-
-                                    {/* Upload button */}
-                                    <label htmlFor={`file-${doc.type}`}>
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <Button
-                                            size="icon"
-                                            variant="ghost"
-                                            className="h-8 w-8"
-                                            disabled={isUploading}
-                                            asChild
-                                          >
-                                            <span>
-                                              {isUploading ? (
-                                                <Loader2 className="h-4 w-4 animate-spin" />
-                                              ) : (
-                                                <Upload className="h-4 w-4" />
-                                              )}
-                                            </span>
-                                          </Button>
-                                        </TooltipTrigger>
-                                        <TooltipContent>{document ? "Replace document" : "Upload document"}</TooltipContent>
-                                      </Tooltip>
-                                    </label>
-                                    <input
-                                      id={`file-${doc.type}`}
-                                      type="file"
-                                      className="hidden"
-                                      accept=".pdf,.jpg,.jpeg,.png"
-                                      onChange={(e) => {
-                                        const file = e.target.files?.[0];
-                                        if (file) handleFileSelect(doc.type, file);
-                                        e.target.value = "";
-                                      }}
-                                    />
-                                  </>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                          {hasVerificationDetails && (
-                            <CollapsibleContent asChild>
-                              <TableRow className="bg-muted/30 hover:bg-muted/30">
-                                <TableCell colSpan={3} className="py-3 px-6">
-                                  <div className="max-w-md">
-                                    <h4 className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">Verified Details</h4>
-                                    {renderVerificationDetails(verificationType)}
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            </CollapsibleContent>
-                          )}
-                        </>
-                      </Collapsible>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+                              </span>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>{document ? "Replace" : "Upload"}</TooltipContent>
+                        </Tooltip>
+                      </label>
+                      <input
+                        id={`file-${doc.type}`}
+                        type="file"
+                        className="hidden"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleFileSelect(doc.type, file);
+                          e.target.value = "";
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </CardContent>
           </Card>
         ))}
