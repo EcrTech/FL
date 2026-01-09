@@ -616,14 +616,14 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
     );
   };
 
-  // Merge bank and employment into one column
+  // Merge bank and employment into one column but keep them as separate sections
   const groupedDocs = REQUIRED_DOCUMENTS.reduce((acc, doc) => {
-    // Merge bank and employment categories
-    const category = doc.category === "bank" || doc.category === "employment" 
+    // Merge bank and employment categories into one column
+    const columnKey = doc.category === "bank" || doc.category === "employment" 
       ? "bank_employment" 
       : doc.category;
-    if (!acc[category]) acc[category] = [];
-    acc[category].push(doc);
+    if (!acc[columnKey]) acc[columnKey] = [];
+    acc[columnKey].push(doc);
     return acc;
   }, {} as Record<string, typeof REQUIRED_DOCUMENTS>);
 
@@ -632,6 +632,123 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
     if (category === "bank_employment") return "Bank & Employment";
     return DOCUMENT_CATEGORIES[category as keyof typeof DOCUMENT_CATEGORIES] || category;
   };
+
+  // Helper to render document rows with sub-section headers for bank_employment
+  const renderDocsWithSubsections = (docs: typeof REQUIRED_DOCUMENTS, category: string) => {
+    if (category !== "bank_employment") {
+      return docs;
+    }
+    
+    // Group by original category for sub-sections
+    const bankDocs = docs.filter(d => d.category === "bank");
+    const employmentDocs = docs.filter(d => d.category === "employment");
+    
+    return { bankDocs, employmentDocs };
+  };
+
+  // Helper function to render a document row
+  const renderDocumentRow = (doc: typeof REQUIRED_DOCUMENTS[0], document: any, isUploading: boolean, isVerified: boolean) => (
+    <div
+      key={doc.type}
+      className={cn(
+        "flex items-center gap-3 p-2 rounded-md border transition-colors",
+        isVerified 
+          ? "border-green-500/50 bg-green-50/50 dark:bg-green-950/20" 
+          : "border-border bg-muted/30"
+      )}
+    >
+      {/* Thumbnail with hover view */}
+      <div 
+        className={cn(
+          "relative h-10 w-10 rounded overflow-hidden flex-shrink-0 group cursor-pointer",
+          document ? "bg-muted" : "bg-muted/50 border border-dashed border-muted-foreground/30"
+        )}
+        onClick={() => document && handleViewDocument(document.file_path, document.file_name)}
+      >
+        {document ? (
+          <>
+            {thumbnailUrls[doc.type] ? (
+              <img 
+                src={thumbnailUrls[doc.type]} 
+                alt={doc.name}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="h-full w-full flex items-center justify-center bg-muted">
+                <FileText className="h-5 w-5 text-muted-foreground" />
+              </div>
+            )}
+            {/* Hover overlay with View */}
+            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <Eye className="h-4 w-4 text-white" />
+            </div>
+          </>
+        ) : (
+          <div className="h-full w-full flex items-center justify-center">
+            <Upload className="h-4 w-4 text-muted-foreground/50" />
+          </div>
+        )}
+      </div>
+
+      {/* Document name and status */}
+      <div className="flex items-center gap-2 min-w-0 flex-1">
+        {isVerified ? (
+          <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
+        ) : document ? (
+          <div className="h-4 w-4 rounded-full border-2 border-amber-400 flex-shrink-0" />
+        ) : (
+          <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30 flex-shrink-0" />
+        )}
+        <span className="text-sm truncate">{doc.name}</span>
+        {doc.mandatory && (
+          <Badge variant="outline" className="text-[10px] px-1 py-0 flex-shrink-0">
+            Req
+          </Badge>
+        )}
+      </div>
+      
+      {/* Action buttons */}
+      <div className="flex items-center gap-0.5 flex-shrink-0">
+        {/* Verify */}
+        {getVerifyIcon(doc.type, document)}
+
+        {/* Upload */}
+        <label htmlFor={`file-${doc.type}`}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7"
+                disabled={isUploading}
+                asChild
+              >
+                <span>
+                  {isUploading ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Upload className="h-3.5 w-3.5" />
+                  )}
+                </span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{document ? "Replace" : "Upload"}</TooltipContent>
+          </Tooltip>
+        </label>
+        <input
+          id={`file-${doc.type}`}
+          type="file"
+          className="hidden"
+          accept=".pdf,.jpg,.jpeg,.png"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleFileSelect(doc.type, file);
+            e.target.value = "";
+          }}
+        />
+      </div>
+    </div>
+  );
 
   // Count documents that need parsing
   const parseableDocTypes = REQUIRED_DOCUMENTS.filter((d) => d.parseable).map((d) => d.type);
@@ -678,117 +795,40 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
                 </CardTitle>
             </CardHeader>
             <CardContent className="p-3 pt-0 space-y-2">
-              {docs.map((doc) => {
-                const document = getDocument(doc.type);
-                const verificationType = DOC_TO_VERIFICATION_TYPE[doc.type];
-                const verification = verificationType ? getVerification(verificationType) : null;
-                const status = document?.verification_status || "pending";
-                const isUploading = uploadingDoc === doc.type;
-                const isVerified = status === "verified";
-
-                return (
-                  <div
-                    key={doc.type}
-                    className={cn(
-                      "flex items-center gap-3 p-2 rounded-md border transition-colors",
-                      isVerified 
-                        ? "border-green-500/50 bg-green-50/50 dark:bg-green-950/20" 
-                        : "border-border bg-muted/30"
-                    )}
-                  >
-                    {/* Thumbnail with hover view */}
-                    <div 
-                      className={cn(
-                        "relative h-10 w-10 rounded overflow-hidden flex-shrink-0 group cursor-pointer",
-                        document ? "bg-muted" : "bg-muted/50 border border-dashed border-muted-foreground/30"
-                      )}
-                      onClick={() => document && handleViewDocument(document.file_path, document.file_name)}
-                    >
-                      {document ? (
-                        <>
-                          {thumbnailUrls[doc.type] ? (
-                            <img 
-                              src={thumbnailUrls[doc.type]} 
-                              alt={doc.name}
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <div className="h-full w-full flex items-center justify-center bg-muted">
-                              <FileText className="h-5 w-5 text-muted-foreground" />
-                            </div>
-                          )}
-                          {/* Hover overlay with View */}
-                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <Eye className="h-4 w-4 text-white" />
-                          </div>
-                        </>
-                      ) : (
-                        <div className="h-full w-full flex items-center justify-center">
-                          <Upload className="h-4 w-4 text-muted-foreground/50" />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Document name and status */}
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      {isVerified ? (
-                        <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
-                      ) : document ? (
-                        <div className="h-4 w-4 rounded-full border-2 border-amber-400 flex-shrink-0" />
-                      ) : (
-                        <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30 flex-shrink-0" />
-                      )}
-                      <span className="text-sm truncate">{doc.name}</span>
-                      {doc.mandatory && (
-                        <Badge variant="outline" className="text-[10px] px-1 py-0 flex-shrink-0">
-                          Req
-                        </Badge>
-                      )}
-                    </div>
-                    
-                    {/* Action buttons */}
-                    <div className="flex items-center gap-0.5 flex-shrink-0">
-                      {/* Verify */}
-                      {getVerifyIcon(doc.type, document)}
-
-                      {/* Upload */}
-                      <label htmlFor={`file-${doc.type}`}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-7 w-7"
-                              disabled={isUploading}
-                              asChild
-                            >
-                              <span>
-                                {isUploading ? (
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                ) : (
-                                  <Upload className="h-3.5 w-3.5" />
-                                )}
-                              </span>
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>{document ? "Replace" : "Upload"}</TooltipContent>
-                        </Tooltip>
-                      </label>
-                      <input
-                        id={`file-${doc.type}`}
-                        type="file"
-                        className="hidden"
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleFileSelect(doc.type, file);
-                          e.target.value = "";
-                        }}
-                      />
-                    </div>
+              {category === "bank_employment" ? (
+                <>
+                  {/* Bank Statements Section */}
+                  {docs.filter(d => d.category === "bank").map((doc) => {
+                    const document = getDocument(doc.type);
+                    const status = document?.verification_status || "pending";
+                    const isUploading = uploadingDoc === doc.type;
+                    const isVerified = status === "verified";
+                    return renderDocumentRow(doc, document, isUploading, isVerified);
+                  })}
+                  
+                  {/* Employment Proof Sub-section */}
+                  <div className="pt-2 mt-2 border-t border-border">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Employment Proof
+                    </span>
                   </div>
-                );
-              })}
+                  {docs.filter(d => d.category === "employment").map((doc) => {
+                    const document = getDocument(doc.type);
+                    const status = document?.verification_status || "pending";
+                    const isUploading = uploadingDoc === doc.type;
+                    const isVerified = status === "verified";
+                    return renderDocumentRow(doc, document, isUploading, isVerified);
+                  })}
+                </>
+              ) : (
+                docs.map((doc) => {
+                  const document = getDocument(doc.type);
+                  const status = document?.verification_status || "pending";
+                  const isUploading = uploadingDoc === doc.type;
+                  const isVerified = status === "verified";
+                  return renderDocumentRow(doc, document, isUploading, isVerified);
+                })
+              )}
               </CardContent>
             </Card>
           ))}
