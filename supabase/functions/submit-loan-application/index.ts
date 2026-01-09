@@ -378,6 +378,11 @@ Deno.serve(async (req) => {
       errors.push('Gross salary is required');
     }
 
+    // Geolocation is mandatory for all applications
+    if (!body.geolocation?.latitude || !body.geolocation?.longitude) {
+      errors.push('Location access is required. Please enable location permissions and try again.');
+    }
+
     if (errors.length > 0) {
       console.log(`[submit-loan-application] Validation errors:`, errors);
       return new Response(

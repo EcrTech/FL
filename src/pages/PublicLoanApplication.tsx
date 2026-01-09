@@ -1,9 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Loader2 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Loader2, MapPin, RefreshCw, AlertCircle } from "lucide-react";
 import { LoanDetailsStep } from "@/components/PublicLoanApplication/LoanDetailsStep";
 import { PersonalDetailsStep } from "@/components/PublicLoanApplication/PersonalDetailsStep";
 import { AddressDetailsStep } from "@/components/PublicLoanApplication/AddressDetailsStep";
@@ -143,6 +145,8 @@ export default function PublicLoanApplication() {
   const [submitting, setSubmitting] = useState(false);
   const [applicationNumber, setApplicationNumber] = useState<string | null>(null);
   const [geolocation, setGeolocation] = useState<{ latitude: number; longitude: number; accuracy: number } | null>(null);
+  const [locationLoading, setLocationLoading] = useState(true);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [formStartTime] = useState(Date.now());
   const [honeypot, setHoneypot] = useState("");
   const [draftId, setDraftId] = useState<string | null>(null);
@@ -183,23 +187,58 @@ export default function PublicLoanApplication() {
     fetchFormConfig();
   }, [slug]);
 
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setGeolocation({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-          });
-        },
-        (err) => {
-          console.log("Geolocation not available:", err.message);
-        },
-        { enableHighAccuracy: true, timeout: 10000 }
-      );
+  // Capture geolocation function
+  const captureGeolocation = useCallback(() => {
+    setLocationLoading(true);
+    setLocationError(null);
+
+    if (!navigator.geolocation) {
+      setLocationError("Geolocation is not supported by your browser. Please use a modern browser.");
+      setLocationLoading(false);
+      return;
     }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setGeolocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+        });
+        setLocationLoading(false);
+        setLocationError(null);
+      },
+      (error) => {
+        console.error("Geolocation error:", error);
+        let errorMessage = "Unable to capture location. ";
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage += "Please allow location access in your browser settings and try again.";
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage += "Location information is unavailable. Please try again.";
+            break;
+          case error.TIMEOUT:
+            errorMessage += "Location request timed out. Please try again.";
+            break;
+          default:
+            errorMessage += "Please enable location permissions and try again.";
+        }
+        setLocationError(errorMessage);
+        setLocationLoading(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      }
+    );
   }, []);
+
+  // Capture geolocation on mount
+  useEffect(() => {
+    captureGeolocation();
+  }, [captureGeolocation]);
 
   const updateFormData = (section: keyof LoanFormData, data: any) => {
     setFormData(prev => ({
@@ -383,6 +422,33 @@ export default function PublicLoanApplication() {
         {error && (
           <div className="mb-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm">
             {error}
+          </div>
+        )}
+
+        {/* Location Status Alert */}
+        {!geolocation && !locationLoading && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Location Required</AlertTitle>
+            <AlertDescription className="flex flex-col gap-2">
+              <span>{locationError || "Location access is required to submit this application."}</span>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={captureGeolocation}
+                className="w-fit"
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Retry Location Access
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {geolocation && (
+          <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
+            <MapPin className="h-4 w-4 text-green-600" />
+            <span>Location captured successfully</span>
           </div>
         )}
 
