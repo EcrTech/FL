@@ -165,33 +165,35 @@ function ReferralsSection({
           {/* Professional Reference */}
           <div className="p-4 rounded-lg border bg-muted/30">
             <h5 className="text-sm font-medium mb-3">Professional Reference</h5>
-            <div className="grid gap-3">
+            <div className="space-y-2">
               {isEditingReferrals ? (
                 <>
-                  <div>
-                    <Label className="text-xs">Name</Label>
-                    <Input
-                      value={referralData.professional_ref_name}
-                      onChange={(e) => setReferralData({ ...referralData, professional_ref_name: e.target.value })}
-                      placeholder="Enter name"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Mobile</Label>
-                    <Input
-                      value={referralData.professional_ref_mobile}
-                      onChange={(e) => setReferralData({ ...referralData, professional_ref_mobile: e.target.value })}
-                      placeholder="Enter mobile"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Email</Label>
-                    <Input
-                      type="email"
-                      value={referralData.professional_ref_email}
-                      onChange={(e) => setReferralData({ ...referralData, professional_ref_email: e.target.value })}
-                      placeholder="Enter email"
-                    />
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <Label className="text-xs">Name</Label>
+                      <Input
+                        value={referralData.professional_ref_name}
+                        onChange={(e) => setReferralData({ ...referralData, professional_ref_name: e.target.value })}
+                        placeholder="Enter name"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Mobile</Label>
+                      <Input
+                        value={referralData.professional_ref_mobile}
+                        onChange={(e) => setReferralData({ ...referralData, professional_ref_mobile: e.target.value })}
+                        placeholder="Enter mobile"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Email</Label>
+                      <Input
+                        type="email"
+                        value={referralData.professional_ref_email}
+                        onChange={(e) => setReferralData({ ...referralData, professional_ref_email: e.target.value })}
+                        placeholder="Enter email"
+                      />
+                    </div>
                   </div>
                   <div>
                     <Label className="text-xs">Address</Label>
@@ -204,17 +206,19 @@ function ReferralsSection({
                 </>
               ) : (
                 <>
-                  <div>
-                    <label className="text-xs text-muted-foreground">Name</label>
-                    <p className="text-sm">{primaryApplicant.professional_ref_name || "N/A"}</p>
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground">Mobile</label>
-                    <p className="text-sm">{primaryApplicant.professional_ref_mobile || "N/A"}</p>
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground">Email</label>
-                    <p className="text-sm">{primaryApplicant.professional_ref_email || "N/A"}</p>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-xs text-muted-foreground">Name</label>
+                      <p className="text-sm">{primaryApplicant.professional_ref_name || "N/A"}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Mobile</label>
+                      <p className="text-sm">{primaryApplicant.professional_ref_mobile || "N/A"}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Email</label>
+                      <p className="text-sm">{primaryApplicant.professional_ref_email || "N/A"}</p>
+                    </div>
                   </div>
                   <div>
                     <label className="text-xs text-muted-foreground">Address</label>
@@ -228,33 +232,35 @@ function ReferralsSection({
           {/* Personal Reference */}
           <div className="p-4 rounded-lg border bg-muted/30">
             <h5 className="text-sm font-medium mb-3">Personal Reference</h5>
-            <div className="grid gap-3">
+            <div className="space-y-2">
               {isEditingReferrals ? (
                 <>
-                  <div>
-                    <Label className="text-xs">Name</Label>
-                    <Input
-                      value={referralData.personal_ref_name}
-                      onChange={(e) => setReferralData({ ...referralData, personal_ref_name: e.target.value })}
-                      placeholder="Enter name"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Mobile</Label>
-                    <Input
-                      value={referralData.personal_ref_mobile}
-                      onChange={(e) => setReferralData({ ...referralData, personal_ref_mobile: e.target.value })}
-                      placeholder="Enter mobile"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Email</Label>
-                    <Input
-                      type="email"
-                      value={referralData.personal_ref_email}
-                      onChange={(e) => setReferralData({ ...referralData, personal_ref_email: e.target.value })}
-                      placeholder="Enter email"
-                    />
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <Label className="text-xs">Name</Label>
+                      <Input
+                        value={referralData.personal_ref_name}
+                        onChange={(e) => setReferralData({ ...referralData, personal_ref_name: e.target.value })}
+                        placeholder="Enter name"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Mobile</Label>
+                      <Input
+                        value={referralData.personal_ref_mobile}
+                        onChange={(e) => setReferralData({ ...referralData, personal_ref_mobile: e.target.value })}
+                        placeholder="Enter mobile"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Email</Label>
+                      <Input
+                        type="email"
+                        value={referralData.personal_ref_email}
+                        onChange={(e) => setReferralData({ ...referralData, personal_ref_email: e.target.value })}
+                        placeholder="Enter email"
+                      />
+                    </div>
                   </div>
                   <div>
                     <Label className="text-xs">Address</Label>
@@ -267,17 +273,19 @@ function ReferralsSection({
                 </>
               ) : (
                 <>
-                  <div>
-                    <label className="text-xs text-muted-foreground">Name</label>
-                    <p className="text-sm">{primaryApplicant.personal_ref_name || "N/A"}</p>
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground">Mobile</label>
-                    <p className="text-sm">{primaryApplicant.personal_ref_mobile || "N/A"}</p>
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground">Email</label>
-                    <p className="text-sm">{primaryApplicant.personal_ref_email || "N/A"}</p>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-xs text-muted-foreground">Name</label>
+                      <p className="text-sm">{primaryApplicant.personal_ref_name || "N/A"}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Mobile</label>
+                      <p className="text-sm">{primaryApplicant.personal_ref_mobile || "N/A"}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Email</label>
+                      <p className="text-sm">{primaryApplicant.personal_ref_email || "N/A"}</p>
+                    </div>
                   </div>
                   <div>
                     <label className="text-xs text-muted-foreground">Address</label>
