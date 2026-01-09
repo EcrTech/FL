@@ -2,8 +2,10 @@ import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
-import { User, FileText, CheckCircle, Eye, Loader2 } from "lucide-react";
+import { User, FileText, CheckCircle, Eye, Loader2, Video, CreditCard } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { VideoKYCDialog } from "@/components/LOS/Verification/VideoKYCDialog";
+import CreditBureauDialog from "@/components/LOS/Verification/CreditBureauDialog";
 
 interface Document {
   id: string;
@@ -14,8 +16,26 @@ interface Document {
   verification_status: string;
 }
 
+interface Verification {
+  id: string;
+  verification_type: string;
+  status: string;
+  verified_at: string | null;
+  response_data: any;
+}
+
+interface Applicant {
+  first_name: string;
+  last_name?: string;
+  middle_name?: string;
+  mobile?: string;
+  pan_number?: string;
+}
+
 interface ApplicantProfileCardProps {
   applicationId: string;
+  orgId: string;
+  applicant: Applicant;
   applicantName: string;
   panNumber?: string;
   aadhaarNumber?: string;
@@ -136,8 +156,70 @@ const DocumentCard = ({
   );
 };
 
+// Verification Card for Video KYC and CIBIL
+const VerificationCard = ({ 
+  type,
+  label,
+  icon: Icon,
+  verification,
+  onClick
+}: { 
+  type: string;
+  label: string;
+  icon: React.ElementType;
+  verification?: Verification;
+  onClick: () => void;
+}) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const isVerified = verification?.status === 'success';
+
+  return (
+    <div 
+      className={cn(
+        "relative flex-1 h-32 rounded-lg overflow-hidden cursor-pointer transition-all duration-200 border-2",
+        isVerified 
+          ? "border-green-500 shadow-[0_0_8px_rgba(34,197,94,0.3)]" 
+          : "border-border hover:border-muted-foreground/50"
+      )}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onClick={onClick}
+    >
+      {/* Card Content */}
+      <div className="w-full h-full bg-muted flex flex-col items-center justify-center gap-2">
+        <Icon className={cn("h-10 w-10", isVerified ? "text-green-500" : "text-muted-foreground")} />
+        <span className="text-xs text-muted-foreground">{label}</span>
+      </div>
+
+      {/* Verified Checkmark */}
+      {isVerified && (
+        <div className="absolute top-2 right-2 bg-green-500 rounded-full p-1">
+          <CheckCircle className="h-4 w-4 text-white" />
+        </div>
+      )}
+
+      {/* Label Overlay */}
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
+        <span className="text-xs font-medium text-white">{label}</span>
+      </div>
+
+      {/* Hover View Overlay */}
+      {isHovered && (
+        <div className="absolute inset-0 bg-black/50 flex items-center justify-center transition-opacity">
+          <div className="flex items-center gap-1.5 text-white bg-white/20 px-3 py-1.5 rounded-full backdrop-blur-sm">
+            <Eye className="h-4 w-4" />
+            <span className="text-sm font-medium">{isVerified ? 'View' : 'Start'}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export function ApplicantProfileCard({
   applicationId,
+  orgId,
+  applicant,
   applicantName,
   panNumber,
   aadhaarNumber,
@@ -146,24 +228,28 @@ export function ApplicantProfileCard({
   gender,
 }: ApplicantProfileCardProps) {
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [verifications, setVerifications] = useState<Verification[]>([]);
   const [loading, setLoading] = useState(true);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerImage, setViewerImage] = useState<{ url: string; name: string; isPdf: boolean } | null>(null);
+  const [videoKycOpen, setVideoKycOpen] = useState(false);
+  const [cibilDialogOpen, setCibilDialogOpen] = useState(false);
 
   useEffect(() => {
-    const fetchDocuments = async () => {
-      const { data, error } = await supabase
+    const fetchData = async () => {
+      // Fetch documents
+      const { data: docData, error: docError } = await supabase
         .from('loan_documents')
         .select('id, document_type, document_category, file_path, file_name, verification_status')
         .eq('loan_application_id', applicationId)
         .in('document_category', ['identity', 'photo']);
 
-      if (!error && data) {
-        setDocuments(data);
+      if (!docError && docData) {
+        setDocuments(docData);
         
         // Find photo document
-        const photoDoc = data.find(d => 
+        const photoDoc = docData.find(d => 
           d.document_type?.toLowerCase().includes('photo') ||
           d.document_category?.toLowerCase().includes('photo')
         );
@@ -177,15 +263,30 @@ export function ApplicantProfileCard({
           }
         }
       }
+
+      // Fetch verifications
+      const { data: verData, error: verError } = await supabase
+        .from('loan_verifications')
+        .select('id, verification_type, status, verified_at, response_data')
+        .eq('loan_application_id', applicationId);
+
+      if (!verError && verData) {
+        setVerifications(verData);
+      }
+
       setLoading(false);
     };
 
-    fetchDocuments();
+    fetchData();
   }, [applicationId]);
 
   const handleViewDocument = (url: string, name: string, isPdf: boolean = false) => {
     setViewerImage({ url, name, isPdf });
     setViewerOpen(true);
+  };
+
+  const getVerification = (type: string) => {
+    return verifications.find(v => v.verification_type === type);
   };
 
   // Filter key documents (PAN and Aadhaar only)
@@ -196,6 +297,8 @@ export function ApplicantProfileCard({
   );
 
   const keyDocs = [panDoc, aadhaarDoc].filter(Boolean) as Document[];
+  const videoKycVerification = getVerification('video_kyc');
+  const cibilVerification = getVerification('credit_bureau');
 
   return (
     <>
@@ -230,18 +333,52 @@ export function ApplicantProfileCard({
                 <div className="flex-1 flex items-center justify-center">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
-              ) : keyDocs.length > 0 ? (
-                keyDocs.map(doc => (
-                  <DocumentCard 
-                    key={doc.id} 
-                    document={doc} 
-                    onView={handleViewDocument}
-                  />
-                ))
               ) : (
-                <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground border-2 border-dashed rounded-lg">
-                  No documents uploaded
-                </div>
+                <>
+                  {/* PAN Card */}
+                  {panDoc ? (
+                    <DocumentCard 
+                      document={panDoc} 
+                      onView={handleViewDocument}
+                    />
+                  ) : (
+                    <div className="flex-1 h-32 flex flex-col items-center justify-center text-sm text-muted-foreground border-2 border-dashed rounded-lg">
+                      <FileText className="h-8 w-8 mb-1" />
+                      PAN Card
+                    </div>
+                  )}
+
+                  {/* Aadhaar Card */}
+                  {aadhaarDoc ? (
+                    <DocumentCard 
+                      document={aadhaarDoc} 
+                      onView={handleViewDocument}
+                    />
+                  ) : (
+                    <div className="flex-1 h-32 flex flex-col items-center justify-center text-sm text-muted-foreground border-2 border-dashed rounded-lg">
+                      <FileText className="h-8 w-8 mb-1" />
+                      Aadhaar Card
+                    </div>
+                  )}
+
+                  {/* Video KYC */}
+                  <VerificationCard 
+                    type="video_kyc"
+                    label="Video KYC"
+                    icon={Video}
+                    verification={videoKycVerification}
+                    onClick={() => setVideoKycOpen(true)}
+                  />
+
+                  {/* CIBIL Report */}
+                  <VerificationCard 
+                    type="credit_bureau"
+                    label="CIBIL Report"
+                    icon={CreditCard}
+                    verification={cibilVerification}
+                    onClick={() => setCibilDialogOpen(true)}
+                  />
+                </>
               )}
             </div>
           </div>
@@ -273,6 +410,25 @@ export function ApplicantProfileCard({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Video KYC Dialog */}
+      <VideoKYCDialog
+        open={videoKycOpen}
+        onOpenChange={setVideoKycOpen}
+        applicationId={applicationId}
+        orgId={orgId}
+        applicant={applicant}
+      />
+
+      {/* CIBIL Dialog */}
+      <CreditBureauDialog
+        open={cibilDialogOpen}
+        onClose={() => setCibilDialogOpen(false)}
+        applicationId={applicationId}
+        orgId={orgId}
+        applicant={applicant}
+        existingVerification={verifications.find(v => v.verification_type === 'credit_bureau')}
+      />
     </>
   );
 }
