@@ -338,16 +338,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                       <span>Designations</span>
                     </Link>
                   )}
-                  {canAccessFeature("approval_matrix") && (
-                    <Link
-                      to="/admin/approval-matrix"
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
-                      onClick={() => setSidebarOpen(false)}
-                    >
-                      <CheckSquare size={18} />
-                      <span>Approval Matrix</span>
-                    </Link>
-                  )}
                 </>
               )}
 
