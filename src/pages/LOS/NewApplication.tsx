@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,7 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, ArrowRight, Check, Save } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ArrowLeft, ArrowRight, Check, Save, MapPin, RefreshCw, AlertCircle } from "lucide-react";
 
 export default function NewApplication() {
   const navigate = useNavigate();
@@ -24,25 +25,56 @@ export default function NewApplication() {
     longitude: number;
     accuracy: number;
   } | null>(null);
+  const [locationLoading, setLocationLoading] = useState(true);
+  const [locationError, setLocationError] = useState<string | null>(null);
+
+  // Capture geolocation function
+  const captureGeolocation = useCallback(() => {
+    setLocationLoading(true);
+    setLocationError(null);
+
+    if (!navigator.geolocation) {
+      setLocationError("Geolocation is not supported by your browser.");
+      setLocationLoading(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setGeolocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+        });
+        setLocationLoading(false);
+        setLocationError(null);
+      },
+      (error) => {
+        let errorMessage = "Unable to capture location. ";
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage += "Please allow location access.";
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage += "Location unavailable.";
+            break;
+          case error.TIMEOUT:
+            errorMessage += "Request timed out.";
+            break;
+          default:
+            errorMessage += "Please enable location permissions.";
+        }
+        setLocationError(errorMessage);
+        setLocationLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  }, []);
 
   // Capture geolocation on mount
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setGeolocation({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-          });
-        },
-        (error) => {
-          console.warn("Geolocation error:", error.message);
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
-    }
-  }, []);
+    captureGeolocation();
+  }, [captureGeolocation]);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -232,6 +264,13 @@ export default function NewApplication() {
   });
 
   const handleSubmit = () => {
+    // Location validation - mandatory
+    if (!geolocation) {
+      notify.error("Location Required", "Location access is required to submit this application. Please enable location permissions and try again.");
+      setCurrentTab("basic");
+      return;
+    }
+
     // Basic validation
     if (!formData.requested_amount || parseFloat(formData.requested_amount) <= 0) {
       notify.error("Validation Error", "Please enter a valid loan amount");
@@ -354,6 +393,39 @@ export default function NewApplication() {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+
+                {/* Location Status */}
+                <div className="pt-4 border-t">
+                  <Label className="text-sm font-medium">Location Status *</Label>
+                  {locationLoading ? (
+                    <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      <span>Capturing location...</span>
+                    </div>
+                  ) : geolocation ? (
+                    <div className="mt-2 flex items-center gap-2 text-sm text-green-600">
+                      <MapPin className="h-4 w-4" />
+                      <span>Location captured ({geolocation.latitude.toFixed(4)}, {geolocation.longitude.toFixed(4)})</span>
+                    </div>
+                  ) : (
+                    <Alert variant="destructive" className="mt-2">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Location Required</AlertTitle>
+                      <AlertDescription className="flex flex-col gap-2">
+                        <span>{locationError || "Location is required to submit applications."}</span>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={captureGeolocation}
+                          className="w-fit"
+                        >
+                          <RefreshCw className="mr-2 h-4 w-4" />
+                          Retry
+                        </Button>
+                      </AlertDescription>
+                    </Alert>
+                  )}
                 </div>
               </CardContent>
             </Card>
