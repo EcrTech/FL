@@ -14,19 +14,32 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Upload, Loader2, FileCheck, X, Sparkles } from "lucide-react";
 
+interface BankDetails {
+  beneficiaryName: string;
+  accountNumber: string;
+  ifscCode: string;
+  bankName: string;
+}
+
 interface ProofUploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  disbursementId: string;
   applicationId: string;
+  sanctionId?: string;
+  disbursementAmount?: number;
+  bankDetails?: BankDetails;
+  disbursementId?: string; // Optional - if provided, just upload proof
   onSuccess?: () => void;
 }
 
 export default function ProofUploadDialog({
   open,
   onOpenChange,
-  disbursementId,
   applicationId,
+  sanctionId,
+  disbursementAmount,
+  bankDetails,
+  disbursementId,
   onSuccess,
 }: ProofUploadDialogProps) {
   const queryClient = useQueryClient();
@@ -40,9 +53,40 @@ export default function ProofUploadDialog({
       const session = await supabase.auth.getSession();
       const userId = session.data.session?.user.id;
 
+      let targetDisbursementId = disbursementId;
+
+      // If no disbursementId provided, create a new disbursement record first
+      if (!targetDisbursementId) {
+        if (!sanctionId) throw new Error("No sanction found");
+        if (!disbursementAmount) throw new Error("No disbursement amount");
+        if (!bankDetails?.accountNumber) throw new Error("Bank details not available");
+
+        const disbursementNumber = `DISB${Date.now()}`;
+
+        const { data: newDisbursement, error: insertError } = await supabase
+          .from("loan_disbursements")
+          .insert({
+            loan_application_id: applicationId,
+            sanction_id: sanctionId,
+            disbursement_number: disbursementNumber,
+            disbursement_amount: disbursementAmount,
+            beneficiary_name: bankDetails.beneficiaryName,
+            account_number: bankDetails.accountNumber,
+            ifsc_code: bankDetails.ifscCode,
+            bank_name: bankDetails.bankName,
+            payment_mode: "neft",
+            status: "pending",
+          })
+          .select("id")
+          .single();
+
+        if (insertError) throw insertError;
+        targetDisbursementId = newDisbursement.id;
+      }
+
       // Upload file to storage
       const fileExt = file.name.split(".").pop();
-      const fileName = `${disbursementId}_proof_${Date.now()}.${fileExt}`;
+      const fileName = `${targetDisbursementId}_proof_${Date.now()}.${fileExt}`;
       const filePath = `disbursement-proofs/${applicationId}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
@@ -119,7 +163,7 @@ export default function ProofUploadDialog({
       const { error: updateError } = await supabase
         .from("loan_disbursements")
         .update(updateData)
-        .eq("id", disbursementId);
+        .eq("id", targetDisbursementId);
 
       if (updateError) throw updateError;
 
@@ -127,7 +171,7 @@ export default function ProofUploadDialog({
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["loan-disbursements"] });
-      queryClient.invalidateQueries({ queryKey: ["all-disbursements"] });
+      queryClient.invalidateQueries({ queryKey: ["unified-disbursals"] });
       
       if (data.extractedUtr) {
         toast.success(`Disbursement completed! UTR: ${data.extractedUtr}`);
