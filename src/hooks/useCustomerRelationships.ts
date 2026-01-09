@@ -67,7 +67,6 @@ interface CustomerGroup {
   last_name: string | null;
   email: string | null;
   aadhaar_number: string | null;
-  customer_id: string | null;
 }
 
 function calculatePaymentScore(applications: LoanApplicationSummary[]): 'excellent' | 'good' | 'fair' | 'poor' {
@@ -138,8 +137,7 @@ export function useCustomerRelationships(searchTerm?: string) {
             requested_amount,
             approved_amount,
             tenure_days,
-            created_at,
-            customer_id
+            created_at
           )
         `)
         .eq("loan_applications.org_id", orgId)
@@ -167,7 +165,6 @@ export function useCustomerRelationships(searchTerm?: string) {
               last_name: applicant.last_name,
               email: applicant.email,
               aadhaar_number: applicant.aadhaar_number,
-              customer_id: applicant.loan_applications?.customer_id,
             },
             applicationIds: [],
           });
@@ -185,8 +182,7 @@ export function useCustomerRelationships(searchTerm?: string) {
           return (
             customer.info.pan_number?.toLowerCase().includes(search) ||
             customer.info.mobile?.includes(search) ||
-            fullName.includes(search) ||
-            customer.info.customer_id?.toLowerCase().includes(search)
+            fullName.includes(search)
           );
         });
       }
@@ -310,7 +306,7 @@ export function useCustomerRelationships(searchTerm?: string) {
           .join(' ');
 
         relationships.push({
-          customerId: customer.info.customer_id || customer.info.pan_number || customer.info.mobile,
+          customerId: customer.info.pan_number || customer.info.mobile,
           panNumber: customer.info.pan_number || 'N/A',
           aadhaarNumber: maskAadhaar(customer.info.aadhaar_number),
           mobile: customer.info.mobile || 'N/A',
