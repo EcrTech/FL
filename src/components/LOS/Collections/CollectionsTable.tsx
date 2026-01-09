@@ -76,6 +76,7 @@ export function CollectionsTable({ collections, onRecordPayment }: CollectionsTa
       filtered = filtered.filter(
         (c) =>
           c.application_number.toLowerCase().includes(search) ||
+          (c.loan_id && c.loan_id.toLowerCase().includes(search)) ||
           c.applicant_name.toLowerCase().includes(search) ||
           c.applicant_phone.includes(search)
       );
@@ -166,6 +167,7 @@ export function CollectionsTable({ collections, onRecordPayment }: CollectionsTa
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50">
+                <TableHead className="py-2 text-xs font-semibold">Loan ID</TableHead>
                 <TableHead className="py-2 text-xs font-semibold">App #</TableHead>
                 <TableHead className="py-2 text-xs font-semibold">Applicant</TableHead>
                 <TableHead className="py-2 text-xs font-semibold">EMI #</TableHead>
@@ -180,14 +182,17 @@ export function CollectionsTable({ collections, onRecordPayment }: CollectionsTa
             <TableBody>
               {paginatedCollections.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                     No records found
                   </TableCell>
                 </TableRow>
               ) : (
                 paginatedCollections.map((record) => (
                   <TableRow key={record.id} className="hover:bg-muted/30">
-                    <TableCell className="py-2 text-xs font-medium">
+                    <TableCell className="py-2 text-xs font-medium text-primary">
+                      {record.loan_id || "—"}
+                    </TableCell>
+                    <TableCell className="py-2 text-xs text-muted-foreground">
                       {record.application_number}
                     </TableCell>
                     <TableCell className="py-2">
