@@ -41,6 +41,7 @@ const formatCurrency = (amount: number) => {
 type UnifiedDisbursalItem = {
   id: string;
   application_id: string;
+  loan_id: string | null;
   application_number: string;
   applicant_name: string;
   approved_amount: number;
@@ -82,6 +83,7 @@ export default function Disbursals() {
         .select(`
           id,
           application_number,
+          loan_id,
           approved_amount,
           current_stage,
           created_at,
@@ -137,6 +139,7 @@ export default function Disbursals() {
             unified.push({
               id: app.id,
               application_id: app.id,
+              loan_id: app.loan_id,
               application_number: app.application_number,
               applicant_name: applicant ? `${applicant.first_name} ${applicant.last_name || ""}`.trim() : "N/A",
               approved_amount: approvedAmount,
@@ -163,6 +166,7 @@ export default function Disbursals() {
           loan_applications!inner(
             id,
             application_number,
+            loan_id,
             approved_amount,
             org_id,
             loan_applicants(first_name, last_name, applicant_type)
@@ -180,6 +184,7 @@ export default function Disbursals() {
           unified.push({
             id: d.id,
             application_id: d.loan_application_id,
+            loan_id: d.loan_applications?.loan_id || null,
             application_number: d.loan_applications?.application_number || "",
             applicant_name: primaryApplicant 
               ? `${primaryApplicant.first_name} ${primaryApplicant.last_name || ""}`.trim() 
@@ -297,6 +302,7 @@ export default function Disbursals() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Loan ID</TableHead>
                       <TableHead>Application #</TableHead>
                       <TableHead>Applicant</TableHead>
                       <TableHead>Approved Amount</TableHead>
@@ -311,6 +317,7 @@ export default function Disbursals() {
                   <TableBody>
                     {filteredDisbursals.map((item) => (
                       <TableRow key={item.id}>
+                        <TableCell className="font-mono text-sm text-primary">{item.loan_id || "-"}</TableCell>
                         <TableCell className="font-mono text-sm">{item.application_number}</TableCell>
                         <TableCell>{item.applicant_name}</TableCell>
                         <TableCell>{formatCurrency(item.approved_amount)}</TableCell>

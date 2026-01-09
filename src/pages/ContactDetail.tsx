@@ -28,6 +28,7 @@ import { EnrichedFieldsSection } from "@/components/Contact/EnrichedFieldsSectio
 interface Contact {
   id: string;
   org_id: string;
+  customer_id: string | null;
   first_name: string;
   last_name: string | null;
   email: string | null;
@@ -168,9 +169,16 @@ export default function ContactDetail() {
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h1 className="text-3xl font-bold">
-                {contact.first_name} {contact.last_name}
-              </h1>
+              <div className="flex items-center gap-3">
+                <h1 className="text-3xl font-bold">
+                  {contact.first_name} {contact.last_name}
+                </h1>
+                {contact.customer_id && (
+                  <Badge variant="secondary" className="font-mono">
+                    {contact.customer_id}
+                  </Badge>
+                )}
+              </div>
               {contact.job_title && contact.company && (
                 <p className="text-muted-foreground">
                   {contact.job_title} at {contact.company}

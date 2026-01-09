@@ -242,6 +242,7 @@ export default function Applications() {
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/50 hover:bg-muted/50">
+                        <TableHead className="font-semibold text-foreground">Loan ID</TableHead>
                         <TableHead className="font-semibold text-foreground">Application #</TableHead>
                         <TableHead className="font-semibold text-foreground">Applicant</TableHead>
                         <TableHead className="font-semibold text-foreground">Status</TableHead>
@@ -259,6 +260,9 @@ export default function Applications() {
                           className="cursor-pointer hover:bg-muted/30 border-b"
                           onClick={() => navigate(`/los/applications/${app.id}`)}
                         >
+                          <TableCell className="py-4">
+                            <span className="font-mono font-medium text-primary">{app.loan_id || "-"}</span>
+                          </TableCell>
                           <TableCell className="py-4">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-mono font-medium text-foreground">{app.application_number}</span>

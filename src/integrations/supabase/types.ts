@@ -1484,6 +1484,7 @@ export type Database = {
           country: string | null
           created_at: string | null
           created_by: string | null
+          customer_id: string | null
           departments: string[] | null
           education: Json | null
           email: string | null
@@ -1536,6 +1537,7 @@ export type Database = {
           country?: string | null
           created_at?: string | null
           created_by?: string | null
+          customer_id?: string | null
           departments?: string[] | null
           education?: Json | null
           email?: string | null
@@ -1588,6 +1590,7 @@ export type Database = {
           country?: string | null
           created_at?: string | null
           created_by?: string | null
+          customer_id?: string | null
           departments?: string[] | null
           education?: Json | null
           email?: string | null
@@ -3629,6 +3632,7 @@ export type Database = {
           id: string
           interest_rate: number | null
           latitude: number | null
+          loan_id: string | null
           longitude: number | null
           org_id: string
           previous_stage: string | null
@@ -3656,6 +3660,7 @@ export type Database = {
           id?: string
           interest_rate?: number | null
           latitude?: number | null
+          loan_id?: string | null
           longitude?: number | null
           org_id: string
           previous_stage?: string | null
@@ -3683,6 +3688,7 @@ export type Database = {
           id?: string
           interest_rate?: number | null
           latitude?: number | null
+          loan_id?: string | null
           longitude?: number | null
           org_id?: string
           previous_stage?: string | null
