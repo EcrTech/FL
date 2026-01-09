@@ -331,7 +331,6 @@ export default function Disbursals() {
                             <Button
                               size="sm"
                               onClick={() => setUploadDialogItem(item)}
-                              disabled={!item.bank_details?.accountNumber}
                             >
                               <Upload className="h-4 w-4 mr-2" />
                               Complete
