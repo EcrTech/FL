@@ -3,18 +3,11 @@ import { format } from "date-fns";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
 import { useCustomerRelationships, CustomerRelationship } from "@/hooks/useCustomerRelationships";
 import { CustomerDetailDialog } from "@/components/LOS/Relationships/CustomerDetailDialog";
+import { CustomerCard } from "@/components/LOS/Relationships/CustomerCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -24,15 +17,8 @@ import {
 } from "@/components/ui/select";
 import { LoadingState } from "@/components/common/LoadingState";
 import { EmptyState } from "@/components/common/EmptyState";
-import { Search, Users, Download, Eye, RefreshCw } from "lucide-react";
+import { Search, Users, Download, LayoutGrid, List } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-
-const scoreColors: Record<string, string> = {
-  excellent: "bg-green-100 text-green-800 border-green-200",
-  good: "bg-blue-100 text-blue-800 border-blue-200",
-  fair: "bg-yellow-100 text-yellow-800 border-yellow-200",
-  poor: "bg-red-100 text-red-800 border-red-200",
-};
 
 export default function CustomerRelationships() {
   const navigate = useNavigate();
@@ -40,6 +26,7 @@ export default function CustomerRelationships() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [scoreFilter, setScoreFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerRelationship | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -159,10 +146,22 @@ export default function CustomerRelationships() {
               View loan history and manage reapplications
             </p>
           </div>
-          <Button onClick={handleExportCSV} variant="outline" disabled={!filteredCustomers.length}>
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
-          </Button>
+          <div className="flex items-center gap-2">
+            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "grid" | "list")}>
+              <TabsList>
+                <TabsTrigger value="grid" className="px-3">
+                  <LayoutGrid className="h-4 w-4" />
+                </TabsTrigger>
+                <TabsTrigger value="list" className="px-3">
+                  <List className="h-4 w-4" />
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <Button onClick={handleExportCSV} variant="outline" disabled={!filteredCustomers.length}>
+              <Download className="h-4 w-4 mr-2" />
+              Export CSV
+            </Button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -209,106 +208,49 @@ export default function CustomerRelationships() {
         </Card>
 
         {/* Results */}
-        <Card>
-          <CardContent className="p-0">
-            {isLoading ? (
-              <div className="p-6">
-                <LoadingState message="Loading customer relationships..." />
+        {isLoading ? (
+          <LoadingState message="Loading customer relationships..." />
+        ) : filteredCustomers.length === 0 ? (
+          <Card>
+            <CardContent className="p-6">
+              <EmptyState
+                icon={<Users className="h-12 w-12" />}
+                title="No customers found"
+                message={
+                  searchTerm
+                    ? "Try adjusting your search or filters"
+                    : "Customer relationships will appear here once loan applications are created"
+                }
+              />
+            </CardContent>
+          </Card>
+        ) : viewMode === "grid" ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {filteredCustomers.map((customer) => (
+              <CustomerCard
+                key={customer.customerId}
+                customer={customer}
+                onViewDetails={handleViewDetails}
+                onCreateReapplication={handleCreateReapplication}
+              />
+            ))}
+          </div>
+        ) : (
+          <Card>
+            <CardContent className="p-0">
+              <div className="divide-y divide-border">
+                {filteredCustomers.map((customer) => (
+                  <CustomerCard
+                    key={customer.customerId}
+                    customer={customer}
+                    onViewDetails={handleViewDetails}
+                    onCreateReapplication={handleCreateReapplication}
+                  />
+                ))}
               </div>
-            ) : filteredCustomers.length === 0 ? (
-              <div className="p-6">
-                <EmptyState
-                  icon={<Users className="h-12 w-12" />}
-                  title="No customers found"
-                  message={
-                    searchTerm
-                      ? "Try adjusting your search or filters"
-                      : "Customer relationships will appear here once loan applications are created"
-                  }
-                />
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Customer ID</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>PAN</TableHead>
-                      <TableHead>Mobile</TableHead>
-                      <TableHead className="text-center">Loans</TableHead>
-                      <TableHead className="text-center">Active</TableHead>
-                      <TableHead className="text-right">Disbursed</TableHead>
-                      <TableHead className="text-right">Outstanding</TableHead>
-                      <TableHead>Score</TableHead>
-                      <TableHead>Last Application</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredCustomers.map((customer) => (
-                      <TableRow key={customer.customerId}>
-                        <TableCell className="font-medium">{customer.customerId}</TableCell>
-                        <TableCell>{customer.name}</TableCell>
-                        <TableCell className="font-mono text-sm">{customer.panNumber}</TableCell>
-                        <TableCell>{customer.mobile}</TableCell>
-                        <TableCell className="text-center">{customer.totalLoans}</TableCell>
-                        <TableCell className="text-center">
-                          {customer.activeLoans > 0 ? (
-                            <Badge variant="default">{customer.activeLoans}</Badge>
-                          ) : (
-                            <Badge variant="outline">0</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(customer.totalDisbursed)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {customer.outstandingAmount > 0 ? (
-                            <span className="text-orange-600 font-medium">
-                              {formatCurrency(customer.outstandingAmount)}
-                            </span>
-                          ) : (
-                            formatCurrency(0)
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={scoreColors[customer.paymentScore]}>
-                            {customer.paymentScore}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {customer.lastApplicationDate
-                            ? format(new Date(customer.lastApplicationDate), "dd MMM yyyy")
-                            : "—"}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleViewDetails(customer)}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleCreateReapplication(customer)}
-                              title="Create Reapplication"
-                            >
-                              <RefreshCw className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Summary Stats */}
         {!isLoading && filteredCustomers.length > 0 && (

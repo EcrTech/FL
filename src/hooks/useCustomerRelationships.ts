@@ -42,6 +42,15 @@ export interface LoanApplicationSummary {
   totalOutstanding: number;
 }
 
+export interface CustomerDocument {
+  id: string;
+  documentType: string;
+  documentCategory: string;
+  filePath: string;
+  fileName: string;
+  verificationStatus: string;
+}
+
 export interface CustomerRelationship {
   customerId: string;
   panNumber: string;
@@ -49,6 +58,7 @@ export interface CustomerRelationship {
   mobile: string;
   name: string;
   email: string | null;
+  photoUrl: string | null;
   totalLoans: number;
   activeLoans: number;
   totalDisbursed: number;
@@ -57,6 +67,7 @@ export interface CustomerRelationship {
   paymentScore: 'excellent' | 'good' | 'fair' | 'poor';
   lastApplicationDate: string;
   applications: LoanApplicationSummary[];
+  documents: CustomerDocument[];
 }
 
 interface CustomerGroup {
@@ -235,12 +246,24 @@ export function useCustomerRelationships(searchTerm?: string) {
               payment_mode,
               reference_number,
               status
+            ),
+            loan_documents (
+              id,
+              document_type,
+              document_category,
+              file_path,
+              file_name,
+              verification_status
             )
           `)
           .in("id", applicationIds)
           .order("created_at", { ascending: false });
 
         if (appsError) throw appsError;
+
+        // Collect all documents from all applications
+        const allDocuments: CustomerDocument[] = [];
+        let photoUrl: string | null = null;
 
         const appSummaries: LoanApplicationSummary[] = (applications || []).map((app: any) => {
           const emiSchedule: EMIRecord[] = (app.loan_repayment_schedule || []).map((emi: any) => ({
@@ -263,6 +286,29 @@ export function useCustomerRelationships(searchTerm?: string) {
             reference_number: p.reference_number,
             status: p.status,
           }));
+
+          // Collect documents
+          (app.loan_documents || []).forEach((doc: any) => {
+            // Check if this is a photo document
+            if (doc.document_type?.toLowerCase().includes('photo') || 
+                doc.document_category?.toLowerCase().includes('photo')) {
+              if (!photoUrl && doc.file_path) {
+                photoUrl = doc.file_path;
+              }
+            }
+            
+            // Add to documents collection if not already present
+            if (!allDocuments.find(d => d.id === doc.id)) {
+              allDocuments.push({
+                id: doc.id,
+                documentType: doc.document_type,
+                documentCategory: doc.document_category,
+                filePath: doc.file_path,
+                fileName: doc.file_name,
+                verificationStatus: doc.verification_status,
+              });
+            }
+          });
 
           const disbursement = app.loan_disbursements?.[0];
           const sanction = app.loan_sanctions?.[0];
@@ -312,6 +358,7 @@ export function useCustomerRelationships(searchTerm?: string) {
           mobile: customer.info.mobile || 'N/A',
           name: fullName,
           email: customer.info.email,
+          photoUrl,
           totalLoans: appSummaries.length,
           activeLoans,
           totalDisbursed,
@@ -320,6 +367,7 @@ export function useCustomerRelationships(searchTerm?: string) {
           paymentScore: calculatePaymentScore(appSummaries),
           lastApplicationDate: appSummaries[0]?.createdAt || '',
           applications: appSummaries,
+          documents: allDocuments,
         });
       }
 
