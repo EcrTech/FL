@@ -7,13 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Upload, CheckCircle, XCircle, Eye, Shield, Loader2, Wand2, Video, CreditCard, ChevronDown, ChevronRight, Sparkles } from "lucide-react";
+import { Upload, CheckCircle, XCircle, Eye, Shield, Loader2, Wand2, ChevronDown, ChevronRight, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { VideoKYCDialog } from "@/components/LOS/Verification/VideoKYCDialog";
-import CreditBureauDialog from "@/components/LOS/Verification/CreditBureauDialog";
 
 interface Applicant {
   first_name: string;
@@ -29,7 +27,6 @@ interface DocumentUploadProps {
 }
 
 const DOCUMENT_CATEGORIES = {
-  identity: "Identity & Verification",
   address: "Address Proof",
   income: "Income Proof",
   bank: "Bank Statements",
@@ -39,10 +36,6 @@ const DOCUMENT_CATEGORIES = {
 };
 
 const REQUIRED_DOCUMENTS = [
-  { type: "pan_card", name: "PAN Card", category: "identity", mandatory: true, verifiable: true, parseable: true },
-  { type: "aadhaar_card", name: "Aadhaar Card", category: "identity", mandatory: true, verifiable: true, parseable: true },
-  { type: "video_kyc", name: "Video KYC", category: "identity", mandatory: true, verifiable: false, parseable: false, isVerification: true },
-  { type: "cibil_report", name: "CIBIL/Credit Bureau Report", category: "identity", mandatory: true, verifiable: false, parseable: false, isVerification: true },
   { type: "salary_slip_1", name: "Salary Slip - Month 1", category: "income", mandatory: true, verifiable: false, parseable: true },
   { type: "salary_slip_2", name: "Salary Slip - Month 2", category: "income", mandatory: true, verifiable: false, parseable: true },
   { type: "salary_slip_3", name: "Salary Slip - Month 3", category: "income", mandatory: true, verifiable: false, parseable: true },
@@ -56,17 +49,8 @@ const REQUIRED_DOCUMENTS = [
   { type: "passport_photo", name: "Passport Size Photo", category: "photo", mandatory: true, verifiable: false, parseable: false },
 ];
 
-const VERIFIABLE_ENDPOINTS: Record<string, string> = {
-  pan_card: "sandbox-pan-verify",
-  aadhaar_card: "sandbox-aadhaar-okyc",
-};
-
-// Map document types to verification types
+// Map document types to verification types (only for bank statement now)
 const DOC_TO_VERIFICATION_TYPE: Record<string, string> = {
-  pan_card: "pan",
-  aadhaar_card: "aadhaar",
-  video_kyc: "video_kyc",
-  cibil_report: "credit_bureau",
   bank_statement: "bank_statement",
 };
 
@@ -81,9 +65,6 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
     url: null,
     name: "",
   });
-  const [videoKycOpen, setVideoKycOpen] = useState(false);
-  const [cibilDialogOpen, setCibilDialogOpen] = useState(false);
-  const [fetchingCibil, setFetchingCibil] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [isParsingAll, setIsParsingAll] = useState(false);
 
@@ -158,50 +139,11 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
     },
   });
 
-  const verifyMutation = useMutation({
-    mutationFn: async ({ docType, docId }: { docType: string; docId: string }) => {
-      setVerifyingDoc(docType);
-      
-      const { data: authData, error: authError } = await supabase.functions.invoke("sandbox-authenticate");
-      
-      if (authError || !authData?.access_token) {
-        throw new Error("Failed to authenticate with verification service");
-      }
-
-      const endpoint = VERIFIABLE_ENDPOINTS[docType];
-      if (!endpoint) throw new Error("Document type not verifiable");
-
-      const { error: updateError } = await supabase
-        .from("loan_documents")
-        .update({
-          verification_status: "verified",
-          verified_at: new Date().toISOString(),
-        })
-        .eq("id", docId);
-
-      if (updateError) throw updateError;
-      
-      return { success: true };
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["loan-documents", applicationId] });
-      toast({ title: "Document verified successfully", description: "Verification completed via API" });
-      setVerifyingDoc(null);
-    },
-    onError: (error: any) => {
-      toast({ title: "Verification failed", description: error.message, variant: "destructive" });
-      setVerifyingDoc(null);
-    },
-  });
-
   const handleFileSelect = (docType: string, file: File) => {
     setUploadingDoc(docType);
     uploadMutation.mutate({ docType, file });
   };
 
-  const handleVerify = (docType: string, docId: string) => {
-    verifyMutation.mutate({ docType, docId });
-  };
 
   const parseMutation = useMutation({
     mutationFn: async ({ docType, docId, filePath }: { docType: string; docId: string; filePath: string }) => {
@@ -322,70 +264,6 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
       });
     }
   };
-
-  // Mock CIBIL fetch mutation
-  const cibilFetchMutation = useMutation({
-    mutationFn: async () => {
-      setFetchingCibil(true);
-      
-      // Simulate API call delay (1.5-2.5 seconds)
-      await new Promise((resolve) => setTimeout(resolve, 1500 + Math.random() * 1000));
-      
-      // Generate mock CIBIL data
-      const mockCibilData = {
-        credit_score: Math.floor(650 + Math.random() * 200), // 650-850
-        bureau_type: "CIBIL",
-        active_accounts: Math.floor(2 + Math.random() * 6),
-        total_outstanding: Math.floor(50000 + Math.random() * 500000),
-        total_overdue: Math.floor(Math.random() * 20000),
-        enquiry_last_30_days: Math.floor(Math.random() * 3),
-        enquiry_last_90_days: Math.floor(Math.random() * 5),
-        max_dpd_history: Math.floor(Math.random() * 30),
-        oldest_account_age_months: Math.floor(24 + Math.random() * 120),
-        credit_utilization: Math.floor(20 + Math.random() * 50),
-        fetched_at: new Date().toISOString(),
-      };
-
-      const { data: { user } } = await supabase.auth.getUser();
-
-      // Save to loan_verifications
-      const { error } = await supabase.from("loan_verifications").upsert({
-        loan_application_id: applicationId,
-        org_id: orgId,
-        verification_type: "credit_bureau",
-        status: "success",
-        verified_at: new Date().toISOString(),
-        verified_by: user?.id,
-        response_data: mockCibilData,
-        request_data: { pan_number: applicant?.pan_number || "XXXXX0000X", source: "mock_api" },
-      }, {
-        onConflict: "loan_application_id,verification_type",
-      });
-
-      if (error) throw error;
-      
-      return mockCibilData;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["loan-verifications", applicationId] });
-      toast({ 
-        title: "CIBIL Score Fetched", 
-        description: `Credit Score: ${data.credit_score} (${data.credit_score >= 750 ? "Excellent" : data.credit_score >= 700 ? "Good" : data.credit_score >= 650 ? "Fair" : "Poor"})`,
-      });
-      setFetchingCibil(false);
-      // Auto-expand the row to show details
-      setExpandedRows((prev) => new Set(prev).add("cibil_report"));
-    },
-    onError: (error: any) => {
-      toast({ title: "Failed to fetch CIBIL", description: error.message, variant: "destructive" });
-      setFetchingCibil(false);
-    },
-  });
-
-  const handleFetchCibil = () => {
-    cibilFetchMutation.mutate();
-  };
-
   const handleViewDocument = async (filePath: string, fileName: string) => {
     try {
       const { data, error } = await supabase.storage
@@ -725,57 +603,6 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
     );
   };
 
-  const renderVerificationAction = (docType: string) => {
-    const verificationType = DOC_TO_VERIFICATION_TYPE[docType];
-    const verification = verificationType ? getVerification(verificationType) : null;
-
-    if (docType === "video_kyc") {
-      return (
-        <Button
-          size="sm"
-          variant={verification?.status === "success" ? "outline" : "default"}
-          onClick={() => setVideoKycOpen(true)}
-          className="gap-1"
-        >
-          <Video className="h-4 w-4" />
-          {verification?.status === "success" ? "View" : "Start"} Video KYC
-        </Button>
-      );
-    }
-
-    if (docType === "cibil_report") {
-      return (
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setCibilDialogOpen(true)}
-            className="gap-1"
-          >
-            <Upload className="h-4 w-4" />
-            Upload CIBIL
-          </Button>
-          <Button
-            size="sm"
-            variant={verification?.status === "success" ? "outline" : "default"}
-            onClick={handleFetchCibil}
-            disabled={fetchingCibil}
-            className="gap-1"
-          >
-            {fetchingCibil ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <CreditCard className="h-4 w-4" />
-            )}
-            {fetchingCibil ? "Fetching..." : verification?.status === "success" ? "Re-fetch" : "Fetch"} CIBIL
-          </Button>
-        </div>
-      );
-    }
-
-    return null;
-  };
-
   const groupedDocs = REQUIRED_DOCUMENTS.reduce((acc, doc) => {
     const category = doc.category;
     if (!acc[category]) acc[category] = [];
@@ -879,9 +706,8 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
                             </TableCell>
                             <TableCell className="py-2 text-right" onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center justify-end gap-1">
-                                {isVerificationDoc ? (
-                                  renderVerificationAction(doc.type)
-                                ) : (
+                                {!isVerificationDoc && (
+                                  <>
                                   <>
                                     {/* Eye icon - View document */}
                                     <Tooltip>
@@ -984,29 +810,6 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
           )}
         </DialogContent>
       </Dialog>
-
-      {/* Video KYC Dialog */}
-      <VideoKYCDialog
-        open={videoKycOpen}
-        onOpenChange={setVideoKycOpen}
-        applicationId={applicationId}
-        orgId={orgId}
-        applicant={applicant ? { first_name: applicant.first_name, last_name: applicant.last_name } : undefined}
-        onVerificationComplete={() => {
-          queryClient.invalidateQueries({ queryKey: ["loan-verifications", applicationId] });
-          setVideoKycOpen(false);
-        }}
-      />
-
-      {/* Credit Bureau Dialog */}
-      <CreditBureauDialog
-        open={cibilDialogOpen}
-        onClose={() => setCibilDialogOpen(false)}
-        applicationId={applicationId}
-        orgId={orgId}
-        applicant={applicant ? { name: `${applicant.first_name} ${applicant.last_name || ""}`.trim(), pan: applicant.pan_number } : undefined}
-        existingVerification={getVerification("credit_bureau")}
-      />
     </TooltipProvider>
   );
 }

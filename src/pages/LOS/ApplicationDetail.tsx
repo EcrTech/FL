@@ -538,6 +538,8 @@ export default function ApplicationDetail() {
         {primaryApplicant && (
           <ApplicantProfileCard
             applicationId={id!}
+            orgId={orgId!}
+            applicant={primaryApplicant}
             applicantName={`${primaryApplicant.first_name} ${primaryApplicant.middle_name || ''} ${primaryApplicant.last_name || ''}`.trim()}
             panNumber={primaryApplicant.pan_number as string}
             aadhaarNumber={primaryApplicant.aadhaar_number as string}
