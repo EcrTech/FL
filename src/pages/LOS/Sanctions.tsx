@@ -40,42 +40,39 @@ export default function Sanctions() {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [selectedApp, setSelectedApp] = useState<SanctionApplication | null>(null);
 
+  // Optimized: Single query with JOINs instead of 3 separate queries
   const { data: applications, isLoading } = useQuery({
     queryKey: ["approved-applications-with-sanctions", orgId],
     queryFn: async () => {
-      // Fetch approved applications
+      // Fetch approved applications with related data in a single query
       const { data: applicationsData, error } = await supabase
         .from("loan_applications")
-        .select("*")
+        .select(`
+          *,
+          loan_applicants!inner(first_name, last_name, email, applicant_type),
+          loan_sanctions(id, status, sanction_number, documents_emailed_at)
+        `)
         .eq("org_id", orgId as string)
         .eq("status", "approved")
+        .eq("loan_applicants.applicant_type", "primary")
         .order("updated_at", { ascending: false });
 
       if (error) throw error;
       if (!applicationsData || applicationsData.length === 0) return [];
 
-      const applicationIds = applicationsData.map((a: any) => a.id);
-      
-      // Fetch primary applicants with email
-      const { data: applicants } = await supabase
-        .from("loan_applicants")
-        .select("loan_application_id, first_name, last_name, email")
-        .in("loan_application_id", applicationIds)
-        .eq("applicant_type", "primary");
-
-      // Fetch sanctions
-      const { data: sanctions } = await supabase
-        .from("loan_sanctions")
-        .select("id, loan_application_id, status, sanction_number, documents_emailed_at")
-        .in("loan_application_id", applicationIds);
-
-      // Merge the data
+      // Transform the data
       return applicationsData.map((app: any) => {
-        const applicant = applicants?.find((a) => a.loan_application_id === app.id);
-        const sanction = sanctions?.find((s) => s.loan_application_id === app.id);
+        const applicant = app.loan_applicants?.[0];
+        const sanction = app.loan_sanctions?.[0];
         return {
-          ...app,
+          id: app.id,
+          application_number: app.application_number,
           loan_id: app.loan_id || null,
+          product_type: app.product_type,
+          approved_amount: app.approved_amount,
+          tenure_days: app.tenure_days,
+          interest_rate: app.interest_rate,
+          updated_at: app.updated_at,
           applicant_name: applicant
             ? [applicant.first_name, applicant.last_name].filter(Boolean).join(" ")
             : "N/A",

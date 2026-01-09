@@ -4,6 +4,7 @@ import App from "./App.tsx";
 import "./index.css";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { setupErrorLogging } from "./lib/errorLogger";
+import { AuthProvider } from "./contexts/AuthContext";
 
 // Set up global error logging
 setupErrorLogging();
@@ -23,7 +24,9 @@ const queryClient = new QueryClient({
 createRoot(document.getElementById("root")!).render(
   <QueryClientProvider client={queryClient}>
     <ErrorBoundary>
-      <App />
+      <AuthProvider>
+        <App />
+      </AuthProvider>
     </ErrorBoundary>
   </QueryClientProvider>
 );
