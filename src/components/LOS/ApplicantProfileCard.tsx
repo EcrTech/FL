@@ -86,14 +86,14 @@ const DocumentThumbnail = ({
   const isPdf = document.file_name?.toLowerCase().endsWith('.pdf');
 
   return (
-    <div className="flex flex-col items-center gap-2 p-3 border rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-      <div className="relative w-20 h-24 bg-muted rounded overflow-hidden flex items-center justify-center">
+    <div className="flex flex-col items-center gap-1 p-2 border rounded bg-muted/30 hover:bg-muted/50 transition-colors">
+      <div className="relative w-14 h-16 bg-muted rounded overflow-hidden flex items-center justify-center">
         {loading ? (
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
         ) : error || !imageUrl ? (
-          <FileText className="h-8 w-8 text-muted-foreground" />
+          <FileText className="h-5 w-5 text-muted-foreground" />
         ) : isPdf ? (
-          <FileText className="h-8 w-8 text-red-500" />
+          <FileText className="h-5 w-5 text-red-500" />
         ) : (
           <img 
             src={imageUrl} 
@@ -103,16 +103,16 @@ const DocumentThumbnail = ({
           />
         )}
       </div>
-      <span className="text-xs font-medium text-center">{getDocumentLabel()}</span>
+      <span className="text-[10px] font-medium text-center leading-tight">{getDocumentLabel()}</span>
       {getVerificationBadge()}
       {imageUrl && (
         <Button 
           variant="ghost" 
           size="sm" 
-          className="h-7 text-xs"
+          className="h-5 text-[10px] px-1.5"
           onClick={() => onView(imageUrl, getDocumentLabel())}
         >
-          <Eye className="h-3 w-3 mr-1" />View
+          <Eye className="h-2.5 w-2.5 mr-0.5" />View
         </Button>
       )}
     </div>
@@ -183,12 +183,12 @@ export function ApplicantProfileCard({
 
   return (
     <>
-      <Card className="mb-4">
-        <CardContent className="p-4">
-          <div className="flex gap-4">
+      <Card className="mb-3">
+        <CardContent className="p-3">
+          <div className="flex gap-3">
             {/* Profile Photo */}
             <div className="flex-shrink-0">
-              <div className="w-28 h-36 bg-muted rounded-lg overflow-hidden flex items-center justify-center border">
+              <div className="w-20 h-24 bg-muted rounded overflow-hidden flex items-center justify-center border">
                 {photoUrl ? (
                   <img 
                     src={photoUrl} 
@@ -197,15 +197,15 @@ export function ApplicantProfileCard({
                     onClick={() => photoUrl && handleViewDocument(photoUrl, 'Applicant Photo')}
                   />
                 ) : (
-                  <User className="h-12 w-12 text-muted-foreground" />
+                  <User className="h-8 w-8 text-muted-foreground" />
                 )}
               </div>
             </div>
 
             {/* Profile Info */}
             <div className="flex-1 min-w-0">
-              <h3 className="text-lg font-semibold truncate">{applicantName}</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2 mt-2 text-sm">
+              <h3 className="text-base font-semibold truncate">{applicantName}</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-1 mt-1 text-xs">
                 <div>
                   <span className="text-muted-foreground">PAN:</span>
                   <span className="ml-1 font-medium">{panNumber || 'N/A'}</span>
@@ -226,10 +226,10 @@ export function ApplicantProfileCard({
             </div>
 
             {/* Document Thumbnails */}
-            <div className="flex-shrink-0 hidden lg:flex gap-2">
+            <div className="flex-shrink-0 hidden lg:flex gap-1.5">
               {loading ? (
-                <div className="flex items-center justify-center w-32">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                <div className="flex items-center justify-center w-24">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                 </div>
               ) : keyDocs.length > 0 ? (
                 keyDocs.map(doc => (
@@ -240,7 +240,7 @@ export function ApplicantProfileCard({
                   />
                 ))
               ) : (
-                <div className="flex items-center text-sm text-muted-foreground">
+                <div className="flex items-center text-xs text-muted-foreground">
                   No documents
                 </div>
               )}
@@ -248,7 +248,7 @@ export function ApplicantProfileCard({
           </div>
 
           {/* Mobile Document Grid */}
-          <div className="lg:hidden mt-4 grid grid-cols-3 gap-2">
+          <div className="lg:hidden mt-2 grid grid-cols-3 gap-1.5">
             {!loading && keyDocs.map(doc => (
               <DocumentThumbnail 
                 key={doc.id} 

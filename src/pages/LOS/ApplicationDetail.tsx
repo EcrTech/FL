@@ -484,76 +484,45 @@ export default function ApplicationDetail() {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid gap-4 md:grid-cols-5">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Requested Amount</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(application.requested_amount)}</div>
-            </CardContent>
+        <div className="grid gap-2 md:grid-cols-5">
+          <Card className="p-3">
+            <div className="text-xs text-muted-foreground">Requested Amount</div>
+            <div className="text-lg font-bold">{formatCurrency(application.requested_amount)}</div>
           </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Tenure</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{tenureDays} days</div>
-            </CardContent>
+          <Card className="p-3">
+            <div className="text-xs text-muted-foreground">Tenure</div>
+            <div className="text-lg font-bold">{tenureDays} days</div>
           </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Applicant</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-sm font-medium">
-                {primaryApplicant
-                  ? `${primaryApplicant.first_name} ${primaryApplicant.last_name || ""}`.trim()
-                  : application.contacts
-                  ? `${application.contacts.first_name} ${application.contacts.last_name || ""}`.trim()
-                  : "N/A"}
+          <Card className="p-3">
+            <div className="text-xs text-muted-foreground">Applicant</div>
+            <div className="text-sm font-medium truncate">
+              {primaryApplicant
+                ? `${primaryApplicant.first_name} ${primaryApplicant.last_name || ""}`.trim()
+                : application.contacts
+                ? `${application.contacts.first_name} ${application.contacts.last_name || ""}`.trim()
+                : "N/A"}
+            </div>
+          </Card>
+          <Card className="p-3">
+            <div className="text-xs text-muted-foreground">Assigned To</div>
+            <div className="text-sm font-medium truncate">
+              {(application as any).assigned_profile
+                ? `${(application as any).assigned_profile.first_name} ${(application as any).assigned_profile.last_name || ""}`
+                : "Unassigned"}
+            </div>
+          </Card>
+          <Card className="p-3">
+            <div className="text-xs text-muted-foreground flex items-center gap-1">
+              <MapPin className="h-3 w-3" />
+              Location
+            </div>
+            {application.latitude && application.longitude ? (
+              <div className="text-xs font-mono text-muted-foreground">
+                {Number(application.latitude).toFixed(4)}, {Number(application.longitude).toFixed(4)}
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium">Assigned To</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-sm font-medium">
-                {(application as any).assigned_profile
-                  ? `${(application as any).assigned_profile.first_name} ${(application as any).assigned_profile.last_name || ""}`
-                  : "Unassigned"}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-1.5">
-                <MapPin className="h-3.5 w-3.5" />
-                Location
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {application.latitude && application.longitude ? (
-                <div className="space-y-1">
-                  <div className="text-xs font-mono text-muted-foreground">
-                    {Number(application.latitude).toFixed(6)}, {Number(application.longitude).toFixed(6)}
-                  </div>
-                  {application.geolocation_accuracy && (
-                    <div className="text-xs text-muted-foreground">
-                      ±{Math.round(Number(application.geolocation_accuracy))}m accuracy
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-sm text-muted-foreground">Not captured</div>
-              )}
-            </CardContent>
+            ) : (
+              <div className="text-xs text-muted-foreground">Not captured</div>
+            )}
           </Card>
         </div>
 
@@ -573,27 +542,27 @@ export default function ApplicationDetail() {
         )}
 
         {/* Application Details Section */}
-        <div className="space-y-6">
+        <div className="space-y-4">
           {/* Applicant Details Card */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
+            <CardHeader className="py-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <User className="h-4 w-4" />
                 Applicant Details
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="pt-0 space-y-3">
               {primaryApplicant ? (
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-x-4 gap-y-2 md:grid-cols-4">
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Full Name</label>
+                    <label className="text-xs text-muted-foreground">Full Name</label>
                     <p className="text-sm">
                       {primaryApplicant.first_name} {primaryApplicant.middle_name || ""}{" "}
                       {primaryApplicant.last_name || ""}
                     </p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Date of Birth</label>
+                    <label className="text-xs text-muted-foreground">Date of Birth</label>
                     <p className="text-sm">
                       {primaryApplicant.dob && !isNaN(new Date(primaryApplicant.dob as string).getTime())
                         ? format(new Date(primaryApplicant.dob as string), "MMM dd, yyyy")
@@ -601,28 +570,28 @@ export default function ApplicationDetail() {
                     </p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Gender</label>
+                    <label className="text-xs text-muted-foreground">Gender</label>
                     <p className="text-sm">{(primaryApplicant.gender as string) || "N/A"}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Marital Status</label>
+                    <label className="text-xs text-muted-foreground">Marital Status</label>
                     <p className="text-sm">{(primaryApplicant.marital_status as string) || "N/A"}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">PAN Number</label>
+                    <label className="text-xs text-muted-foreground">PAN Number</label>
                     <p className="text-sm font-mono">{(primaryApplicant.pan_number as string) || "N/A"}</p>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Mobile</label>
+                    <label className="text-xs text-muted-foreground">Mobile</label>
                     <p className="text-sm">{(primaryApplicant.mobile as string) || "N/A"}</p>
                   </div>
                   <div className="md:col-span-2">
-                    <label className="text-sm font-medium text-muted-foreground">Current Address</label>
+                    <label className="text-xs text-muted-foreground">Current Address</label>
                     <p className="text-sm">{formatAddress(primaryApplicant.current_address)}</p>
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">No applicant details available. Please add applicant information.</p>
+                <p className="text-sm text-muted-foreground">No applicant details available.</p>
               )}
 
               {/* Referrals Section - Always visible with edit capability */}
