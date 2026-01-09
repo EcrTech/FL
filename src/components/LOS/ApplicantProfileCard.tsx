@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
-import { User, CreditCard, FileText, CheckCircle, XCircle, Clock, Eye, Loader2 } from "lucide-react";
+import { User, FileText, CheckCircle, Eye, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface Document {
   id: string;
@@ -25,7 +24,7 @@ interface ApplicantProfileCardProps {
   gender?: string;
 }
 
-const DocumentThumbnail = ({ 
+const DocumentCard = ({ 
   document, 
   onView 
 }: { 
@@ -35,6 +34,7 @@ const DocumentThumbnail = ({
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {
     const fetchSignedUrl = async () => {
@@ -64,17 +64,6 @@ const DocumentThumbnail = ({
     fetchSignedUrl();
   }, [document.file_path]);
 
-  const getVerificationBadge = () => {
-    switch (document.verification_status) {
-      case 'verified':
-        return <Badge className="bg-green-500/10 text-green-600 text-xs"><CheckCircle className="h-3 w-3 mr-1" />Verified</Badge>;
-      case 'failed':
-        return <Badge className="bg-red-500/10 text-red-600 text-xs"><XCircle className="h-3 w-3 mr-1" />Failed</Badge>;
-      default:
-        return <Badge variant="secondary" className="text-xs"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
-    }
-  };
-
   const getDocumentLabel = () => {
     const type = document.document_type?.toLowerCase() || '';
     if (type.includes('pan')) return 'PAN Card';
@@ -83,17 +72,35 @@ const DocumentThumbnail = ({
     return document.document_type || 'Document';
   };
 
+  const isVerified = document.verification_status === 'verified';
   const isPdf = document.file_name?.toLowerCase().endsWith('.pdf');
 
   return (
-    <div className="flex flex-col items-center gap-1.5 p-2 border rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-      <div className="relative w-24 h-16 bg-muted rounded overflow-hidden flex items-center justify-center">
+    <div 
+      className={cn(
+        "relative flex-1 h-32 rounded-lg overflow-hidden cursor-pointer transition-all duration-200 border-2",
+        isVerified 
+          ? "border-green-500 shadow-[0_0_8px_rgba(34,197,94,0.3)]" 
+          : "border-border hover:border-muted-foreground/50"
+      )}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onClick={() => imageUrl && onView(imageUrl, getDocumentLabel())}
+    >
+      {/* Document Content */}
+      <div className="w-full h-full bg-muted flex items-center justify-center">
         {loading ? (
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         ) : error || !imageUrl ? (
-          <FileText className="h-6 w-6 text-muted-foreground" />
+          <div className="flex flex-col items-center gap-1">
+            <FileText className="h-10 w-10 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">{getDocumentLabel()}</span>
+          </div>
         ) : isPdf ? (
-          <FileText className="h-6 w-6 text-red-500" />
+          <div className="flex flex-col items-center gap-1">
+            <FileText className="h-10 w-10 text-red-500" />
+            <span className="text-xs text-muted-foreground">{getDocumentLabel()}</span>
+          </div>
         ) : (
           <img 
             src={imageUrl} 
@@ -103,17 +110,27 @@ const DocumentThumbnail = ({
           />
         )}
       </div>
-      <span className="text-xs font-medium text-center leading-tight">{getDocumentLabel()}</span>
-      {getVerificationBadge()}
-      {imageUrl && (
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          className="h-6 text-xs px-2"
-          onClick={() => onView(imageUrl, getDocumentLabel())}
-        >
-          <Eye className="h-3 w-3 mr-1" />View
-        </Button>
+
+      {/* Verified Checkmark */}
+      {isVerified && (
+        <div className="absolute top-2 right-2 bg-green-500 rounded-full p-1">
+          <CheckCircle className="h-4 w-4 text-white" />
+        </div>
+      )}
+
+      {/* Label Overlay */}
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
+        <span className="text-xs font-medium text-white">{getDocumentLabel()}</span>
+      </div>
+
+      {/* Hover View Overlay */}
+      {isHovered && imageUrl && (
+        <div className="absolute inset-0 bg-black/50 flex items-center justify-center transition-opacity">
+          <div className="flex items-center gap-1.5 text-white bg-white/20 px-3 py-1.5 rounded-full backdrop-blur-sm">
+            <Eye className="h-4 w-4" />
+            <span className="text-sm font-medium">View</span>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -171,27 +188,24 @@ export function ApplicantProfileCard({
     setViewerOpen(true);
   };
 
-  // Filter key documents
+  // Filter key documents (PAN and Aadhaar only)
   const panDoc = documents.find(d => d.document_type?.toLowerCase().includes('pan'));
   const aadhaarDoc = documents.find(d => 
     d.document_type?.toLowerCase().includes('aadhaar') || 
     d.document_type?.toLowerCase().includes('aadhar')
   );
-  const employeeIdDoc = documents.find(d => 
-    d.document_type?.toLowerCase().includes('employee') ||
-    d.document_type?.toLowerCase().includes('id card')
-  );
 
-  const keyDocs = [panDoc, aadhaarDoc, employeeIdDoc].filter(Boolean) as Document[];
+  const keyDocs = [panDoc, aadhaarDoc].filter(Boolean) as Document[];
 
   return (
     <>
       <Card className="mb-3">
         <CardContent className="p-4">
-          <div className="flex flex-col items-center gap-4">
-            {/* Profile Photo - Circular */}
-            <div className="flex-shrink-0">
-              <div className="w-24 h-24 rounded-full overflow-hidden flex items-center justify-center border-2 border-primary/20 bg-muted">
+          <div className="flex gap-6">
+            {/* Left Side - Photo and Name */}
+            <div className="flex-shrink-0 flex flex-col items-center gap-2">
+              {/* Profile Photo - Circular */}
+              <div className="w-20 h-20 rounded-full overflow-hidden flex items-center justify-center border-2 border-primary/20 bg-muted">
                 {photoUrl ? (
                   <img 
                     src={photoUrl} 
@@ -200,56 +214,37 @@ export function ApplicantProfileCard({
                     onClick={() => photoUrl && handleViewDocument(photoUrl, 'Applicant Photo')}
                   />
                 ) : (
-                  <User className="h-10 w-10 text-muted-foreground" />
+                  <User className="h-8 w-8 text-muted-foreground" />
                 )}
               </div>
-            </div>
-
-            {/* Profile Info - Below Photo */}
-            <div className="text-center">
-              <h3 className="text-lg font-semibold">{applicantName}</h3>
-              <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 mt-2 text-sm">
-                <div>
-                  <span className="text-muted-foreground">PAN:</span>
-                  <span className="ml-1 font-medium">{panNumber || 'N/A'}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Mobile:</span>
-                  <span className="ml-1 font-medium">{mobile || 'N/A'}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">DOB:</span>
-                  <span className="ml-1 font-medium">{dateOfBirth || 'N/A'}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Gender:</span>
-                  <span className="ml-1 font-medium">{gender || 'N/A'}</span>
-                </div>
+              {/* Name below photo */}
+              <div className="text-center max-w-[120px]">
+                <h3 className="text-sm font-semibold leading-tight">{applicantName}</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">{panNumber || ''}</p>
               </div>
             </div>
 
-            {/* Document Thumbnails - Large */}
-            <div className="flex justify-center gap-3 w-full">
+            {/* Right Side - Document Cards */}
+            <div className="flex-1 flex gap-3">
               {loading ? (
-                <div className="flex items-center justify-center">
-                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                <div className="flex-1 flex items-center justify-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
               ) : keyDocs.length > 0 ? (
                 keyDocs.map(doc => (
-                  <DocumentThumbnail 
+                  <DocumentCard 
                     key={doc.id} 
                     document={doc} 
                     onView={handleViewDocument}
                   />
                 ))
               ) : (
-                <div className="text-sm text-muted-foreground">
+                <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground border-2 border-dashed rounded-lg">
                   No documents uploaded
                 </div>
               )}
             </div>
           </div>
-
         </CardContent>
       </Card>
 
