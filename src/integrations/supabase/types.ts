@@ -6174,6 +6174,253 @@ export type Database = {
         }
         Relationships: []
       }
+      rbl_bank_config: {
+        Row: {
+          api_endpoint: string
+          client_id: string | null
+          created_at: string
+          environment: string
+          id: string
+          is_active: boolean | null
+          org_id: string
+          updated_at: string
+        }
+        Insert: {
+          api_endpoint: string
+          client_id?: string | null
+          created_at?: string
+          environment: string
+          id?: string
+          is_active?: boolean | null
+          org_id: string
+          updated_at?: string
+        }
+        Update: {
+          api_endpoint?: string
+          client_id?: string | null
+          created_at?: string
+          environment?: string
+          id?: string
+          is_active?: boolean | null
+          org_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rbl_bank_config_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rbl_nach_mandates: {
+        Row: {
+          account_holder_name: string
+          account_number: string
+          bank_name: string | null
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          end_date: string | null
+          frequency: string
+          id: string
+          ifsc_code: string
+          loan_application_id: string
+          mandate_id: string | null
+          max_amount: number
+          org_id: string
+          rejection_reason: string | null
+          request_payload: Json | null
+          response_payload: Json | null
+          start_date: string
+          status: string
+          umrn: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_holder_name: string
+          account_number: string
+          bank_name?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          frequency: string
+          id?: string
+          ifsc_code: string
+          loan_application_id: string
+          mandate_id?: string | null
+          max_amount: number
+          org_id: string
+          rejection_reason?: string | null
+          request_payload?: Json | null
+          response_payload?: Json | null
+          start_date: string
+          status?: string
+          umrn?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_holder_name?: string
+          account_number?: string
+          bank_name?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          frequency?: string
+          id?: string
+          ifsc_code?: string
+          loan_application_id?: string
+          mandate_id?: string | null
+          max_amount?: number
+          org_id?: string
+          rejection_reason?: string | null
+          request_payload?: Json | null
+          response_payload?: Json | null
+          start_date?: string
+          status?: string
+          umrn?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rbl_nach_mandates_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rbl_nach_mandates_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_with_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rbl_nach_mandates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rbl_nach_mandates_loan_application_id_fkey"
+            columns: ["loan_application_id"]
+            isOneToOne: false
+            referencedRelation: "loan_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rbl_nach_mandates_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rbl_payment_transactions: {
+        Row: {
+          amount: number | null
+          beneficiary_account: string | null
+          beneficiary_ifsc: string | null
+          beneficiary_name: string | null
+          callback_data: Json | null
+          created_at: string
+          disbursement_id: string | null
+          error_message: string | null
+          id: string
+          initiated_by: string | null
+          loan_application_id: string | null
+          org_id: string
+          payment_mode: string | null
+          reference_id: string
+          request_payload: Json | null
+          response_payload: Json | null
+          status: string
+          transaction_type: string
+          updated_at: string
+          utr_number: string | null
+        }
+        Insert: {
+          amount?: number | null
+          beneficiary_account?: string | null
+          beneficiary_ifsc?: string | null
+          beneficiary_name?: string | null
+          callback_data?: Json | null
+          created_at?: string
+          disbursement_id?: string | null
+          error_message?: string | null
+          id?: string
+          initiated_by?: string | null
+          loan_application_id?: string | null
+          org_id: string
+          payment_mode?: string | null
+          reference_id: string
+          request_payload?: Json | null
+          response_payload?: Json | null
+          status?: string
+          transaction_type: string
+          updated_at?: string
+          utr_number?: string | null
+        }
+        Update: {
+          amount?: number | null
+          beneficiary_account?: string | null
+          beneficiary_ifsc?: string | null
+          beneficiary_name?: string | null
+          callback_data?: Json | null
+          created_at?: string
+          disbursement_id?: string | null
+          error_message?: string | null
+          id?: string
+          initiated_by?: string | null
+          loan_application_id?: string | null
+          org_id?: string
+          payment_mode?: string | null
+          reference_id?: string
+          request_payload?: Json | null
+          response_payload?: Json | null
+          status?: string
+          transaction_type?: string
+          updated_at?: string
+          utr_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rbl_payment_transactions_disbursement_id_fkey"
+            columns: ["disbursement_id"]
+            isOneToOne: false
+            referencedRelation: "loan_disbursements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rbl_payment_transactions_initiated_by_fkey"
+            columns: ["initiated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rbl_payment_transactions_loan_application_id_fkey"
+            columns: ["loan_application_id"]
+            isOneToOne: false
+            referencedRelation: "loan_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rbl_payment_transactions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       redefine_data_repository: {
         Row: {
           address: string | null
