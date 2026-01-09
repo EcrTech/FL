@@ -17,6 +17,7 @@ import UploadSignedDocumentDialog from "@/components/LOS/Sanction/UploadSignedDo
 interface SanctionApplication {
   id: string;
   application_number: string;
+  loan_id: string | null;
   product_type: string;
   approved_amount: number;
   tenure_days: number;
@@ -74,6 +75,7 @@ export default function Sanctions() {
         const sanction = sanctions?.find((s) => s.loan_application_id === app.id);
         return {
           ...app,
+          loan_id: app.loan_id || null,
           applicant_name: applicant
             ? [applicant.first_name, applicant.last_name].filter(Boolean).join(" ")
             : "N/A",
@@ -253,6 +255,7 @@ export default function Sanctions() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Loan ID</TableHead>
                       <TableHead>Application No.</TableHead>
                       <TableHead>Applicant</TableHead>
                       <TableHead>Loan Type</TableHead>
@@ -285,7 +288,10 @@ export default function Sanctions() {
                           className="cursor-pointer hover:bg-muted/50"
                           onClick={() => navigate(`/los/sanctions/${app.id}`)}
                         >
-                          <TableCell className="font-medium">
+                          <TableCell className="font-medium text-primary">
+                            {app.loan_id || "—"}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
                             {app.application_number}
                           </TableCell>
                           <TableCell>

@@ -114,6 +114,7 @@ export default function ApprovalQueue({ orgId, userId }: ApprovalQueueProps) {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Loan ID</TableHead>
                   <TableHead>Application #</TableHead>
                   <TableHead>Applicant</TableHead>
                   <TableHead>Amount</TableHead>
@@ -126,7 +127,10 @@ export default function ApprovalQueue({ orgId, userId }: ApprovalQueueProps) {
               <TableBody>
                 {applications.map((app) => (
                   <TableRow key={app.id}>
-                    <TableCell className="font-mono font-medium">
+                    <TableCell className="font-medium text-primary">
+                      {app.loan_id || "—"}
+                    </TableCell>
+                    <TableCell className="font-mono text-muted-foreground">
                       {app.application_number}
                     </TableCell>
                     <TableCell>{getApplicantName(app)}</TableCell>

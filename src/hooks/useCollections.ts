@@ -7,6 +7,7 @@ export interface CollectionRecord {
   id: string;
   loan_application_id: string;
   application_number: string;
+  loan_id: string | null;
   applicant_name: string;
   applicant_phone: string;
   emi_number: number;
@@ -44,6 +45,7 @@ export function useCollections() {
           status,
           loan_applications:loan_application_id(
             application_number,
+            loan_id,
             loan_amount,
             contact_id,
             loan_applicants(first_name, last_name, phone),
@@ -64,6 +66,7 @@ export function useCollections() {
           id: item.id,
           loan_application_id: item.loan_application_id,
           application_number: item.loan_applications?.application_number || "N/A",
+          loan_id: item.loan_applications?.loan_id || null,
           applicant_name: applicant 
             ? `${applicant.first_name} ${applicant.last_name || ""}`.trim() 
             : "N/A",
