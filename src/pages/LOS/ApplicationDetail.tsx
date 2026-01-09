@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, User, FileText, Calculator, FileCheck, DollarSign, XCircle, CreditCard, CheckCircle, MapPin, Edit2, Save, X } from "lucide-react";
+import { ArrowLeft, User, FileText, Calculator, FileCheck, DollarSign, XCircle, CreditCard, CheckCircle, MapPin, Edit2, Save, X, RefreshCw, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { LoadingState } from "@/components/common/LoadingState";
 import { format } from "date-fns";
@@ -367,6 +367,130 @@ export default function ApplicationDetail() {
     enabled: !!id && !!orgId,
   });
 
+  // Extract applicant data from OCR documents
+  const extractApplicantFromOCR = () => {
+    const allDocs = documents || [];
+    
+    // Get data from different document types
+    const salarySlip = allDocs.find(d => d.document_type?.includes('salary_slip') && d.ocr_data);
+    const form16 = allDocs.find(d => d.document_type?.includes('form_16') && d.ocr_data);
+    const itr = allDocs.find(d => d.document_type?.includes('itr') && d.ocr_data);
+    const bankStatement = allDocs.find(d => d.document_type === 'bank_statement' && d.ocr_data);
+    const employeeId = allDocs.find(d => d.document_type === 'employee_id' && d.ocr_data);
+    const panCard = allDocs.find(d => d.document_type === 'pan_card' && d.ocr_data);
+    const aadhaarCard = allDocs.find(d => (d.document_type === 'aadhaar_card' || d.document_type === 'aadhar_card') && d.ocr_data);
+    
+    // Extract name from various sources (prioritize verified documents)
+    const extractedName = 
+      (panCard?.ocr_data as any)?.name ||
+      (aadhaarCard?.ocr_data as any)?.name ||
+      (salarySlip?.ocr_data as any)?.employee_name ||
+      (form16?.ocr_data as any)?.employee_name ||
+      (itr?.ocr_data as any)?.name ||
+      (bankStatement?.ocr_data as any)?.account_holder_name ||
+      (employeeId?.ocr_data as any)?.employee_name;
+    
+    // Parse name into parts
+    const nameParts = extractedName?.trim().split(/\s+/) || [];
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
+    const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '';
+    
+    // Extract PAN number
+    const panNumber = (panCard?.ocr_data as any)?.pan_number || (panCard?.ocr_data as any)?.pan;
+    
+    // Extract DOB
+    const dob = (panCard?.ocr_data as any)?.dob || (aadhaarCard?.ocr_data as any)?.dob;
+    
+    // Extract gender
+    const gender = (aadhaarCard?.ocr_data as any)?.gender;
+    
+    // Extract father's name
+    const fatherName = (panCard?.ocr_data as any)?.father_name || (aadhaarCard?.ocr_data as any)?.father_name;
+    
+    // Extract mobile from employeeId or other sources
+    const mobile = (employeeId?.ocr_data as any)?.phone?.replace(/[^0-9]/g, '').slice(-10) || '';
+    
+    // Extract email
+    const email = (employeeId?.ocr_data as any)?.email;
+    
+    // Extract address from Aadhaar
+    const address = (aadhaarCard?.ocr_data as any)?.address;
+    
+    return {
+      firstName,
+      middleName,
+      lastName,
+      panNumber,
+      dob,
+      gender,
+      fatherName,
+      mobile,
+      email,
+      address,
+      hasData: !!firstName
+    };
+  };
+
+  // Mutation to create applicant from OCR data
+  const createApplicantFromOCRMutation = useMutation({
+    mutationFn: async () => {
+      const ocrData = extractApplicantFromOCR();
+      
+      if (!ocrData.firstName) {
+        throw new Error("No name found in parsed documents");
+      }
+      
+      // Parse and validate DOB
+      let parsedDob: string | null = null;
+      if (ocrData.dob) {
+        const dobDate = new Date(ocrData.dob);
+        if (!isNaN(dobDate.getTime())) {
+          parsedDob = dobDate.toISOString().split('T')[0];
+        }
+      }
+      
+      // Use a placeholder DOB if not found (required field)
+      const finalDob = parsedDob || '1990-01-01';
+      
+      // Mobile is required - use placeholder if not found
+      const finalMobile = ocrData.mobile || '0000000000';
+      
+      const applicantData = {
+        loan_application_id: id,
+        applicant_type: 'primary',
+        first_name: ocrData.firstName,
+        middle_name: ocrData.middleName || null,
+        last_name: ocrData.lastName || null,
+        father_name: ocrData.fatherName || null,
+        pan_number: ocrData.panNumber || null,
+        dob: finalDob,
+        gender: ocrData.gender || null,
+        mobile: finalMobile,
+        email: ocrData.email || null,
+        current_address: ocrData.address ? { line1: ocrData.address } : null,
+      };
+      
+      const { data, error } = await supabase
+        .from("loan_applicants")
+        .insert(applicantData)
+        .select()
+        .single();
+        
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Applicant profile created from document data");
+      queryClient.invalidateQueries({ queryKey: ["loan-application", id, orgId] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to create applicant profile");
+    },
+  });
+
+  const ocrApplicantData = extractApplicantFromOCR();
+
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
@@ -600,8 +724,38 @@ export default function ApplicationDetail() {
                     <p className="text-sm">{formatAddress(primaryApplicant.current_address)}</p>
                   </div>
                 </div>
+              ) : ocrApplicantData.hasData ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg border border-dashed">
+                    <Sparkles className="h-5 w-5 text-primary" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Applicant data found in documents</p>
+                      <p className="text-xs text-muted-foreground">
+                        Name: {ocrApplicantData.firstName} {ocrApplicantData.middleName} {ocrApplicantData.lastName}
+                        {ocrApplicantData.panNumber && ` • PAN: ${ocrApplicantData.panNumber}`}
+                      </p>
+                    </div>
+                    <Button 
+                      onClick={() => createApplicantFromOCRMutation.mutate()}
+                      disabled={createApplicantFromOCRMutation.isPending}
+                      size="sm"
+                    >
+                      {createApplicantFromOCRMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                          Create Applicant Profile
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
               ) : (
-                <p className="text-sm text-muted-foreground">No applicant details available.</p>
+                <p className="text-sm text-muted-foreground">No applicant details available. Upload documents to auto-fill applicant information.</p>
               )}
 
               {/* Referrals Section - Always visible with edit capability */}
