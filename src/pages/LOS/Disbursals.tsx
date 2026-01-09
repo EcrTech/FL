@@ -314,7 +314,9 @@ export default function Disbursals() {
                         <TableCell className="font-mono text-sm">{item.application_number}</TableCell>
                         <TableCell>{item.applicant_name}</TableCell>
                         <TableCell>{formatCurrency(item.approved_amount)}</TableCell>
-                        <TableCell>{formatCurrency(item.disbursed_amount)}</TableCell>
+                        <TableCell>
+                          {item.status === "ready" ? "-" : formatCurrency(item.disbursed_amount)}
+                        </TableCell>
                         <TableCell>{getStatusBadge(item.status)}</TableCell>
                         <TableCell className="font-mono text-sm">{item.utr_number || "-"}</TableCell>
                         <TableCell>
