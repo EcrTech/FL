@@ -172,21 +172,8 @@ export function CustomerDetailDialog({
     }).format(amount);
   };
 
-  const handleCreateReapplication = () => {
-    const latestApp = customer.applications[0];
-    
-    navigate("/los/applications/new", {
-      state: {
-        prefillData: {
-          pan_number: customer.panNumber,
-          mobile: customer.mobile,
-          name: customer.name,
-          email: customer.email,
-          isReapplication: true,
-          previousApplicationId: latestApp?.applicationId,
-        },
-      },
-    });
+  const handleShareReferralLink = () => {
+    navigate("/los/my-referrals");
     onOpenChange(false);
   };
 
@@ -229,9 +216,9 @@ export function CustomerDetailDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <span>Customer Details</span>
-            <Button onClick={handleCreateReapplication}>
+            <Button onClick={handleShareReferralLink}>
               <RefreshCw className="h-4 w-4 mr-2" />
-              Create Reapplication
+              Share Referral Link
             </Button>
           </DialogTitle>
         </DialogHeader>

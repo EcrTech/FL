@@ -47,7 +47,7 @@ import Inventory from "./pages/Inventory";
 import OutboundWebhooks from "./pages/OutboundWebhooks";
 import Tasks from "./pages/Tasks";
 import Applications from "./pages/LOS/Applications";
-import NewApplication from "./pages/LOS/NewApplication";
+// NewApplication import removed - applications only via referral links
 import ApplicationDetail from "./pages/LOS/ApplicationDetail";
 import ApprovalQueuePage from "./pages/LOS/ApprovalQueue";
 import LOSDashboard from "./pages/LOS/Dashboard";
@@ -300,11 +300,7 @@ const App = () => (
             </ProtectedRoute>
           } />
           
-          <Route path="/los/applications/new" element={
-            <ProtectedRoute>
-              <NewApplication />
-            </ProtectedRoute>
-          } />
+          {/* NewApplication route removed - applications only via referral links */}
           
           <Route path="/los/applications/:id" element={
             <ProtectedRoute>

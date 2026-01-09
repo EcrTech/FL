@@ -68,20 +68,8 @@ export default function CustomerRelationships() {
     setDialogOpen(true);
   };
 
-  const handleCreateReapplication = (customer: CustomerRelationship) => {
-    const latestApp = customer.applications[0];
-    navigate("/los/applications/new", {
-      state: {
-        prefillData: {
-          pan_number: customer.panNumber,
-          mobile: customer.mobile,
-          name: customer.name,
-          email: customer.email,
-          isReapplication: true,
-          previousApplicationId: latestApp?.applicationId,
-        },
-      },
-    });
+  const handleShareReferralLink = () => {
+    navigate("/los/my-referrals");
   };
 
   const handleExportCSV = () => {
@@ -231,7 +219,7 @@ export default function CustomerRelationships() {
                 key={customer.customerId}
                 customer={customer}
                 onViewDetails={handleViewDetails}
-                onCreateReapplication={handleCreateReapplication}
+                onShareReferralLink={handleShareReferralLink}
               />
             ))}
           </div>
@@ -244,7 +232,7 @@ export default function CustomerRelationships() {
                     key={customer.customerId}
                     customer={customer}
                     onViewDetails={handleViewDetails}
-                    onCreateReapplication={handleCreateReapplication}
+                    onShareReferralLink={handleShareReferralLink}
                   />
                 ))}
               </div>

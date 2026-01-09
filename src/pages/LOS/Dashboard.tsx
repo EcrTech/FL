@@ -180,12 +180,7 @@ export default function LOSDashboard() {
               Loan Origination System overview and statistics
             </p>
           </div>
-          {permissions.canCreateApplication && (
-            <Button onClick={() => navigate("/los/applications/new")}>
-              <FileText className="h-4 w-4 mr-2" />
-              New Application
-            </Button>
-          )}
+          {/* Applications can only be created via referral links */}
         </div>
 
         {/* Stats Grid */}
@@ -371,16 +366,14 @@ export default function LOSDashboard() {
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 md:grid-cols-3">
-              {permissions.canCreateApplication && (
-                <Button
-                  variant="outline"
-                  className="h-auto py-4 flex-col gap-2"
-                  onClick={() => navigate("/los/applications/new")}
-                >
-                  <FileText className="h-6 w-6" />
-                  <span>New Application</span>
-                </Button>
-              )}
+              <Button
+                variant="outline"
+                className="h-auto py-4 flex-col gap-2"
+                onClick={() => navigate("/los/my-referrals")}
+              >
+                <FileText className="h-6 w-6" />
+                <span>My Referrals</span>
+              </Button>
               {permissions.canApproveLoans && (
                 <Button
                   variant="outline"
