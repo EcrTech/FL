@@ -566,24 +566,8 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
       );
     }
 
-    // For API-verifiable docs (PAN, Aadhaar), use API verification
-    if (isApiVerifiable) {
-      return (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8"
-              onClick={() => handleVerify(docType, document.id)}
-            >
-              <Shield className="h-4 w-4 text-muted-foreground hover:text-primary" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Verify via API</TooltipContent>
-        </Tooltip>
-      );
-    }
+    // For API-verifiable docs (PAN, Aadhaar), now handled in ApplicantProfileCard
+    // Allow manual approval only for other docs
 
     // For other docs, allow manual approval
     return (
@@ -707,7 +691,6 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
                             <TableCell className="py-2 text-right" onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center justify-end gap-1">
                                 {!isVerificationDoc && (
-                                  <>
                                   <>
                                     {/* Eye icon - View document */}
                                     <Tooltip>
