@@ -79,21 +79,21 @@ const DocumentThumbnail = ({
     const type = document.document_type?.toLowerCase() || '';
     if (type.includes('pan')) return 'PAN Card';
     if (type.includes('aadhaar') || type.includes('aadhar')) return 'Aadhaar Card';
-    if (type.includes('photo')) return 'Photo';
+    if (type.includes('employee') || type.includes('id card')) return 'Employee ID';
     return document.document_type || 'Document';
   };
 
   const isPdf = document.file_name?.toLowerCase().endsWith('.pdf');
 
   return (
-    <div className="flex flex-col items-center gap-1 p-2 border rounded bg-muted/30 hover:bg-muted/50 transition-colors">
-      <div className="relative w-14 h-16 bg-muted rounded overflow-hidden flex items-center justify-center">
+    <div className="flex flex-col items-center gap-1.5 p-2 border rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+      <div className="relative w-24 h-16 bg-muted rounded overflow-hidden flex items-center justify-center">
         {loading ? (
-          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         ) : error || !imageUrl ? (
-          <FileText className="h-5 w-5 text-muted-foreground" />
+          <FileText className="h-6 w-6 text-muted-foreground" />
         ) : isPdf ? (
-          <FileText className="h-5 w-5 text-red-500" />
+          <FileText className="h-6 w-6 text-red-500" />
         ) : (
           <img 
             src={imageUrl} 
@@ -103,16 +103,16 @@ const DocumentThumbnail = ({
           />
         )}
       </div>
-      <span className="text-[10px] font-medium text-center leading-tight">{getDocumentLabel()}</span>
+      <span className="text-xs font-medium text-center leading-tight">{getDocumentLabel()}</span>
       {getVerificationBadge()}
       {imageUrl && (
         <Button 
           variant="ghost" 
           size="sm" 
-          className="h-5 text-[10px] px-1.5"
+          className="h-6 text-xs px-2"
           onClick={() => onView(imageUrl, getDocumentLabel())}
         >
-          <Eye className="h-2.5 w-2.5 mr-0.5" />View
+          <Eye className="h-3 w-3 mr-1" />View
         </Button>
       )}
     </div>
@@ -177,18 +177,21 @@ export function ApplicantProfileCard({
     d.document_type?.toLowerCase().includes('aadhaar') || 
     d.document_type?.toLowerCase().includes('aadhar')
   );
-  const photoDoc = documents.find(d => d.document_type?.toLowerCase().includes('photo'));
+  const employeeIdDoc = documents.find(d => 
+    d.document_type?.toLowerCase().includes('employee') ||
+    d.document_type?.toLowerCase().includes('id card')
+  );
 
-  const keyDocs = [panDoc, aadhaarDoc, photoDoc].filter(Boolean) as Document[];
+  const keyDocs = [panDoc, aadhaarDoc, employeeIdDoc].filter(Boolean) as Document[];
 
   return (
     <>
       <Card className="mb-3">
-        <CardContent className="p-3">
-          <div className="flex gap-3">
-            {/* Profile Photo */}
+        <CardContent className="p-4">
+          <div className="flex flex-col items-center gap-4">
+            {/* Profile Photo - Circular */}
             <div className="flex-shrink-0">
-              <div className="w-20 h-24 bg-muted rounded overflow-hidden flex items-center justify-center border">
+              <div className="w-24 h-24 rounded-full overflow-hidden flex items-center justify-center border-2 border-primary/20 bg-muted">
                 {photoUrl ? (
                   <img 
                     src={photoUrl} 
@@ -197,15 +200,15 @@ export function ApplicantProfileCard({
                     onClick={() => photoUrl && handleViewDocument(photoUrl, 'Applicant Photo')}
                   />
                 ) : (
-                  <User className="h-8 w-8 text-muted-foreground" />
+                  <User className="h-10 w-10 text-muted-foreground" />
                 )}
               </div>
             </div>
 
-            {/* Profile Info */}
-            <div className="flex-1 min-w-0">
-              <h3 className="text-base font-semibold truncate">{applicantName}</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-1 mt-1 text-xs">
+            {/* Profile Info - Below Photo */}
+            <div className="text-center">
+              <h3 className="text-lg font-semibold">{applicantName}</h3>
+              <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 mt-2 text-sm">
                 <div>
                   <span className="text-muted-foreground">PAN:</span>
                   <span className="ml-1 font-medium">{panNumber || 'N/A'}</span>
@@ -225,10 +228,10 @@ export function ApplicantProfileCard({
               </div>
             </div>
 
-            {/* Document Thumbnails */}
-            <div className="flex-shrink-0 hidden lg:flex gap-1.5">
+            {/* Document Thumbnails - Large */}
+            <div className="flex justify-center gap-3 w-full">
               {loading ? (
-                <div className="flex items-center justify-center w-24">
+                <div className="flex items-center justify-center">
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                 </div>
               ) : keyDocs.length > 0 ? (
@@ -240,23 +243,13 @@ export function ApplicantProfileCard({
                   />
                 ))
               ) : (
-                <div className="flex items-center text-xs text-muted-foreground">
-                  No documents
+                <div className="text-sm text-muted-foreground">
+                  No documents uploaded
                 </div>
               )}
             </div>
           </div>
 
-          {/* Mobile Document Grid */}
-          <div className="lg:hidden mt-2 grid grid-cols-3 gap-1.5">
-            {!loading && keyDocs.map(doc => (
-              <DocumentThumbnail 
-                key={doc.id} 
-                document={doc} 
-                onView={handleViewDocument}
-              />
-            ))}
-          </div>
         </CardContent>
       </Card>
 
