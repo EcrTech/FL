@@ -53,6 +53,7 @@ import ApprovalQueuePage from "./pages/LOS/ApprovalQueue";
 import LOSDashboard from "./pages/LOS/Dashboard";
 import MyReferrals from "./pages/LOS/MyReferrals";
 import Collections from "./pages/LOS/Collections";
+import CustomerRelationships from "./pages/LOS/CustomerRelationships";
 import Sanctions from "./pages/LOS/Sanctions";
 import SanctionDetail from "./pages/LOS/SanctionDetail";
 import Disbursals from "./pages/LOS/Disbursals";
@@ -344,6 +345,12 @@ const App = () => (
           <Route path="/los/collections" element={
             <ProtectedRoute>
               <Collections />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/los/relationships" element={
+            <ProtectedRoute>
+              <CustomerRelationships />
             </ProtectedRoute>
           } />
           
