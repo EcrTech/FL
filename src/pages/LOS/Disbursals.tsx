@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
   CreditCard, Search, Eye, Loader2, CheckCircle, 
-  Clock, XCircle, Banknote, FileCheck
+  Clock, XCircle, Upload, FileCheck
 } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import ProofUploadDialog from "@/components/LOS/Disbursement/ProofUploadDialog";
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat("en-IN", {
@@ -48,6 +49,15 @@ type UnifiedDisbursalItem = {
   has_proof?: boolean;
   date: string;
   disbursement_number?: string;
+  transaction_date?: string;
+  // For single-step upload
+  sanction_id?: string;
+  bank_details?: {
+    beneficiaryName: string;
+    accountNumber: string;
+    ifscCode: string;
+    bankName: string;
+  };
 };
 
 export default function Disbursals() {
@@ -55,6 +65,7 @@ export default function Disbursals() {
   const { orgId } = useOrgContext();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [uploadDialogItem, setUploadDialogItem] = useState<UnifiedDisbursalItem | null>(null);
 
   // Fetch all disbursal data in a unified way
   const { data: allDisbursals, isLoading } = useQuery({
@@ -73,7 +84,7 @@ export default function Disbursals() {
           approved_amount,
           current_stage,
           created_at,
-          loan_sanctions!inner(id)
+          loan_sanctions!inner(id, processing_fee)
         `)
         .eq("org_id", orgId)
         .in("current_stage", ["sanction", "sanctioned", "disbursement_pending"])
@@ -105,14 +116,37 @@ export default function Disbursals() {
               .eq("applicant_type", "primary")
               .maybeSingle();
 
+            // Fetch bank details from OCR
+            const { data: bankStatement } = await supabase
+              .from("loan_documents")
+              .select("ocr_data")
+              .eq("loan_application_id", app.id)
+              .eq("document_type", "bank_statement")
+              .not("ocr_data", "is", null)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            const ocrData = bankStatement?.ocr_data as Record<string, unknown> | null;
+            const sanction = Array.isArray(app.loan_sanctions) ? app.loan_sanctions[0] : app.loan_sanctions;
+            const processingFee = sanction?.processing_fee || 0;
+            const netAmount = (app.approved_amount || 0) - processingFee;
+
             unified.push({
               id: app.id,
               application_id: app.id,
               application_number: app.application_number,
               applicant_name: applicant ? `${applicant.first_name} ${applicant.last_name || ""}`.trim() : "N/A",
-              amount: app.approved_amount || 0,
+              amount: netAmount,
               status: "ready",
               date: app.created_at,
+              sanction_id: sanction?.id,
+              bank_details: ocrData ? {
+                beneficiaryName: (ocrData.account_holder_name as string) || "",
+                accountNumber: (ocrData.account_number as string) || "",
+                ifscCode: (ocrData.ifsc_code as string) || "",
+                bankName: (ocrData.bank_name as string) || "",
+              } : undefined,
             });
           }
         }
@@ -151,7 +185,8 @@ export default function Disbursals() {
             status: d.status as "pending" | "completed" | "failed",
             utr_number: d.utr_number,
             has_proof: !!d.proof_document_path,
-            date: d.disbursement_date || d.created_at,
+            date: d.created_at,
+            transaction_date: d.disbursement_date,
             disbursement_number: d.disbursement_number,
           });
         }
@@ -263,8 +298,8 @@ export default function Disbursals() {
                       <TableHead>Amount</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>UTR</TableHead>
+                      <TableHead>Transaction Date</TableHead>
                       <TableHead>Proof</TableHead>
-                      <TableHead>Date</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -277,6 +312,11 @@ export default function Disbursals() {
                         <TableCell>{getStatusBadge(item.status)}</TableCell>
                         <TableCell className="font-mono text-sm">{item.utr_number || "-"}</TableCell>
                         <TableCell>
+                          {item.transaction_date 
+                            ? format(new Date(item.transaction_date), "MMM dd, yyyy")
+                            : "-"}
+                        </TableCell>
+                        <TableCell>
                           {item.has_proof ? (
                             <Badge variant="outline" className="gap-1 text-green-600">
                               <CheckCircle className="h-3 w-3" />
@@ -286,17 +326,15 @@ export default function Disbursals() {
                             <span className="text-muted-foreground text-sm">-</span>
                           )}
                         </TableCell>
-                        <TableCell>
-                          {format(new Date(item.date), "MMM dd, yyyy")}
-                        </TableCell>
                         <TableCell className="text-right">
                           {item.status === "ready" ? (
                             <Button
                               size="sm"
-                              onClick={() => navigate(`/los/applications/${item.application_id}?tab=disbursement`)}
+                              onClick={() => setUploadDialogItem(item)}
+                              disabled={!item.bank_details?.accountNumber}
                             >
-                              <Banknote className="h-4 w-4 mr-2" />
-                              Initiate
+                              <Upload className="h-4 w-4 mr-2" />
+                              Complete
                             </Button>
                           ) : (
                             <Button
@@ -322,6 +360,18 @@ export default function Disbursals() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Single-step upload dialog */}
+      {uploadDialogItem && (
+        <ProofUploadDialog
+          open={!!uploadDialogItem}
+          onOpenChange={(open) => !open && setUploadDialogItem(null)}
+          applicationId={uploadDialogItem.application_id}
+          sanctionId={uploadDialogItem.sanction_id}
+          disbursementAmount={uploadDialogItem.amount}
+          bankDetails={uploadDialogItem.bank_details}
+        />
+      )}
     </DashboardLayout>
   );
 }
