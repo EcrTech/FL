@@ -135,33 +135,44 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const refreshAuth = useCallback(async () => {
     setIsLoading(true);
-    const { data: { session: currentSession } } = await supabase.auth.getSession();
-    setSession(currentSession);
-    setUser(currentSession?.user ?? null);
-    
-    if (currentSession?.user) {
-      await fetchUserData(currentSession.user);
-    }
-    setIsLoading(false);
-  }, [fetchUserData]);
-
-  useEffect(() => {
-    let mounted = true;
-
-    const initAuth = async () => {
+    try {
       const { data: { session: currentSession } } = await supabase.auth.getSession();
-      
-      if (!mounted) return;
-      
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       
       if (currentSession?.user) {
         await fetchUserData(currentSession.user);
       }
-      
+    } catch (error) {
+      console.error("Error refreshing auth:", error);
+    } finally {
       setIsLoading(false);
-      setIsInitialized(true);
+    }
+  }, [fetchUserData]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const initAuth = async () => {
+      try {
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        
+        if (!mounted) return;
+        
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+        
+        if (currentSession?.user) {
+          await fetchUserData(currentSession.user);
+        }
+      } catch (error) {
+        console.error("Error initializing auth:", error);
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+          setIsInitialized(true);
+        }
+      }
     };
 
     initAuth();
@@ -171,17 +182,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
       async (event, currentSession) => {
         if (!mounted) return;
         
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
-        
-        if (event === 'SIGNED_IN' && currentSession?.user) {
-          await fetchUserData(currentSession.user);
-        } else if (event === 'SIGNED_OUT') {
-          // Clear all state on sign out
-          setProfile(null);
-          setOrganization(null);
-          setUserRole(null);
-          setDesignationPermissions([]);
+        try {
+          setSession(currentSession);
+          setUser(currentSession?.user ?? null);
+          
+          if (event === 'SIGNED_IN' && currentSession?.user) {
+            await fetchUserData(currentSession.user);
+          } else if (event === 'SIGNED_OUT') {
+            setProfile(null);
+            setOrganization(null);
+            setUserRole(null);
+            setDesignationPermissions([]);
+          }
+        } catch (error) {
+          console.error("Error handling auth state change:", error);
         }
       }
     );
