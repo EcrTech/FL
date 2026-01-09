@@ -31,7 +31,6 @@ const DOCUMENT_CATEGORIES = {
   income: "Income Proof",
   bank: "Bank Statements",
   employment: "Employment Proof",
-  photo: "Photographs",
   other: "Other Documents",
 };
 
@@ -46,7 +45,6 @@ const REQUIRED_DOCUMENTS = [
   { type: "bank_statement", name: "Bank Statement (6 months)", category: "bank", mandatory: true, verifiable: false, parseable: true },
   { type: "offer_letter", name: "Offer Letter", category: "employment", mandatory: true, verifiable: false, parseable: true },
   { type: "employee_id", name: "Employee ID Card", category: "employment", mandatory: false, verifiable: false, parseable: true },
-  { type: "passport_photo", name: "Passport Size Photo", category: "photo", mandatory: true, verifiable: false, parseable: false },
 ];
 
 // Map document types to verification types (only for bank statement now)
@@ -607,25 +605,6 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
   return (
     <TooltipProvider>
       <div className="space-y-4">
-        {/* Parse All Button */}
-        {unparsedCount > 0 && (
-          <div className="flex justify-end">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleParseAll}
-              disabled={isParsingAll}
-              className="gap-2"
-            >
-              {isParsingAll ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Sparkles className="h-4 w-4" />
-              )}
-              {isParsingAll ? "Parsing..." : `Parse All Documents (${unparsedCount})`}
-            </Button>
-          </div>
-        )}
         {Object.entries(groupedDocs).map(([category, docs]) => (
           <Card key={category}>
             <CardHeader className="py-3 px-4">
@@ -637,9 +616,9 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[40%]">Document</TableHead>
-                    <TableHead className="w-[25%]">Status</TableHead>
-                    <TableHead className="text-right w-[35%]">Actions</TableHead>
+                    <TableHead className="w-[50%]">Document</TableHead>
+                    <TableHead className="w-[20%]">Status</TableHead>
+                    <TableHead className="text-right w-[30%]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
