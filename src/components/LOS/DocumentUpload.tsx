@@ -616,12 +616,22 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
     );
   };
 
+  // Merge bank and employment into one column
   const groupedDocs = REQUIRED_DOCUMENTS.reduce((acc, doc) => {
-    const category = doc.category;
+    // Merge bank and employment categories
+    const category = doc.category === "bank" || doc.category === "employment" 
+      ? "bank_employment" 
+      : doc.category;
     if (!acc[category]) acc[category] = [];
     acc[category].push(doc);
     return acc;
   }, {} as Record<string, typeof REQUIRED_DOCUMENTS>);
+
+  // Custom category labels
+  const getCategoryLabel = (category: string) => {
+    if (category === "bank_employment") return "Bank & Employment";
+    return DOCUMENT_CATEGORIES[category as keyof typeof DOCUMENT_CATEGORIES] || category;
+  };
 
   // Count documents that need parsing
   const parseableDocTypes = REQUIRED_DOCUMENTS.filter((d) => d.parseable).map((d) => d.type);
@@ -635,13 +645,37 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
 
   return (
     <TooltipProvider>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {Object.entries(groupedDocs).map(([category, docs]) => (
-          <Card key={category} className="h-fit">
-            <CardHeader className="py-3 px-4">
-              <CardTitle className="text-sm font-medium">
-                {DOCUMENT_CATEGORIES[category as keyof typeof DOCUMENT_CATEGORIES]}
-              </CardTitle>
+      <div className="space-y-3">
+        {/* Parse All Documents button */}
+        <div className="flex justify-end">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleParseAll}
+            disabled={isParsingAll || unparsedCount === 0}
+            className="gap-2"
+          >
+            {isParsingAll ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4" />
+            )}
+            Parse All Documents
+            {unparsedCount > 0 && (
+              <Badge variant="secondary" className="ml-1 text-xs">
+                {unparsedCount}
+              </Badge>
+            )}
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {Object.entries(groupedDocs).map(([category, docs]) => (
+            <Card key={category} className="h-fit">
+              <CardHeader className="py-3 px-4">
+                <CardTitle className="text-sm font-medium">
+                  {getCategoryLabel(category)}
+                </CardTitle>
             </CardHeader>
             <CardContent className="p-3 pt-0 space-y-2">
               {docs.map((doc) => {
@@ -714,10 +748,6 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
                     
                     {/* Action buttons */}
                     <div className="flex items-center gap-0.5 flex-shrink-0">
-
-                      {/* Parse */}
-                      {getParseIcon(doc.type, document)}
-
                       {/* Verify */}
                       {getVerifyIcon(doc.type, document)}
 
@@ -759,9 +789,10 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
                   </div>
                 );
               })}
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
 
       {/* Document Preview Dialog */}
