@@ -239,16 +239,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                 </div>
               )}
               
-              {canAccessFeature("contacts") && (
-                <Link
-                  to="/contacts"
-                  className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <Contact size={20} />
-                  <span>Contacts</span>
-                </Link>
-              )}
 
               {canAccessFeature("pipeline_stages") && (
                 <Link
