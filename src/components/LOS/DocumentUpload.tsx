@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Upload, CheckCircle, XCircle, Eye, Shield, Loader2, Wand2, ChevronDown, ChevronRight, Sparkles } from "lucide-react";
+import { Upload, CheckCircle, XCircle, Eye, Shield, Loader2, Wand2, ChevronDown, ChevronRight, Sparkles, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -65,6 +65,7 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
   });
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [isParsingAll, setIsParsingAll] = useState(false);
+  const [thumbnailUrls, setThumbnailUrls] = useState<Record<string, string>>({});
 
   const { data: documents = [] } = useQuery({
     queryKey: ["loan-documents", applicationId],
@@ -96,6 +97,36 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
     },
     enabled: !!applicationId,
   });
+
+  // Fetch thumbnail URLs for uploaded documents
+  useEffect(() => {
+    const fetchThumbnails = async () => {
+      const urls: Record<string, string> = {};
+      for (const doc of documents) {
+        // Only fetch for image types (not PDFs)
+        const isImage = doc.mime_type?.startsWith("image/") || 
+          /\.(jpg|jpeg|png|webp)$/i.test(doc.file_name || "");
+        
+        if (isImage && doc.file_path) {
+          try {
+            const { data } = await supabase.storage
+              .from("loan-documents")
+              .createSignedUrl(doc.file_path, 3600);
+            if (data?.signedUrl) {
+              urls[doc.document_type] = data.signedUrl;
+            }
+          } catch (err) {
+            console.error("Failed to get thumbnail URL:", err);
+          }
+        }
+      }
+      setThumbnailUrls(urls);
+    };
+
+    if (documents.length > 0) {
+      fetchThumbnails();
+    }
+  }, [documents]);
 
   const getVerification = (verificationType: string) => {
     return verifications.find((v) => v.verification_type === verificationType);
@@ -625,16 +656,51 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
                   <div
                     key={doc.type}
                     className={cn(
-                      "flex items-center justify-between gap-2 p-2 rounded-md border transition-colors",
+                      "flex items-center gap-3 p-2 rounded-md border transition-colors",
                       isVerified 
                         ? "border-green-500/50 bg-green-50/50 dark:bg-green-950/20" 
                         : "border-border bg-muted/30"
                     )}
                   >
+                    {/* Thumbnail with hover view */}
+                    <div 
+                      className={cn(
+                        "relative h-10 w-10 rounded overflow-hidden flex-shrink-0 group cursor-pointer",
+                        document ? "bg-muted" : "bg-muted/50 border border-dashed border-muted-foreground/30"
+                      )}
+                      onClick={() => document && handleViewDocument(document.file_path, document.file_name)}
+                    >
+                      {document ? (
+                        <>
+                          {thumbnailUrls[doc.type] ? (
+                            <img 
+                              src={thumbnailUrls[doc.type]} 
+                              alt={doc.name}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="h-full w-full flex items-center justify-center bg-muted">
+                              <FileText className="h-5 w-5 text-muted-foreground" />
+                            </div>
+                          )}
+                          {/* Hover overlay with View */}
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <Eye className="h-4 w-4 text-white" />
+                          </div>
+                        </>
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center">
+                          <Upload className="h-4 w-4 text-muted-foreground/50" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Document name and status */}
                     <div className="flex items-center gap-2 min-w-0 flex-1">
-                      {/* Status indicator */}
                       {isVerified ? (
                         <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
+                      ) : document ? (
+                        <div className="h-4 w-4 rounded-full border-2 border-amber-400 flex-shrink-0" />
                       ) : (
                         <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30 flex-shrink-0" />
                       )}
@@ -648,21 +714,6 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
                     
                     {/* Action buttons */}
                     <div className="flex items-center gap-0.5 flex-shrink-0">
-                      {/* View */}
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7"
-                            disabled={!document}
-                            onClick={() => document && handleViewDocument(document.file_path, document.file_name)}
-                          >
-                            <Eye className={cn("h-3.5 w-3.5", !document && "text-muted-foreground/40")} />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>{document ? "View" : "No document"}</TooltipContent>
-                      </Tooltip>
 
                       {/* Parse */}
                       {getParseIcon(doc.type, document)}
