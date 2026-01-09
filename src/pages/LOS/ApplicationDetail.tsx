@@ -463,7 +463,7 @@ export default function ApplicationDetail() {
             <div>
               <div className="flex items-center gap-3">
                 <h1 className="text-3xl font-bold text-foreground">
-                  {application.application_number}
+                  {application.loan_id || application.application_number}
                 </h1>
                 <Badge className={STATUS_COLORS[application.status]}>
                   {application.status.replace("_", " ").toUpperCase()}
@@ -473,6 +473,9 @@ export default function ApplicationDetail() {
                 </Badge>
               </div>
               <p className="text-muted-foreground mt-1">
+                {application.loan_id && (
+                  <span className="mr-2">Application: {application.application_number} •</span>
+                )}
                 Created {format(new Date(application.created_at), "MMM dd, yyyy")}
               </p>
             </div>
