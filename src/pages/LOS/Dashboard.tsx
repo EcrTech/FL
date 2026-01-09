@@ -24,86 +24,100 @@ export default function LOSDashboard() {
   const navigate = useNavigate();
   const { permissions } = useLOSPermissions();
 
+  // Fetch all stats in a single query function with Promise.all for parallel execution
   const { data: stats, isLoading } = useQuery({
     queryKey: ["los-stats", orgId],
     queryFn: async () => {
-      // Total applications
-      const { count: totalApps } = await supabase
-        .from("loan_applications")
-        .select("*", { count: "exact", head: true })
-        .eq("org_id", orgId);
+      const today = new Date().toISOString().split("T")[0];
+      
+      // Execute ALL queries in parallel - massive performance improvement
+      const [
+        totalAppsRes,
+        pendingApprovalRes,
+        disbursedRes,
+        inProgressRes,
+        approvedAppsRes,
+        disbursementsRes,
+        pendingEMIsRes,
+        overdueEMIsRes
+      ] = await Promise.all([
+        // Total applications
+        supabase
+          .from("loan_applications")
+          .select("*", { count: "exact", head: true })
+          .eq("org_id", orgId),
+        
+        // Pending approval
+        supabase
+          .from("loan_applications")
+          .select("*", { count: "exact", head: true })
+          .eq("org_id", orgId)
+          .eq("current_stage", "approval_pending"),
+        
+        // Disbursed
+        supabase
+          .from("loan_applications")
+          .select("*", { count: "exact", head: true })
+          .eq("org_id", orgId)
+          .eq("current_stage", "disbursed"),
+        
+        // In progress
+        supabase
+          .from("loan_applications")
+          .select("*", { count: "exact", head: true })
+          .eq("org_id", orgId)
+          .in("current_stage", [
+            "document_collection",
+            "field_verification",
+            "credit_assessment",
+          ]),
+        
+        // Total sanctioned/approved amount
+        supabase
+          .from("loan_applications")
+          .select("approved_amount")
+          .eq("org_id", orgId)
+          .eq("status", "approved")
+          .not("approved_amount", "is", null),
+        
+        // Total disbursed amount
+        supabase
+          .from("loan_disbursements")
+          .select("disbursement_amount")
+          .eq("status", "completed"),
+        
+        // Pending EMIs
+        supabase
+          .from("loan_repayment_schedule")
+          .select("*", { count: "exact", head: true })
+          .eq("status", "pending"),
+        
+        // Overdue EMIs
+        supabase
+          .from("loan_repayment_schedule")
+          .select("*", { count: "exact", head: true })
+          .or(`status.eq.overdue,and(status.eq.pending,due_date.lt.${today})`)
+      ]);
 
-      // Pending approval
-      const { count: pendingApproval } = await supabase
-        .from("loan_applications")
-        .select("*", { count: "exact", head: true })
-        .eq("org_id", orgId)
-        .eq("current_stage", "approval_pending");
-
-      // Disbursed
-      const { count: disbursed } = await supabase
-        .from("loan_applications")
-        .select("*", { count: "exact", head: true })
-        .eq("org_id", orgId)
-        .eq("current_stage", "disbursed");
-
-      // In progress
-      const { count: inProgress } = await supabase
-        .from("loan_applications")
-        .select("*", { count: "exact", head: true })
-        .eq("org_id", orgId)
-        .in("current_stage", [
-          "document_collection",
-          "field_verification",
-          "credit_assessment",
-        ]);
-
-      // Total sanctioned/approved amount - single source of truth from loan_applications
-      const { data: approvedApps } = await supabase
-        .from("loan_applications")
-        .select("approved_amount")
-        .eq("org_id", orgId)
-        .eq("status", "approved")
-        .not("approved_amount", "is", null);
-
-      const totalSanctioned = approvedApps?.reduce(
+      const totalSanctioned = approvedAppsRes.data?.reduce(
         (sum, app) => sum + (app.approved_amount || 0),
         0
       ) || 0;
 
-      // Total disbursed amount
-      const { data: disbursements } = await supabase
-        .from("loan_disbursements")
-        .select("disbursement_amount")
-        .eq("status", "completed");
-
-      const totalDisbursedAmount = disbursements?.reduce(
+      const totalDisbursedAmount = disbursementsRes.data?.reduce(
         (sum, d) => sum + d.disbursement_amount,
         0
       ) || 0;
 
-      // EMI Stats
-      const today = new Date().toISOString().split("T")[0];
-      
-      const { count: pendingEMIs } = await supabase
-        .from("loan_repayment_schedule")
-        .select("*", { count: "exact", head: true })
-        .eq("status", "pending");
-
-      const { count: overdueEMIs } = await supabase
-        .from("loan_repayment_schedule")
-        .select("*", { count: "exact", head: true })
-        .or(`status.eq.overdue,and(status.eq.pending,due_date.lt.${today})`);
-
       return {
-        totalApps: totalApps || 0,
-        pendingApproval: pendingApproval || 0,
-        disbursed: disbursed || 0,
-        inProgress: inProgress || 0,
+        totalApps: totalAppsRes.count || 0,
+        pendingApproval: pendingApprovalRes.count || 0,
+        disbursed: disbursedRes.count || 0,
+        inProgress: inProgressRes.count || 0,
         totalSanctioned,
         totalDisbursedAmount,
-        pendingEMIs: pendingEMIs || 0,
-        overdueEMIs: overdueEMIs || 0,
+        pendingEMIs: pendingEMIsRes.count || 0,
+        overdueEMIs: overdueEMIsRes.count || 0,
       };
     },
     enabled: !!orgId,

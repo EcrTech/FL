@@ -1,6 +1,5 @@
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import logo from "@/assets/insync-logo.png";
 import {
@@ -45,7 +44,7 @@ import {
 } from "lucide-react";
 import { useNotification } from "@/hooks/useNotification";
 import { OnboardingDialog } from "@/components/Onboarding/OnboardingDialog";
-import { useFeatureAccess } from "@/hooks/useFeatureAccess";
+import { useAuth } from "@/contexts/AuthContext";
 import { useModuleTracking } from "@/hooks/useModuleTracking";
 import { NotificationBell } from "./NotificationBell";
 import { QuickDial } from "@/components/Contact/QuickDial";
@@ -58,78 +57,35 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
   const navigate = useNavigate();
   const notify = useNotification();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [userName, setUserName] = useState<string>("");
-  const [orgLogo, setOrgLogo] = useState<string>("");
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [onboardingChecked, setOnboardingChecked] = useState(false);
-  const [orgName, setOrgName] = useState<string>("");
-  const { canAccessFeature, loading: featureAccessLoading } = useFeatureAccess();
+  
+  // Get all user data from centralized AuthContext - NO additional API calls!
+  const { 
+    userName, 
+    orgLogo, 
+    orgName, 
+    userRole, 
+    isAdmin, 
+    canAccessFeature, 
+    signOut,
+    profile,
+    isLoading: featureAccessLoading 
+  } = useAuth();
   
   // Track module usage
   useModuleTracking();
 
-  useEffect(() => {
-    const fetchUserData = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // PERFORMANCE: Batch all queries together
-      const [roleRes, profileRes] = await Promise.all([
-        supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", user.id)
-          .single(),
-        supabase
-          .from("profiles")
-          .select("first_name, last_name, org_id, onboarding_completed")
-          .eq("id", user.id)
-          .single()
-      ]);
-
-      if (roleRes.data) {
-        setUserRole(roleRes.data.role);
-      }
-
-      if (profileRes.data) {
-        setUserName(`${profileRes.data.first_name} ${profileRes.data.last_name}`);
-        
-        // Check if user needs onboarding
-        if (!profileRes.data.onboarding_completed && roleRes.data?.role) {
-          setShowOnboarding(true);
-        }
-        setOnboardingChecked(true);
-        
-        // Get organization logo and name (only if org_id exists)
-        if (profileRes.data.org_id) {
-          const { data: orgData } = await supabase
-            .from("organizations")
-            .select("logo_url, name")
-            .eq("id", profileRes.data.org_id)
-            .single();
-          
-          if (orgData?.logo_url) {
-            setOrgLogo(orgData.logo_url);
-          }
-          if (orgData?.name) {
-            setOrgName(orgData.name);
-          }
-        }
-      }
-    };
-
-    fetchUserData();
-  }, []);
+  // Check if user needs onboarding (only once profile is loaded)
+  const onboardingChecked = !!profile;
+  const needsOnboarding = profile && !profile.onboarding_completed && userRole;
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await signOut();
     notify.success("Signed out", "You've been successfully signed out");
     navigate("/login");
   };
 
-  const isAdmin = userRole === "admin" || userRole === "super_admin";
-  const isManager = userRole === "admin" || userRole === "super_admin" || userRole === "sales_manager" || userRole === "support_manager";
+  const isManager = isAdmin || userRole === "sales_manager" || userRole === "support_manager";
 
   // Check if sections should be visible
   const showDashboardsSection = canAccessFeature("analytics") || canAccessFeature("calling") || 
@@ -496,9 +452,9 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
       </div>
       
       {/* Onboarding Dialog */}
-      {onboardingChecked && showOnboarding && userRole && (
+      {onboardingChecked && needsOnboarding && userRole && (
         <OnboardingDialog
-          open={showOnboarding}
+          open={showOnboarding || !!needsOnboarding}
           userRole={userRole}
           onComplete={() => setShowOnboarding(false)}
         />

@@ -1,5 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 export type LOSRole = "credit_manager" | "credit_officer" | "disbursement_officer" | "admin";
 
@@ -82,32 +81,22 @@ const rolePermissions: Record<LOSRole, LOSPermissions> = {
   },
 };
 
+/**
+ * LOS Permissions hook that uses centralized AuthContext
+ * Prevents duplicate auth API calls
+ */
 export function useLOSPermissions() {
-  const { data: userRole, isLoading } = useQuery({
-    queryKey: ["los-user-role"],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
+  const { userRole, isLoading } = useAuth();
 
-      const { data: roles } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id);
+  // Map the general role to LOS role
+  const losRole: LOSRole | null = userRole === "admin" || userRole === "super_admin" 
+    ? "admin" 
+    : userRole 
+      ? "credit_officer" 
+      : null;
 
-      if (!roles || roles.length === 0) return null;
-
-      // Check for admin first
-      if (roles.some(r => r.role === "admin")) return "admin";
-      
-      // For LOS, we'll use a custom role check
-      // In production, you'd have a separate LOS roles table
-      // For now, we'll treat all non-admin users as credit_officer
-      return "credit_officer" as LOSRole;
-    },
-  });
-
-  const permissions: LOSPermissions = userRole 
-    ? rolePermissions[userRole]
+  const permissions: LOSPermissions = losRole 
+    ? rolePermissions[losRole]
     : {
         canCreateApplication: false,
         canViewApplications: false,
@@ -126,7 +115,7 @@ export function useLOSPermissions() {
 
   return {
     permissions,
-    userRole,
+    userRole: losRole,
     isLoading,
   };
 }
