@@ -130,15 +130,16 @@ export default function Disbursals() {
 
             const ocrData = bankStatement?.ocr_data as Record<string, unknown> | null;
             const sanction = Array.isArray(app.loan_sanctions) ? app.loan_sanctions[0] : app.loan_sanctions;
-            const processingFee = sanction?.processing_fee || 0;
-            const netAmount = (app.approved_amount || 0) - processingFee;
+            const approvedAmount = Number(app.approved_amount) || 0;
+            const processingFee = Number(sanction?.processing_fee) || 0;
+            const netAmount = approvedAmount - processingFee;
 
             unified.push({
               id: app.id,
               application_id: app.id,
               application_number: app.application_number,
               applicant_name: applicant ? `${applicant.first_name} ${applicant.last_name || ""}`.trim() : "N/A",
-              approved_amount: app.approved_amount || 0,
+              approved_amount: approvedAmount,
               disbursed_amount: netAmount,
               status: "ready",
               date: app.created_at,
@@ -183,8 +184,8 @@ export default function Disbursals() {
             applicant_name: primaryApplicant 
               ? `${primaryApplicant.first_name} ${primaryApplicant.last_name || ""}`.trim() 
               : "N/A",
-            approved_amount: d.loan_applications?.approved_amount || 0,
-            disbursed_amount: d.disbursement_amount,
+            approved_amount: Number(d.loan_applications?.approved_amount) || 0,
+            disbursed_amount: Number(d.disbursement_amount) || 0,
             status: d.status as "pending" | "completed" | "failed",
             utr_number: d.utr_number,
             has_proof: !!d.proof_document_path,
