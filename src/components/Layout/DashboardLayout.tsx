@@ -217,16 +217,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                 <span>LOS Dashboard</span>
               </Link>
 
-              {(canAccessFeature("analytics") || canAccessFeature("campaigns_email") || canAccessFeature("campaigns_whatsapp") || canAccessFeature("ai_insights")) && (
-                <Link
-                  to="/reports"
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <TrendingUp size={18} />
-                  <span>Sales Dashboard</span>
-                </Link>
-              )}
 
               {/* Sales & Operations Section */}
               {showOperationsSection && (
