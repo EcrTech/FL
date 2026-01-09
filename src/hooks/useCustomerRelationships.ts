@@ -7,11 +7,11 @@ export interface EMIRecord {
   emi_number: number;
   principal_amount: number;
   interest_amount: number;
-  total_amount: number;
+  total_emi: number;
   due_date: string;
   status: string;
-  paid_date: string | null;
-  paid_amount: number | null;
+  payment_date: string | null;
+  amount_paid: number | null;
 }
 
 export interface PaymentRecord {
@@ -90,7 +90,7 @@ function calculatePaymentScore(applications: LoanApplicationSummary[]): 'excelle
     app.emiSchedule.forEach(emi => {
       totalEmis++;
       if (emi.status === 'paid') {
-        if (emi.paid_date && new Date(emi.paid_date) <= new Date(emi.due_date)) {
+        if (emi.payment_date && new Date(emi.payment_date) <= new Date(emi.due_date)) {
           paidOnTime++;
         } else {
           paidLate++;
@@ -233,11 +233,11 @@ export function useCustomerRelationships(searchTerm?: string) {
               emi_number,
               principal_amount,
               interest_amount,
-              total_amount,
+              total_emi,
               due_date,
               status,
-              paid_date,
-              paid_amount
+              payment_date,
+              amount_paid
             ),
             loan_payments (
               id,
@@ -271,11 +271,11 @@ export function useCustomerRelationships(searchTerm?: string) {
             emi_number: emi.emi_number,
             principal_amount: emi.principal_amount,
             interest_amount: emi.interest_amount,
-            total_amount: emi.total_amount,
+            total_emi: emi.total_emi,
             due_date: emi.due_date,
             status: emi.status,
-            paid_date: emi.paid_date,
-            paid_amount: emi.paid_amount,
+            payment_date: emi.payment_date,
+            amount_paid: emi.amount_paid,
           }));
 
           const payments: PaymentRecord[] = (app.loan_payments || []).map((p: any) => ({
@@ -317,7 +317,7 @@ export function useCustomerRelationships(searchTerm?: string) {
             .filter((p: PaymentRecord) => p.status === 'completed')
             .reduce((sum: number, p: PaymentRecord) => sum + p.payment_amount, 0);
 
-          const totalDue = emiSchedule.reduce((sum: number, e: EMIRecord) => sum + e.total_amount, 0);
+          const totalDue = emiSchedule.reduce((sum: number, e: EMIRecord) => sum + e.total_emi, 0);
           const totalOutstanding = Math.max(0, totalDue - totalPaid);
 
           return {

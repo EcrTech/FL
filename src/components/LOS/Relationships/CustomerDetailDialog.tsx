@@ -203,7 +203,7 @@ export function CustomerDetailDialog({
     app.emiSchedule.forEach(emi => {
       paymentSummary.totalEmis++;
       if (emi.status === 'paid') {
-        if (emi.paid_date && new Date(emi.paid_date) <= new Date(emi.due_date)) {
+        if (emi.payment_date && new Date(emi.payment_date) <= new Date(emi.due_date)) {
           paymentSummary.paidOnTime++;
         } else {
           paymentSummary.paidLate++;
