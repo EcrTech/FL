@@ -29,7 +29,7 @@ const DocumentCard = ({
   onView 
 }: { 
   document: Document; 
-  onView: (url: string, name: string) => void;
+  onView: (url: string, name: string, isPdf: boolean) => void;
 }) => {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -85,7 +85,7 @@ const DocumentCard = ({
       )}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      onClick={() => imageUrl && onView(imageUrl, getDocumentLabel())}
+      onClick={() => imageUrl && onView(imageUrl, getDocumentLabel(), isPdf)}
     >
       {/* Document Content */}
       <div className="w-full h-full bg-muted flex items-center justify-center">
@@ -149,7 +149,7 @@ export function ApplicantProfileCard({
   const [loading, setLoading] = useState(true);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
-  const [viewerImage, setViewerImage] = useState<{ url: string; name: string } | null>(null);
+  const [viewerImage, setViewerImage] = useState<{ url: string; name: string; isPdf: boolean } | null>(null);
 
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -183,8 +183,8 @@ export function ApplicantProfileCard({
     fetchDocuments();
   }, [applicationId]);
 
-  const handleViewDocument = (url: string, name: string) => {
-    setViewerImage({ url, name });
+  const handleViewDocument = (url: string, name: string, isPdf: boolean = false) => {
+    setViewerImage({ url, name, isPdf });
     setViewerOpen(true);
   };
 
@@ -250,17 +250,25 @@ export function ApplicantProfileCard({
 
       {/* Document Viewer Dialog */}
       <Dialog open={viewerOpen} onOpenChange={setViewerOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-4xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>{viewerImage?.name}</DialogTitle>
           </DialogHeader>
-          <div className="flex items-center justify-center max-h-[70vh] overflow-auto">
+          <div className="flex items-center justify-center h-[75vh] overflow-auto">
             {viewerImage && (
-              <img 
-                src={viewerImage.url} 
-                alt={viewerImage.name}
-                className="max-w-full max-h-[65vh] object-contain"
-              />
+              viewerImage.isPdf ? (
+                <iframe 
+                  src={viewerImage.url}
+                  title={viewerImage.name}
+                  className="w-full h-full border-0"
+                />
+              ) : (
+                <img 
+                  src={viewerImage.url} 
+                  alt={viewerImage.name}
+                  className="max-w-full max-h-[70vh] object-contain"
+                />
+              )
             )}
           </div>
         </DialogContent>
