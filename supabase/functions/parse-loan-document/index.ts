@@ -203,49 +203,87 @@ serve(async (req) => {
       binary += String.fromCharCode(bytes[i]);
     }
     const base64 = btoa(binary);
-    
 
     // Detect file type from path or content
     const fileExtension = filePath.split('.').pop()?.toLowerCase() || '';
     const isPdf = fileExtension === 'pdf' || fileData.type === 'application/pdf';
-    const mimeType = isPdf ? 'application/pdf' : (fileData.type || "image/jpeg");
-
-    console.log(`[ParseDocument] File size: ${arrayBuffer.byteLength}, MIME: ${mimeType}, isPDF: ${isPdf}`);
+    
+    console.log(`[ParseDocument] File size: ${arrayBuffer.byteLength}, isPDF: ${isPdf}`);
 
     // Get the appropriate prompt for this document type
     const prompt = DOCUMENT_PROMPTS[documentType] || `Extract all relevant information from this document and return as JSON.`;
 
-    // Call Lovable AI with vision capabilities
-    // Gemini 2.5 Flash supports both images and PDFs natively
-    console.log(`[ParseDocument] Calling Lovable AI for parsing...`);
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:${mimeType};base64,${base64}`,
+    let aiResponse: Response;
+
+    if (isPdf) {
+      // For PDFs, use Gemini with file upload approach via inline_data
+      // Gemini supports PDFs via the generativeai format with inline_data
+      console.log(`[ParseDocument] Using Gemini Pro for PDF parsing...`);
+      
+      // Use google/gemini-2.5-pro which has better PDF support
+      aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${lovableApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-pro",
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "file",
+                  file: {
+                    filename: filePath.split('/').pop() || "document.pdf",
+                    file_data: `data:application/pdf;base64,${base64}`,
+                  },
                 },
-              },
-              {
-                type: "text",
-                text: prompt,
-              },
-            ],
-          },
-        ],
-        max_tokens: 4000,
-      }),
-    });
+                {
+                  type: "text",
+                  text: prompt,
+                },
+              ],
+            },
+          ],
+          max_tokens: 4000,
+        }),
+      });
+    } else {
+      // For images, use the standard image_url approach
+      const mimeType = fileData.type || "image/jpeg";
+      console.log(`[ParseDocument] Using Gemini Flash for image parsing, MIME: ${mimeType}`);
+      
+      aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${lovableApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: `data:${mimeType};base64,${base64}`,
+                  },
+                },
+                {
+                  type: "text",
+                  text: prompt,
+                },
+              ],
+            },
+          ],
+          max_tokens: 4000,
+        }),
+      });
+    }
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
