@@ -197,11 +197,11 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 p-4 space-y-2">
+            <nav className="flex-1 p-2 space-y-0.5">
               {/* Dashboards & Reports Section */}
               {showDashboardsSection && (
-                <div className="pb-2 section-accent-teal pl-4">
-                  <p className="px-4 text-xs font-semibold uppercase tracking-wider gradient-text-primary">
+                <div className="pb-1 pt-1 section-accent-teal pl-3">
+                  <p className="px-3 text-xs font-semibold uppercase tracking-wider gradient-text-primary">
                     Dashboards & Reports
                   </p>
                 </div>
@@ -210,129 +210,125 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
               {/* LOS Dashboard */}
               <Link
                 to="/los/dashboard"
-                className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
                 onClick={() => setSidebarOpen(false)}
               >
-                <Activity size={20} />
+                <Activity size={18} />
                 <span>LOS Dashboard</span>
               </Link>
 
               {(canAccessFeature("analytics") || canAccessFeature("campaigns_email") || canAccessFeature("campaigns_whatsapp") || canAccessFeature("ai_insights")) && (
                 <Link
                   to="/reports"
-                  className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
                   onClick={() => setSidebarOpen(false)}
                 >
-                  <TrendingUp size={20} />
+                  <TrendingUp size={18} />
                   <span>Sales Dashboard</span>
                 </Link>
               )}
 
-
-
               {/* Sales & Operations Section */}
               {showOperationsSection && (
-                <div className="pt-4 pb-2 section-accent-teal pl-4">
-                  <p className="px-4 text-xs font-semibold uppercase tracking-wider gradient-text-primary">
+                <div className="pt-2 pb-1 section-accent-teal pl-3">
+                  <p className="px-3 text-xs font-semibold uppercase tracking-wider gradient-text-primary">
                     Sales & Operations
                   </p>
                 </div>
               )}
-              
 
               {canAccessFeature("pipeline_stages") && (
                 <Link
                   to="/pipeline"
-                  className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
                   onClick={() => setSidebarOpen(false)}
                 >
-                  <GitBranch size={20} />
+                  <GitBranch size={18} />
                   <span>Leads</span>
                 </Link>
               )}
 
               <Link
                 to="/los/applications"
-                className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
                 onClick={() => setSidebarOpen(false)}
               >
-                <FileText size={20} />
+                <FileText size={18} />
                 <span>Loan Applications</span>
               </Link>
 
-
               <Link
                 to="/los/approval-queue"
-                className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
                 onClick={() => setSidebarOpen(false)}
               >
-                <List size={20} />
+                <List size={18} />
                 <span>Approvals</span>
               </Link>
 
               <Link
                 to="/los/sanctions"
-                className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
                 onClick={() => setSidebarOpen(false)}
               >
-                <FileText size={20} />
+                <FileText size={18} />
                 <span>Sanctions</span>
               </Link>
 
               <Link
                 to="/los/disbursals"
-                className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
                 onClick={() => setSidebarOpen(false)}
               >
-                <CreditCard size={20} />
+                <CreditCard size={18} />
                 <span>Disbursals</span>
               </Link>
 
               <Link
                 to="/los/collections"
-                className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
                 onClick={() => setSidebarOpen(false)}
               >
-                <IndianRupee size={20} />
+                <IndianRupee size={18} />
                 <span>Collections</span>
               </Link>
 
               <Link
                 to="/los/relationships"
-                className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
                 onClick={() => setSidebarOpen(false)}
               >
-                <Users size={20} />
+                <Users size={18} />
                 <span>Customer Relationships</span>
               </Link>
 
               {isAdmin && (
                 <Link
                   to="/los/negative-pincodes"
-                  className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
                   onClick={() => setSidebarOpen(false)}
                 >
-                  <MapPinOff size={20} />
+                  <MapPinOff size={18} />
                   <span>Negative Pin Codes</span>
                 </Link>
               )}
 
               <Link
                 to="/tasks"
-                className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
                 onClick={() => setSidebarOpen(false)}
               >
-                <CheckSquare size={20} />
+                <CheckSquare size={18} />
                 <span>Tasks</span>
               </Link>
 
               {canAccessFeature("communications") && (
                 <Link
                   to="/communications"
-                  className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
                   onClick={() => setSidebarOpen(false)}
                 >
-                  <MessageSquare size={20} />
+                  <MessageSquare size={18} />
                   <span>Campaigns</span>
                 </Link>
               )}
@@ -340,10 +336,10 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
               {canAccessFeature("redefine_data_repository") && orgName.includes("Redefine") && (
                 <Link
                   to="/redefine-repository"
-                  className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
                   onClick={() => setSidebarOpen(false)}
                 >
-                  <Database size={20} />
+                  <Database size={18} />
                   <span>Data Repository</span>
                 </Link>
               )}
@@ -351,70 +347,69 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
               {canAccessFeature("inventory") && orgName === "C.Parekh & Co" && (
                 <Link
                   to="/inventory"
-                  className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
                   onClick={() => setSidebarOpen(false)}
                 >
-                  <Package size={20} />
+                  <Package size={18} />
                   <span>Inventory</span>
                 </Link>
               )}
 
               {showManagementSection && (
                 <>
-                  <div className="pt-4 pb-2 section-accent-teal pl-4">
-                    <p className="px-4 text-xs font-semibold uppercase tracking-wider gradient-text-primary">
+                  <div className="pt-2 pb-1 section-accent-teal pl-3">
+                    <p className="px-3 text-xs font-semibold uppercase tracking-wider gradient-text-primary">
                       Management
                     </p>
                   </div>
                   {canAccessFeature("users") && (
                     <Link
                       to="/users"
-                      className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
                       onClick={() => setSidebarOpen(false)}
                     >
-                      <UserCog size={20} />
+                      <UserCog size={18} />
                       <span>Users</span>
                     </Link>
                   )}
                   {canAccessFeature("teams") && (
                     <Link
                       to="/teams"
-                      className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
                       onClick={() => setSidebarOpen(false)}
                     >
-                      <UsersRound size={20} />
+                      <UsersRound size={18} />
                       <span>Teams</span>
                     </Link>
                   )}
                   {canAccessFeature("designations") && (
                     <Link
                       to="/admin/designations"
-                      className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
                       onClick={() => setSidebarOpen(false)}
                     >
-                      <Award size={20} />
+                      <Award size={18} />
                       <span>Designations</span>
                     </Link>
                   )}
                   {canAccessFeature("approval_matrix") && (
                     <Link
                       to="/admin/approval-matrix"
-                      className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
                       onClick={() => setSidebarOpen(false)}
                     >
-                      <CheckSquare size={20} />
+                      <CheckSquare size={18} />
                       <span>Approval Matrix</span>
                     </Link>
                   )}
                 </>
               )}
 
-
               {isAdmin && (
                 <>
                   {showAdminCommunicationSection && (
-                    <div className="pt-4 pb-2 section-accent-teal pl-4">
-                      <p className="px-4 text-xs font-semibold uppercase tracking-wider gradient-text-primary">
+                    <div className="pt-2 pb-1 section-accent-teal pl-3">
+                      <p className="px-3 text-xs font-semibold uppercase tracking-wider gradient-text-primary">
                         Communication Setup
                       </p>
                     </div>
@@ -423,10 +418,10 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                   {canAccessFeature("templates") && (
                     <Link
                       to="/templates"
-                      className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
                       onClick={() => setSidebarOpen(false)}
                     >
-                      <FileText size={20} />
+                      <FileText size={18} />
                       <span>Templates</span>
                     </Link>
                   )}
@@ -436,8 +431,8 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
               {isAdmin && (
                 <>
                   {(canAccessFeature("connectors") || canAccessFeature("api_keys")) && (
-                    <div className="pt-4 pb-2 section-accent-teal pl-4">
-                      <p className="px-4 text-xs font-semibold uppercase tracking-wider gradient-text-primary">
+                    <div className="pt-2 pb-1 section-accent-teal pl-3">
+                      <p className="px-3 text-xs font-semibold uppercase tracking-wider gradient-text-primary">
                         Integration & APIs
                       </p>
                     </div>
@@ -446,10 +441,10 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                   {canAccessFeature("connectors") && (
                     <Link
                       to="/admin/connectors"
-                      className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
                       onClick={() => setSidebarOpen(false)}
                     >
-                      <Webhook size={20} />
+                      <Webhook size={18} />
                       <span>Webhook Connectors</span>
                     </Link>
                   )}
@@ -457,10 +452,10 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                   {canAccessFeature("connectors") && (
                     <Link
                       to="/admin/outbound-webhooks"
-                      className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200"
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
                       onClick={() => setSidebarOpen(false)}
                     >
-                      <Send size={20} />
+                      <Send size={18} />
                       <span>Outbound Webhooks</span>
                     </Link>
                   )}
@@ -470,24 +465,24 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
             </nav>
 
             {/* Profile and logout at bottom */}
-            <div className="p-4 border-t border-border">
+            <div className="p-2 border-t border-border">
               <div className="flex items-center justify-between">
                 <Link
                   to="/profile"
-                  className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 flex-1"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 flex-1 text-sm"
                   onClick={() => setSidebarOpen(false)}
                 >
-                  <User size={20} />
+                  <User size={18} />
                   <span>My Profile</span>
                 </Link>
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={handleSignOut}
-                  className="text-muted-foreground hover:text-destructive"
+                  className="text-muted-foreground hover:text-destructive h-8 w-8"
                   title="Sign Out"
                 >
-                  <LogOut size={20} />
+                  <LogOut size={18} />
                 </Button>
               </div>
             </div>
