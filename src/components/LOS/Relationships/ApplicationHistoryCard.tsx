@@ -165,7 +165,7 @@ export function ApplicationHistoryCard({ application }: ApplicationHistoryCardPr
                           <TableCell className="text-xs">{emi.emi_number}</TableCell>
                           <TableCell className="text-xs">{formatDate(emi.due_date)}</TableCell>
                           <TableCell className="text-xs text-right">
-                            {formatCurrency(emi.total_amount)}
+                            {formatCurrency(emi.total_emi)}
                           </TableCell>
                           <TableCell>
                             <Badge
@@ -182,7 +182,7 @@ export function ApplicationHistoryCard({ application }: ApplicationHistoryCardPr
                             </Badge>
                           </TableCell>
                           <TableCell className="text-xs">
-                            {formatDate(emi.paid_date)}
+                            {formatDate(emi.payment_date)}
                           </TableCell>
                         </TableRow>
                       ))}

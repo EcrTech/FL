@@ -21,6 +21,7 @@ import ApprovalActionDialog from "@/components/LOS/Approval/ApprovalActionDialog
 import ApprovalHistory from "@/components/LOS/Approval/ApprovalHistory";
 import DisbursementForm from "@/components/LOS/Disbursement/DisbursementForm";
 import DisbursementStatus from "@/components/LOS/Disbursement/DisbursementStatus";
+import { ApplicantProfileCard } from "@/components/LOS/ApplicantProfileCard";
 
 const STAGE_LABELS: Record<string, string> = {
   application_login: "Application Login",
@@ -555,6 +556,21 @@ export default function ApplicationDetail() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Applicant Profile with Documents */}
+        {primaryApplicant && (
+          <ApplicantProfileCard
+            applicationId={id!}
+            applicantName={`${primaryApplicant.first_name} ${primaryApplicant.middle_name || ''} ${primaryApplicant.last_name || ''}`.trim()}
+            panNumber={primaryApplicant.pan_number as string}
+            aadhaarNumber={primaryApplicant.aadhaar_number as string}
+            mobile={primaryApplicant.mobile as string}
+            dateOfBirth={primaryApplicant.dob && !isNaN(new Date(primaryApplicant.dob as string).getTime())
+              ? format(new Date(primaryApplicant.dob as string), "MMM dd, yyyy")
+              : undefined}
+            gender={primaryApplicant.gender as string}
+          />
+        )}
 
         {/* Application Details Section */}
         <div className="space-y-6">
