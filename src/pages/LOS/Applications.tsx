@@ -168,12 +168,7 @@ export default function Applications() {
               Manage and track all loan applications
             </p>
           </div>
-          {permissions.canCreateApplication && (
-            <Button onClick={() => navigate("/los/applications/new")}>
-              <Plus className="mr-2 h-4 w-4" />
-              New Application
-            </Button>
-          )}
+          {/* Applications can only be created via referral links */}
         </div>
 
         {/* Filters */}
@@ -229,11 +224,11 @@ export default function Applications() {
                 <p className="text-muted-foreground mb-4">
                   {searchQuery || statusFilter !== "all" || stageFilter !== "all"
                     ? "Try adjusting your filters"
-                    : "Create your first application to get started"}
+                    : "Share your referral link to receive applications"}
                 </p>
-                <Button onClick={() => navigate("/los/applications/new")}>
+                <Button onClick={() => navigate("/los/my-referrals")}>
                   <Plus className="mr-2 h-4 w-4" />
-                  Create Application
+                  Get Referral Link
                 </Button>
               </div>
             ) : (

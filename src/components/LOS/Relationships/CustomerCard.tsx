@@ -26,7 +26,7 @@ import { useState, useEffect } from "react";
 interface CustomerCardProps {
   customer: CustomerRelationship;
   onViewDetails: (customer: CustomerRelationship) => void;
-  onCreateReapplication: (customer: CustomerRelationship) => void;
+  onShareReferralLink: () => void;
 }
 
 const scoreColors: Record<string, string> = {
@@ -136,7 +136,7 @@ function DocumentThumbnail({ document }: { document: CustomerDocument }) {
   );
 }
 
-export function CustomerCard({ customer, onViewDetails, onCreateReapplication }: CustomerCardProps) {
+export function CustomerCard({ customer, onViewDetails, onShareReferralLink }: CustomerCardProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -264,8 +264,8 @@ export function CustomerCard({ customer, onViewDetails, onCreateReapplication }:
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => onCreateReapplication(customer)}
-              title="Create Reapplication"
+              onClick={onShareReferralLink}
+              title="Share Referral Link"
             >
               <RefreshCw className="h-4 w-4" />
             </Button>
