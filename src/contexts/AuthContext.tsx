@@ -152,31 +152,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     let mounted = true;
+    let isInitializing = true;
 
-    // Set up auth state change listener FIRST (before getSession)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
-        if (!mounted) return;
-        
-        try {
-          setSession(currentSession);
-          setUser(currentSession?.user ?? null);
-          
-          if (event === 'SIGNED_IN' && currentSession?.user) {
-            await fetchUserData(currentSession.user);
-          } else if (event === 'SIGNED_OUT') {
-            setProfile(null);
-            setOrganization(null);
-            setUserRole(null);
-            setDesignationPermissions([]);
-          }
-        } catch (error) {
-          console.error("Error handling auth state change:", error);
-        }
-      }
-    );
-
-    // Then check for existing session
+    // Initialize auth on mount
     const initAuth = async () => {
       try {
         const { data: { session: currentSession }, error } = await supabase.auth.getSession();
@@ -197,6 +175,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         console.error("Error initializing auth:", error);
       } finally {
         if (mounted) {
+          isInitializing = false;
           setIsLoading(false);
           setIsInitialized(true);
         }
@@ -204,6 +183,35 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
 
     initAuth();
+
+    // Set up auth state change listener for subsequent auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, currentSession) => {
+        if (!mounted) return;
+        
+        // Skip if still initializing - initAuth handles the initial state
+        if (isInitializing) return;
+        
+        try {
+          setSession(currentSession);
+          setUser(currentSession?.user ?? null);
+          
+          if (event === 'SIGNED_IN' && currentSession?.user) {
+            setIsLoading(true);
+            await fetchUserData(currentSession.user);
+            setIsLoading(false);
+          } else if (event === 'SIGNED_OUT') {
+            setProfile(null);
+            setOrganization(null);
+            setUserRole(null);
+            setDesignationPermissions([]);
+          }
+        } catch (error) {
+          console.error("Error handling auth state change:", error);
+          setIsLoading(false);
+        }
+      }
+    );
 
     return () => {
       mounted = false;
