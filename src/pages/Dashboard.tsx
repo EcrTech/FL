@@ -1,5 +1,5 @@
-import { useMemo, useEffect } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,37 +41,25 @@ const COLORS = ['#01B8AA', '#168980', '#8AD4EB', '#F2C80F', '#A66999', '#FE9666'
 
 export default function Dashboard() {
   const { orgId, isLoading: orgLoading } = useOrgContext();
-  const queryClient = useQueryClient();
+  
 
   // Fetch optimized dashboard stats using database function
-  const { data: rawStats, isLoading: statsLoading, refetch: refetchStats } = useQuery<any>({
+  const { data: rawStats, isLoading: statsLoading } = useQuery<any>({
     queryKey: ["dashboard-stats", orgId],
     queryFn: async () => {
       if (!orgId) throw new Error("No organization context");
-      
-      console.log('=== DASHBOARD QUERY START ===');
-      console.log('[Dashboard] orgId:', orgId);
-      console.log('[Dashboard] Calling get_dashboard_stats with p_org_id:', orgId);
-      
       const { data, error } = await supabase.rpc("get_dashboard_stats", {
         p_org_id: orgId,
       });
-      
-      console.log('[Dashboard] RPC call completed');
-      console.log('[Dashboard] Error:', error);
-      console.log('[Dashboard] Data received:', JSON.stringify(data, null, 2));
-      console.log('=== DASHBOARD QUERY END ===');
-      
       if (error) throw error;
       return data;
     },
     enabled: !!orgId,
-    staleTime: 0, // Never use stale data - always refetch when org changes
-    refetchOnMount: 'always', // Always refetch when component mounts
+    staleTime: 2 * 60 * 1000, // 2 minutes - reasonable cache time
   });
 
   // Fetch pipeline distribution
-  const { data: pipelineRaw = [], isLoading: pipelineLoading, refetch: refetchPipeline } = useQuery({
+  const { data: pipelineRaw = [], isLoading: pipelineLoading } = useQuery({
     queryKey: ["pipeline-distribution", orgId],
     queryFn: async () => {
       if (!orgId) throw new Error("No organization context");
@@ -82,12 +70,11 @@ export default function Dashboard() {
       return data || [];
     },
     enabled: !!orgId,
-    staleTime: 0,
-    refetchOnMount: 'always',
+    staleTime: 2 * 60 * 1000,
   });
 
   // Fetch activity trends
-  const { data: activityRaw = [], isLoading: activitiesLoading, refetch: refetchActivity } = useQuery({
+  const { data: activityRaw = [], isLoading: activitiesLoading } = useQuery({
     queryKey: ["activity-trends", orgId],
     queryFn: async () => {
       if (!orgId) throw new Error("No organization context");
@@ -99,8 +86,7 @@ export default function Dashboard() {
       return data || [];
     },
     enabled: !!orgId,
-    staleTime: 0,
-    refetchOnMount: 'always',
+    staleTime: 2 * 60 * 1000,
   });
 
   // Fetch demo stats for this month
@@ -115,43 +101,9 @@ export default function Dashboard() {
       return data?.[0] || { demos_done: 0, demos_upcoming: 0 };
     },
     enabled: !!orgId,
-    staleTime: 0,
-    refetchOnMount: 'always',
+    staleTime: 2 * 60 * 1000,
   });
 
-  // Listen for org context changes and remove ALL cached queries
-  useEffect(() => {
-    const handleOrgChange = () => {
-      console.log('[Dashboard] Org context change event received, removing all cached queries');
-      // Remove ALL cached queries (not just invalidate) to prevent stale data
-      queryClient.removeQueries({ queryKey: ["dashboard-stats"] });
-      queryClient.removeQueries({ queryKey: ["pipeline-distribution"] });
-      queryClient.removeQueries({ queryKey: ["activity-trends"] });
-      queryClient.removeQueries({ queryKey: ["demo-stats"] });
-    };
-
-    window.addEventListener("orgContextChange", handleOrgChange);
-    return () => window.removeEventListener("orgContextChange", handleOrgChange);
-  }, [queryClient]);
-
-  // Watch for orgId changes and remove old queries
-  useEffect(() => {
-    if (orgId) {
-      console.log('[Dashboard] orgId changed to:', orgId);
-      // Remove queries for other orgs to prevent stale data
-      queryClient.removeQueries({ 
-        predicate: (query) => {
-          const queryKey = query.queryKey;
-          return (
-            (queryKey[0] === 'dashboard-stats' || 
-             queryKey[0] === 'pipeline-distribution' || 
-             queryKey[0] === 'activity-trends') &&
-            queryKey[1] !== orgId
-          );
-        }
-      });
-    }
-  }, [orgId, queryClient]);
 
   // Fetch tasks for analytics
   const { data: tasksData } = useTasks({ filter: "assigned_to_me" });
@@ -160,7 +112,8 @@ export default function Dashboard() {
   const inProgressTasksCount = allTasks.filter(t => t.status === "in_progress").length;
   const overdueTasksCount = allTasks.filter(t => t.isOverdue && t.status !== "completed").length;
 
-  const loading = orgLoading || statsLoading || pipelineLoading || activitiesLoading;
+  // Only block on critical data - orgId and main stats
+  const loading = orgLoading || statsLoading;
 
   // Process stats from database function
   const stats: DashboardStats = useMemo(() => {
