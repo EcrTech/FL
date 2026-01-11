@@ -5,13 +5,14 @@ import DashboardLayout from "@/components/Layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, TrendingUp, Phone, Target, ArrowUpRight, ArrowDownRight, CheckSquare } from "lucide-react";
 import { Bar, BarChart, Line, LineChart, Pie, PieChart, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from "recharts";
-import { useOrgContext } from "@/hooks/useOrgContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { LoadingState } from "@/components/common/LoadingState";
 import { TaskList } from "@/components/Tasks/TaskList";
 import { useTasks } from "@/hooks/useTasks";
 import { Link } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface DashboardStats {
   totalContacts: number;
@@ -40,7 +41,7 @@ interface ActivityData {
 const COLORS = ['#01B8AA', '#168980', '#8AD4EB', '#F2C80F', '#A66999', '#FE9666', '#FD625E'];
 
 export default function Dashboard() {
-  const { orgId, isLoading: orgLoading } = useOrgContext();
+  const { orgId, isLoading: authLoading, profileError, isInitialized } = useAuth();
   
 
   // Fetch optimized dashboard stats using database function
@@ -112,8 +113,8 @@ export default function Dashboard() {
   const inProgressTasksCount = allTasks.filter(t => t.status === "in_progress").length;
   const overdueTasksCount = allTasks.filter(t => t.isOverdue && t.status !== "completed").length;
 
-  // Only block on critical data - orgId and main stats
-  const loading = orgLoading || statsLoading;
+  // Only show loading during initial auth - not blocking on orgId
+  const loading = authLoading && !isInitialized;
 
   // Process stats from database function
   const stats: DashboardStats = useMemo(() => {
@@ -197,7 +198,33 @@ export default function Dashboard() {
     }));
   }, [activityRaw]);
 
-  if (!orgId || loading) {
+  // Show error state if profile/org loading failed
+  if (profileError) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Alert variant="destructive" className="max-w-md">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Unable to Load Dashboard</AlertTitle>
+            <AlertDescription>
+              {profileError}
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="mt-3 w-full"
+                onClick={() => window.location.reload()}
+              >
+                Retry
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // Show loading only during initial auth
+  if (loading) {
     return (
       <DashboardLayout>
         <LoadingState message="Loading dashboard data..." />
