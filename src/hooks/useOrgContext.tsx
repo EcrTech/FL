@@ -1,29 +1,20 @@
-import { useAuth } from "@/contexts/AuthContext";
+import { ORGANIZATION_ID } from "@/config/organization";
 
 /**
  * Organization context hook for single-tenant application
  * 
- * Now uses the centralized AuthContext to prevent duplicate API calls.
- * All users belong to the same organization.
+ * Returns the hardcoded organization ID immediately without any loading state.
+ * This eliminates the auth → profile → org loading chain that was blocking pages.
  * 
- * @returns Organization context state
- * @property {string | null} orgId - The organization ID
- * @property {boolean} isLoading - Loading state during context initialization
- * @property {string | null} error - Error message if profile/org loading failed
- * 
- * @example
- * ```tsx
- * const { orgId, isLoading, error } = useOrgContext();
- * if (error) return <ErrorState message={error} />;
- * if (!orgId) return <LoadingState />;
- * ```
+ * @returns Organization context with immediate values
+ * @property {string} orgId - The hardcoded organization ID (always available)
+ * @property {boolean} isLoading - Always false (no loading needed)
+ * @property {null} error - Always null (no fetch = no errors)
  */
 export function useOrgContext() {
-  const { orgId, isLoading, profileError } = useAuth();
-  
   return {
-    orgId,
-    isLoading,
-    error: profileError,
+    orgId: ORGANIZATION_ID,
+    isLoading: false,
+    error: null,
   };
 }
