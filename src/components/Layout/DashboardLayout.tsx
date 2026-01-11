@@ -245,7 +245,7 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                 onClick={() => setSidebarOpen(false)}
               >
                 <Users size={18} />
-                <span>Customer Relationships</span>
+                <span>Reports</span>
               </Link>
 
               {isAdmin && (
