@@ -1,5 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+import { useOrgContext } from "@/hooks/useOrgContext";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -39,39 +41,16 @@ interface CallLog {
 }
 
 export default function CallLogs() {
-  const [callLogs, setCallLogs] = useState<CallLog[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { orgId, isLoading: orgLoading } = useOrgContext();
   const [searchQuery, setSearchQuery] = useState("");
   const [callTypeFilter, setCallTypeFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("7");
   const notify = useNotification();
 
-  useEffect(() => {
-    fetchCallLogs();
-    
-    // Auto-refresh every 15 seconds
-    const intervalId = setInterval(() => {
-      fetchCallLogs();
-    }, 15000);
-    
-    return () => clearInterval(intervalId);
-  }, [dateFilter, callTypeFilter]);
-
-  const fetchCallLogs = async () => {
-    try {
-      setLoading(true);
-      
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('org_id')
-        .eq('id', user.id)
-        .single();
-
-      if (!profile) return;
-
+  // Use React Query for data fetching with proper caching
+  const { data: callLogs = [], isLoading: queryLoading } = useQuery({
+    queryKey: ['call-logs', orgId, dateFilter, callTypeFilter],
+    queryFn: async () => {
       // Calculate date filter
       const fromDate = new Date();
       fromDate.setDate(fromDate.getDate() - parseInt(dateFilter));
@@ -83,7 +62,7 @@ export default function CallLogs() {
           contacts (first_name, last_name),
           call_dispositions (name, category)
         `)
-        .eq('org_id', profile.org_id)
+        .eq('org_id', orgId!)
         .gte('created_at', fromDate.toISOString())
         .order('created_at', { ascending: false });
 
@@ -94,13 +73,14 @@ export default function CallLogs() {
       const { data, error } = await query;
 
       if (error) throw error;
-      setCallLogs((data || []) as CallLog[]);
-    } catch (error: any) {
-        notify.error("Error loading call logs", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      return (data || []) as CallLog[];
+    },
+    enabled: !!orgId,
+    staleTime: 30 * 1000, // 30 seconds
+    refetchInterval: 15000, // Auto-refresh every 15 seconds
+  });
+
+  const loading = orgLoading || queryLoading;
 
   const formatDuration = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);

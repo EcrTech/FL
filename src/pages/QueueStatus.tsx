@@ -41,14 +41,13 @@ const QueueStatus = () => {
   }, [orgId]);
 
   const fetchJobs = async () => {
+    if (!orgId) return;
+    
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
       const { data, error } = await supabase
         .from("operation_queue" as any)
         .select("*")
-        .eq("user_id", user.id)
+        .eq("org_id", orgId)
         .order("created_at", { ascending: false })
         .limit(50);
 
