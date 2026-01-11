@@ -52,6 +52,9 @@ interface AuthContextType {
   isLoading: boolean;
   isInitialized: boolean;
   
+  // Error state
+  profileError: string | null;
+  
   // Permission helpers
   hasPermission: (featureKey: string, permission: 'view' | 'create' | 'edit' | 'delete') => boolean;
   canAccessFeature: (featureKey: string) => boolean;
@@ -76,6 +79,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [designationPermissions, setDesignationPermissions] = useState<DesignationPermission[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   // Refs to properly guard async operations across renders
   const isInitializingRef = useRef(true);
@@ -90,6 +94,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     fetchInProgressRef.current = true;
 
     try {
+      setProfileError(null);
+      
       // Fetch all user data in parallel - single batch of requests
       const [roleRes, profileRes] = await Promise.all([
         supabase
@@ -109,38 +115,56 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setUserRole(roleRes.data.role);
       }
 
-      // Set profile and fetch related data
-      if (profileRes.data) {
-        setProfile(profileRes.data);
+      // Handle profile fetch errors
+      if (profileRes.error) {
+        console.error("[AuthContext] Profile fetch error:", profileRes.error);
+        setProfileError("Failed to load your profile. Please try refreshing the page.");
+        return;
+      }
 
-        // Fetch org data and designation permissions in parallel
-        const orgPromise = profileRes.data.org_id
-          ? supabase
-              .from("organizations")
-              .select("id, name, logo_url")
-              .eq("id", profileRes.data.org_id)
-              .single()
-          : Promise.resolve({ data: null, error: null });
+      if (!profileRes.data) {
+        console.error("[AuthContext] No profile found for user:", currentUser.id);
+        setProfileError("Profile not found. Please contact support.");
+        return;
+      }
 
-        const permissionsPromise = profileRes.data.designation_id
-          ? supabase
-              .from("designation_feature_access")
-              .select("feature_key, can_view, can_create, can_edit, can_delete, custom_permissions")
-              .eq("designation_id", profileRes.data.designation_id)
-          : Promise.resolve({ data: [], error: null });
+      // Set profile
+      setProfile(profileRes.data);
 
-        const [orgRes, permissionsRes] = await Promise.all([orgPromise, permissionsPromise]);
+      if (!profileRes.data.org_id) {
+        console.error("[AuthContext] User has no org_id:", currentUser.id);
+        setProfileError("Your account is not linked to an organization. Please contact support.");
+        return;
+      }
 
-        if (orgRes.data) {
-          setOrganization(orgRes.data);
-        }
+      // Fetch org data and designation permissions in parallel
+      const orgPromise = supabase
+        .from("organizations")
+        .select("id, name, logo_url")
+        .eq("id", profileRes.data.org_id)
+        .single();
 
-        if (permissionsRes.data) {
-          setDesignationPermissions(permissionsRes.data);
-        }
+      const permissionsPromise = profileRes.data.designation_id
+        ? supabase
+            .from("designation_feature_access")
+            .select("feature_key, can_view, can_create, can_edit, can_delete, custom_permissions")
+            .eq("designation_id", profileRes.data.designation_id)
+        : Promise.resolve({ data: [], error: null });
+
+      const [orgRes, permissionsRes] = await Promise.all([orgPromise, permissionsPromise]);
+
+      if (orgRes.error) {
+        console.error("[AuthContext] Organization fetch error:", orgRes.error);
+      } else if (orgRes.data) {
+        setOrganization(orgRes.data);
+      }
+
+      if (permissionsRes.data) {
+        setDesignationPermissions(permissionsRes.data);
       }
     } catch (error) {
-      console.error("Error fetching user data:", error);
+      console.error("[AuthContext] Error fetching user data:", error);
+      setProfileError("An error occurred while loading your account. Please try again.");
     } finally {
       fetchInProgressRef.current = false;
     }
@@ -282,6 +306,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     designationPermissions,
     isLoading,
     isInitialized,
+    profileError,
     hasPermission,
     canAccessFeature,
     signOut,

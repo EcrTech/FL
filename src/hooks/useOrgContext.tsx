@@ -9,18 +9,21 @@ import { useAuth } from "@/contexts/AuthContext";
  * @returns Organization context state
  * @property {string | null} orgId - The organization ID
  * @property {boolean} isLoading - Loading state during context initialization
+ * @property {string | null} error - Error message if profile/org loading failed
  * 
  * @example
  * ```tsx
- * const { orgId, isLoading } = useOrgContext();
+ * const { orgId, isLoading, error } = useOrgContext();
+ * if (error) return <ErrorState message={error} />;
  * if (!orgId) return <LoadingState />;
  * ```
  */
 export function useOrgContext() {
-  const { orgId, isLoading } = useAuth();
+  const { orgId, isLoading, profileError } = useAuth();
   
   return {
     orgId,
     isLoading,
+    error: profileError,
   };
 }
