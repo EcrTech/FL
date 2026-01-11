@@ -2,11 +2,9 @@ import { useState } from "react";
 import { format } from "date-fns";
 import { useCustomerRelationships, CustomerRelationship } from "@/hooks/useCustomerRelationships";
 import { CustomerDetailDialog } from "./CustomerDetailDialog";
-import { CustomerCard } from "./CustomerCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -14,18 +12,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { LoadingState } from "@/components/common/LoadingState";
 import { EmptyState } from "@/components/common/EmptyState";
-import { Search, Users, Download, LayoutGrid, List, TrendingUp, IndianRupee, AlertCircle } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Search, Users, Download, TrendingUp, IndianRupee, AlertCircle, Eye } from "lucide-react";
+
+const scoreConfig: Record<string, { label: string; color: string }> = {
+  excellent: { label: "Excellent", color: "bg-green-500" },
+  good: { label: "Good", color: "bg-blue-500" },
+  fair: { label: "Fair", color: "bg-amber-500" },
+  poor: { label: "Poor", color: "bg-red-500" },
+};
 
 export function ClientsTab() {
-  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [scoreFilter, setScoreFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerRelationship | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -64,10 +75,6 @@ export function ClientsTab() {
   const handleViewDetails = (customer: CustomerRelationship) => {
     setSelectedCustomer(customer);
     setDialogOpen(true);
-  };
-
-  const handleShareReferralLink = () => {
-    navigate("/los/my-referrals");
   };
 
   const handleExportCSV = () => {
@@ -177,22 +184,10 @@ export function ClientsTab() {
               <CardTitle className="text-lg">Search & Filter</CardTitle>
               <CardDescription>Find customers by PAN, mobile, name, or customer ID</CardDescription>
             </div>
-            <div className="flex items-center gap-2">
-              <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "grid" | "list")}>
-                <TabsList>
-                  <TabsTrigger value="grid" className="px-3">
-                    <LayoutGrid className="h-4 w-4" />
-                  </TabsTrigger>
-                  <TabsTrigger value="list" className="px-3">
-                    <List className="h-4 w-4" />
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-              <Button onClick={handleExportCSV} variant="outline" disabled={!filteredCustomers.length}>
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </Button>
-            </div>
+            <Button onClick={handleExportCSV} variant="outline" disabled={!filteredCustomers.length}>
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -249,29 +244,84 @@ export function ClientsTab() {
             />
           </CardContent>
         </Card>
-      ) : viewMode === "grid" ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {filteredCustomers.map((customer) => (
-            <CustomerCard
-              key={customer.customerId}
-              customer={customer}
-              onViewDetails={handleViewDetails}
-              onShareReferralLink={handleShareReferralLink}
-            />
-          ))}
-        </div>
       ) : (
         <Card>
           <CardContent className="p-0">
-            <div className="divide-y divide-border">
-              {filteredCustomers.map((customer) => (
-                <CustomerCard
-                  key={customer.customerId}
-                  customer={customer}
-                  onViewDetails={handleViewDetails}
-                  onShareReferralLink={handleShareReferralLink}
-                />
-              ))}
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Customer ID</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>PAN</TableHead>
+                    <TableHead>Mobile</TableHead>
+                    <TableHead className="text-center">Total Loans</TableHead>
+                    <TableHead className="text-center">Active</TableHead>
+                    <TableHead className="text-right">Disbursed</TableHead>
+                    <TableHead className="text-right">Outstanding</TableHead>
+                    <TableHead>Payment Score</TableHead>
+                    <TableHead>Last Activity</TableHead>
+                    <TableHead className="text-center">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredCustomers.map((customer) => {
+                    const score = scoreConfig[customer.paymentScore] || { label: customer.paymentScore, color: "bg-gray-500" };
+                    
+                    return (
+                      <TableRow 
+                        key={customer.customerId} 
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => handleViewDetails(customer)}
+                      >
+                        <TableCell className="font-mono text-sm font-medium">
+                          {customer.customerId}
+                        </TableCell>
+                        <TableCell className="font-medium">{customer.name}</TableCell>
+                        <TableCell className="font-mono text-sm">{customer.panNumber}</TableCell>
+                        <TableCell className="text-sm">{customer.mobile}</TableCell>
+                        <TableCell className="text-center">{customer.totalLoans}</TableCell>
+                        <TableCell className="text-center">
+                          <span className={customer.activeLoans > 0 ? "text-green-600 font-medium" : "text-muted-foreground"}>
+                            {customer.activeLoans}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency(customer.totalDisbursed)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span className={customer.outstandingAmount > 0 ? "text-orange-600 font-medium" : "text-green-600"}>
+                            {formatCurrency(customer.outstandingAmount)}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={`${score.color} text-white`}>
+                            {score.label}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {customer.lastApplicationDate 
+                            ? format(new Date(customer.lastApplicationDate), "dd MMM yyyy")
+                            : "-"
+                          }
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewDetails(customer);
+                            }}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             </div>
           </CardContent>
         </Card>

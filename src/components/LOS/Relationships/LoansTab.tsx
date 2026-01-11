@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { useLoansList, LoanListItem } from "@/hooks/useLoansList";
-import { LoanCard } from "./LoanCard";
 import { LoanDetailDialog } from "./LoanDetailDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,17 +12,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { LoadingState } from "@/components/common/LoadingState";
 import { EmptyState } from "@/components/common/EmptyState";
-import { Search, Banknote, Download, LayoutGrid, List, TrendingUp, AlertCircle, CheckCircle, IndianRupee } from "lucide-react";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Search, Banknote, Download, TrendingUp, AlertCircle, CheckCircle, IndianRupee, Eye } from "lucide-react";
+
+const paymentStatusConfig: Record<string, { label: string; color: string }> = {
+  on_track: { label: "On Track", color: "bg-green-500" },
+  overdue: { label: "Overdue", color: "bg-red-500" },
+  completed: { label: "Completed", color: "bg-blue-500" },
+};
 
 export function LoansTab() {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [paymentFilter, setPaymentFilter] = useState<string>("all");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [selectedLoan, setSelectedLoan] = useState<LoanListItem | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -212,22 +225,10 @@ export function LoansTab() {
               <CardTitle className="text-lg">Search & Filter</CardTitle>
               <CardDescription>Find loans by ID, application number, PAN, or name</CardDescription>
             </div>
-            <div className="flex items-center gap-2">
-              <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "grid" | "list")}>
-                <TabsList>
-                  <TabsTrigger value="list" className="px-3">
-                    <List className="h-4 w-4" />
-                  </TabsTrigger>
-                  <TabsTrigger value="grid" className="px-3">
-                    <LayoutGrid className="h-4 w-4" />
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-              <Button onClick={handleExportCSV} variant="outline" disabled={!filteredLoans.length}>
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </Button>
-            </div>
+            <Button onClick={handleExportCSV} variant="outline" disabled={!filteredLoans.length}>
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -283,26 +284,111 @@ export function LoansTab() {
             />
           </CardContent>
         </Card>
-      ) : viewMode === "list" ? (
-        <div className="space-y-3">
-          {filteredLoans.map((loan) => (
-            <LoanCard
-              key={loan.id}
-              loan={loan}
-              onViewDetails={handleViewDetails}
-            />
-          ))}
-        </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {filteredLoans.map((loan) => (
-            <LoanCard
-              key={loan.id}
-              loan={loan}
-              onViewDetails={handleViewDetails}
-            />
-          ))}
-        </div>
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Loan ID</TableHead>
+                    <TableHead>Application #</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>PAN</TableHead>
+                    <TableHead className="text-right">Disbursed</TableHead>
+                    <TableHead className="text-right">Outstanding</TableHead>
+                    <TableHead>EMI Progress</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Next Due</TableHead>
+                    <TableHead className="text-center">On-Time %</TableHead>
+                    <TableHead className="text-center">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredLoans.map((loan) => {
+                    const statusConfig = paymentStatusConfig[loan.paymentStatus] || { label: loan.paymentStatus, color: "bg-gray-500" };
+                    const emiProgress = loan.emiCount > 0 ? Math.round((loan.paidEmiCount / loan.emiCount) * 100) : 0;
+                    
+                    return (
+                      <TableRow 
+                        key={loan.id} 
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => handleViewDetails(loan)}
+                      >
+                        <TableCell className="font-mono text-sm font-medium">
+                          {loan.loanId}
+                        </TableCell>
+                        <TableCell className="font-mono text-sm text-muted-foreground">
+                          {loan.applicationNumber}
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{loan.applicantName}</p>
+                            <p className="text-xs text-muted-foreground">{loan.mobile}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">{loan.panNumber}</TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency(loan.disbursedAmount)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span className={loan.outstandingAmount > 0 ? "text-orange-600 font-medium" : "text-green-600"}>
+                            {formatCurrency(loan.outstandingAmount)}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2 min-w-[120px]">
+                            <Progress value={emiProgress} className="h-2 flex-1" />
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">
+                              {loan.paidEmiCount}/{loan.emiCount}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={`${statusConfig.color} text-white`}>
+                            {statusConfig.label}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {loan.nextDueDate ? (
+                            <div className="text-sm">
+                              <p>{format(new Date(loan.nextDueDate), "dd MMM")}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatCurrency(loan.nextDueAmount || 0)}
+                              </p>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className={`font-medium ${
+                            loan.onTimePaymentPercent >= 90 ? "text-green-600" :
+                            loan.onTimePaymentPercent >= 70 ? "text-amber-600" : "text-red-600"
+                          }`}>
+                            {loan.onTimePaymentPercent}%
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewDetails(loan);
+                            }}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       <LoanDetailDialog

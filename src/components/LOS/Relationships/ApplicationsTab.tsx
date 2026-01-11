@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import { useApplicationsList, ApplicationListItem } from "@/hooks/useApplicationsList";
-import { ApplicationCard } from "./ApplicationCard";
 import { ApplicationDetailDialog } from "./ApplicationDetailDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,17 +12,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { LoadingState } from "@/components/common/LoadingState";
 import { EmptyState } from "@/components/common/EmptyState";
-import { Search, FileText, Download, LayoutGrid, List, CheckCircle, Clock, XCircle, Banknote } from "lucide-react";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Search, FileText, Download, CheckCircle, Clock, XCircle, Banknote, Eye, Check, X } from "lucide-react";
+
+const stageConfig: Record<string, { label: string; color: string }> = {
+  application: { label: "Application", color: "bg-slate-500" },
+  documents: { label: "Documents", color: "bg-blue-500" },
+  verification: { label: "Verification", color: "bg-purple-500" },
+  assessment: { label: "Assessment", color: "bg-amber-500" },
+  approval: { label: "Approval", color: "bg-cyan-500" },
+  sanctioned: { label: "Sanctioned", color: "bg-green-500" },
+  disbursed: { label: "Disbursed", color: "bg-emerald-600" },
+  rejected: { label: "Rejected", color: "bg-red-500" },
+};
 
 export function ApplicationsTab() {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [selectedApplication, setSelectedApplication] = useState<ApplicationListItem | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -206,22 +223,10 @@ export function ApplicationsTab() {
               <CardTitle className="text-lg">Search & Filter</CardTitle>
               <CardDescription>Find applications by number, PAN, mobile, or name</CardDescription>
             </div>
-            <div className="flex items-center gap-2">
-              <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "grid" | "list")}>
-                <TabsList>
-                  <TabsTrigger value="list" className="px-3">
-                    <List className="h-4 w-4" />
-                  </TabsTrigger>
-                  <TabsTrigger value="grid" className="px-3">
-                    <LayoutGrid className="h-4 w-4" />
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-              <Button onClick={handleExportCSV} variant="outline" disabled={!filteredApplications.length}>
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </Button>
-            </div>
+            <Button onClick={handleExportCSV} variant="outline" disabled={!filteredApplications.length}>
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -285,26 +290,89 @@ export function ApplicationsTab() {
             />
           </CardContent>
         </Card>
-      ) : viewMode === "list" ? (
-        <div className="space-y-3">
-          {filteredApplications.map((application) => (
-            <ApplicationCard
-              key={application.id}
-              application={application}
-              onViewDetails={handleViewDetails}
-            />
-          ))}
-        </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {filteredApplications.map((application) => (
-            <ApplicationCard
-              key={application.id}
-              application={application}
-              onViewDetails={handleViewDetails}
-            />
-          ))}
-        </div>
+        <Card>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Application #</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Applicant</TableHead>
+                    <TableHead>PAN</TableHead>
+                    <TableHead>Mobile</TableHead>
+                    <TableHead>Stage</TableHead>
+                    <TableHead className="text-right">Requested</TableHead>
+                    <TableHead className="text-right">Approved</TableHead>
+                    <TableHead className="text-center">Sanctioned</TableHead>
+                    <TableHead className="text-center">Disbursed</TableHead>
+                    <TableHead className="text-center">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredApplications.map((app) => {
+                    const stage = stageConfig[app.currentStage] || { label: app.currentStage, color: "bg-gray-500" };
+                    return (
+                      <TableRow 
+                        key={app.id} 
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => handleViewDetails(app)}
+                      >
+                        <TableCell className="font-mono text-sm font-medium">
+                          {app.applicationNumber}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {format(new Date(app.createdAt), "dd MMM yyyy")}
+                        </TableCell>
+                        <TableCell className="font-medium">{app.applicantName}</TableCell>
+                        <TableCell className="font-mono text-sm">{app.panNumber}</TableCell>
+                        <TableCell className="text-sm">{app.mobile}</TableCell>
+                        <TableCell>
+                          <Badge className={`${stage.color} text-white`}>
+                            {stage.label}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency(app.requestedAmount)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {app.approvedAmount ? formatCurrency(app.approvedAmount) : "-"}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {app.isSanctioned ? (
+                            <Check className="h-4 w-4 text-green-500 mx-auto" />
+                          ) : (
+                            <X className="h-4 w-4 text-muted-foreground mx-auto" />
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {app.isDisbursed ? (
+                            <Check className="h-4 w-4 text-green-500 mx-auto" />
+                          ) : (
+                            <X className="h-4 w-4 text-muted-foreground mx-auto" />
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewDetails(app);
+                            }}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       <ApplicationDetailDialog
