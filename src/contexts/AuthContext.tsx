@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
 
@@ -77,7 +77,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
 
+  // Refs to properly guard async operations across renders
+  const isInitializingRef = useRef(true);
+  const fetchInProgressRef = useRef(false);
+
   const fetchUserData = useCallback(async (currentUser: User) => {
+    // Prevent concurrent fetch calls
+    if (fetchInProgressRef.current) {
+      console.log("[AuthContext] Fetch already in progress, skipping");
+      return;
+    }
+    fetchInProgressRef.current = true;
+
     try {
       // Fetch all user data in parallel - single batch of requests
       const [roleRes, profileRes] = await Promise.all([
@@ -130,6 +141,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     } catch (error) {
       console.error("Error fetching user data:", error);
+    } finally {
+      fetchInProgressRef.current = false;
     }
   }, []);
 
@@ -152,7 +165,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     let mounted = true;
-    let isInitializing = true;
+    isInitializingRef.current = true;
 
     // Initialize auth on mount
     const initAuth = async () => {
@@ -175,7 +188,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         console.error("Error initializing auth:", error);
       } finally {
         if (mounted) {
-          isInitializing = false;
+          isInitializingRef.current = false;
           setIsLoading(false);
           setIsInitialized(true);
         }
@@ -190,7 +203,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (!mounted) return;
         
         // Skip if still initializing - initAuth handles the initial state
-        if (isInitializing) return;
+        // Using ref to properly check across async boundaries
+        if (isInitializingRef.current) {
+          console.log("[AuthContext] Still initializing, skipping auth state change");
+          return;
+        }
         
         try {
           setSession(currentSession);

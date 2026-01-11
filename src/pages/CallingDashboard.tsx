@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+import { useOrgContext } from "@/hooks/useOrgContext";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -11,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
+import { LoadingState } from "@/components/common/LoadingState";
 
 interface AgentStats {
   agent_id: string;
@@ -37,7 +40,7 @@ interface DashboardStats {
   positive_rate: number;
 }
 
-interface User {
+interface UserType {
   id: string;
   first_name: string;
   last_name: string;
@@ -69,109 +72,48 @@ interface CallLog {
 }
 
 export default function CallingDashboard() {
-  const [agentStats, setAgentStats] = useState<AgentStats[]>([]);
-  const [dispositionStats, setDispositionStats] = useState<DispositionStats[]>([]);
-  const [dashboardStats, setDashboardStats] = useState<DashboardStats>({
-    total_calls: 0,
-    total_duration: 0,
-    avg_duration: 0,
-    total_agents: 0,
-    positive_rate: 0,
-  });
-  const [loading, setLoading] = useState(true);
+  const { orgId, isLoading: orgLoading } = useOrgContext();
   const [timeRange, setTimeRange] = useState("7");
   const [selectedUser, setSelectedUser] = useState<string>("all");
-  const [users, setUsers] = useState<User[]>([]);
   const [teamMemberIds, setTeamMemberIds] = useState<string[]>([]);
-  const [activeCallsCount, setActiveCallsCount] = useState(0);
-  const [callLogs, setCallLogs] = useState<CallLog[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [callTypeFilter, setCallTypeFilter] = useState("all");
   const notify = useNotification();
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
+  // Fetch users using React Query
+  const { data: users = [] } = useQuery({
+    queryKey: ['dashboard-users', orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name")
+        .eq("org_id", orgId!)
+        .order("first_name");
 
+      if (error) throw error;
+      return (data || []) as UserType[];
+    },
+    enabled: !!orgId,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+
+  // Fetch team members when user selection changes
   useEffect(() => {
-    if (selectedUser !== "all") {
+    if (selectedUser !== "all" && orgId) {
       fetchTeamMembers(selectedUser);
     } else {
       setTeamMemberIds([]);
     }
-  }, [selectedUser]);
-
-  useEffect(() => {
-    fetchDashboardData();
-    fetchActiveCalls();
-    fetchCallLogs();
-    
-    // Auto-refresh every 20 seconds
-    const intervalId = setInterval(() => {
-      fetchDashboardData();
-      fetchActiveCalls();
-      fetchCallLogs();
-    }, 20000);
-    
-    return () => clearInterval(intervalId);
-  }, [timeRange, selectedUser, teamMemberIds, callTypeFilter]);
-
-  const fetchActiveCalls = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: profile } = await supabase.from("profiles").select("org_id").eq("id", user.id).single();
-      if (!profile?.org_id) return;
-
-      const { count } = await supabase
-        .from("agent_call_sessions")
-        .select("*", { count: "exact", head: true })
-        .eq("org_id", profile.org_id)
-        .in("status", ["initiating", "ringing", "connected"]);
-
-      setActiveCallsCount(count || 0);
-    } catch (error) {
-      console.error("Error fetching active calls:", error);
-    }
-  };
-
-  const fetchUsers = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("org_id")
-        .eq("id", user.id)
-        .single();
-
-      if (!profile?.org_id) throw new Error("Organization not found");
-
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, first_name, last_name")
-        .eq("org_id", profile.org_id)
-        .order("first_name");
-
-      if (error) throw error;
-      setUsers(data || []);
-    } catch (error: any) {
-      notify.error("Error loading users", error);
-    }
-  };
+  }, [selectedUser, orgId]);
 
   const fetchTeamMembers = async (userId: string) => {
     try {
-      // Check if user is a team manager
       const { data: managedTeams } = await supabase
         .from("teams")
         .select("id")
         .eq("manager_id", userId);
 
       if (managedTeams && managedTeams.length > 0) {
-        // Get all team members from the managed teams
         const { data: teamMembers } = await supabase
           .from("team_members")
           .select("user_id")
@@ -179,13 +121,10 @@ export default function CallingDashboard() {
 
         if (teamMembers) {
           const memberIds = teamMembers.map(tm => tm.user_id);
-          // Include the manager themselves
           setTeamMemberIds([userId, ...memberIds]);
           return;
         }
       }
-
-      // If not a manager or no team members, just set the single user
       setTeamMemberIds([userId]);
     } catch (error: any) {
       notify.error("Error loading team", error);
@@ -193,23 +132,29 @@ export default function CallingDashboard() {
     }
   };
 
-  const fetchDashboardData = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+  // Fetch active calls count
+  const { data: activeCallsCount = 0 } = useQuery({
+    queryKey: ['active-calls', orgId],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("agent_call_sessions")
+        .select("*", { count: "exact", head: true })
+        .eq("org_id", orgId!)
+        .in("status", ["initiating", "ringing", "connected"]);
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("org_id")
-        .eq("id", user.id)
-        .single();
+      return count || 0;
+    },
+    enabled: !!orgId,
+    refetchInterval: 20000,
+  });
 
-      if (!profile?.org_id) throw new Error("Organization not found");
-
+  // Fetch dashboard data
+  const { data: dashboardData, isLoading: dashboardLoading } = useQuery({
+    queryKey: ['calling-dashboard', orgId, timeRange, selectedUser, teamMemberIds],
+    queryFn: async () => {
       const daysAgo = new Date();
       daysAgo.setDate(daysAgo.getDate() - parseInt(timeRange));
 
-      // Fetch from call_logs table
       let callLogsQuery = supabase
         .from("call_logs")
         .select(`
@@ -217,7 +162,7 @@ export default function CallingDashboard() {
           profiles!call_logs_agent_id_fkey(id, first_name, last_name),
           call_dispositions(name, category)
         `)
-        .eq("org_id", profile.org_id)
+        .eq("org_id", orgId!)
         .gte("created_at", daysAgo.toISOString())
         .not("conversation_duration", "is", null);
 
@@ -225,10 +170,9 @@ export default function CallingDashboard() {
         callLogsQuery = callLogsQuery.in("agent_id", teamMemberIds);
       }
 
-      const { data: callLogs, error: callLogsError } = await callLogsQuery;
-      if (callLogsError) throw callLogsError;
+      const { data: callLogs, error } = await callLogsQuery;
+      if (error) throw error;
 
-      // Transform call_logs to activities format
       const activities = callLogs?.map(log => ({
         ...log,
         created_by: log.agent_id,
@@ -240,23 +184,21 @@ export default function CallingDashboard() {
       const totalDuration = activities?.reduce((sum, a) => sum + (a.call_duration || 0), 0) || 0;
       const avgDuration = totalCalls > 0 ? Math.round(totalDuration / totalCalls) : 0;
       
-      // Get unique agents
       const uniqueAgents = new Set(activities?.map(a => a.created_by).filter(Boolean));
       const totalAgents = uniqueAgents.size;
 
-      // Calculate positive rate
       const positiveCallsCount = activities?.filter(a => 
         a.call_dispositions?.category === "positive"
       ).length || 0;
       const positiveRate = totalCalls > 0 ? Math.round((positiveCallsCount / totalCalls) * 100) : 0;
 
-      setDashboardStats({
+      const stats: DashboardStats = {
         total_calls: totalCalls,
         total_duration: totalDuration,
         avg_duration: avgDuration,
         total_agents: totalAgents,
         positive_rate: positiveRate,
-      });
+      };
 
       // Calculate agent statistics
       const agentMap = new Map<string, AgentStats>();
@@ -280,31 +222,28 @@ export default function CallingDashboard() {
           });
         }
         
-        const stats = agentMap.get(agentId)!;
-        stats.total_calls++;
-        stats.total_duration += activity.call_duration || 0;
+        const agentStats = agentMap.get(agentId)!;
+        agentStats.total_calls++;
+        agentStats.total_duration += activity.call_duration || 0;
         
         if (activity.call_dispositions?.category === "positive") {
-          stats.positive_calls++;
+          agentStats.positive_calls++;
         } else if (activity.call_dispositions?.category === "negative") {
-          stats.negative_calls++;
+          agentStats.negative_calls++;
         }
       });
 
-      // Calculate derived metrics
-      const agentStatsArray = Array.from(agentMap.values()).map(stats => ({
-        ...stats,
-        avg_call_duration: stats.total_calls > 0 
-          ? Math.round(stats.total_duration / stats.total_calls) 
+      const agentStatsArray = Array.from(agentMap.values()).map(agentStats => ({
+        ...agentStats,
+        avg_call_duration: agentStats.total_calls > 0 
+          ? Math.round(agentStats.total_duration / agentStats.total_calls) 
           : 0,
-        conversion_rate: stats.total_calls > 0 
-          ? Math.round((stats.positive_calls / stats.total_calls) * 100) 
+        conversion_rate: agentStats.total_calls > 0 
+          ? Math.round((agentStats.positive_calls / agentStats.total_calls) * 100) 
           : 0,
       }));
 
-      // Sort by total calls descending
       agentStatsArray.sort((a, b) => b.total_calls - a.total_calls);
-      setAgentStats(agentStatsArray);
 
       // Calculate disposition statistics
       const dispositionMap = new Map<string, DispositionStats>();
@@ -328,39 +267,22 @@ export default function CallingDashboard() {
 
       const dispositionStatsArray = Array.from(dispositionMap.values());
       dispositionStatsArray.sort((a, b) => b.count - a.count);
-      setDispositionStats(dispositionStatsArray);
 
-    } catch (error: any) {
-      notify.error("Error loading dashboard", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      return {
+        stats,
+        agentStats: agentStatsArray,
+        dispositionStats: dispositionStatsArray,
+      };
+    },
+    enabled: !!orgId,
+    staleTime: 30 * 1000,
+    refetchInterval: 20000,
+  });
 
-  const formatDuration = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`;
-    }
-    return `${minutes}m ${secs}s`;
-  };
-
-  const fetchCallLogs = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('org_id')
-        .eq('id', user.id)
-        .single();
-
-      if (!profile) return;
-
+  // Fetch call logs for the logs tab
+  const { data: callLogs = [] } = useQuery({
+    queryKey: ['dashboard-call-logs', orgId, timeRange, callTypeFilter, selectedUser, teamMemberIds],
+    queryFn: async () => {
       const daysAgo = new Date();
       daysAgo.setDate(daysAgo.getDate() - parseInt(timeRange));
 
@@ -371,7 +293,7 @@ export default function CallingDashboard() {
           contacts (first_name, last_name),
           call_dispositions (name, category)
         `)
-        .eq('org_id', profile.org_id)
+        .eq('org_id', orgId!)
         .gte('created_at', daysAgo.toISOString())
         .order('created_at', { ascending: false });
 
@@ -384,12 +306,34 @@ export default function CallingDashboard() {
       }
 
       const { data, error } = await query;
-
       if (error) throw error;
-      setCallLogs((data || []) as CallLog[]);
-    } catch (error: any) {
-      console.error("Error loading call logs:", error);
+      return (data || []) as CallLog[];
+    },
+    enabled: !!orgId,
+    staleTime: 30 * 1000,
+    refetchInterval: 20000,
+  });
+
+  const loading = orgLoading || dashboardLoading;
+  const dashboardStats = dashboardData?.stats || {
+    total_calls: 0,
+    total_duration: 0,
+    avg_duration: 0,
+    total_agents: 0,
+    positive_rate: 0,
+  };
+  const agentStats = dashboardData?.agentStats || [];
+  const dispositionStats = dashboardData?.dispositionStats || [];
+
+  const formatDuration = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
     }
+    return `${minutes}m ${secs}s`;
   };
 
   const getCategoryColor = (category: string) => {
@@ -421,6 +365,14 @@ export default function CallingDashboard() {
 
     return matchesSearch;
   });
+
+  if (orgLoading) {
+    return (
+      <DashboardLayout>
+        <LoadingState message="Loading dashboard..." />
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>

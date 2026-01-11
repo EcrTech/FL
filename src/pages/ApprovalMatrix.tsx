@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { useOrgContext } from "@/hooks/useOrgContext";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,11 +44,11 @@ const ROLE_HIERARCHY = [
 
 export default function ApprovalMatrix() {
   const notify = useNotification();
+  const { orgId, isLoading: orgLoading } = useOrgContext();
   const [approvalTypes, setApprovalTypes] = useState<ApprovalType[]>([]);
   const [approvalRules, setApprovalRules] = useState<ApprovalRule[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<ApprovalRule | null>(null);
-  const [orgId, setOrgId] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     approval_type_id: "",
@@ -56,22 +57,6 @@ export default function ApprovalMatrix() {
     threshold_amount: "",
     required_roles: [] as string[],
   });
-
-  useEffect(() => {
-    const fetchOrgId = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("org_id")
-        .eq("id", user.id)
-        .single();
-
-      if (profile?.org_id) setOrgId(profile.org_id);
-    };
-    fetchOrgId();
-  }, []);
 
   const { data: typesData, refetch: refetchTypes } = useQuery({
     queryKey: ['approval-types', orgId],
@@ -113,20 +98,14 @@ export default function ApprovalMatrix() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!orgId) {
+      notify.error("Error", "Organization not found");
+      return;
+    }
+
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("org_id")
-        .eq("id", user.id)
-        .single();
-
-      if (!profile?.org_id) return;
-
       const payload = {
-        org_id: profile.org_id,
+        org_id: orgId,
         approval_type_id: formData.approval_type_id,
         name: formData.name,
         description: formData.description,
