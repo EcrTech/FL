@@ -34,6 +34,8 @@ export default function ReferralLoanApplication() {
   const [submitting, setSubmitting] = useState(false);
   const [applicationNumber, setApplicationNumber] = useState<string | null>(null);
   const [submissionSuccess, setSubmissionSuccess] = useState(false);
+  const [draftApplicationId, setDraftApplicationId] = useState<string | null>(null);
+  const [creatingDraft, setCreatingDraft] = useState(false);
   const [geolocation, setGeolocation] = useState<{
     latitude: number;
     longitude: number;
@@ -178,6 +180,65 @@ export default function ReferralLoanApplication() {
     setAadhaarVerified(true);
   };
 
+  // Create draft application before entering Video KYC step
+  const createDraftApplication = async (): Promise<string | null> => {
+    if (!referrerInfo) {
+      toast.error("Referrer information not available");
+      return null;
+    }
+
+    setCreatingDraft(true);
+    try {
+      // Generate a temporary application number for draft
+      const tempAppNumber = `DRAFT-${Date.now()}`;
+
+      const { data: draft, error: draftError } = await supabase
+        .from("loan_applications")
+        .insert({
+          org_id: referrerInfo.orgId,
+          referred_by: referrerInfo.userId,
+          applicant_name: basicInfo.name,
+          applicant_email: basicInfo.email,
+          applicant_phone: basicInfo.phone,
+          requested_amount: basicInfo.requestedAmount,
+          tenure_days: basicInfo.tenureDays,
+          pan_number: panNumber,
+          aadhaar_number: aadhaarNumber,
+          status: "draft",
+          current_stage: "video_kyc",
+          application_number: tempAppNumber,
+          source: "referral",
+        })
+        .select("id")
+        .single();
+
+      if (draftError) {
+        console.error("Error creating draft application:", draftError);
+        toast.error("Failed to prepare application. Please try again.");
+        return null;
+      }
+
+      console.log("Draft application created:", draft.id);
+      return draft.id;
+    } catch (err) {
+      console.error("Error creating draft:", err);
+      toast.error("Failed to prepare application. Please try again.");
+      return null;
+    } finally {
+      setCreatingDraft(false);
+    }
+  };
+
+  // Handle entering Video KYC step
+  const handleEnterVideoStep = async () => {
+    // Create draft application to get ID for video upload
+    const appId = await createDraftApplication();
+    if (appId) {
+      setDraftApplicationId(appId);
+      setCurrentStep(4);
+    }
+  };
+
   const handleVideoKycComplete = async () => {
     // Final check for geolocation before submission
     if (!geolocation) {
@@ -212,6 +273,7 @@ export default function ReferralLoanApplication() {
         referrerInfo,
         referralCode,
         geolocation,
+        draftApplicationId, // Include the draft ID so the edge function can update it
       };
 
       const { data, error: submitError } = await supabase.functions.invoke("submit-loan-application", {
@@ -432,19 +494,28 @@ export default function ReferralLoanApplication() {
                   aadhaarNumber={aadhaarNumber}
                   onAadhaarChange={setAadhaarNumber}
                   onVerified={handleAadhaarVerified}
-                  onNext={() => setCurrentStep(4)}
+                  onNext={handleEnterVideoStep}
                   onBack={() => setCurrentStep(2)}
                   isVerified={aadhaarVerified}
                   verifiedData={aadhaarData}
                 />
               )}
 
-              {currentStep === 4 && (
+              {creatingDraft && (
+                <div className="flex flex-col items-center justify-center py-16">
+                  <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+                  <span className="text-muted-foreground font-body text-lg">Preparing Video KYC...</span>
+                </div>
+              )}
+
+              {currentStep === 4 && !creatingDraft && (
                 <VideoKYCStep
                   onComplete={handleVideoKycComplete}
                   onBack={() => setCurrentStep(3)}
                   isCompleted={videoKycCompleted}
                   applicantName={basicInfo.name}
+                  applicationId={draftApplicationId || undefined}
+                  orgId={referrerInfo?.orgId}
                 />
               )}
 

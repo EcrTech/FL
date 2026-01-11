@@ -2,14 +2,17 @@ import { useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Check, Loader2, Video, Camera, Mic, ArrowLeft, AlertCircle, Play, Square } from "lucide-react";
+import { Check, Loader2, Video, Camera, Mic, ArrowLeft, Play, Square, Upload } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface VideoKYCStepProps {
   onComplete: () => void;
   onBack: () => void;
   isCompleted: boolean;
   applicantName: string;
+  applicationId?: string;
+  orgId?: string;
 }
 
 export function VideoKYCStep({
@@ -17,12 +20,16 @@ export function VideoKYCStep({
   onBack,
   isCompleted,
   applicantName,
+  applicationId,
+  orgId,
 }: VideoKYCStepProps) {
-  const [step, setStep] = useState<'instructions' | 'permissions' | 'recording' | 'completed'>('instructions');
+  const [step, setStep] = useState<'instructions' | 'permissions' | 'recording' | 'uploading' | 'completed'>('instructions');
   const [hasPermissions, setHasPermissions] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [checkingPermissions, setCheckingPermissions] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -72,10 +79,6 @@ export function VideoKYCStep({
         }
       };
 
-      mediaRecorder.onstop = () => {
-        console.log('Recording completed, chunks:', chunksRef.current.length);
-      };
-
       mediaRecorderRef.current = mediaRecorder;
       mediaRecorder.start(1000);
       setIsRecording(true);
@@ -92,6 +95,51 @@ export function VideoKYCStep({
     }
   }, []);
 
+  const uploadVideo = async (videoBlob: Blob): Promise<boolean> => {
+    if (!applicationId || !orgId) {
+      console.error('Missing applicationId or orgId for upload');
+      toast.error("Application data missing. Please try again.");
+      return false;
+    }
+
+    setIsUploading(true);
+    setStep('uploading');
+    setUploadProgress(10);
+
+    try {
+      const formData = new FormData();
+      formData.append('video', videoBlob, 'videokyc.webm');
+      formData.append('application_id', applicationId);
+      formData.append('org_id', orgId);
+
+      setUploadProgress(30);
+
+      const { data, error } = await supabase.functions.invoke('referral-videokyc-upload', {
+        body: formData,
+      });
+
+      setUploadProgress(80);
+
+      if (error) {
+        throw error;
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      setUploadProgress(100);
+      console.log('Video uploaded successfully:', data);
+      return true;
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast.error(error.message || "Failed to upload video. Please try again.");
+      return false;
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
@@ -101,15 +149,38 @@ export function VideoKYCStep({
         clearInterval(timerRef.current);
       }
 
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
+      // Handle the recording completion
+      mediaRecorderRef.current.onstop = async () => {
+        // Stop the camera stream
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop());
+        }
 
-      setStep('completed');
-      onComplete();
-      toast.success("Video KYC completed successfully");
+        // Create video blob from chunks
+        const videoBlob = new Blob(chunksRef.current, { type: 'video/webm' });
+        console.log('Recording completed, blob size:', videoBlob.size);
+
+        // Upload the video if we have application context
+        if (applicationId && orgId) {
+          const uploadSuccess = await uploadVideo(videoBlob);
+          if (uploadSuccess) {
+            setStep('completed');
+            toast.success("Video KYC uploaded successfully");
+            onComplete();
+          } else {
+            // Reset to allow retry
+            setStep('instructions');
+          }
+        } else {
+          // Fallback: No applicationId/orgId (legacy behavior)
+          console.warn('No applicationId/orgId provided, skipping upload');
+          setStep('completed');
+          onComplete();
+          toast.success("Video KYC completed successfully");
+        }
+      };
     }
-  }, [isRecording, onComplete]);
+  }, [isRecording, onComplete, applicationId, orgId]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -237,6 +308,27 @@ export function VideoKYCStep({
                 </>
               )}
             </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {step === 'uploading' && (
+        <Card className="border-2 border-primary/20 rounded-xl overflow-hidden">
+          <CardContent className="p-8 text-center">
+            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Upload className="h-8 w-8 text-primary animate-pulse" />
+            </div>
+            <h4 className="text-lg font-heading font-bold text-foreground mb-2">Uploading Video...</h4>
+            <p className="text-sm text-muted-foreground font-body mb-6">
+              Please wait while we securely upload your Video KYC recording
+            </p>
+            <div className="w-full bg-muted rounded-full h-2 mb-2">
+              <div 
+                className="bg-primary h-2 rounded-full transition-all duration-300"
+                style={{ width: `${uploadProgress}%` }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">{uploadProgress}% complete</p>
           </CardContent>
         </Card>
       )}
