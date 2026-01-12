@@ -24,10 +24,74 @@ interface RBLWebhookPayload {
 }
 
 serve(async (req) => {
+  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Handle GET requests for health check and URL verification
+  if (req.method === "GET") {
+    const url = new URL(req.url);
+    
+    // Support challenge verification (some banks send a challenge token)
+    const challenge = url.searchParams.get("challenge");
+    const hubChallenge = url.searchParams.get("hub.challenge");
+    const verifyToken = url.searchParams.get("verify_token");
+    
+    // If challenge parameter exists, echo it back (common verification pattern)
+    if (challenge) {
+      console.log("[RBL-Webhook] GET request - challenge verification");
+      return new Response(challenge, { 
+        headers: { ...corsHeaders, "Content-Type": "text/plain" } 
+      });
+    }
+    
+    if (hubChallenge) {
+      console.log("[RBL-Webhook] GET request - hub.challenge verification");
+      return new Response(hubChallenge, { 
+        headers: { ...corsHeaders, "Content-Type": "text/plain" } 
+      });
+    }
+
+    // Standard health check response
+    console.log("[RBL-Webhook] GET request - health check");
+    return new Response(
+      JSON.stringify({
+        status: "healthy",
+        service: "rbl-webhook-handler",
+        version: "1.0.0",
+        timestamp: new Date().toISOString(),
+        endpoints: {
+          health_check: "GET /",
+          webhook: "POST /"
+        },
+        supported_events: [
+          "FUND_TRANSFER",
+          "DISBURSEMENT", 
+          "MANDATE_STATUS",
+          "NACH_STATUS",
+          "PENNY_DROP",
+          "PAYMENT_STATUS"
+        ],
+        supported_statuses: [
+          "SUCCESS",
+          "COMPLETED", 
+          "FAILED",
+          "REJECTED",
+          "REVERSED",
+          "PENDING",
+          "PROCESSING",
+          "IN_PROGRESS"
+        ]
+      }),
+      { 
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      }
+    );
+  }
+
+  // Handle POST requests for webhook callbacks
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
