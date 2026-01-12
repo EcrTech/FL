@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useState, ReactNode, useCallback,
 import { supabase } from "@/integrations/supabase/client";
 import { Session, User } from "@supabase/supabase-js";
 
+console.log('[AuthContext] Module loading...');
+
 interface UserProfile {
   id: string;
   first_name: string;
@@ -71,6 +73,8 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
+  console.log('[AuthProvider] Component rendering...');
+  
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -86,15 +90,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const fetchInProgressRef = useRef(false);
 
   const fetchUserData = useCallback(async (currentUser: User) => {
+    console.log('[AuthProvider] fetchUserData called for user:', currentUser.id);
+    
     // Prevent concurrent fetch calls
     if (fetchInProgressRef.current) {
-      console.log("[AuthContext] Fetch already in progress, skipping");
+      console.log("[AuthProvider] Fetch already in progress, skipping");
       return;
     }
     fetchInProgressRef.current = true;
 
     try {
       setProfileError(null);
+      
+      console.log('[AuthProvider] Fetching role and profile in parallel...');
       
       // Fetch all user data in parallel - single batch of requests
       const [roleRes, profileRes] = await Promise.all([
@@ -110,6 +118,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
           .single()
       ]);
 
+      console.log('[AuthProvider] Role result:', roleRes.data, 'Error:', roleRes.error);
+      console.log('[AuthProvider] Profile result:', profileRes.data ? 'Found' : 'Not found', 'Error:', profileRes.error);
+
       // Set user role
       if (roleRes.data) {
         setUserRole(roleRes.data.role);
@@ -117,26 +128,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       // Handle profile fetch errors
       if (profileRes.error) {
-        console.error("[AuthContext] Profile fetch error:", profileRes.error);
+        console.error("[AuthProvider] Profile fetch error:", profileRes.error);
         setProfileError("Failed to load your profile. Please try refreshing the page.");
         return;
       }
 
       if (!profileRes.data) {
-        console.error("[AuthContext] No profile found for user:", currentUser.id);
+        console.error("[AuthProvider] No profile found for user:", currentUser.id);
         setProfileError("Profile not found. Please contact support.");
         return;
       }
 
       // Set profile
       setProfile(profileRes.data);
+      console.log('[AuthProvider] Profile set, org_id:', profileRes.data.org_id);
 
       if (!profileRes.data.org_id) {
-        console.error("[AuthContext] User has no org_id:", currentUser.id);
+        console.error("[AuthProvider] User has no org_id:", currentUser.id);
         setProfileError("Your account is not linked to an organization. Please contact support.");
         return;
       }
 
+      console.log('[AuthProvider] Fetching org data and permissions in parallel...');
+      
       // Fetch org data and designation permissions in parallel
       const orgPromise = supabase
         .from("organizations")
@@ -153,8 +167,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       const [orgRes, permissionsRes] = await Promise.all([orgPromise, permissionsPromise]);
 
+      console.log('[AuthProvider] Org result:', orgRes.data ? 'Found' : 'Not found', 'Error:', orgRes.error);
+      console.log('[AuthProvider] Permissions count:', permissionsRes.data?.length || 0);
+
       if (orgRes.error) {
-        console.error("[AuthContext] Organization fetch error:", orgRes.error);
+        console.error("[AuthProvider] Organization fetch error:", orgRes.error);
       } else if (orgRes.data) {
         setOrganization(orgRes.data);
       }
@@ -162,8 +179,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (permissionsRes.data) {
         setDesignationPermissions(permissionsRes.data);
       }
+      
+      console.log('[AuthProvider] fetchUserData completed successfully');
     } catch (error) {
-      console.error("[AuthContext] Error fetching user data:", error);
+      console.error("[AuthProvider] Error fetching user data:", error);
       setProfileError("An error occurred while loading your account. Please try again.");
     } finally {
       fetchInProgressRef.current = false;
@@ -171,6 +190,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const refreshAuth = useCallback(async () => {
+    console.log('[AuthProvider] refreshAuth called');
     setIsLoading(true);
     try {
       const { data: { session: currentSession } } = await supabase.auth.getSession();
@@ -181,37 +201,49 @@ export function AuthProvider({ children }: AuthProviderProps) {
         await fetchUserData(currentSession.user);
       }
     } catch (error) {
-      console.error("Error refreshing auth:", error);
+      console.error("[AuthProvider] Error refreshing auth:", error);
     } finally {
       setIsLoading(false);
     }
   }, [fetchUserData]);
 
   useEffect(() => {
+    console.log('[AuthProvider] useEffect starting - initializing auth...');
     let mounted = true;
     isInitializingRef.current = true;
 
     // Initialize auth on mount
     const initAuth = async () => {
+      console.log('[AuthProvider] initAuth called');
       try {
+        console.log('[AuthProvider] Fetching initial session...');
         const { data: { session: currentSession }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error("Error getting session:", error);
+          console.error("[AuthProvider] Error getting session:", error);
         }
         
-        if (!mounted) return;
+        console.log('[AuthProvider] Initial session:', currentSession ? 'Exists' : 'None');
+        
+        if (!mounted) {
+          console.log('[AuthProvider] Component unmounted, aborting initAuth');
+          return;
+        }
         
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
         if (currentSession?.user) {
+          console.log('[AuthProvider] Session found, fetching user data...');
           await fetchUserData(currentSession.user);
+        } else {
+          console.log('[AuthProvider] No session, skipping user data fetch');
         }
       } catch (error) {
-        console.error("Error initializing auth:", error);
+        console.error("[AuthProvider] Error initializing auth:", error);
       } finally {
         if (mounted) {
+          console.log('[AuthProvider] initAuth complete, setting isInitialized=true');
           isInitializingRef.current = false;
           setIsLoading(false);
           setIsInitialized(true);
@@ -224,12 +256,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Set up auth state change listener for subsequent auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
+        console.log('[AuthProvider] onAuthStateChange:', event, currentSession ? 'Session exists' : 'No session');
+        
         if (!mounted) return;
         
         // Skip if still initializing - initAuth handles the initial state
         // Using ref to properly check across async boundaries
         if (isInitializingRef.current) {
-          console.log("[AuthContext] Still initializing, skipping auth state change");
+          console.log("[AuthProvider] Still initializing, skipping auth state change");
           return;
         }
         
@@ -238,29 +272,33 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setUser(currentSession?.user ?? null);
           
           if (event === 'SIGNED_IN' && currentSession?.user) {
+            console.log('[AuthProvider] SIGNED_IN event, fetching user data...');
             setIsLoading(true);
             await fetchUserData(currentSession.user);
             setIsLoading(false);
           } else if (event === 'SIGNED_OUT') {
+            console.log('[AuthProvider] SIGNED_OUT event, clearing state');
             setProfile(null);
             setOrganization(null);
             setUserRole(null);
             setDesignationPermissions([]);
           }
         } catch (error) {
-          console.error("Error handling auth state change:", error);
+          console.error("[AuthProvider] Error handling auth state change:", error);
           setIsLoading(false);
         }
       }
     );
 
     return () => {
+      console.log('[AuthProvider] Cleanup - unmounting');
       mounted = false;
       subscription.unsubscribe();
     };
   }, [fetchUserData]);
 
   const signOut = useCallback(async () => {
+    console.log('[AuthProvider] signOut called');
     await supabase.auth.signOut();
   }, []);
 
@@ -312,6 +350,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     signOut,
     refreshAuth,
   };
+
+  console.log('[AuthProvider] Rendering with state:', {
+    isLoading,
+    isInitialized,
+    hasSession: !!session,
+    hasUser: !!user,
+    hasProfile: !!profile,
+    userRole,
+    profileError
+  });
 
   return (
     <AuthContext.Provider value={value}>

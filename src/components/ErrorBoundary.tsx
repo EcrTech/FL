@@ -16,18 +16,23 @@ class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
     this.state = { hasError: false };
+    console.log('[ErrorBoundary] Initialized');
   }
 
   static getDerivedStateFromError(error: Error): State {
+    console.error('[ErrorBoundary] getDerivedStateFromError - Caught error:', error.message);
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Error caught by boundary:', error, errorInfo);
+    console.error('[ErrorBoundary] componentDidCatch - Error:', error);
+    console.error('[ErrorBoundary] componentDidCatch - ErrorInfo:', errorInfo);
     logError(error, errorInfo);
   }
 
   render() {
+    console.log('[ErrorBoundary] Rendering, hasError:', this.state.hasError);
+    
     if (this.state.hasError) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -59,6 +64,8 @@ class ErrorBoundary extends Component<Props, State> {
                 </summary>
                 <pre className="mt-2 p-2 bg-muted rounded text-xs overflow-auto">
                   {this.state.error.message}
+                  {'\n\n'}
+                  {this.state.error.stack}
                 </pre>
               </details>
             )}

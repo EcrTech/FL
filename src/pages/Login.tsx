@@ -9,7 +9,11 @@ import { useNotification } from "@/hooks/useNotification";
 import { ForgotPasswordDialog } from "@/components/Auth/ForgotPasswordDialog";
 import { Eye, EyeOff } from "lucide-react";
 
+console.log('[Login] Module loaded');
+
 export default function Login() {
+  console.log('[Login] Component rendering...');
+  
   const navigate = useNavigate();
   const notify = useNotification();
   const [loading, setLoading] = useState(false);
@@ -19,14 +23,15 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
+    console.log('[Login] useEffect - setting up auth listener...');
     let mounted = true;
 
     // Listen for auth changes and redirect on successful login
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
-      console.log("Login - Auth state change:", event, session ? "Session exists" : "No session");
+      console.log("[Login] Auth state change:", event, session ? "Session exists" : "No session");
       if (event === 'SIGNED_IN' && session) {
-        console.log("Login - User signed in, redirecting to LOS dashboard");
+        console.log("[Login] User signed in, redirecting to LOS dashboard");
         navigate("/los/dashboard", { replace: true });
       }
     });
@@ -34,14 +39,15 @@ export default function Login() {
     // Check if user is already logged in - do this after setting up listener
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mounted) return;
-      console.log("Login - Initial session check:", session ? "Session exists" : "No session");
+      console.log("[Login] Initial session check:", session ? "Session exists" : "No session");
       if (session) {
-        console.log("Login - Redirecting to LOS dashboard");
+        console.log("[Login] Redirecting to LOS dashboard");
         navigate("/los/dashboard", { replace: true });
       }
     });
 
     return () => {
+      console.log('[Login] Cleanup - unsubscribing');
       mounted = false;
       subscription.unsubscribe();
     };
@@ -49,25 +55,34 @@ export default function Login() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('[Login] handleSubmit called');
     setLoading(true);
 
     try {
+      console.log('[Login] Attempting sign in...');
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[Login] Sign in error:', error);
+        throw error;
+      }
 
+      console.log('[Login] Sign in successful');
       notify.success("Welcome back!", "You've successfully signed in");
 
       // Navigation will be handled by the auth state change listener
     } catch (error: any) {
+      console.error('[Login] Sign in failed:', error);
       notify.error("Login failed", error);
       setLoading(false);
     }
   };
 
+  console.log('[Login] About to render AuthLayout...');
+  
   return (
     <AuthLayout title="Welcome back" subtitle="Sign in to your account">
       <form onSubmit={handleSubmit} className="space-y-4">
