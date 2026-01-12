@@ -345,17 +345,17 @@ export function ApplicantProfileCard({
               </div>
               
               {/* Communication Icons */}
-              <div className="flex gap-2 mt-1">
+              <div className="flex gap-2 mt-2">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button 
-                      variant="outline" 
+                      variant="default" 
                       size="icon" 
-                      className="h-8 w-8"
+                      className="h-9 w-9 bg-green-500 hover:bg-green-600 shadow-md"
                       onClick={() => setWhatsappDialogOpen(true)}
                       disabled={!mobile}
                     >
-                      <MessageSquare className="h-4 w-4 text-green-600" />
+                      <MessageSquare className="h-5 w-5 text-white" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -366,13 +366,13 @@ export function ApplicantProfileCard({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button 
-                      variant="outline" 
+                      variant="default" 
                       size="icon" 
-                      className="h-8 w-8"
+                      className="h-9 w-9 bg-blue-500 hover:bg-blue-600 shadow-md"
                       onClick={() => setEmailDialogOpen(true)}
                       disabled={!applicant.email}
                     >
-                      <Mail className="h-4 w-4 text-blue-600" />
+                      <Mail className="h-5 w-5 text-white" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
