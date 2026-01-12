@@ -17,6 +17,7 @@ interface SendEmailDialogProps {
   onOpenChange: (open: boolean) => void;
   contactId: string;
   contactName: string;
+  initialEmail?: string;
   onEmailSent?: () => void;
 }
 
@@ -25,6 +26,7 @@ export function SendEmailDialog({
   onOpenChange,
   contactId,
   contactName,
+  initialEmail,
   onEmailSent,
 }: SendEmailDialogProps) {
   const notify = useNotification();
@@ -41,10 +43,14 @@ export function SendEmailDialog({
 
   useEffect(() => {
     if (open) {
-      fetchPrimaryEmail();
+      if (initialEmail) {
+        setRecipientEmail(initialEmail);
+      } else {
+        fetchPrimaryEmail();
+      }
       fetchUserInfo();
     }
-  }, [open, contactId]);
+  }, [open, contactId, initialEmail]);
 
   const fetchUserInfo = async () => {
     try {

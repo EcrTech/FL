@@ -7,13 +7,20 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
-import { User, FileText, CheckCircle, Eye, Loader2, Video, CreditCard, Link } from "lucide-react";
+import { User, FileText, CheckCircle, Eye, Loader2, Video, CreditCard, Link, MessageSquare, Mail } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VideoKYCDialog } from "@/components/LOS/Verification/VideoKYCDialog";
 import CreditBureauDialog from "@/components/LOS/Verification/CreditBureauDialog";
 import { VideoKYCRetryButton } from "@/components/LOS/Verification/VideoKYCRetryButton";
-
+import { SendWhatsAppDialog } from "@/components/Contact/SendWhatsAppDialog";
+import { SendEmailDialog } from "@/components/Contact/SendEmailDialog";
 interface Document {
   id: string;
   document_type: string;
@@ -36,6 +43,7 @@ interface Applicant {
   last_name?: string;
   middle_name?: string;
   mobile?: string;
+  email?: string;
   pan_number?: string;
 }
 
@@ -243,6 +251,8 @@ export function ApplicantProfileCard({
   const [videoKycOpen, setVideoKycOpen] = useState(false);
   const [cibilDialogOpen, setCibilDialogOpen] = useState(false);
   const [showRetryLinkDialog, setShowRetryLinkDialog] = useState(false);
+  const [whatsappDialogOpen, setWhatsappDialogOpen] = useState(false);
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -332,6 +342,43 @@ export function ApplicantProfileCard({
               <div className="text-center max-w-[120px]">
                 <h3 className="text-sm font-semibold leading-tight">{applicantName}</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">{panNumber || ''}</p>
+              </div>
+              
+              {/* Communication Icons */}
+              <div className="flex gap-2 mt-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      className="h-8 w-8"
+                      onClick={() => setWhatsappDialogOpen(true)}
+                      disabled={!mobile}
+                    >
+                      <MessageSquare className="h-4 w-4 text-green-600" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {mobile ? "Send WhatsApp" : "No phone number available"}
+                  </TooltipContent>
+                </Tooltip>
+                
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      className="h-8 w-8"
+                      onClick={() => setEmailDialogOpen(true)}
+                      disabled={!applicant.email}
+                    >
+                      <Mail className="h-4 w-4 text-blue-600" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {applicant.email ? "Send Email" : "No email available"}
+                  </TooltipContent>
+                </Tooltip>
               </div>
             </div>
 
@@ -463,6 +510,26 @@ export function ApplicantProfileCard({
         orgId={orgId}
         applicant={applicant}
         existingVerification={verifications.find(v => v.verification_type === 'credit_bureau')}
+      />
+
+      {/* WhatsApp Dialog */}
+      {mobile && (
+        <SendWhatsAppDialog
+          open={whatsappDialogOpen}
+          onOpenChange={setWhatsappDialogOpen}
+          contactId={applicationId}
+          contactName={applicantName}
+          phoneNumber={mobile}
+        />
+      )}
+
+      {/* Email Dialog */}
+      <SendEmailDialog
+        open={emailDialogOpen}
+        onOpenChange={setEmailDialogOpen}
+        contactId={applicationId}
+        contactName={applicantName}
+        initialEmail={applicant.email}
       />
     </>
   );
