@@ -191,7 +191,7 @@ export default function DocumentDataVerification({ applicationId }: DocumentData
           {
             source: "Application",
             value:
-              typeof primaryApplicant?.current_address === "object"
+              primaryApplicant?.current_address && typeof primaryApplicant.current_address === "object"
                 ? Object.values(primaryApplicant.current_address as Record<string, string>)
                     .filter(Boolean)
                     .join(", ")
