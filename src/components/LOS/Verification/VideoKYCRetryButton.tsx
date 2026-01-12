@@ -15,6 +15,12 @@ interface VideoKYCRetryButtonProps {
   applicantPhone?: string;
   applicantEmail?: string;
   onSuccess?: () => void;
+  /** Controlled mode: externally control whether dialog is open */
+  open?: boolean;
+  /** Controlled mode: callback when open state changes */
+  onOpenChange?: (open: boolean) => void;
+  /** Whether to show the default trigger button (default: true) */
+  showTrigger?: boolean;
 }
 
 export function VideoKYCRetryButton({
@@ -24,10 +30,18 @@ export function VideoKYCRetryButton({
   applicantPhone,
   applicantEmail,
   onSuccess,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+  showTrigger = true,
 }: VideoKYCRetryButtonProps) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
   const [generatedLink, setGeneratedLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  // Support both controlled and uncontrolled modes
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = isControlled ? (controlledOnOpenChange || (() => {})) : setInternalOpen;
 
   // Check if there's an existing pending link
   const { data: existingRecording } = useQuery({
@@ -100,15 +114,17 @@ export function VideoKYCRetryButton({
 
   return (
     <>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setOpen(true)}
-        className="gap-2"
-      >
-        <Link className="h-4 w-4" />
-        Generate Retry Link
-      </Button>
+      {showTrigger && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setOpen(true)}
+          className="gap-2"
+        >
+          <Link className="h-4 w-4" />
+          Generate Retry Link
+        </Button>
+      )}
 
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="sm:max-w-md">
