@@ -272,10 +272,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setUser(currentSession?.user ?? null);
           
           if (event === 'SIGNED_IN' && currentSession?.user) {
-            console.log('[AuthProvider] SIGNED_IN event, fetching user data...');
-            setIsLoading(true);
-            await fetchUserData(currentSession.user);
-            setIsLoading(false);
+            console.log('[AuthProvider] SIGNED_IN event');
+            // Only set loading and fetch if not already in progress
+            if (!fetchInProgressRef.current) {
+              console.log('[AuthProvider] Starting user data fetch...');
+              setIsLoading(true);
+              await fetchUserData(currentSession.user);
+              setIsLoading(false);
+            } else {
+              console.log('[AuthProvider] Fetch already in progress, waiting for initAuth to complete');
+            }
           } else if (event === 'SIGNED_OUT') {
             console.log('[AuthProvider] SIGNED_OUT event, clearing state');
             setProfile(null);
