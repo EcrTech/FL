@@ -22,7 +22,51 @@
   </head>
 
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Initial loader - shown before React mounts. If this stays visible, React failed to load -->
+      <div id="initial-loader" style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f4f4f5;font-family:system-ui,-apple-system,sans-serif;">
+        <div style="text-align:center;">
+          <div style="width:48px;height:48px;border:4px solid #e5e7eb;border-top-color:#6366f1;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto;"></div>
+          <p style="margin-top:16px;color:#71717a;font-size:14px;">Loading application...</p>
+          <p id="boot-status" style="margin-top:8px;color:#a1a1aa;font-size:12px;">Initializing...</p>
+        </div>
+      </div>
+      <style>
+        @keyframes spin { to { transform: rotate(360deg); } }
+      </style>
+    </div>
+    <script>
+      // Log when HTML starts loading
+      console.log('[BOOT] index.html loaded at', new Date().toISOString());
+      
+      // Update boot status
+      window.updateBootStatus = function(status) {
+        var el = document.getElementById('boot-status');
+        if (el) el.textContent = status;
+      };
+      
+      // Global error handler to catch any unhandled errors
+      window.onerror = function(msg, url, line, col, error) {
+        console.error('[BOOT] Global error caught:', msg, 'at', url, ':', line, ':', col);
+        var loader = document.getElementById('initial-loader');
+        if (loader) {
+          loader.innerHTML = '<div style="text-align:center;padding:20px;max-width:500px;">' +
+            '<div style="font-size:48px;margin-bottom:16px;">⚠️</div>' +
+            '<h1 style="color:#ef4444;margin-bottom:8px;font-size:20px;">Failed to Load Application</h1>' +
+            '<p style="color:#71717a;margin-bottom:16px;font-size:14px;">An error occurred during startup</p>' +
+            '<pre style="background:#fef2f2;color:#991b1b;padding:12px;border-radius:8px;font-size:12px;text-align:left;overflow:auto;max-height:200px;">' + 
+            msg + '\\n\\nAt: ' + url + ':' + line + ':' + col + '</pre>' +
+            '<button onclick="location.reload()" style="margin-top:16px;padding:10px 24px;background:#6366f1;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">Reload Page</button>' +
+            '</div>';
+        }
+        return false;
+      };
+      
+      // Unhandled promise rejection handler
+      window.onunhandledrejection = function(event) {
+        console.error('[BOOT] Unhandled promise rejection:', event.reason);
+      };
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
