@@ -31,6 +31,7 @@ export default function TemplateBuilder() {
   const { orgId } = useOrgContext();
   
   const [loading, setLoading] = useState(false);
+  const [submittingToExotel, setSubmittingToExotel] = useState(false);
   const [templateName, setTemplateName] = useState("");
   const [category, setCategory] = useState("marketing");
   const [language, setLanguage] = useState("en");
@@ -251,13 +252,42 @@ export default function TemplateBuilder() {
         submission_status: 'pending_submission',
       };
 
-      const { error } = await supabase
+      const { data: insertedTemplate, error } = await supabase
         .from('communication_templates')
-        .insert(templateData);
+        .insert(templateData)
+        .select()
+        .single();
 
       if (error) throw error;
 
-      notify.success("Template Created", "Template saved successfully. Submit it to WhatsApp for approval via their Business Manager.");
+      notify.success("Template Created", "Template saved locally. Now submitting to Exotel for WhatsApp approval...");
+      
+      // Submit to Exotel for approval
+      setSubmittingToExotel(true);
+      try {
+        const { data: exotelResult, error: exotelError } = await supabase.functions.invoke(
+          'submit-whatsapp-template',
+          {
+            body: {
+              templateId: insertedTemplate.id,
+              orgId: orgId,
+            },
+          }
+        );
+
+        if (exotelError) {
+          notify.error("Exotel Submission Failed", exotelError.message || "Failed to submit template to Exotel. You can try again from the Templates page.");
+        } else if (exotelResult?.success) {
+          notify.success("Submitted to Exotel", "Template submitted for WhatsApp approval. Check the Templates page for status updates.");
+        } else {
+          notify.error("Exotel Submission Failed", exotelResult?.error || "Failed to submit template. Check WhatsApp Settings for missing configuration.");
+        }
+      } catch (exotelErr: any) {
+        console.error('Exotel submission error:', exotelErr);
+        notify.error("Exotel Submission Failed", exotelErr.message || "Failed to submit template to Exotel.");
+      } finally {
+        setSubmittingToExotel(false);
+      }
 
       navigate('/templates');
     } catch (error: any) {
