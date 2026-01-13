@@ -114,7 +114,7 @@ const WhatsAppSettings = () => {
           whatsapp_source_number: settings.whatsapp_source_number,
           waba_id: settings.waba_id,
           is_active: settings.is_active,
-        });
+        }, { onConflict: 'org_id' });
 
       console.log("🔴 [5] SUPABASE RETURNED, error:", error);
 
