@@ -126,6 +126,21 @@ export function BasicInfoStep({
     const otp = type === 'email' ? emailOtp : phoneOtp;
     const setVerifying = type === 'email' ? setVerifyingEmail : setVerifyingPhone;
 
+    console.log(`[OTP Verify] Starting ${type} verification`, { sessionId: sessionId ? 'exists' : 'missing', otpLength: otp.length });
+
+    if (!sessionId) {
+      toast.error("Session expired. Please request a new OTP.");
+      // Reset OTP sent state to allow resending
+      if (type === 'email') {
+        setEmailOtpSent(false);
+        setEmailOtp("");
+      } else {
+        setPhoneOtpSent(false);
+        setPhoneOtp("");
+      }
+      return;
+    }
+
     if (otp.length !== 6) {
       toast.error("Please enter a valid 6-digit OTP");
       return;
@@ -133,20 +148,34 @@ export function BasicInfoStep({
 
     setVerifying(true);
     try {
+      console.log(`[OTP Verify] Calling verify-public-otp for ${type}`);
       const { data, error } = await supabase.functions.invoke('verify-public-otp', {
         body: { sessionId, otp },
       });
 
-      if (error) throw error;
+      console.log(`[OTP Verify] Response:`, { data, error });
 
-      if (data.verified) {
+      if (error) {
+        console.error(`[OTP Verify] Function error:`, error);
+        throw new Error(error.message || 'Verification failed');
+      }
+
+      // Check for error in response data (non-2xx responses return error in data)
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      if (data?.verified) {
         onVerificationComplete(type);
         toast.success(`${type === 'email' ? 'Email' : 'Phone'} verified successfully`);
+      } else {
+        toast.error("Verification failed. Please try again.");
       }
     } catch (error: any) {
-      console.error('Error verifying OTP:', error);
-      toast.error(error.message || 'Invalid OTP');
+      console.error('[OTP Verify] Error:', error);
+      toast.error(error.message || 'Invalid OTP. Please try again.');
     } finally {
+      console.log(`[OTP Verify] Setting verifying to false for ${type}`);
       setVerifying(false);
     }
   };
