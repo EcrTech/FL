@@ -77,13 +77,21 @@ export default function Applications() {
     return differenceInHours(new Date(), new Date(createdAt)) < 48;
   };
 
-  const { data: applications = [], isLoading } = useQuery({
+const { data: applications = [], isLoading } = useQuery({
     queryKey: ["loan-applications", orgId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("loan_applications")
         .select(`
-          *,
+          id,
+          loan_id,
+          application_number,
+          status,
+          current_stage,
+          requested_amount,
+          tenure_days,
+          source,
+          created_at,
           loan_applicants(first_name, last_name, mobile),
           contacts(first_name, last_name, phone),
           assigned_profile:profiles!loan_applications_assigned_to_fkey(first_name, last_name)
@@ -98,6 +106,7 @@ export default function Applications() {
       return data as any[];
     },
     enabled: !!orgId,
+    staleTime: 30000, // 30 seconds - reduce unnecessary refetches
   });
 
   const filteredApplications = applications.filter((app) => {

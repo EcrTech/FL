@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useRealtimeSync } from "./useRealtimeSync";
-import { useOrgContext } from "./useOrgContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "./use-toast";
 
 interface Notification {
@@ -23,13 +23,12 @@ interface Notification {
 
 export function useNotifications() {
   const queryClient = useQueryClient();
-  const { orgId } = useOrgContext();
+  const { user, orgId } = useAuth();
 
-  // Fetch notifications
+  // Fetch notifications - use user from AuthContext to avoid redundant getUser() call
   const { data: notifications = [], isLoading } = useQuery<Notification[]>({
-    queryKey: ["notifications", orgId],
+    queryKey: ["notifications", orgId, user?.id],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
 
       const { data, error } = await supabase
@@ -42,7 +41,8 @@ export function useNotifications() {
       if (error) throw error;
       return (data || []) as unknown as Notification[];
     },
-    enabled: !!orgId,
+    enabled: !!orgId && !!user,
+    staleTime: 30000, // 30 seconds - reduce refetches
   });
 
   // Count unread notifications
@@ -63,10 +63,9 @@ export function useNotifications() {
     },
   });
 
-  // Mark all as read mutation
+  // Mark all as read mutation - use user from AuthContext
   const markAllAsReadMutation = useMutation({
     mutationFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const { error } = await supabase
