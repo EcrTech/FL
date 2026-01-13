@@ -86,14 +86,20 @@ const WhatsAppSettings = () => {
   };
 
   const handleSave = async () => {
+    console.log("🔴 [1] handleSave CALLED at:", Date.now());
+    
     if (!settings.exotel_sid || !settings.exotel_api_key || !settings.exotel_api_token || !settings.whatsapp_source_number) {
+      console.log("🔴 [2] VALIDATION FAILED");
       notify.error("Validation Error", "Please fill in all required fields");
       return;
     }
 
+    console.log("🔴 [3] VALIDATION PASSED, calling setSaving(true)");
     setSaving(true);
     
     try {
+      console.log("🔴 [4] ABOUT TO CALL supabase.upsert with org_id:", ORGANIZATION_ID);
+      
       const { error } = await supabase
         .from("whatsapp_settings")
         .upsert({
@@ -106,14 +112,18 @@ const WhatsAppSettings = () => {
           is_active: settings.is_active,
         });
 
+      console.log("🔴 [5] SUPABASE RETURNED, error:", error);
+
       if (error) throw error;
 
+      console.log("🔴 [6] SUCCESS - showing notification");
       notify.success("Success", "WhatsApp settings saved successfully");
       fetchSettings();
     } catch (error: any) {
-      console.error("Error saving WhatsApp settings:", error);
+      console.error("🔴 [CATCH] Error:", error);
       notify.error("Error", error.message || "Failed to save settings");
     } finally {
+      console.log("🔴 [FINALLY] Setting saving to false");
       setSaving(false);
     }
   };
