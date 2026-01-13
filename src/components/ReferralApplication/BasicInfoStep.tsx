@@ -175,9 +175,17 @@ export function BasicInfoStep({
       });
       console.log(`[OTP Verify] Invoking edge function at ${Date.now() - startTime}ms`);
       
-      const { data, error } = await supabase.functions.invoke('verify-public-otp', {
+      // Add timeout to prevent infinite hanging
+      const timeoutMs = 30000;
+      const invokePromise = supabase.functions.invoke('verify-public-otp', {
         body: { sessionId, otp },
       });
+      
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Request timed out after 30 seconds')), timeoutMs);
+      });
+      
+      const { data, error } = await Promise.race([invokePromise, timeoutPromise]) as Awaited<typeof invokePromise>;
       
       console.log(`[OTP Verify] Edge function returned at ${Date.now() - startTime}ms`);
       console.log(`[OTP Verify] Raw response - data type: ${typeof data}, error type: ${typeof error}`);
