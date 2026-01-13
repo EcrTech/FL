@@ -86,12 +86,23 @@ const WhatsAppSettings = () => {
   };
 
   const handleSave = async () => {
+    console.log("[WhatsAppSettings] handleSave called");
+    console.log("[WhatsAppSettings] Current settings:", JSON.stringify(settings, null, 2));
+    console.log("[WhatsAppSettings] ORGANIZATION_ID:", ORGANIZATION_ID);
+    
     if (!settings.exotel_sid || !settings.exotel_api_key || !settings.exotel_api_token || !settings.whatsapp_source_number) {
+      console.log("[WhatsAppSettings] Validation failed - missing required fields");
+      console.log("[WhatsAppSettings] exotel_sid:", !!settings.exotel_sid);
+      console.log("[WhatsAppSettings] exotel_api_key:", !!settings.exotel_api_key);
+      console.log("[WhatsAppSettings] exotel_api_token:", !!settings.exotel_api_token);
+      console.log("[WhatsAppSettings] whatsapp_source_number:", !!settings.whatsapp_source_number);
       notify.error("Validation Error", "Please fill in all required fields");
       return;
     }
 
+    console.log("[WhatsAppSettings] Validation passed, starting save...");
     setSaving(true);
+    
     try {
       const dataToSave = {
         ...(settings.id && { id: settings.id }),
@@ -104,18 +115,42 @@ const WhatsAppSettings = () => {
         is_active: settings.is_active,
       };
 
-      const { error } = await supabase
+      console.log("[WhatsAppSettings] Data to save:", JSON.stringify(dataToSave, null, 2));
+      console.log("[WhatsAppSettings] Has existing id:", !!settings.id);
+      console.log("[WhatsAppSettings] Calling upsert with onConflict: 'org_id'");
+
+      const { data, error } = await supabase
         .from("whatsapp_settings")
-        .upsert(dataToSave, { onConflict: 'org_id' });
+        .upsert(dataToSave, { onConflict: 'org_id' })
+        .select();
 
-      if (error) throw error;
+      console.log("[WhatsAppSettings] Upsert response - data:", data);
+      console.log("[WhatsAppSettings] Upsert response - error:", error);
 
+      if (error) {
+        console.error("[WhatsAppSettings] Upsert error details:", {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        });
+        throw error;
+      }
+
+      console.log("[WhatsAppSettings] Save successful!");
       notify.success("Success", "WhatsApp settings saved successfully");
       fetchSettings();
     } catch (error: any) {
-      console.error("Error saving settings:", error);
+      console.error("[WhatsAppSettings] Catch block error:", error);
+      console.error("[WhatsAppSettings] Error details:", {
+        message: error?.message,
+        code: error?.code,
+        details: error?.details,
+        hint: error?.hint,
+      });
       notify.error("Error", error.message || "Failed to save settings");
     } finally {
+      console.log("[WhatsAppSettings] Finally block - setting saving to false");
       setSaving(false);
     }
   };
