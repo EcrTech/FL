@@ -173,19 +173,34 @@ export function BasicInfoStep({
         sessionId: sessionId.substring(0, 8) + '...', 
         otpLength: otp.length 
       });
+      
+      // Debug Supabase client state
+      console.log(`[OTP Verify] Supabase client check:`, {
+        supabaseExists: !!supabase,
+        functionsExists: !!supabase?.functions,
+        invokeExists: typeof supabase?.functions?.invoke,
+      });
+      
       console.log(`[OTP Verify] Invoking edge function at ${Date.now() - startTime}ms`);
       
-      // Add timeout to prevent infinite hanging
-      const timeoutMs = 30000;
-      const invokePromise = supabase.functions.invoke('verify-public-otp', {
-        body: { sessionId, otp },
+      // Use direct fetch instead of supabase.functions.invoke to diagnose the hanging issue
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      console.log(`[OTP Verify] Using direct fetch to: ${supabaseUrl}/functions/v1/verify-public-otp`);
+      
+      const fetchResponse = await fetch(`${supabaseUrl}/functions/v1/verify-public-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseKey}`,
+          'apikey': supabaseKey,
+        },
+        body: JSON.stringify({ sessionId, otp }),
       });
       
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Request timed out after 30 seconds')), timeoutMs);
-      });
-      
-      const { data, error } = await Promise.race([invokePromise, timeoutPromise]) as Awaited<typeof invokePromise>;
+      console.log(`[OTP Verify] Fetch response status: ${fetchResponse.status}`);
+      const data = await fetchResponse.json();
+      const error = fetchResponse.ok ? null : { message: data.error || 'Request failed' };
       
       console.log(`[OTP Verify] Edge function returned at ${Date.now() - startTime}ms`);
       console.log(`[OTP Verify] Raw response - data type: ${typeof data}, error type: ${typeof error}`);
