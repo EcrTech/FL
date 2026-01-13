@@ -83,34 +83,49 @@ serve(async (req) => {
     if (identifierType === 'email') {
       // Send email OTP using Resend
       const resendApiKey = Deno.env.get('RESEND_API_KEY');
-      if (resendApiKey) {
-        const emailResponse = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${resendApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            from: 'Paisaa Saarthi <noreply@in-sync.co.in>',
-            to: identifier,
-            subject: 'Your OTP for Loan Application',
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #1e3a5f;">Verify Your Email</h2>
-                <p>Your OTP for loan application verification is:</p>
-                <div style="background: #f3f4f6; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0;">
-                  <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #1e3a5f;">${otpCode}</span>
-                </div>
-                <p style="color: #666;">This OTP is valid for 5 minutes. Do not share it with anyone.</p>
-              </div>
-            `,
-          }),
-        });
-
-        if (!emailResponse.ok) {
-          console.error('Email sending failed:', await emailResponse.text());
-        }
+      if (!resendApiKey) {
+        console.error('RESEND_API_KEY not configured');
+        return new Response(
+          JSON.stringify({ error: 'Email service not configured' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
+
+      console.log(`[send-public-otp] Sending email OTP to: ${identifier}`);
+      
+      const emailResponse = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: 'Paisaa Saarthi <noreply@in-sync.co.in>',
+          to: identifier,
+          subject: 'Your OTP for Loan Application',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #1e3a5f;">Verify Your Email</h2>
+              <p>Your OTP for loan application verification is:</p>
+              <div style="background: #f3f4f6; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0;">
+                <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #1e3a5f;">${otpCode}</span>
+              </div>
+              <p style="color: #666;">This OTP is valid for 5 minutes. Do not share it with anyone.</p>
+            </div>
+          `,
+        }),
+      });
+
+      if (!emailResponse.ok) {
+        const errorText = await emailResponse.text();
+        console.error('Email sending failed:', errorText);
+        return new Response(
+          JSON.stringify({ error: 'Failed to send email OTP. Please check email address.' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log(`[send-public-otp] Email OTP sent successfully to: ${identifier}`);
     } else if (identifierType === 'phone') {
       // Send SMS OTP using Exotel
       // Fetch Exotel settings from the first active org (system-level config for public forms)
