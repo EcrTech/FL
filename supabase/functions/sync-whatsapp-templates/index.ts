@@ -30,7 +30,7 @@ serve(async (req) => {
     // Get WhatsApp settings for this org
     const { data: settings, error: settingsError } = await supabase
       .from('whatsapp_settings')
-      .select('api_key, api_token, subdomain, exotel_sid, waba_id')
+      .select('exotel_api_key, exotel_api_token, exotel_subdomain, exotel_sid, waba_id')
       .eq('org_id', orgId)
       .single();
 
@@ -42,7 +42,7 @@ serve(async (req) => {
       );
     }
 
-    if (!settings.api_key || !settings.api_token || !settings.subdomain || !settings.exotel_sid || !settings.waba_id) {
+    if (!settings.exotel_api_key || !settings.exotel_api_token || !settings.exotel_subdomain || !settings.exotel_sid || !settings.waba_id) {
       return new Response(
         JSON.stringify({ success: false, error: 'Missing WhatsApp credentials. Please configure API Key, Token, Subdomain, SID, and WABA ID in WhatsApp Settings.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -50,9 +50,9 @@ serve(async (req) => {
     }
 
     // Build Exotel API URL to fetch templates
-    const exotelUrl = `https://${settings.api_key}:${settings.api_token}@${settings.subdomain}/v2/accounts/${settings.exotel_sid}/templates?waba_id=${settings.waba_id}`;
+    const exotelUrl = `https://${settings.exotel_api_key}:${settings.exotel_api_token}@${settings.exotel_subdomain}/v2/accounts/${settings.exotel_sid}/templates?waba_id=${settings.waba_id}`;
 
-    console.info('Fetching templates from Exotel:', exotelUrl.replace(settings.api_token, '***'));
+    console.info('Fetching templates from Exotel:', exotelUrl.replace(settings.exotel_api_token, '***'));
 
     // Fetch templates from Exotel
     const exotelResponse = await fetch(exotelUrl, {
