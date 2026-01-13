@@ -108,29 +108,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       setProfileError(null);
       
-      console.log('[AuthProvider] Fetching role and profile in parallel...');
+      console.log('[AuthProvider] Fetching all user data in a single parallel batch...');
       
-      // Fetch all user data in parallel - single batch of requests
-      const [roleRes, profileRes] = await Promise.all([
-        supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", currentUser.id)
-          .maybeSingle(),
-        supabase
-          .from("profiles")
-          .select("id, first_name, last_name, org_id, designation_id, onboarding_completed")
-          .eq("id", currentUser.id)
-          .single()
-      ]);
+      // Fetch profile first to get org_id and designation_id
+      const profileRes = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, org_id, designation_id, onboarding_completed")
+        .eq("id", currentUser.id)
+        .single();
 
-      console.log('[AuthProvider] Role result:', roleRes.data, 'Error:', roleRes.error);
       console.log('[AuthProvider] Profile result:', profileRes.data ? 'Found' : 'Not found', 'Error:', profileRes.error);
-
-      // Set user role
-      if (roleRes.data) {
-        setUserRole(roleRes.data.role);
-      }
 
       // Handle profile fetch errors
       if (profileRes.error) {
@@ -145,7 +132,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return;
       }
 
-      // Set profile
+      // Set profile immediately
       setProfile(profileRes.data);
       console.log('[AuthProvider] Profile set, org_id:', profileRes.data.org_id);
 
@@ -155,26 +142,39 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return;
       }
 
-      console.log('[AuthProvider] Fetching org data and permissions in parallel...');
+      // Now fetch ALL remaining data in a single parallel batch
+      console.log('[AuthProvider] Fetching role, org, and permissions in single parallel batch...');
       
-      // Fetch org data and designation permissions in parallel
-      const orgPromise = supabase
-        .from("organizations")
-        .select("id, name, logo_url")
-        .eq("id", profileRes.data.org_id)
-        .single();
+      const [roleRes, orgRes, permissionsRes] = await Promise.all([
+        // User role
+        supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", currentUser.id)
+          .maybeSingle(),
+        // Organization
+        supabase
+          .from("organizations")
+          .select("id, name, logo_url")
+          .eq("id", profileRes.data.org_id)
+          .single(),
+        // Designation permissions (conditional but still in parallel)
+        profileRes.data.designation_id
+          ? supabase
+              .from("designation_feature_access")
+              .select("feature_key, can_view, can_create, can_edit, can_delete, custom_permissions")
+              .eq("designation_id", profileRes.data.designation_id)
+          : Promise.resolve({ data: [], error: null })
+      ]);
 
-      const permissionsPromise = profileRes.data.designation_id
-        ? supabase
-            .from("designation_feature_access")
-            .select("feature_key, can_view, can_create, can_edit, can_delete, custom_permissions")
-            .eq("designation_id", profileRes.data.designation_id)
-        : Promise.resolve({ data: [], error: null });
-
-      const [orgRes, permissionsRes] = await Promise.all([orgPromise, permissionsPromise]);
-
+      console.log('[AuthProvider] Role result:', roleRes.data, 'Error:', roleRes.error);
       console.log('[AuthProvider] Org result:', orgRes.data ? 'Found' : 'Not found', 'Error:', orgRes.error);
       console.log('[AuthProvider] Permissions count:', permissionsRes.data?.length || 0);
+
+      // Set all results
+      if (roleRes.data) {
+        setUserRole(roleRes.data.role);
+      }
 
       if (orgRes.error) {
         console.error("[AuthProvider] Organization fetch error:", orgRes.error);

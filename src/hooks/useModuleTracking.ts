@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 /**
  * Automatic module usage tracking hook
@@ -11,8 +12,9 @@ import { supabase } from '@/integrations/supabase/client';
  * @remarks
  * - Runs automatically on route changes via useLocation
  * - Only tracks routes defined in MODULE_MAP
- * - Requires authenticated user with org_id
- * - Updates existing records or creates new ones
+ * - Uses AuthContext to avoid redundant API calls
+ * - Debounced to prevent tracking rapid route changes
+ * - Non-blocking (fire-and-forget) to not impact page load
  * 
  * @example
  * ```tsx
@@ -45,56 +47,74 @@ const MODULE_MAP: Record<string, { key: string; name: string; icon: string; feat
   '/api-keys': { key: 'api_keys', name: 'API Keys', icon: 'Key', featureKey: 'api_management' },
 };
 
+// Debounce delay in ms
+const DEBOUNCE_DELAY = 500;
+
 export const useModuleTracking = () => {
   const location = useLocation();
+  const { user, orgId } = useAuth();
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const lastTrackedPath = useRef<string | null>(null);
 
   useEffect(() => {
-    const trackModuleUsage = async () => {
-      const module = MODULE_MAP[location.pathname];
-      if (!module) return;
+    // Clear any pending debounce
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+    const module = MODULE_MAP[location.pathname];
+    if (!module || !user || !orgId) return;
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('org_id')
-        .eq('id', user.id)
-        .single();
+    // Skip if same path (prevents duplicate tracking)
+    if (lastTrackedPath.current === location.pathname) return;
 
-      if (!profile?.org_id) return;
+    // Debounce tracking to prevent rapid route changes
+    debounceRef.current = setTimeout(() => {
+      lastTrackedPath.current = location.pathname;
+      
+      // Fire-and-forget - don't await, don't block rendering
+      (async () => {
+        try {
+          // Try to increment existing record or insert new one
+          const { data: existing } = await supabase
+            .from('user_module_usage')
+            .select('id, visit_count')
+            .eq('user_id', user.id)
+            .eq('module_key', module.key)
+            .maybeSingle();
 
-      // Try to increment existing record or insert new one
-      const { data: existing } = await supabase
-        .from('user_module_usage')
-        .select('id, visit_count')
-        .eq('user_id', user.id)
-        .eq('module_key', module.key)
-        .maybeSingle();
+          if (existing) {
+            await supabase
+              .from('user_module_usage')
+              .update({
+                visit_count: existing.visit_count + 1,
+                last_visited_at: new Date().toISOString(),
+              })
+              .eq('id', existing.id);
+          } else {
+            await supabase
+              .from('user_module_usage')
+              .insert({
+                user_id: user.id,
+                org_id: orgId,
+                module_key: module.key,
+                module_name: module.name,
+                module_path: location.pathname,
+                module_icon: module.icon,
+                visit_count: 1,
+              });
+          }
+        } catch (error) {
+          // Silently fail - tracking should never break the app
+          console.debug('[ModuleTracking] Error:', error);
+        }
+      })();
+    }, DEBOUNCE_DELAY);
 
-      if (existing) {
-        await supabase
-          .from('user_module_usage')
-          .update({
-            visit_count: existing.visit_count + 1,
-            last_visited_at: new Date().toISOString(),
-          })
-          .eq('id', existing.id);
-      } else {
-        await supabase
-          .from('user_module_usage')
-          .insert({
-            user_id: user.id,
-            org_id: profile.org_id,
-            module_key: module.key,
-            module_name: module.name,
-            module_path: location.pathname,
-            module_icon: module.icon,
-            visit_count: 1,
-          });
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
       }
     };
-
-    trackModuleUsage();
-  }, [location.pathname]);
+  }, [location.pathname, user, orgId]);
 };
