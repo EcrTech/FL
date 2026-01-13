@@ -7,6 +7,7 @@ import { useCollections, CollectionRecord } from "@/hooks/useCollections";
 import { LoadingState } from "@/components/common/LoadingState";
 import { CollectionsTable } from "@/components/LOS/Collections/CollectionsTable";
 import { RecordPaymentDialog } from "@/components/LOS/Collections/RecordPaymentDialog";
+import DashboardLayout from "@/components/Layout/DashboardLayout";
 
 export default function Collections() {
   const { data: stats, isLoading: statsLoading } = useEMIStats();
@@ -37,11 +38,15 @@ export default function Collections() {
   };
 
   if (statsLoading || collectionsLoading) {
-    return <LoadingState message="Loading collections data..." />;
+    return (
+      <DashboardLayout>
+        <LoadingState message="Loading collections data..." />
+      </DashboardLayout>
+    );
   }
 
   return (
-    <div className="space-y-4">
+    <DashboardLayout>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -120,6 +125,6 @@ export default function Collections() {
         onSubmit={handlePaymentSubmit}
         isSubmitting={isRecording}
       />
-    </div>
+    </DashboardLayout>
   );
 }
