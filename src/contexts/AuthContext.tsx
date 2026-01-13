@@ -267,30 +267,41 @@ export function AuthProvider({ children }: AuthProviderProps) {
           return;
         }
         
-        try {
-          setSession(currentSession);
-          setUser(currentSession?.user ?? null);
+        // Update session and user state (non-blocking)
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+        
+        // Handle TOKEN_REFRESHED silently - no loading state needed
+        if (event === 'TOKEN_REFRESHED' && currentSession?.user) {
+          console.log('[AuthProvider] TOKEN_REFRESHED - session updated silently');
+          return;
+        }
+        
+        if (event === 'SIGNED_IN' && currentSession?.user) {
+          console.log('[AuthProvider] SIGNED_IN event');
           
-          if (event === 'SIGNED_IN' && currentSession?.user) {
-            console.log('[AuthProvider] SIGNED_IN event');
-            // Only set loading and fetch if not already in progress
-            if (!fetchInProgressRef.current) {
-              console.log('[AuthProvider] Starting user data fetch...');
+          // Only show loading if we don't already have profile data
+          // (fresh login vs returning session with token refresh)
+          const shouldShowLoading = !profile;
+          
+          if (!fetchInProgressRef.current) {
+            console.log('[AuthProvider] Starting user data fetch...');
+            if (shouldShowLoading) {
               setIsLoading(true);
-              await fetchUserData(currentSession.user);
-              setIsLoading(false);
-            } else {
-              console.log('[AuthProvider] Fetch already in progress, waiting for initAuth to complete');
             }
-          } else if (event === 'SIGNED_OUT') {
-            console.log('[AuthProvider] SIGNED_OUT event, clearing state');
-            setProfile(null);
-            setOrganization(null);
-            setUserRole(null);
-            setDesignationPermissions([]);
+            await fetchUserData(currentSession.user);
+            if (shouldShowLoading) {
+              setIsLoading(false);
+            }
+          } else {
+            console.log('[AuthProvider] Fetch already in progress, waiting for initAuth to complete');
           }
-        } catch (error) {
-          console.error("[AuthProvider] Error handling auth state change:", error);
+        } else if (event === 'SIGNED_OUT') {
+          console.log('[AuthProvider] SIGNED_OUT event, clearing state');
+          setProfile(null);
+          setOrganization(null);
+          setUserRole(null);
+          setDesignationPermissions([]);
           setIsLoading(false);
         }
       }
