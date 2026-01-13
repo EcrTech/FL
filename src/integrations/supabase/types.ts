@@ -7605,6 +7605,7 @@ export type Database = {
           is_active: boolean | null
           org_id: string
           updated_at: string | null
+          waba_id: string | null
           webhook_secret: string | null
           whatsapp_source_number: string
         }
@@ -7618,6 +7619,7 @@ export type Database = {
           is_active?: boolean | null
           org_id: string
           updated_at?: string | null
+          waba_id?: string | null
           webhook_secret?: string | null
           whatsapp_source_number: string
         }
@@ -7631,6 +7633,7 @@ export type Database = {
           is_active?: boolean | null
           org_id?: string
           updated_at?: string | null
+          waba_id?: string | null
           webhook_secret?: string | null
           whatsapp_source_number?: string
         }

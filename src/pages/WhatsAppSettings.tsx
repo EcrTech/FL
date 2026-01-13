@@ -19,6 +19,7 @@ interface WhatsAppSettings {
   exotel_api_token: string;
   exotel_subdomain: string;
   whatsapp_source_number: string;
+  waba_id: string;
   is_active: boolean;
 }
 
@@ -33,6 +34,7 @@ const WhatsAppSettings = () => {
     exotel_api_token: "",
     exotel_subdomain: "api.exotel.com",
     whatsapp_source_number: "",
+    waba_id: "",
     is_active: true,
   });
   const [templateCount, setTemplateCount] = useState(0);
@@ -60,6 +62,7 @@ const WhatsAppSettings = () => {
           exotel_api_token: data.exotel_api_token || "",
           exotel_subdomain: data.exotel_subdomain || "api.exotel.com",
           whatsapp_source_number: data.whatsapp_source_number || "",
+          waba_id: data.waba_id || "",
           is_active: data.is_active,
         });
       }
@@ -109,6 +112,7 @@ const WhatsAppSettings = () => {
           exotel_api_token: settings.exotel_api_token,
           exotel_subdomain: settings.exotel_subdomain,
           whatsapp_source_number: settings.whatsapp_source_number,
+          waba_id: settings.waba_id,
           is_active: settings.is_active,
         });
 
@@ -226,6 +230,22 @@ const WhatsAppSettings = () => {
                 />
                 <p className="text-sm text-muted-foreground">
                   Enter the phone number with + and country code
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="waba-id">WhatsApp Business Account ID (WABA ID) *</Label>
+                <Input
+                  id="waba-id"
+                  type="text"
+                  placeholder="Enter your WABA ID"
+                  value={settings.waba_id}
+                  onChange={(e) =>
+                    setSettings({ ...settings, waba_id: e.target.value })
+                  }
+                />
+                <p className="text-sm text-muted-foreground">
+                  Required for submitting templates to WhatsApp for approval. Find this in your Meta Business Manager.
                 </p>
               </div>
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrgContext } from "@/hooks/useOrgContext";
 import { useNotification } from "@/hooks/useNotification";
@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LoadingState } from "@/components/common/LoadingState";
 import { EmptyState } from "@/components/common/EmptyState";
-import { MessageSquare, RefreshCw, Plus, Mail } from "lucide-react";
+import { MessageSquare, RefreshCw, Plus, Mail, Send, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { StandardEmailTemplateDialog } from "@/components/Templates/StandardEmailTemplateDialog";
 
@@ -25,7 +25,10 @@ interface WhatsAppTemplate {
   content: string;
   variables: Array<{ index: number; name: string }> | null;
   status: string;
+  submission_status: string;
+  rejection_reason: string | null;
   last_synced_at: string;
+  submitted_at: string | null;
 }
 
 interface EmailTemplate {
@@ -42,11 +45,13 @@ const Templates = () => {
   const { orgId } = useOrgContext();
   const notify = useNotification();
   const [syncing, setSyncing] = useState(false);
+  const [submittingTemplateId, setSubmittingTemplateId] = useState<string | null>(null);
   const [queuedJobId, setQueuedJobId] = useState<string | null>(null);
   const [queueStatus, setQueueStatus] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("whatsapp");
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [selectedEmailTemplate, setSelectedEmailTemplate] = useState<EmailTemplate | null>(null);
+  const queryClient = useQueryClient();
 
   // Real-time sync for queue updates
   useRealtimeSync({
@@ -106,8 +111,51 @@ const Templates = () => {
   const loading = loadingWhatsApp || loadingEmail;
 
   const handleSync = async () => {
-    // Templates are now managed locally - no external sync needed
-    notify.info("Info", "Templates are managed locally. Create templates directly in this app.");
+    // Refresh template list from database
+    setSyncing(true);
+    try {
+      await queryClient.invalidateQueries({ queryKey: ['whatsapp-templates', orgId] });
+      notify.success("Refreshed", "Template list refreshed from database");
+    } catch (error) {
+      notify.error("Error", "Failed to refresh templates");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleSubmitToExotel = async (template: WhatsAppTemplate) => {
+    if (!template.id) return;
+    
+    setSubmittingTemplateId(template.id);
+    try {
+      const { data, error } = await supabase.functions.invoke(
+        'submit-whatsapp-template',
+        {
+          body: {
+            templateId: template.id,
+            orgId: orgId,
+          },
+        }
+      );
+
+      if (error) {
+        notify.error("Submission Failed", error.message || "Failed to submit template to Exotel");
+        return;
+      }
+
+      if (data?.success) {
+        notify.success("Submitted", "Template submitted to Exotel for WhatsApp approval");
+        // Refresh templates to show updated status
+        queryClient.invalidateQueries({ queryKey: ['whatsapp-templates', orgId] });
+      } else {
+        notify.error("Submission Failed", data?.error || "Failed to submit template. Check WhatsApp Settings.");
+      }
+    } catch (error: any) {
+      console.error('Error submitting template:', error);
+      notify.error("Error", error.message || "Failed to submit template");
+    } finally {
+      setSubmittingTemplateId(null);
+    }
   };
 
   const handleCreateEmail = () => {
@@ -140,7 +188,7 @@ const Templates = () => {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
+    switch (status?.toLowerCase()) {
       case "approved":
         return "default";
       case "pending":
@@ -148,9 +196,34 @@ const Templates = () => {
         return "secondary";
       case "rejected":
         return "destructive";
+      case "synced":
+        return "outline";
+      case "draft":
+        return "outline";
       default:
         return "outline";
     }
+  };
+
+  const getSubmissionStatusLabel = (template: WhatsAppTemplate) => {
+    const status = template.submission_status?.toLowerCase();
+    switch (status) {
+      case "draft":
+        return "Not Submitted";
+      case "pending_submission":
+        return "Ready to Submit";
+      case "synced":
+        return "Submitted to Exotel";
+      case "rejected":
+        return "Submission Failed";
+      default:
+        return status || "Unknown";
+    }
+  };
+
+  const canSubmitToExotel = (template: WhatsAppTemplate) => {
+    const status = template.submission_status?.toLowerCase();
+    return status === "draft" || status === "pending_submission" || status === "rejected";
   };
 
   if (loading) {
@@ -234,11 +307,11 @@ const Templates = () => {
               <EmptyState
                 icon={<MessageSquare className="h-12 w-12" />}
                 title="No templates found"
-                message="Configure your WhatsApp settings and sync templates from Gupshup"
+                message="Create a WhatsApp template and submit it to Exotel for approval"
                 action={
-                  <Button onClick={handleSync} disabled={syncing}>
-                    <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-                    {syncing ? 'Syncing...' : 'Sync Templates'}
+                  <Button onClick={() => window.location.href = '/templates/create'}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Template
                   </Button>
                 }
               />
@@ -273,8 +346,52 @@ const Templates = () => {
                           </div>
                         </div>
                       )}
-                      <div className="text-xs text-muted-foreground">
-                        Last synced: {format(new Date(template.last_synced_at), "PPp")}
+                      
+                      {/* Submission Status */}
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Exotel Status:</span>
+                        <Badge variant={template.submission_status === 'synced' ? 'default' : 'secondary'}>
+                          {getSubmissionStatusLabel(template)}
+                        </Badge>
+                      </div>
+                      
+                      {/* Rejection reason if any */}
+                      {template.rejection_reason && (
+                        <div className="p-2 bg-destructive/10 rounded text-xs text-destructive">
+                          {template.rejection_reason}
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs text-muted-foreground">
+                          {template.submitted_at 
+                            ? `Submitted: ${format(new Date(template.submitted_at), "PPp")}`
+                            : template.last_synced_at 
+                              ? `Created: ${format(new Date(template.last_synced_at), "PPp")}`
+                              : 'Not submitted yet'
+                          }
+                        </div>
+                        
+                        {canSubmitToExotel(template) && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleSubmitToExotel(template)}
+                            disabled={submittingTemplateId === template.id}
+                          >
+                            {submittingTemplateId === template.id ? (
+                              <>
+                                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                                Submitting...
+                              </>
+                            ) : (
+                              <>
+                                <Send className="mr-1 h-3 w-3" />
+                                Submit
+                              </>
+                            )}
+                          </Button>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
