@@ -86,16 +86,13 @@ const WhatsAppSettings = () => {
   };
 
   const handleSave = async () => {
-    console.log("[WhatsAppSettings] handleSave called");
+    console.log("[WhatsAppSettings] ========== SAVE STARTED ==========");
+    console.log("[WhatsAppSettings] handleSave called at:", new Date().toISOString());
     console.log("[WhatsAppSettings] Current settings:", JSON.stringify(settings, null, 2));
     console.log("[WhatsAppSettings] ORGANIZATION_ID:", ORGANIZATION_ID);
     
     if (!settings.exotel_sid || !settings.exotel_api_key || !settings.exotel_api_token || !settings.whatsapp_source_number) {
       console.log("[WhatsAppSettings] Validation failed - missing required fields");
-      console.log("[WhatsAppSettings] exotel_sid:", !!settings.exotel_sid);
-      console.log("[WhatsAppSettings] exotel_api_key:", !!settings.exotel_api_key);
-      console.log("[WhatsAppSettings] exotel_api_token:", !!settings.exotel_api_token);
-      console.log("[WhatsAppSettings] whatsapp_source_number:", !!settings.whatsapp_source_number);
       notify.error("Validation Error", "Please fill in all required fields");
       return;
     }
@@ -115,17 +112,35 @@ const WhatsAppSettings = () => {
         is_active: settings.is_active,
       };
 
-      console.log("[WhatsAppSettings] Data to save:", JSON.stringify(dataToSave, null, 2));
-      console.log("[WhatsAppSettings] Has existing id:", !!settings.id);
-      console.log("[WhatsAppSettings] Calling upsert with onConflict: 'org_id'");
-
-      const { data, error } = await supabase
+      console.log("[WhatsAppSettings] Step 1: Data prepared:", JSON.stringify(dataToSave, null, 2));
+      
+      console.log("[WhatsAppSettings] Step 2: Creating query...");
+      const startTime = Date.now();
+      
+      // Create a timeout promise
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error("Request timeout after 30s")), 30000);
+      });
+      
+      // Create the actual upsert call
+      const upsertCall = supabase
         .from("whatsapp_settings")
         .upsert(dataToSave, { onConflict: 'org_id' })
         .select();
+      
+      console.log("[WhatsAppSettings] Step 3: Executing with timeout...");
+      
+      // Race between upsert and timeout
+      const result = await Promise.race([upsertCall, timeoutPromise]);
+      
+      const duration = Date.now() - startTime;
+      console.log("[WhatsAppSettings] Step 4: Response received in", duration, "ms");
+      console.log("[WhatsAppSettings] Response:", result);
 
-      console.log("[WhatsAppSettings] Upsert response - data:", data);
-      console.log("[WhatsAppSettings] Upsert response - error:", error);
+      const { data, error } = result as { data: any; error: any };
+
+      console.log("[WhatsAppSettings] Response data:", data);
+      console.log("[WhatsAppSettings] Response error:", error);
 
       if (error) {
         console.error("[WhatsAppSettings] Upsert error details:", {
@@ -137,21 +152,23 @@ const WhatsAppSettings = () => {
         throw error;
       }
 
-      console.log("[WhatsAppSettings] Save successful!");
+      console.log("[WhatsAppSettings] Step 5: Save successful!");
       notify.success("Success", "WhatsApp settings saved successfully");
       fetchSettings();
     } catch (error: any) {
-      console.error("[WhatsAppSettings] Catch block error:", error);
-      console.error("[WhatsAppSettings] Error details:", {
-        message: error?.message,
-        code: error?.code,
-        details: error?.details,
-        hint: error?.hint,
-      });
+      console.error("[WhatsAppSettings] CATCH BLOCK ERROR:", error);
+      console.error("[WhatsAppSettings] Error type:", typeof error);
+      console.error("[WhatsAppSettings] Error name:", error?.name);
+      console.error("[WhatsAppSettings] Error message:", error?.message);
+      console.error("[WhatsAppSettings] Error code:", error?.code);
+      console.error("[WhatsAppSettings] Error details:", error?.details);
+      console.error("[WhatsAppSettings] Error hint:", error?.hint);
+      console.error("[WhatsAppSettings] Error stack:", error?.stack);
       notify.error("Error", error.message || "Failed to save settings");
     } finally {
-      console.log("[WhatsAppSettings] Finally block - setting saving to false");
+      console.log("[WhatsAppSettings] FINALLY block executing - setting saving to false");
       setSaving(false);
+      console.log("[WhatsAppSettings] ========== SAVE ENDED ==========");
     }
   };
 
