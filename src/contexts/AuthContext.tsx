@@ -286,23 +286,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (event === 'SIGNED_IN' && currentSession?.user) {
           console.log('[AuthProvider] SIGNED_IN event');
           
-          // Only show loading if we don't already have profile data
-          // (fresh login vs returning session with token refresh)
-          // Use ref to avoid stale closure capturing initial null profile
-          const shouldShowLoading = !profileRef.current;
-          
-          if (!fetchInProgressRef.current) {
-            console.log('[AuthProvider] Starting user data fetch...');
-            if (shouldShowLoading) {
-              setIsLoading(true);
+          // CRITICAL: Use setTimeout to break out of synchronous onAuthStateChange callback
+          // This prevents Supabase client deadlock - see https://supabase.com/docs/reference/javascript/auth-onauthstatechange
+          // "You can easily create a dead-lock by using await on a call to another method of the Supabase library."
+          setTimeout(async () => {
+            const shouldShowLoading = !profileRef.current;
+            
+            if (!fetchInProgressRef.current) {
+              console.log('[AuthProvider] Starting user data fetch...');
+              if (shouldShowLoading) {
+                setIsLoading(true);
+              }
+              await fetchUserData(currentSession.user);
+              if (shouldShowLoading) {
+                setIsLoading(false);
+              }
+            } else {
+              console.log('[AuthProvider] Fetch already in progress, waiting for initAuth to complete');
             }
-            await fetchUserData(currentSession.user);
-            if (shouldShowLoading) {
-              setIsLoading(false);
-            }
-          } else {
-            console.log('[AuthProvider] Fetch already in progress, waiting for initAuth to complete');
-          }
+          }, 0);
         } else if (event === 'SIGNED_OUT') {
           console.log('[AuthProvider] SIGNED_OUT event, clearing state');
           setProfile(null);
