@@ -148,8 +148,14 @@ export default function VerificationDashboard({ applicationId, orgId }: Verifica
     (v) => getVerificationStatus(v.type) === "failed"
   );
 
+  // Check if all verifications are either success or failed (not pending/in_progress)
+  const allVerificationsProcessed = VERIFICATION_TYPES.every(
+    (v) => ["success", "failed"].includes(getVerificationStatus(v.type))
+  );
+
   const handleMoveToAssessment = () => {
-    if (allVerificationsComplete) {
+    // Allow moving forward if all verifications are processed (even with failures)
+    if (allVerificationsComplete || allVerificationsProcessed) {
       updateStageMutation.mutate("credit_assessment");
     }
   };
@@ -203,13 +209,25 @@ export default function VerificationDashboard({ applicationId, orgId }: Verifica
             </div>
           )}
 
-          {anyVerificationFailed && (
-            <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <div className="flex items-center gap-2">
-                <AlertCircle className="h-5 w-5 text-red-600" />
-                <p className="font-medium text-red-900">
-                  Some verifications have failed. Review and retry.
-                </p>
+          {anyVerificationFailed && !allVerificationsComplete && (
+            <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5 text-amber-600" />
+                  <div>
+                    <p className="font-medium text-amber-900">
+                      Some verifications have failed.
+                    </p>
+                    <p className="text-sm text-amber-700">
+                      You can still proceed with failed verifications or retry them.
+                    </p>
+                  </div>
+                </div>
+                {allVerificationsProcessed && (
+                  <Button onClick={handleMoveToAssessment} variant="outline">
+                    Proceed Anyway
+                  </Button>
+                )}
               </div>
             </div>
           )}
