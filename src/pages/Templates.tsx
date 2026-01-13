@@ -111,13 +111,31 @@ const Templates = () => {
   const loading = loadingWhatsApp || loadingEmail;
 
   const handleSync = async () => {
-    // Refresh template list from database
+    // Sync templates from Exotel API
     setSyncing(true);
     try {
-      await queryClient.invalidateQueries({ queryKey: ['whatsapp-templates', orgId] });
-      notify.success("Refreshed", "Template list refreshed from database");
-    } catch (error) {
-      notify.error("Error", "Failed to refresh templates");
+      const { data, error } = await supabase.functions.invoke(
+        'sync-whatsapp-templates',
+        {
+          body: { orgId },
+        }
+      );
+
+      if (error) {
+        notify.error("Sync Failed", error.message || "Failed to sync templates from Exotel");
+        return;
+      }
+
+      if (data?.success) {
+        notify.success("Sync Complete", data.message || "Templates synced from Exotel");
+        // Refresh templates from database
+        await queryClient.invalidateQueries({ queryKey: ['whatsapp-templates', orgId] });
+      } else {
+        notify.error("Sync Failed", data?.error || "Failed to sync templates");
+      }
+    } catch (error: any) {
+      console.error('Error syncing templates:', error);
+      notify.error("Error", error.message || "Failed to sync templates");
     } finally {
       setSyncing(false);
     }
