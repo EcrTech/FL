@@ -168,8 +168,9 @@ export function BasicInfoStep({
     setVerifying(true);
     
     try {
-      console.log(`[OTP Verify] About to invoke verify-public-otp`);
-      console.log(`[OTP Verify] Request body:`, { 
+      // v2 - Using direct fetch to bypass supabase.functions.invoke hanging issue
+      console.log(`[OTP Verify v2] About to invoke verify-public-otp`);
+      console.log(`[OTP Verify v2] Request body:`, { 
         sessionId: sessionId.substring(0, 8) + '...', 
         otpLength: otp.length 
       });
