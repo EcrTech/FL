@@ -88,6 +88,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Refs to properly guard async operations across renders
   const isInitializingRef = useRef(true);
   const fetchInProgressRef = useRef(false);
+  const profileRef = useRef<UserProfile | null>(null);
+
+  // Keep profileRef in sync with profile state to avoid stale closures
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
 
   const fetchUserData = useCallback(async (currentUser: User) => {
     console.log('[AuthProvider] fetchUserData called for user:', currentUser.id);
@@ -282,7 +288,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
           
           // Only show loading if we don't already have profile data
           // (fresh login vs returning session with token refresh)
-          const shouldShowLoading = !profile;
+          // Use ref to avoid stale closure capturing initial null profile
+          const shouldShowLoading = !profileRef.current;
           
           if (!fetchInProgressRef.current) {
             console.log('[AuthProvider] Starting user data fetch...');

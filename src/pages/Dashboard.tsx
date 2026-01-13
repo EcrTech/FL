@@ -114,7 +114,7 @@ export default function Dashboard() {
   const overdueTasksCount = allTasks.filter(t => t.isOverdue && t.status !== "completed").length;
 
   // Only show loading during initial auth - not blocking on orgId
-  const loading = authLoading && !isInitialized;
+  const loading = !isInitialized;
 
   // Process stats from database function
   const stats: DashboardStats = useMemo(() => {
