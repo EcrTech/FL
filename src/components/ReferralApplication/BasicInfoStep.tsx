@@ -109,9 +109,9 @@ export function BasicInfoStep({
       // Handle test mode for phone OTP
       if (type === 'phone' && data.isTestMode && data.testOtp) {
         setPhoneTestOtp(data.testOtp);
-        toast.success(`Test Mode: SMS not configured. Use OTP: ${data.testOtp}`);
+        toast.success(`Test Mode: WhatsApp not configured. Use OTP: ${data.testOtp}`);
       } else {
-        toast.success(`OTP sent to your ${type}`);
+        toast.success(type === 'phone' ? 'OTP sent via WhatsApp' : `OTP sent to your ${type}`);
       }
     } catch (error: any) {
       console.error('Error sending OTP:', error);
