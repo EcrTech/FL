@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { useOrgContext } from "@/hooks/useOrgContext";
+import { ORGANIZATION_ID } from "@/config/organization";
 import { DashboardLayout } from "@/components/Layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,6 @@ interface WhatsAppSettings {
 }
 
 const WhatsAppSettings = () => {
-  const { orgId } = useOrgContext();
   const notify = useNotification();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -39,18 +38,16 @@ const WhatsAppSettings = () => {
   const [templateCount, setTemplateCount] = useState(0);
 
   useEffect(() => {
-    if (orgId) {
-      fetchSettings();
-      fetchTemplateCount();
-    }
-  }, [orgId]);
+    fetchSettings();
+    fetchTemplateCount();
+  }, []);
 
   const fetchSettings = async () => {
     try {
       const { data, error } = await supabase
         .from("whatsapp_settings")
         .select("*")
-        .eq("org_id", orgId)
+        .eq("org_id", ORGANIZATION_ID)
         .maybeSingle();
 
       if (error) throw error;
@@ -79,7 +76,7 @@ const WhatsAppSettings = () => {
       const { count } = await supabase
         .from("communication_templates")
         .select("*", { count: "exact", head: true })
-        .eq("org_id", orgId)
+        .eq("org_id", ORGANIZATION_ID)
         .eq("template_type", "whatsapp");
 
       setTemplateCount(count || 0);
@@ -96,18 +93,20 @@ const WhatsAppSettings = () => {
 
     setSaving(true);
     try {
+      const dataToSave = {
+        ...(settings.id && { id: settings.id }),
+        org_id: ORGANIZATION_ID,
+        exotel_sid: settings.exotel_sid,
+        exotel_api_key: settings.exotel_api_key,
+        exotel_api_token: settings.exotel_api_token,
+        exotel_subdomain: settings.exotel_subdomain,
+        whatsapp_source_number: settings.whatsapp_source_number,
+        is_active: settings.is_active,
+      };
+
       const { error } = await supabase
         .from("whatsapp_settings")
-        .upsert({
-          id: settings.id,
-          org_id: orgId,
-          exotel_sid: settings.exotel_sid,
-          exotel_api_key: settings.exotel_api_key,
-          exotel_api_token: settings.exotel_api_token,
-          exotel_subdomain: settings.exotel_subdomain,
-          whatsapp_source_number: settings.whatsapp_source_number,
-          is_active: settings.is_active,
-        });
+        .upsert(dataToSave, { onConflict: 'org_id' });
 
       if (error) throw error;
 
