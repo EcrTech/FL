@@ -248,7 +248,7 @@ export default function TemplateBuilder() {
           ...(sampleBody.length > 0 && { body: sampleBody }),
         },
         status: 'draft',
-        submission_status: 'pending',
+        submission_status: 'pending_submission',
       };
 
       const { error } = await supabase
