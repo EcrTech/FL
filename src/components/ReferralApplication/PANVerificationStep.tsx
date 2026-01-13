@@ -52,29 +52,34 @@ export function PANVerificationStep({
     setVerificationError(null);
 
     try {
-      // Step 1: Authenticate with Sandbox
-      console.log('[PAN Verification] Authenticating...');
-      const { data: authData, error: authError } = await supabase.functions.invoke('sandbox-authenticate', {
+      // Step 1: Authenticate with Sandbox (public endpoint - no auth required)
+      console.log('[PAN Verification] Authenticating with public endpoint...');
+      const { data: authData, error: authError } = await supabase.functions.invoke('sandbox-public-authenticate', {
         body: {},
       });
+
+      console.log('[PAN Verification] Auth response:', { authData, authError });
 
       if (authError) {
         console.error('[PAN Verification] Auth error:', authError);
         throw new Error('Failed to connect to verification service');
       }
 
-      if (!authData?.access_token) {
-        throw new Error('Authentication failed - no token received');
+      if (!authData?.success || !authData?.access_token) {
+        console.error('[PAN Verification] Auth failed:', authData?.error);
+        throw new Error(authData?.error || 'Authentication failed - no token received');
       }
 
       // Step 2: Verify PAN
-      console.log('[PAN Verification] Verifying PAN...');
+      console.log('[PAN Verification] Verifying PAN:', panNumber.substring(0, 4) + '****');
       const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-public-pan', {
         body: {
           panNumber,
           accessToken: authData.access_token,
         },
       });
+
+      console.log('[PAN Verification] Verify response:', { verifyData, verifyError });
 
       if (verifyError) {
         console.error('[PAN Verification] Verify error:', verifyError);
