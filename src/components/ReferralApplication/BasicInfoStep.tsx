@@ -304,22 +304,22 @@ export function BasicInfoStep({
           <Input
             id="tenureDays"
             type="number"
-            placeholder="Enter tenure in days (1 - 365)"
+            placeholder="Enter tenure in days (15 - 90)"
             value={formData.tenureDays || ''}
             onChange={(e) => {
               const value = parseInt(e.target.value) || 0;
               onUpdate({ tenureDays: value });
             }}
-            min={1}
-            max={365}
+            min={15}
+            max={90}
             className="h-12 bg-background border-2 border-border rounded-xl text-base font-body focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
           />
           <p className="text-xs text-muted-foreground font-body">
-            Minimum 1 day • Maximum 365 days
+            Minimum 15 days • Maximum 90 days
           </p>
-          {formData.tenureDays > 0 && (formData.tenureDays < 1 || formData.tenureDays > 365) && (
+          {formData.tenureDays > 0 && (formData.tenureDays < 15 || formData.tenureDays > 90) && (
             <p className="text-xs text-[hsl(var(--coral-500))] font-body">
-              Please enter a tenure between 1 and 365 days
+              Please enter a tenure between 15 and 90 days
             </p>
           )}
         </div>
