@@ -146,19 +146,36 @@ serve(async (req) => {
         
         const auth = btoa(`${whatsappSettings.exotel_api_key}:${whatsappSettings.exotel_api_token}`);
         
-        // Use the psver template with OTP as the variable
+        // Use the "test" template with OTP as the {{1}} variable
+        // Note: "test" template says "Hello {{1}}, Welcome to In-Sync..."
+        // For a proper OTP message, create a new UTILITY template with: "Your OTP is {{1}}"
         const whatsappPayload = {
-          to: formattedPhone,
-          from: whatsappSettings.whatsapp_source_number,
-          channel: 'whatsapp',
-          template: {
-            name: 'psver',
-            language: 'en',
-            body_params: [otpCode] // {{1}} = OTP code
+          whatsapp: {
+            messages: [{
+              from: whatsappSettings.whatsapp_source_number,
+              to: formattedPhone,
+              content: {
+                type: 'template',
+                template: {
+                  name: 'test', // Using "test" template as it has {{1}} variable
+                  language: {
+                    code: 'en'
+                  },
+                  components: [{
+                    type: 'body',
+                    parameters: [{
+                      type: 'text',
+                      text: otpCode
+                    }]
+                  }]
+                }
+              }
+            }]
           }
         };
         
         console.log(`[send-public-otp] Sending WhatsApp OTP to: ${formattedPhone.substring(0, 4)}***`);
+        console.log(`[send-public-otp] Payload:`, JSON.stringify(whatsappPayload));
         
         const whatsappResponse = await fetch(exotelUrl, {
           method: 'POST',
@@ -169,13 +186,14 @@ serve(async (req) => {
           body: JSON.stringify(whatsappPayload),
         });
 
-        if (!whatsappResponse.ok) {
-          const errorText = await whatsappResponse.text();
-          console.error('Exotel WhatsApp error:', errorText);
+        const responseData = await whatsappResponse.json();
+        console.log(`[send-public-otp] Exotel response:`, JSON.stringify(responseData));
+
+        if (!whatsappResponse.ok || responseData?.whatsapp?.messages?.[0]?.status === 'failure') {
+          console.error('Exotel WhatsApp error:', JSON.stringify(responseData));
         } else {
-          const result = await whatsappResponse.json();
           whatsappSent = true;
-          console.log(`[send-public-otp] WhatsApp OTP sent via Exotel to: ${formattedPhone.substring(0, 4)}***`, result);
+          console.log(`[send-public-otp] WhatsApp OTP sent successfully to: ${formattedPhone.substring(0, 4)}***`);
         }
       } else {
         console.warn('WhatsApp settings not configured - WhatsApp OTP not sent');
