@@ -192,18 +192,14 @@ export default function ReferralLoanApplication() {
       // Generate a temporary application number for draft
       const tempAppNumber = `DRAFT-${Date.now()}`;
 
+      // 1. Create the loan application (without applicant details - those go in loan_applicants)
       const { data: draft, error: draftError } = await supabase
         .from("loan_applications")
         .insert({
           org_id: referrerInfo.orgId,
           referred_by: referrerInfo.userId,
-          applicant_name: basicInfo.name,
-          applicant_email: basicInfo.email,
-          applicant_phone: basicInfo.phone,
           requested_amount: basicInfo.requestedAmount,
           tenure_days: basicInfo.tenureDays,
-          pan_number: panNumber,
-          aadhaar_number: aadhaarNumber,
           status: "draft",
           current_stage: "video_kyc",
           application_number: tempAppNumber,
@@ -216,6 +212,33 @@ export default function ReferralLoanApplication() {
         console.error("Error creating draft application:", draftError);
         toast.error("Failed to prepare application. Please try again.");
         return null;
+      }
+
+      // 2. Create the loan applicant record with personal details
+      const nameParts = basicInfo.name.trim().split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+
+      // Extract DOB from Aadhaar verification data if available, otherwise use placeholder
+      const dob = aadhaarData?.dob || '1990-01-01';
+
+      const { error: applicantError } = await supabase
+        .from("loan_applicants")
+        .insert({
+          loan_application_id: draft.id,
+          applicant_type: 'primary',
+          first_name: firstName,
+          last_name: lastName || null,
+          mobile: basicInfo.phone,
+          email: basicInfo.email || null,
+          pan_number: panNumber?.toUpperCase() || null,
+          aadhaar_number: aadhaarNumber?.replace(/\s/g, '') || null,
+          dob: dob,
+        });
+
+      if (applicantError) {
+        console.error("Error creating loan applicant:", applicantError);
+        // Don't fail the whole process - application is created
       }
 
       console.log("Draft application created:", draft.id);
