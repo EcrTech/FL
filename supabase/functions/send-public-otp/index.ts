@@ -127,60 +127,69 @@ serve(async (req) => {
 
       console.log(`[send-public-otp] Email OTP sent successfully to: ${identifier}`);
     } else if (identifierType === 'phone') {
-      // Send SMS OTP using Exotel
-      // Fetch Exotel settings from the first active org (system-level config for public forms)
-      const { data: exotelSettings } = await supabase
-        .from('exotel_settings')
+      // Send WhatsApp OTP using template
+      // Fetch WhatsApp settings from the first active org (system-level config for public forms)
+      const { data: whatsappSettings } = await supabase
+        .from('whatsapp_settings')
         .select('*')
         .eq('is_active', true)
         .limit(1)
         .single();
       
-      let smsSent = false;
-      if (exotelSettings) {
-        const formattedPhone = identifier.replace(/^\+91/, '').replace(/\D/g, '');
-        const smsMessage = `Your OTP for Paisaa Saarthi loan application is: ${otpCode}. Valid for 5 minutes. Do not share this with anyone.`;
+      let whatsappSent = false;
+      if (whatsappSettings && whatsappSettings.exotel_sid && whatsappSettings.exotel_api_key && whatsappSettings.exotel_api_token) {
+        const formattedPhone = identifier.replace(/^\+/, ''); // Remove leading + for Exotel
         
-        // Exotel SMS API
-        const exotelSmsUrl = `https://${exotelSettings.subdomain}/v1/Accounts/${exotelSettings.account_sid}/Sms/send.json`;
-        const auth = btoa(`${exotelSettings.api_key}:${exotelSettings.api_token}`);
+        // Exotel WhatsApp Template API
+        const exotelSubdomain = whatsappSettings.exotel_subdomain || 'api.exotel.com';
+        const exotelUrl = `https://${exotelSubdomain}/v2/accounts/${whatsappSettings.exotel_sid}/messages`;
         
-        const smsParams = new URLSearchParams({
-          From: exotelSettings.caller_id,
-          To: formattedPhone,
-          Body: smsMessage,
-        });
+        const auth = btoa(`${whatsappSettings.exotel_api_key}:${whatsappSettings.exotel_api_token}`);
         
-        const smsResponse = await fetch(exotelSmsUrl, {
+        // Use the psver template with OTP as the variable
+        const whatsappPayload = {
+          to: formattedPhone,
+          from: whatsappSettings.whatsapp_source_number,
+          channel: 'whatsapp',
+          template: {
+            name: 'psver',
+            language: 'en',
+            body_params: [otpCode] // {{1}} = OTP code
+          }
+        };
+        
+        console.log(`[send-public-otp] Sending WhatsApp OTP to: ${formattedPhone.substring(0, 4)}***`);
+        
+        const whatsappResponse = await fetch(exotelUrl, {
           method: 'POST',
           headers: {
             'Authorization': `Basic ${auth}`,
-            'Content-Type': 'application/x-www-form-urlencoded',
+            'Content-Type': 'application/json',
           },
-          body: smsParams.toString(),
+          body: JSON.stringify(whatsappPayload),
         });
 
-        if (!smsResponse.ok) {
-          const errorText = await smsResponse.text();
-          console.error('Exotel SMS error:', errorText);
+        if (!whatsappResponse.ok) {
+          const errorText = await whatsappResponse.text();
+          console.error('Exotel WhatsApp error:', errorText);
         } else {
-          smsSent = true;
-          console.log(`[send-public-otp] SMS OTP sent via Exotel to: ${formattedPhone.substring(0, 4)}***`);
+          const result = await whatsappResponse.json();
+          whatsappSent = true;
+          console.log(`[send-public-otp] WhatsApp OTP sent via Exotel to: ${formattedPhone.substring(0, 4)}***`, result);
         }
       } else {
-        console.warn('Exotel not configured - SMS OTP not sent');
+        console.warn('WhatsApp settings not configured - WhatsApp OTP not sent');
       }
 
-      // If SMS not sent, log the OTP for testing and return it in response
-      if (!smsSent) {
+      // If WhatsApp not sent, log the OTP for testing and return it in response
+      if (!whatsappSent) {
         console.log(`[send-public-otp] TEST MODE - OTP for ${identifier}: ${otpCode}`);
-        console.log(`[send-public-otp] OTP sent to ${identifierType}: ${identifier.substring(0, 3)}***`);
 
         return new Response(
           JSON.stringify({ 
             success: true, 
             sessionId,
-            message: 'SMS not configured - Test Mode',
+            message: 'WhatsApp not configured - Test Mode',
             isTestMode: true,
             testOtp: otpCode 
           }),
