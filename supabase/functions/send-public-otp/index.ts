@@ -148,6 +148,7 @@ serve(async (req) => {
         
         // Using "psotp1" authentication template for OTP delivery
         // Template: "Your login code is {{1}}. No further action is needed..."
+        // IMPORTANT: For Copy Code buttons, use "copy_code" not "url"
         const whatsappPayload = {
           whatsapp: {
             messages: [{
@@ -170,7 +171,7 @@ serve(async (req) => {
                     },
                     {
                       type: 'button',
-                      sub_type: 'url',
+                      sub_type: 'copy_code',  // FIXED: Use copy_code for OTP buttons
                       index: '0',
                       parameters: [{
                         type: 'text',
@@ -184,8 +185,15 @@ serve(async (req) => {
           }
         };
         
-        console.log(`[send-public-otp] Sending WhatsApp OTP to: ${formattedPhone.substring(0, 4)}***`);
-        console.log(`[send-public-otp] Payload:`, JSON.stringify(whatsappPayload));
+        console.log(`[send-public-otp] === DEBUG INFO ===`);
+        console.log(`[send-public-otp] Exotel SID: ${whatsappSettings.exotel_sid}`);
+        console.log(`[send-public-otp] Exotel Subdomain: ${exotelSubdomain}`);
+        console.log(`[send-public-otp] Exotel URL: ${exotelUrl}`);
+        console.log(`[send-public-otp] WhatsApp Source Number: ${whatsappSettings.whatsapp_source_number}`);
+        console.log(`[send-public-otp] Target Phone: ${formattedPhone}`);
+        console.log(`[send-public-otp] OTP Code: ${otpCode}`);
+        console.log(`[send-public-otp] Template Name: psotp1`);
+        console.log(`[send-public-otp] Full Payload:`, JSON.stringify(whatsappPayload, null, 2));
         
         const whatsappResponse = await fetch(exotelUrl, {
           method: 'POST',
@@ -196,17 +204,40 @@ serve(async (req) => {
           body: JSON.stringify(whatsappPayload),
         });
 
-        const responseData = await whatsappResponse.json();
-        console.log(`[send-public-otp] Exotel response:`, JSON.stringify(responseData));
+        const responseText = await whatsappResponse.text();
+        console.log(`[send-public-otp] === RESPONSE INFO ===`);
+        console.log(`[send-public-otp] HTTP Status: ${whatsappResponse.status}`);
+        console.log(`[send-public-otp] Response Headers:`, JSON.stringify(Object.fromEntries(whatsappResponse.headers.entries())));
+        console.log(`[send-public-otp] Raw Response: ${responseText}`);
+        
+        let responseData;
+        try {
+          responseData = JSON.parse(responseText);
+          console.log(`[send-public-otp] Parsed Response:`, JSON.stringify(responseData, null, 2));
+        } catch (e) {
+          console.error(`[send-public-otp] Failed to parse response as JSON: ${e}`);
+          responseData = { raw: responseText };
+        }
 
-        if (!whatsappResponse.ok || responseData?.whatsapp?.messages?.[0]?.status === 'failure') {
-          console.error('Exotel WhatsApp error:', JSON.stringify(responseData));
+        // Check for any error conditions
+        const messageStatus = responseData?.response?.whatsapp?.messages?.[0];
+        console.log(`[send-public-otp] Message Status:`, JSON.stringify(messageStatus));
+        
+        if (!whatsappResponse.ok) {
+          console.error(`[send-public-otp] HTTP Error: Status ${whatsappResponse.status}`);
+          console.error(`[send-public-otp] Error Details:`, responseText);
+        } else if (messageStatus?.status === 'failure' || messageStatus?.error_data) {
+          console.error(`[send-public-otp] WhatsApp API Error:`, JSON.stringify(messageStatus));
         } else {
           whatsappSent = true;
-          console.log(`[send-public-otp] WhatsApp OTP sent successfully to: ${formattedPhone.substring(0, 4)}***`);
+          console.log(`[send-public-otp] ✅ WhatsApp OTP sent successfully!`);
+          console.log(`[send-public-otp] Message SID: ${messageStatus?.data?.sid || 'N/A'}`);
         }
       } else {
-        console.warn('WhatsApp settings not configured - WhatsApp OTP not sent');
+        console.warn('[send-public-otp] WhatsApp settings not configured:');
+        console.warn(`  - exotel_sid: ${!!whatsappSettings?.exotel_sid}`);
+        console.warn(`  - exotel_api_key: ${!!whatsappSettings?.exotel_api_key}`);
+        console.warn(`  - exotel_api_token: ${!!whatsappSettings?.exotel_api_token}`);
       }
 
       // If WhatsApp not sent, log the OTP for testing and return it in response
