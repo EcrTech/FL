@@ -47,12 +47,12 @@ export default function LOSDashboard() {
           .select("*", { count: "exact", head: true })
           .eq("org_id", orgId),
         
-        // Pending approval
+        // Pending approval (applications that are approved but awaiting disbursement)
         supabase
           .from("loan_applications")
           .select("*", { count: "exact", head: true })
           .eq("org_id", orgId)
-          .eq("current_stage", "approval_pending"),
+          .in("current_stage", ["approved", "disbursement_pending"]),
         
         // Disbursed
         supabase
@@ -61,15 +61,17 @@ export default function LOSDashboard() {
           .eq("org_id", orgId)
           .eq("current_stage", "disbursed"),
         
-        // In progress
+        // In progress (applications in initial stages)
         supabase
           .from("loan_applications")
           .select("*", { count: "exact", head: true })
           .eq("org_id", orgId)
           .in("current_stage", [
+            "application_login",
             "document_collection",
             "field_verification",
             "credit_assessment",
+            "approval_pending",
           ]),
         
         // Total sanctioned/approved amount
