@@ -146,9 +146,8 @@ serve(async (req) => {
         
         const auth = btoa(`${whatsappSettings.exotel_api_key}:${whatsappSettings.exotel_api_token}`);
         
-        // Use the "test" template with OTP as the {{1}} variable
-        // Note: "test" template says "Hello {{1}}, Welcome to In-Sync..."
-        // For a proper OTP message, create a new UTILITY template with: "Your OTP is {{1}}"
+        // Using "psver" static template for testing (no variables)
+        // This template sends: "Your PS number is 589689"
         const whatsappPayload = {
           whatsapp: {
             messages: [{
@@ -157,17 +156,11 @@ serve(async (req) => {
               content: {
                 type: 'template',
                 template: {
-                  name: 'test', // Using "test" template as it has {{1}} variable
+                  name: 'psver',  // Static template with no variables
                   language: {
                     code: 'en'
-                  },
-                  components: [{
-                    type: 'body',
-                    parameters: [{
-                      type: 'text',
-                      text: otpCode
-                    }]
-                  }]
+                  }
+                  // No components needed - template has no variables
                 }
               }
             }]
