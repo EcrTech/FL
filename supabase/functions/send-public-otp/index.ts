@@ -159,7 +159,7 @@ serve(async (req) => {
                 template: {
                   name: 'psotp1',  // Authentication template with OTP variable
                   language: {
-                    code: 'en'
+                    code: 'en_US'  // Must match template's registered language
                   },
                   components: [
                     {
