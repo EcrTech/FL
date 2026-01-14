@@ -146,7 +146,7 @@ serve(async (req) => {
         
         const auth = btoa(`${whatsappSettings.exotel_api_key}:${whatsappSettings.exotel_api_token}`);
         
-        // Using "psotp" authentication template for OTP delivery
+        // Using "psotp1" authentication template for OTP delivery
         // Template: "Your login code is {{1}}. No further action is needed..."
         const whatsappPayload = {
           whatsapp: {
@@ -156,17 +156,28 @@ serve(async (req) => {
               content: {
                 type: 'template',
                 template: {
-                  name: 'psotp',  // Authentication template with OTP variable
+                  name: 'psotp1',  // Authentication template with OTP variable
                   language: {
                     code: 'en'
                   },
-                  components: [{
-                    type: 'body',
-                    parameters: [{
-                      type: 'text',
-                      text: otpCode  // Dynamic OTP code for {{1}}
-                    }]
-                  }]
+                  components: [
+                    {
+                      type: 'body',
+                      parameters: [{
+                        type: 'text',
+                        text: otpCode  // Dynamic OTP code for {{1}}
+                      }]
+                    },
+                    {
+                      type: 'button',
+                      sub_type: 'url',
+                      index: '0',
+                      parameters: [{
+                        type: 'text',
+                        text: otpCode  // Same OTP for "Copy code" button
+                      }]
+                    }
+                  ]
                 }
               }
             }]
