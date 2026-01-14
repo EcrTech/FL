@@ -171,7 +171,7 @@ serve(async (req) => {
                     },
                     {
                       type: 'button',
-                      sub_type: 'copy_code',  // FIXED: Use copy_code for OTP buttons
+                      sub_type: 'url',  // Template registered with URL button type
                       index: '0',
                       parameters: [{
                         type: 'text',
