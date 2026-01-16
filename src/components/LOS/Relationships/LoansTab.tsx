@@ -86,6 +86,19 @@ export function LoansTab() {
   const handleExportCSV = () => {
     if (!filteredLoans.length) return;
 
+    // Build filename with filter info
+    let filename = `loans-${format(new Date(), "yyyy-MM-dd")}`;
+    if (statusFilter !== "all") filename += `_${statusFilter}`;
+    if (paymentFilter !== "all") filename += `_payment-${paymentFilter}`;
+    if (debouncedSearch) filename += `_search`;
+
+    // Build filter metadata row
+    const filterParts = [];
+    filterParts.push(`Loan Status: ${statusFilter === "all" ? "All" : statusFilter}`);
+    filterParts.push(`Payment Status: ${paymentFilter === "all" ? "All" : paymentFilter}`);
+    if (debouncedSearch) filterParts.push(`Search: "${debouncedSearch}"`);
+    const filterInfo = [`"Filters Applied: ${filterParts.join(", ")}"`];
+
     const headers = [
       "Loan ID",
       "Application Number",
@@ -120,12 +133,12 @@ export function LoansTab() {
       loan.disbursementDate ? format(new Date(loan.disbursementDate), "dd/MM/yyyy") : "",
     ]);
 
-    const csvContent = [headers, ...rows].map((row) => row.join(",")).join("\n");
+    const csvContent = [filterInfo, headers, ...rows].map((row) => row.join(",")).join("\n");
     const blob = new Blob([csvContent], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `loans-${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.download = `${filename}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };

@@ -80,6 +80,19 @@ export function ClientsTab() {
   const handleExportCSV = () => {
     if (!filteredCustomers.length) return;
 
+    // Build filename with filter info
+    let filename = `customers-${format(new Date(), "yyyy-MM-dd")}`;
+    if (scoreFilter !== "all") filename += `_score-${scoreFilter}`;
+    if (statusFilter !== "all") filename += `_${statusFilter}`;
+    if (debouncedSearch) filename += `_search`;
+
+    // Build filter metadata row
+    const filterParts = [];
+    filterParts.push(`Payment Score: ${scoreFilter === "all" ? "All" : scoreFilter}`);
+    filterParts.push(`Status: ${statusFilter === "all" ? "All" : statusFilter}`);
+    if (debouncedSearch) filterParts.push(`Search: "${debouncedSearch}"`);
+    const filterInfo = [`"Filters Applied: ${filterParts.join(", ")}"`];
+
     const headers = [
       "Customer ID",
       "Name",
@@ -108,12 +121,12 @@ export function ClientsTab() {
       c.lastApplicationDate ? format(new Date(c.lastApplicationDate), "dd/MM/yyyy") : "",
     ]);
 
-    const csvContent = [headers, ...rows].map((row) => row.join(",")).join("\n");
+    const csvContent = [filterInfo, headers, ...rows].map((row) => row.join(",")).join("\n");
     const blob = new Blob([csvContent], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `customers-${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.download = `${filename}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
