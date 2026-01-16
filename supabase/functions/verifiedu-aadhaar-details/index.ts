@@ -1,0 +1,183 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { uniqueRequestNumber, applicationId, orgId } = await req.json();
+
+    if (!uniqueRequestNumber) {
+      return new Response(JSON.stringify({ error: "Unique request number is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const verifieduToken = Deno.env.get("VERIFIEDU_TOKEN");
+    const companyId = Deno.env.get("VERIFIEDU_COMPANY_ID");
+    const baseUrl = Deno.env.get("VERIFIEDU_API_BASE_URL");
+
+    if (!verifieduToken || !companyId || !baseUrl) {
+      console.log("VerifiedU credentials not configured, using mock mode");
+      // Mock response for testing
+      const mockResponse = {
+        success: true,
+        data: {
+          aadhaar_uid: "XXXX-XXXX-1234",
+          name: "MOCK USER NAME",
+          gender: "Male",
+          dob: "1990-01-01",
+          addresses: [{
+            combined: "123 Mock Street, Mock City, Mock State - 123456",
+            house: "123",
+            street: "Mock Street",
+            landmark: "",
+            locality: "Mock Locality",
+            vtc: "Mock VTC",
+            subdist: "Mock Subdist",
+            dist: "Mock City",
+            state: "Mock State",
+            country: "India",
+            pc: "123456",
+          }],
+          is_valid: true,
+          photo: null,
+        },
+        is_mock: true,
+      };
+
+      return new Response(JSON.stringify(mockResponse), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Call VerifiedU API
+    const response = await fetch(`${baseUrl}/api/verifiedu/GetAadhaarDetailsById`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "token": verifieduToken,
+        "companyid": companyId,
+      },
+      body: JSON.stringify({
+        unique_request_number: uniqueRequestNumber,
+      }),
+    });
+
+    const responseData = await response.json();
+    console.log("VerifiedU Aadhaar details response:", JSON.stringify(responseData));
+
+    if (!response.ok) {
+      return new Response(JSON.stringify({ 
+        error: responseData.message || "Failed to fetch Aadhaar details",
+        details: responseData 
+      }), {
+        status: response.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Update verification record in database if applicationId is provided
+    if (applicationId && orgId) {
+      const adminClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      );
+
+      // Find and update the existing verification record
+      const { data: existingVerification } = await adminClient
+        .from("loan_verifications")
+        .select("id")
+        .eq("loan_application_id", applicationId)
+        .eq("verification_type", "aadhaar")
+        .eq("verification_source", "verifiedu")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      const verificationData = {
+        status: responseData.is_valid ? "success" : "failed",
+        response_data: {
+          aadhaar_uid: responseData.aadhaar_uid,
+          name: responseData.name,
+          gender: responseData.gender,
+          dob: responseData.dob,
+          addresses: responseData.addresses,
+          is_valid: responseData.is_valid,
+          verified_address: responseData.addresses?.[0]?.combined || "",
+        },
+        verified_at: new Date().toISOString(),
+      };
+
+      if (existingVerification) {
+        await adminClient
+          .from("loan_verifications")
+          .update(verificationData)
+          .eq("id", existingVerification.id);
+      } else {
+        await adminClient.from("loan_verifications").insert({
+          loan_application_id: applicationId,
+          org_id: orgId,
+          verification_type: "aadhaar",
+          verification_source: "verifiedu",
+          request_data: { unique_request_number: uniqueRequestNumber },
+          ...verificationData,
+        });
+      }
+    }
+
+    return new Response(JSON.stringify({
+      success: true,
+      data: {
+        aadhaar_uid: responseData.aadhaar_uid,
+        name: responseData.name,
+        gender: responseData.gender,
+        dob: responseData.dob,
+        addresses: responseData.addresses,
+        is_valid: responseData.is_valid,
+      },
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
+  } catch (error) {
+    console.error("Error in verifiedu-aadhaar-details:", error);
+    return new Response(JSON.stringify({ 
+      error: error instanceof Error ? error.message : "Internal server error" 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});

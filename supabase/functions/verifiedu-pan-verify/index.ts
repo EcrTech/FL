@@ -1,0 +1,149 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { panNumber, applicationId, orgId } = await req.json();
+
+    if (!panNumber) {
+      return new Response(JSON.stringify({ error: "PAN number is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Validate PAN format
+    const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+    if (!panRegex.test(panNumber.toUpperCase())) {
+      return new Response(JSON.stringify({ error: "Invalid PAN format" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const verifieduToken = Deno.env.get("VERIFIEDU_TOKEN");
+    const companyId = Deno.env.get("VERIFIEDU_COMPANY_ID");
+    const baseUrl = Deno.env.get("VERIFIEDU_API_BASE_URL");
+
+    if (!verifieduToken || !companyId || !baseUrl) {
+      console.log("VerifiedU credentials not configured, using mock mode");
+      // Mock response for testing
+      const mockResponse = {
+        success: true,
+        data: {
+          id: `mock_${Date.now()}`,
+          status: "success",
+          pan_number: panNumber.toUpperCase(),
+          dob: "1990-01-01",
+          name: "MOCK USER NAME",
+          is_valid: true,
+        },
+        is_mock: true,
+      };
+
+      return new Response(JSON.stringify(mockResponse), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Call VerifiedU API
+    const response = await fetch(`${baseUrl}/api/verifiedu/VerifyPAN`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "token": verifieduToken,
+        "companyid": companyId,
+      },
+      body: JSON.stringify({
+        PanNumber: panNumber.toUpperCase(),
+      }),
+    });
+
+    const responseData = await response.json();
+    console.log("VerifiedU PAN response:", JSON.stringify(responseData));
+
+    if (!response.ok) {
+      return new Response(JSON.stringify({ 
+        error: responseData.message || "PAN verification failed",
+        details: responseData 
+      }), {
+        status: response.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Save verification to database if applicationId is provided
+    if (applicationId && orgId) {
+      const adminClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      );
+
+      await adminClient.from("loan_verifications").insert({
+        loan_application_id: applicationId,
+        org_id: orgId,
+        verification_type: "pan",
+        verification_source: "verifiedu",
+        status: responseData.data?.is_valid ? "success" : "failed",
+        request_data: { pan_number: panNumber.toUpperCase() },
+        response_data: responseData.data,
+        verified_at: new Date().toISOString(),
+      });
+    }
+
+    return new Response(JSON.stringify({
+      success: true,
+      data: {
+        id: responseData.data?.id,
+        status: responseData.data?.status,
+        pan_number: responseData.data?.pan_number,
+        dob: responseData.data?.dob,
+        name: responseData.data?.name,
+        is_valid: responseData.data?.is_valid,
+      },
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
+  } catch (error) {
+    console.error("Error in verifiedu-pan-verify:", error);
+    return new Response(JSON.stringify({ 
+      error: error instanceof Error ? error.message : "Internal server error" 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});

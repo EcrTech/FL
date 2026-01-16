@@ -62,6 +62,8 @@ import NegativePinCodes from "./pages/NegativePinCodes";
 import Profile from "./pages/Profile";
 import ESignDocument from "./pages/ESignDocument";
 import VideoKYC from "./pages/VideoKYC";
+import DigilockerSuccess from "./pages/DigilockerSuccess";
+import DigilockerFailure from "./pages/DigilockerFailure";
 import ProtectedRoute from "./components/Auth/ProtectedRoute";
 
 console.log('[App] Module loaded, all imports successful');
@@ -83,6 +85,8 @@ const App = () => {
             <Route path="/apply/ref/:referralCode" element={<ReferralLoanApplication />} />
             <Route path="/esign/:token" element={<ESignDocument />} />
             <Route path="/videokyc/:token" element={<VideoKYC />} />
+            <Route path="/digilocker/success" element={<DigilockerSuccess />} />
+            <Route path="/digilocker/failure" element={<DigilockerFailure />} />
             
             <Route path="/dashboard" element={
               <ProtectedRoute>

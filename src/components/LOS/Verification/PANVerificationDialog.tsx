@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, CheckCircle } from "lucide-react";
 
 interface PANVerificationDialogProps {
   open: boolean;
@@ -32,68 +32,45 @@ export default function PANVerificationDialog({
 
   const [formData, setFormData] = useState({
     pan_number: existingVerification?.request_data?.pan_number || applicant?.pan_number || "",
-    name_on_pan: existingVerification?.response_data?.name_on_pan || "",
+    name_on_pan: existingVerification?.response_data?.name_on_pan || existingVerification?.response_data?.name || "",
     pan_status: existingVerification?.response_data?.pan_status || "valid",
     name_match_result: existingVerification?.response_data?.name_match_result || "exact",
     status: existingVerification?.status || "success",
     remarks: existingVerification?.remarks || "",
   });
 
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-
-  // Authenticate with Sandbox
-  const authMutation = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke('sandbox-authenticate');
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (data) => {
-      setAccessToken(data.access_token);
-      toast({ title: "Authenticated successfully" });
-    },
-    onError: (error: any) => {
-      toast({
-        variant: "destructive",
-        title: "Authentication Failed",
-        description: error.message || "Failed to authenticate with verification service",
-      });
-    },
-  });
-
-  // Verify PAN via Sandbox API
+  // Verify PAN via VerifiedU API (no separate auth needed)
   const verifyMutation = useMutation({
     mutationFn: async () => {
-      if (!accessToken) {
-        throw new Error("Not authenticated. Please authenticate first.");
-      }
       if (!formData.pan_number || formData.pan_number.length !== 10) {
         throw new Error("Please enter a valid 10-character PAN number");
       }
 
-      const { data, error } = await supabase.functions.invoke('sandbox-pan-verify', {
+      const { data, error } = await supabase.functions.invoke('verifiedu-pan-verify', {
         body: {
           panNumber: formData.pan_number,
           applicationId,
           orgId,
-          accessToken,
         },
       });
 
       if (error) throw error;
+      if (!data.success) throw new Error(data.error || "PAN verification failed");
       return data;
     },
     onSuccess: (data) => {
       toast({
         title: "PAN Verified",
-        description: "PAN details have been verified successfully",
+        description: data.is_mock 
+          ? "PAN verified in mock mode (configure VerifiedU credentials for live verification)" 
+          : "PAN details have been verified successfully",
       });
       // Update form with verified data
       setFormData(prev => ({
         ...prev,
         name_on_pan: data.data.name || prev.name_on_pan,
-        pan_status: data.data.status || prev.pan_status,
-        status: data.verification_status,
+        pan_status: data.data.is_valid ? "valid" : "invalid",
+        status: data.data.is_valid ? "success" : "failed",
       }));
       queryClient.invalidateQueries({ queryKey: ["loan-verifications", applicationId] });
     },
@@ -112,7 +89,7 @@ export default function PANVerificationDialog({
         loan_application_id: applicationId,
         applicant_id: applicant?.id,
         verification_type: "pan",
-        verification_source: "nsdl",
+        verification_source: "verifiedu",
         status: formData.status,
         request_data: { pan_number: formData.pan_number },
         response_data: {
@@ -157,60 +134,44 @@ export default function PANVerificationDialog({
         <DialogHeader>
           <DialogTitle>PAN Verification</DialogTitle>
           <DialogDescription>
-            Manual entry for PAN card verification results
+            Verify PAN card via VerifiedU API
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Authentication and API Verification Actions */}
+          {/* PAN Input and Verify Button */}
           <div className="space-y-2">
-            {!accessToken ? (
-              <Button
-                onClick={() => authMutation.mutate()}
-                disabled={authMutation.isPending}
-                variant="outline"
-                className="w-full"
-              >
-                {authMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Authenticate with Sandbox
-              </Button>
-            ) : (
-              <>
-                <div>
-                  <Label>PAN Number</Label>
-                  <Input
-                    value={formData.pan_number}
-                    onChange={(e) => setFormData({ ...formData, pan_number: e.target.value.toUpperCase().slice(0, 10) })}
-                    placeholder="ABCDE1234F"
-                    maxLength={10}
-                  />
-                </div>
-                
-                <Button
-                  onClick={() => verifyMutation.mutate()}
-                  disabled={!formData.pan_number || verifyMutation.isPending}
-                  variant="default"
-                  className="w-full"
-                >
-                  {verifyMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Verify PAN via API
-                </Button>
-              </>
-            )}
+            <div>
+              <Label>PAN Number</Label>
+              <Input
+                value={formData.pan_number}
+                onChange={(e) => setFormData({ ...formData, pan_number: e.target.value.toUpperCase().slice(0, 10) })}
+                placeholder="ABCDE1234F"
+                maxLength={10}
+              />
+            </div>
+            
+            <Button
+              onClick={() => verifyMutation.mutate()}
+              disabled={!formData.pan_number || formData.pan_number.length !== 10 || verifyMutation.isPending}
+              variant="default"
+              className="w-full"
+            >
+              {verifyMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Verify PAN via VerifiedU
+            </Button>
           </div>
+
+          {/* Verification Success Indicator */}
+          {formData.status === "success" && formData.name_on_pan && (
+            <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-md text-sm">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <span className="text-green-800">Verified: {formData.name_on_pan}</span>
+            </div>
+          )}
 
           <div className="border-t pt-4">
             <h4 className="text-sm font-medium mb-2">Verification Results</h4>
-          </div>
-
-          <div>
-            <Label>PAN Number</Label>
-            <Input
-              value={formData.pan_number}
-              onChange={(e) => setFormData({ ...formData, pan_number: e.target.value.toUpperCase() })}
-              placeholder="ABCDE1234F"
-              maxLength={10}
-            />
           </div>
 
           <div>
