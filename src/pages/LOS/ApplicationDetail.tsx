@@ -193,6 +193,8 @@ function ReferralsSection({
           orgId={orgId}
         />
       )}
+
+      {!primaryApplicant && (
         <p className="text-sm text-muted-foreground">No applicant record found. Referral information cannot be added.</p>
       )}
 
