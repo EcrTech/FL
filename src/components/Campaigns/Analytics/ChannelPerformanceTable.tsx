@@ -103,10 +103,10 @@ export default function ChannelPerformanceTable({ data, isLoading }: ChannelPerf
         {sortedData.map((row) => (
           <TableRow key={row.channel}>
             <TableCell className="font-medium capitalize">{row.channel}</TableCell>
-            <TableCell>${row.spend.toFixed(2)}</TableCell>
+            <TableCell>₹{row.spend.toFixed(2)}</TableCell>
             <TableCell>{row.conversions}</TableCell>
             <TableCell>{row.roas.toFixed(2)}</TableCell>
-            <TableCell>${row.cpa.toFixed(2)}</TableCell>
+            <TableCell>₹{row.cpa.toFixed(2)}</TableCell>
           </TableRow>
         ))}
       </TableBody>

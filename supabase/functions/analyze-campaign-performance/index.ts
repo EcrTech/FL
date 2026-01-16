@@ -85,16 +85,16 @@ Status: ${campaign.status}
 Period: Last 30 days
 
 Metrics:
-- Total Spend: $${totalSpend.toFixed(2)}
+- Total Spend: ₹${totalSpend.toFixed(2)}
 - ROAS: ${avgRoas.toFixed(2)}x (target: 2.5x)
 - Conversions: ${totalConversions}
-- CPA: $${avgCpa.toFixed(2)} (target: $60)
+- CPA: ₹${avgCpa.toFixed(2)} (target: ₹60)
 - Total Opens: ${metrics.reduce((sum, m) => sum + (m.open_count || 0), 0)}
 - Total Clicks: ${metrics.reduce((sum, m) => sum + (m.click_count || 0), 0)}
 - Bounces: ${metrics.reduce((sum, m) => sum + (m.bounce_count || 0), 0)}
 
 Recent trend (last 7 days):
-${metrics.slice(0, 7).map(m => `${m.date}: ${m.conversions} conversions, $${m.spend} spend`).join('\n')}
+${metrics.slice(0, 7).map(m => `${m.date}: ${m.conversions} conversions, ₹${m.spend} spend`).join('\n')}
 
 Identify:
 1. Performance issues (low ROAS, high CPA, declining trends)
