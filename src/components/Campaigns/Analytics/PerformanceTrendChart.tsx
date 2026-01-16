@@ -55,7 +55,7 @@ export default function PerformanceTrendChart({ data, isLoading }: PerformanceTr
           }}
         />
         <Legend />
-        <Line type="monotone" dataKey="spend" stroke="hsl(var(--primary))" name="Spend ($)" />
+        <Line type="monotone" dataKey="spend" stroke="hsl(var(--primary))" name="Spend (₹)" />
         <Line type="monotone" dataKey="conversions" stroke="hsl(var(--chart-2))" name="Conversions" />
         <Line type="monotone" dataKey="roas" stroke="hsl(var(--chart-3))" name="ROAS" />
       </LineChart>

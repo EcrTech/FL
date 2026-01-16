@@ -106,7 +106,7 @@ export default function CampaignOverview() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <MetricCard
             title="Total Spend"
-            value={`$${totals.spend.toFixed(2)}`}
+            value={`₹${totals.spend.toFixed(2)}`}
             trend={12}
             isLoading={isLoading}
           />
@@ -124,7 +124,7 @@ export default function CampaignOverview() {
           />
           <MetricCard
             title="Avg CPA"
-            value={`$${avgCPA.toFixed(2)}`}
+            value={`₹${avgCPA.toFixed(2)}`}
             trend={-3}
             isLoading={isLoading}
           />

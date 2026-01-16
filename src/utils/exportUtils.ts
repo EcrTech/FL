@@ -99,5 +99,5 @@ export function formatNumberForExport(value: number | null, decimals: number = 2
  */
 export function formatCurrencyForExport(value: number | null): string {
   if (value === null || value === undefined) return '';
-  return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `₹${value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
