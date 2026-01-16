@@ -5,7 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { CheckCircle2, Circle, ArrowRight, ArrowLeft, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNotification } from "@/hooks/useNotification";
-
+import { useAuth } from "@/contexts/AuthContext";
 interface OnboardingStep {
   title: string;
   description: string;
@@ -182,6 +182,7 @@ interface OnboardingDialogProps {
 
 export function OnboardingDialog({ open, userRole, onComplete }: OnboardingDialogProps) {
   const notify = useNotification();
+  const { refreshAuth } = useAuth();
   const [currentStep, setCurrentStep] = useState(0);
   const [completing, setCompleting] = useState(false);
   
@@ -212,6 +213,9 @@ export function OnboardingDialog({ open, userRole, onComplete }: OnboardingDialo
 
         if (error) throw error;
 
+        // Refresh AuthContext to update the profile state
+        await refreshAuth();
+
         notify.success("Welcome aboard! 🎉", "You're all set to start using the platform.");
         
         onComplete();
@@ -238,7 +242,7 @@ export function OnboardingDialog({ open, userRole, onComplete }: OnboardingDialo
           <div className="flex items-center gap-2 mb-2">
             <Sparkles className="h-5 w-5 text-primary" />
             <DialogTitle className="text-2xl">
-              {currentStep === 0 ? "Welcome to Junoon LOS!" : currentStepData.title}
+              {currentStep === 0 ? "Welcome to Paisa Sarthi LOS!" : currentStepData.title}
             </DialogTitle>
           </div>
           <DialogDescription className="text-base">

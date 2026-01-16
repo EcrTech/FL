@@ -7,9 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useNotification } from "@/hooks/useNotification";
 import { ForgotPasswordDialog } from "@/components/Auth/ForgotPasswordDialog";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Loader2, ArrowLeft, Shield } from "lucide-react";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
 console.log('[Login] Module loaded');
+
+type LoginStep = 'credentials' | 'otp';
 
 export default function Login() {
   console.log('[Login] Component rendering...');
@@ -21,6 +24,15 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  
+  // 2FA OTP states
+  const [step, setStep] = useState<LoginStep>('credentials');
+  const [otp, setOtp] = useState("");
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [userPhone, setUserPhone] = useState<string | null>(null);
 
   useEffect(() => {
     console.log('[Login] useEffect - setting up auth listener...');
@@ -53,39 +65,242 @@ export default function Login() {
     };
   }, [navigate]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Resend cooldown timer
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendCooldown]);
+
+  const handleCredentialsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('[Login] handleSubmit called');
+    console.log('[Login] handleCredentialsSubmit called');
     setLoading(true);
 
     try {
-      console.log('[Login] Attempting sign in...');
-      const { error } = await supabase.auth.signInWithPassword({
+      // First verify credentials
+      console.log('[Login] Verifying credentials...');
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) {
-        console.error('[Login] Sign in error:', error);
-        throw error;
+      if (authError) {
+        console.error('[Login] Credentials verification error:', authError);
+        throw authError;
       }
 
-      console.log('[Login] Sign in successful');
-      notify.success("Welcome back!", "You've successfully signed in");
+      console.log('[Login] Credentials verified, fetching user profile for phone...');
+      
+      // Get user's phone number from profile
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('phone')
+        .eq('id', authData.user.id)
+        .single();
 
-      // Navigation will be handled by the auth state change listener
+      if (profileError || !profile?.phone) {
+        console.log('[Login] No phone number found, completing login without 2FA');
+        notify.success("Welcome back!", "You've successfully signed in");
+        return;
+      }
+
+      // Sign out temporarily - we'll complete login after OTP verification
+      await supabase.auth.signOut();
+
+      setUserPhone(profile.phone);
+      
+      // Send OTP via WhatsApp
+      await sendOtp(profile.phone);
+      
+      setStep('otp');
+      notify.success("Credentials verified", "Please enter the OTP sent to your phone");
     } catch (error: any) {
-      console.error('[Login] Sign in failed:', error);
+      console.error('[Login] Credentials verification failed:', error);
       notify.error("Login failed", error);
+    } finally {
       setLoading(false);
     }
   };
 
+  const sendOtp = async (phone: string) => {
+    setSendingOtp(true);
+    try {
+      console.log('[Login] Sending OTP to:', phone);
+      
+      const { data, error } = await supabase.functions.invoke('send-public-otp', {
+        body: {
+          identifier: phone,
+          identifierType: 'phone'
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success) {
+        setSessionId(data.sessionId);
+        setResendCooldown(60);
+        console.log('[Login] OTP sent successfully');
+      } else {
+        throw new Error(data.error || 'Failed to send OTP');
+      }
+    } catch (error: any) {
+      console.error('[Login] Failed to send OTP:', error);
+      notify.error("Failed to send OTP", error.message || "Please try again");
+      throw error;
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otp || otp.length !== 6) {
+      notify.error("Invalid OTP", new Error("Please enter a valid 6-digit OTP"));
+      return;
+    }
+
+    setVerifyingOtp(true);
+    try {
+      console.log('[Login] Verifying OTP...');
+      
+      const { data, error } = await supabase.functions.invoke('verify-public-otp', {
+        body: {
+          sessionId,
+          otp
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.success && data.verified) {
+        console.log('[Login] OTP verified, completing login...');
+        
+        // Complete login with credentials
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (signInError) throw signInError;
+
+        notify.success("Welcome back!", "You've successfully signed in with 2FA");
+        // Navigation will be handled by the auth state change listener
+      } else {
+        throw new Error(data.error || 'Invalid OTP');
+      }
+    } catch (error: any) {
+      console.error('[Login] OTP verification failed:', error);
+      notify.error("Verification failed", error.message || "Please try again");
+      setOtp("");
+    } finally {
+      setVerifyingOtp(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0 || !userPhone) return;
+    
+    try {
+      await sendOtp(userPhone);
+      notify.success("OTP Resent", "A new OTP has been sent to your phone");
+    } catch (error) {
+      // Error already handled in sendOtp
+    }
+  };
+
+  const handleBackToCredentials = async () => {
+    setStep('credentials');
+    setOtp("");
+    setSessionId(null);
+    setUserPhone(null);
+  };
+
   console.log('[Login] About to render AuthLayout...');
   
+  if (step === 'otp') {
+    return (
+      <AuthLayout 
+        title="Two-Factor Authentication" 
+        subtitle={`Enter the OTP sent to ${userPhone ? `****${userPhone.slice(-4)}` : 'your phone'}`}
+      >
+        <div className="space-y-6">
+          <div className="flex items-center justify-center mb-4">
+            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+              <Shield className="h-8 w-8 text-primary" />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="otp" className="text-center block">One-Time Password</Label>
+            <div className="flex justify-center">
+              <InputOTP 
+                maxLength={6} 
+                value={otp} 
+                onChange={setOtp}
+                disabled={verifyingOtp}
+              >
+                <InputOTPGroup>
+                  <InputOTPSlot index={0} />
+                  <InputOTPSlot index={1} />
+                  <InputOTPSlot index={2} />
+                  <InputOTPSlot index={3} />
+                  <InputOTPSlot index={4} />
+                  <InputOTPSlot index={5} />
+                </InputOTPGroup>
+              </InputOTP>
+            </div>
+          </div>
+
+          <Button 
+            onClick={handleVerifyOtp} 
+            className="w-full" 
+            disabled={otp.length !== 6 || verifyingOtp}
+          >
+            {verifyingOtp ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Verifying...
+              </>
+            ) : (
+              "Verify & Sign In"
+            )}
+          </Button>
+
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={handleResendOtp}
+              disabled={resendCooldown > 0 || sendingOtp}
+              className="text-sm text-primary hover:underline disabled:text-muted-foreground disabled:no-underline"
+            >
+              {sendingOtp ? (
+                "Sending..."
+              ) : resendCooldown > 0 ? (
+                `Resend OTP in ${resendCooldown}s`
+              ) : (
+                "Resend OTP"
+              )}
+            </button>
+          </div>
+
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={handleBackToCredentials}
+            className="w-full"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Login
+          </Button>
+        </div>
+      </AuthLayout>
+    );
+  }
+
   return (
     <AuthLayout title="Welcome back" subtitle="Sign in to your account">
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleCredentialsSubmit} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
           <Input
@@ -128,7 +343,14 @@ export default function Login() {
         </div>
 
         <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? "Signing in..." : "Sign In"}
+          {loading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Verifying...
+            </>
+          ) : (
+            "Sign In"
+          )}
         </Button>
 
         <p className="text-center text-sm text-muted-foreground">
