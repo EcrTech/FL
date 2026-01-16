@@ -3460,6 +3460,14 @@ export type Database = {
           age: number | null
           alternate_mobile: string | null
           applicant_type: string
+          bank_account_holder_name: string | null
+          bank_account_number: string | null
+          bank_account_type: string | null
+          bank_branch: string | null
+          bank_ifsc_code: string | null
+          bank_name: string | null
+          bank_verified: boolean | null
+          bank_verified_at: string | null
           created_at: string
           current_address: Json | null
           dob: string
@@ -3494,6 +3502,14 @@ export type Database = {
           age?: number | null
           alternate_mobile?: string | null
           applicant_type?: string
+          bank_account_holder_name?: string | null
+          bank_account_number?: string | null
+          bank_account_type?: string | null
+          bank_branch?: string | null
+          bank_ifsc_code?: string | null
+          bank_name?: string | null
+          bank_verified?: boolean | null
+          bank_verified_at?: string | null
           created_at?: string
           current_address?: Json | null
           dob: string
@@ -3528,6 +3544,14 @@ export type Database = {
           age?: number | null
           alternate_mobile?: string | null
           applicant_type?: string
+          bank_account_holder_name?: string | null
+          bank_account_number?: string | null
+          bank_account_type?: string | null
+          bank_branch?: string | null
+          bank_ifsc_code?: string | null
+          bank_name?: string | null
+          bank_verified?: boolean | null
+          bank_verified_at?: string | null
           created_at?: string
           current_address?: Json | null
           dob?: string
@@ -4886,6 +4910,73 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "loan_products_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      loan_referrals: {
+        Row: {
+          address: string | null
+          applicant_id: string | null
+          created_at: string | null
+          email: string | null
+          id: string
+          loan_application_id: string | null
+          mobile: string | null
+          name: string
+          org_id: string
+          referral_type: string
+          relationship: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          applicant_id?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          loan_application_id?: string | null
+          mobile?: string | null
+          name: string
+          org_id: string
+          referral_type: string
+          relationship?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          applicant_id?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          loan_application_id?: string | null
+          mobile?: string | null
+          name?: string
+          org_id?: string
+          referral_type?: string
+          relationship?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loan_referrals_applicant_id_fkey"
+            columns: ["applicant_id"]
+            isOneToOne: false
+            referencedRelation: "loan_applicants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_referrals_loan_application_id_fkey"
+            columns: ["loan_application_id"]
+            isOneToOne: false
+            referencedRelation: "loan_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_referrals_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
