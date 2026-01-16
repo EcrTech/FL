@@ -77,3 +77,18 @@ verify_jwt = true
 
 [functions.referral-videokyc-upload]
 verify_jwt = false
+
+[functions.verifiedu-pan-verify]
+verify_jwt = false
+
+[functions.verifiedu-aadhaar-initiate]
+verify_jwt = false
+
+[functions.verifiedu-aadhaar-details]
+verify_jwt = false
+
+[functions.verifiedu-bank-verify]
+verify_jwt = false
+
+[functions.verifiedu-public-pan-verify]
+verify_jwt = false

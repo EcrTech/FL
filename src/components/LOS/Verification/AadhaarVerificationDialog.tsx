@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, ExternalLink, CheckCircle, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface AadhaarVerificationDialogProps {
   open: boolean;
@@ -31,125 +32,64 @@ export default function AadhaarVerificationDialog({
   const queryClient = useQueryClient();
 
   const [formData, setFormData] = useState({
-    aadhaar_number: "",
     aadhaar_last4: existingVerification?.request_data?.aadhaar_last4 || "",
     verified_address: existingVerification?.response_data?.verified_address || "",
     address_match_result: existingVerification?.response_data?.address_match_result || "exact",
     aadhaar_status: existingVerification?.response_data?.aadhaar_status || "valid",
     status: existingVerification?.status || "success",
     remarks: existingVerification?.remarks || "",
+    name: existingVerification?.response_data?.name || "",
   });
 
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [otpRequestId, setOtpRequestId] = useState<string | null>(null);
-  const [otpValue, setOtpValue] = useState("");
-  const [isTestMode, setIsTestMode] = useState(false);
-  const [testOtp, setTestOtp] = useState<string | null>(null);
+  const [digilockerUrl, setDigilockerUrl] = useState<string | null>(null);
 
-  // Authenticate with Sandbox
-  const authMutation = useMutation({
+  // Get the base URL for callbacks
+  const getBaseUrl = () => {
+    if (typeof window !== 'undefined') {
+      return window.location.origin;
+    }
+    return '';
+  };
+
+  // Initiate Aadhaar verification via VerifiedU DigiLocker
+  const initiateMutation = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke('sandbox-authenticate');
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (data) => {
-      setAccessToken(data.access_token);
-      toast({ title: "Authenticated successfully" });
-    },
-    onError: (error: any) => {
-      toast({
-        variant: "destructive",
-        title: "Authentication Failed",
-        description: error.message || "Failed to authenticate with verification service",
-      });
-    },
-  });
-
-  // Generate OTP
-  const generateOtpMutation = useMutation({
-    mutationFn: async () => {
-      if (!accessToken) {
-        throw new Error("Not authenticated. Please authenticate first.");
-      }
-      if (!formData.aadhaar_number || formData.aadhaar_number.length !== 12) {
-        throw new Error("Please enter a valid 12-digit Aadhaar number");
-      }
-
-      const { data, error } = await supabase.functions.invoke('sandbox-aadhaar-okyc', {
+      const baseUrl = getBaseUrl();
+      
+      const { data, error } = await supabase.functions.invoke('verifiedu-aadhaar-initiate', {
         body: {
-          operation: 'generate-otp',
-          aadhaarNumber: formData.aadhaar_number,
-          orgId,
-          accessToken,
-        },
-      });
-
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (data) => {
-      setOtpRequestId(data.request_id);
-      setIsTestMode(data.is_test_mode || false);
-      setTestOtp(data.test_otp || null);
-      toast({
-        title: "OTP Sent",
-        description: data.message || "OTP sent to registered mobile number",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        variant: "destructive",
-        title: "Failed to send OTP",
-        description: error.message || "Could not generate OTP",
-      });
-    },
-  });
-
-  // Verify OTP
-  const verifyOtpMutation = useMutation({
-    mutationFn: async () => {
-      if (!accessToken || !otpRequestId) {
-        throw new Error("OTP not generated. Please generate OTP first.");
-      }
-      if (!otpValue) {
-        throw new Error("Please enter the OTP");
-      }
-
-      const { data, error } = await supabase.functions.invoke('sandbox-aadhaar-okyc', {
-        body: {
-          operation: 'verify-otp',
-          otp: otpValue,
-          requestId: otpRequestId,
           applicationId,
           orgId,
-          accessToken,
+          successUrl: `${baseUrl}/digilocker/success`,
+          failureUrl: `${baseUrl}/digilocker/failure`,
         },
       });
 
       if (error) throw error;
+      if (!data.success) throw new Error(data.error || "Failed to initiate Aadhaar verification");
       return data;
     },
     onSuccess: (data) => {
-      toast({
-        title: "Aadhaar Verified",
-        description: "Aadhaar details verified successfully",
-      });
-      // Update form with verified data
-      setFormData(prev => ({
-        ...prev,
-        aadhaar_last4: prev.aadhaar_number.slice(-4),
-        verified_address: data.data.address?.combined || prev.verified_address,
-        status: data.verification_status,
-      }));
-      queryClient.invalidateQueries({ queryKey: ["loan-verifications", applicationId] });
-      setOtpValue("");
+      if (data.is_mock) {
+        toast({
+          title: "Mock Mode",
+          description: "VerifiedU credentials not configured. Redirecting to mock success page.",
+        });
+        // In mock mode, redirect directly to success page
+        window.location.href = data.data.url;
+      } else {
+        setDigilockerUrl(data.data.url);
+        toast({
+          title: "DigiLocker Ready",
+          description: "Click the button to open DigiLocker and verify your Aadhaar",
+        });
+      }
     },
     onError: (error: any) => {
       toast({
         variant: "destructive",
-        title: "Verification Failed",
-        description: error.message || "Failed to verify Aadhaar",
+        title: "Initiation Failed",
+        description: error.message || "Failed to initiate Aadhaar verification",
       });
     },
   });
@@ -160,13 +100,14 @@ export default function AadhaarVerificationDialog({
         loan_application_id: applicationId,
         applicant_id: applicant?.id,
         verification_type: "aadhaar",
-        verification_source: "uidai",
+        verification_source: "verifiedu",
         status: formData.status,
         request_data: { aadhaar_last4: formData.aadhaar_last4 },
         response_data: {
           verified_address: formData.verified_address,
           address_match_result: formData.address_match_result,
           aadhaar_status: formData.aadhaar_status,
+          name: formData.name,
         },
         remarks: formData.remarks,
         verified_at: new Date().toISOString(),
@@ -199,90 +140,60 @@ export default function AadhaarVerificationDialog({
     },
   });
 
+  const openDigilocker = () => {
+    if (digilockerUrl) {
+      window.open(digilockerUrl, '_blank');
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Aadhaar Verification</DialogTitle>
           <DialogDescription>
-            Manual entry for Aadhaar verification results
+            Verify Aadhaar via VerifiedU DigiLocker integration
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Authentication and API Verification Actions */}
-          <div className="space-y-2">
-            {!accessToken ? (
+          {/* DigiLocker Verification Flow */}
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Aadhaar verification uses DigiLocker. The applicant will be redirected to DigiLocker to authorize access to their Aadhaar data.
+            </AlertDescription>
+          </Alert>
+
+          <div className="space-y-3">
+            {!digilockerUrl ? (
               <Button
-                onClick={() => authMutation.mutate()}
-                disabled={authMutation.isPending}
-                variant="outline"
+                onClick={() => initiateMutation.mutate()}
+                disabled={initiateMutation.isPending}
+                variant="default"
                 className="w-full"
               >
-                {authMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Authenticate with Sandbox
+                {initiateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Initiate DigiLocker Verification
               </Button>
             ) : (
-              <>
-                <div>
-                  <Label>Full Aadhaar Number (12 digits)</Label>
-                  <Input
-                    value={formData.aadhaar_number}
-                    onChange={(e) => setFormData({ ...formData, aadhaar_number: e.target.value.replace(/\D/g, '').slice(0, 12) })}
-                    placeholder="Enter 12-digit Aadhaar"
-                    maxLength={12}
-                  />
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 p-3 bg-primary/10 rounded-md">
+                  <CheckCircle className="h-4 w-4 text-primary" />
+                  <span className="text-sm">DigiLocker verification initiated</span>
                 </div>
-                
-                {!otpRequestId ? (
-                  <Button
-                    onClick={() => generateOtpMutation.mutate()}
-                    disabled={!formData.aadhaar_number || generateOtpMutation.isPending}
-                    variant="default"
-                    className="w-full"
-                  >
-                    {generateOtpMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Send OTP
-                  </Button>
-                ) : (
-                  <div className="space-y-2">
-                    {isTestMode && (
-                      <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm p-3 rounded-md">
-                        <strong>Test Mode:</strong> OTPs are not sent to real numbers. 
-                        Use test OTP: <code className="bg-amber-100 px-1 rounded font-mono">{testOtp || '123456'}</code>
-                      </div>
-                    )}
-                    <Label>Enter OTP</Label>
-                    <Input
-                      value={otpValue}
-                      onChange={(e) => setOtpValue(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      placeholder="Enter 6-digit OTP"
-                      maxLength={6}
-                    />
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={() => verifyOtpMutation.mutate()}
-                        disabled={!otpValue || verifyOtpMutation.isPending}
-                        className="flex-1"
-                      >
-                        {verifyOtpMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Verify OTP
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          setOtpRequestId(null);
-                          setOtpValue("");
-                          setIsTestMode(false);
-                          setTestOtp(null);
-                        }}
-                        variant="outline"
-                      >
-                        Resend OTP
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </>
+                <Button
+                  onClick={openDigilocker}
+                  variant="default"
+                  className="w-full"
+                >
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  Open DigiLocker to Complete Verification
+                </Button>
+                <p className="text-xs text-muted-foreground text-center">
+                  After completing verification in DigiLocker, the data will be automatically fetched.
+                </p>
+              </div>
             )}
           </div>
 
@@ -294,9 +205,18 @@ export default function AadhaarVerificationDialog({
             <Label>Aadhaar Last 4 Digits</Label>
             <Input
               value={formData.aadhaar_last4}
-              onChange={(e) => setFormData({ ...formData, aadhaar_last4: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, aadhaar_last4: e.target.value.replace(/\D/g, '').slice(0, 4) })}
               placeholder="XXXX"
               maxLength={4}
+            />
+          </div>
+
+          <div>
+            <Label>Name on Aadhaar</Label>
+            <Input
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="Full name as per Aadhaar"
             />
           </div>
 

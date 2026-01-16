@@ -52,30 +52,12 @@ export function PANVerificationStep({
     setVerificationError(null);
 
     try {
-      // Step 1: Authenticate with Sandbox (public endpoint - no auth required)
-      console.log('[PAN Verification] Authenticating with public endpoint...');
-      const { data: authData, error: authError } = await supabase.functions.invoke('sandbox-public-authenticate', {
-        body: {},
-      });
-
-      console.log('[PAN Verification] Auth response:', { authData, authError });
-
-      if (authError) {
-        console.error('[PAN Verification] Auth error:', authError);
-        throw new Error('Failed to connect to verification service');
-      }
-
-      if (!authData?.success || !authData?.access_token) {
-        console.error('[PAN Verification] Auth failed:', authData?.error);
-        throw new Error(authData?.error || 'Authentication failed - no token received');
-      }
-
-      // Step 2: Verify PAN
-      console.log('[PAN Verification] Verifying PAN:', panNumber.substring(0, 4) + '****');
-      const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-public-pan', {
+      // Call VerifiedU PAN verification (public endpoint)
+      console.log('[PAN Verification] Verifying PAN via VerifiedU:', panNumber.substring(0, 4) + '****');
+      
+      const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verifiedu-public-pan-verify', {
         body: {
           panNumber,
-          accessToken: authData.access_token,
         },
       });
 
@@ -88,14 +70,14 @@ export function PANVerificationStep({
 
       if (verifyData?.success) {
         onVerified({
-          name: verifyData.name || 'Name retrieved',
+          name: verifyData.data?.name || 'Name retrieved',
           status: 'Verified',
         });
         toast.success("PAN verified successfully!");
       } else {
         // PAN verification failed but we got a response
-        setVerificationError(verifyData?.message || 'PAN verification failed. Please check and try again.');
-        toast.error(verifyData?.message || "PAN verification failed");
+        setVerificationError(verifyData?.error || 'PAN verification failed. Please check and try again.');
+        toast.error(verifyData?.error || "PAN verification failed");
       }
     } catch (error: any) {
       console.error('[PAN Verification] Error:', error);
