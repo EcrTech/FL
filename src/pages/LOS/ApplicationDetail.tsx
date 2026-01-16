@@ -367,6 +367,14 @@ export default function ApplicationDetail() {
   const { orgId, isLoading: isOrgLoading } = useOrgContext();
   const [approvalAction, setApprovalAction] = useState<"approve" | "reject" | null>(null);
   const [isEditingReferrals, setIsEditingReferrals] = useState(false);
+  const [isEditingApplicant, setIsEditingApplicant] = useState(false);
+  const [applicantData, setApplicantData] = useState({
+    gender: "",
+    marital_status: "",
+    pan_number: "",
+    mobile: "",
+    current_address: "",
+  });
   const [referralData, setReferralData] = useState({
     professional_ref_name: "",
     professional_ref_mobile: "",
@@ -547,6 +555,38 @@ export default function ApplicationDetail() {
     },
   });
 
+  // Mutation to save applicant details
+  const saveApplicantMutation = useMutation({
+    mutationFn: async (data: typeof applicantData) => {
+      if (!primaryApplicant?.id) {
+        throw new Error("No applicant to update");
+      }
+
+      const updateData: Record<string, any> = {};
+      if (data.gender) updateData.gender = data.gender;
+      if (data.marital_status) updateData.marital_status = data.marital_status;
+      if (data.pan_number) updateData.pan_number = data.pan_number;
+      if (data.mobile) updateData.mobile = data.mobile;
+      if (data.current_address) updateData.current_address = { line1: data.current_address };
+
+      const { error } = await supabase
+        .from("loan_applicants")
+        .update(updateData)
+        .eq("id", primaryApplicant.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Applicant details updated successfully");
+      setIsEditingApplicant(false);
+      queryClient.invalidateQueries({ queryKey: ["loan-application", id, orgId] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to update applicant details");
+    },
+  });
+
+
   const ocrApplicantData = extractApplicantFromOCR();
 
 
@@ -641,6 +681,25 @@ export default function ApplicationDetail() {
 
   const primaryApplicant = application.loan_applicants?.[0];
   const tenureDays = application.tenure_days;
+
+  // Initialize applicant data when primaryApplicant changes
+  useEffect(() => {
+    if (primaryApplicant) {
+      const address = primaryApplicant.current_address as Record<string, any> | string | null;
+      let addressStr = "";
+      if (address) {
+        if (typeof address === "string") addressStr = address;
+        else if (typeof address === "object") addressStr = [address.line1, address.line2, address.city, address.state, address.pincode].filter(Boolean).join(", ");
+      }
+      setApplicantData({
+        gender: (primaryApplicant.gender as string) || "",
+        marital_status: (primaryApplicant.marital_status as string) || "",
+        pan_number: (primaryApplicant.pan_number as string) || "",
+        mobile: (primaryApplicant.mobile as string) || "",
+        current_address: addressStr,
+      });
+    }
+  }, [primaryApplicant]);
 
   return (
     <DashboardLayout>
@@ -738,50 +797,167 @@ export default function ApplicationDetail() {
           {/* Applicant Details Card */}
           <Card>
             <CardHeader className="py-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <User className="h-4 w-4" />
-                Applicant Details
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <User className="h-4 w-4" />
+                  Applicant Details
+                </CardTitle>
+                {primaryApplicant && (
+                  <div className="flex gap-2">
+                    {isEditingApplicant ? (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsEditingApplicant(false)}
+                        >
+                          <X className="h-3 w-3 mr-1" />
+                          Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => saveApplicantMutation.mutate(applicantData)}
+                          disabled={saveApplicantMutation.isPending}
+                        >
+                          <Save className="h-3 w-3 mr-1" />
+                          {saveApplicantMutation.isPending ? "Saving..." : "Save"}
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsEditingApplicant(true)}
+                      >
+                        <Edit2 className="h-3 w-3 mr-1" />
+                        Edit
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="pt-0 space-y-3">
               {primaryApplicant ? (
-                <div className="grid gap-x-4 gap-y-2 md:grid-cols-4">
-                  <div>
-                    <label className="text-xs text-muted-foreground">Full Name</label>
-                    <p className="text-sm">
-                      {primaryApplicant.first_name} {primaryApplicant.middle_name || ""}{" "}
-                      {primaryApplicant.last_name || ""}
-                    </p>
+                isEditingApplicant ? (
+                  <div className="grid gap-4 md:grid-cols-4">
+                    <div>
+                      <Label className="text-xs">Full Name</Label>
+                      <p className="text-sm mt-1">
+                        {primaryApplicant.first_name} {primaryApplicant.middle_name || ""}{" "}
+                        {primaryApplicant.last_name || ""}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Date of Birth</Label>
+                      <p className="text-sm mt-1">
+                        {primaryApplicant.dob && !isNaN(new Date(primaryApplicant.dob as string).getTime())
+                          ? format(new Date(primaryApplicant.dob as string), "MMM dd, yyyy")
+                          : "N/A"}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Gender</Label>
+                      <Select
+                        value={applicantData.gender}
+                        onValueChange={(value) => setApplicantData({ ...applicantData, gender: value })}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Select gender" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="male">Male</SelectItem>
+                          <SelectItem value="female">Female</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Marital Status</Label>
+                      <Select
+                        value={applicantData.marital_status}
+                        onValueChange={(value) => setApplicantData({ ...applicantData, marital_status: value })}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="single">Single</SelectItem>
+                          <SelectItem value="married">Married</SelectItem>
+                          <SelectItem value="divorced">Divorced</SelectItem>
+                          <SelectItem value="widowed">Widowed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs">PAN Number</Label>
+                      <Input
+                        value={applicantData.pan_number}
+                        onChange={(e) => setApplicantData({ ...applicantData, pan_number: e.target.value.toUpperCase() })}
+                        placeholder="ABCDE1234F"
+                        className="mt-1 font-mono"
+                        maxLength={10}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Mobile</Label>
+                      <Input
+                        value={applicantData.mobile}
+                        onChange={(e) => setApplicantData({ ...applicantData, mobile: e.target.value })}
+                        placeholder="9876543210"
+                        className="mt-1"
+                        maxLength={10}
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label className="text-xs">Current Address</Label>
+                      <Input
+                        value={applicantData.current_address}
+                        onChange={(e) => setApplicantData({ ...applicantData, current_address: e.target.value })}
+                        placeholder="Enter full address"
+                        className="mt-1"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground">Date of Birth</label>
-                    <p className="text-sm">
-                      {primaryApplicant.dob && !isNaN(new Date(primaryApplicant.dob as string).getTime())
-                        ? format(new Date(primaryApplicant.dob as string), "MMM dd, yyyy")
-                        : "N/A"}
-                    </p>
+                ) : (
+                  <div className="grid gap-x-4 gap-y-2 md:grid-cols-4">
+                    <div>
+                      <label className="text-xs text-muted-foreground">Full Name</label>
+                      <p className="text-sm">
+                        {primaryApplicant.first_name} {primaryApplicant.middle_name || ""}{" "}
+                        {primaryApplicant.last_name || ""}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Date of Birth</label>
+                      <p className="text-sm">
+                        {primaryApplicant.dob && !isNaN(new Date(primaryApplicant.dob as string).getTime())
+                          ? format(new Date(primaryApplicant.dob as string), "MMM dd, yyyy")
+                          : "N/A"}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Gender</label>
+                      <p className="text-sm">{(primaryApplicant.gender as string) || "N/A"}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Marital Status</label>
+                      <p className="text-sm">{(primaryApplicant.marital_status as string) || "N/A"}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">PAN Number</label>
+                      <p className="text-sm font-mono">{(primaryApplicant.pan_number as string) || "N/A"}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Mobile</label>
+                      <p className="text-sm">{(primaryApplicant.mobile as string) || "N/A"}</p>
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="text-xs text-muted-foreground">Current Address</label>
+                      <p className="text-sm">{formatAddress(primaryApplicant.current_address)}</p>
+                    </div>
                   </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground">Gender</label>
-                    <p className="text-sm">{(primaryApplicant.gender as string) || "N/A"}</p>
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground">Marital Status</label>
-                    <p className="text-sm">{(primaryApplicant.marital_status as string) || "N/A"}</p>
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground">PAN Number</label>
-                    <p className="text-sm font-mono">{(primaryApplicant.pan_number as string) || "N/A"}</p>
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground">Mobile</label>
-                    <p className="text-sm">{(primaryApplicant.mobile as string) || "N/A"}</p>
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="text-xs text-muted-foreground">Current Address</label>
-                    <p className="text-sm">{formatAddress(primaryApplicant.current_address)}</p>
-                  </div>
-                </div>
+                )
               ) : ocrApplicantData.hasData ? (
                 <div className="space-y-4">
                   <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg border border-dashed">
