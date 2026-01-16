@@ -9,7 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, User, FileText, Calculator, FileCheck, DollarSign, XCircle, CreditCard, CheckCircle, MapPin, Edit2, Save, X, RefreshCw, Loader2, Sparkles } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowLeft, User, FileText, Calculator, FileCheck, DollarSign, XCircle, CreditCard, CheckCircle, MapPin, Edit2, Save, X, RefreshCw, Loader2, Sparkles, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { LoadingState } from "@/components/common/LoadingState";
 import { format } from "date-fns";
@@ -22,6 +23,9 @@ import ApprovalHistory from "@/components/LOS/Approval/ApprovalHistory";
 import DisbursementForm from "@/components/LOS/Disbursement/DisbursementForm";
 import DisbursementStatus from "@/components/LOS/Disbursement/DisbursementStatus";
 import { ApplicantProfileCard } from "@/components/LOS/ApplicantProfileCard";
+import { BankDetailsSection } from "@/components/LOS/BankDetailsSection";
+import { AddReferralDialog } from "@/components/LOS/AddReferralDialog";
+import { ApplicationSummary } from "@/components/LOS/ApplicationSummary";
 
 const STAGE_LABELS: Record<string, string> = {
   application_login: "Application Login",
@@ -132,31 +136,63 @@ function ReferralsSection({
     setIsEditingReferrals(false);
   };
 
+  // Query for additional referrals
+  const { data: additionalReferrals = [] } = useQuery({
+    queryKey: ["loan-referrals", applicationId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("loan_referrals")
+        .select("*")
+        .eq("loan_application_id", applicationId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!applicationId,
+  });
+
+  const [showAddReferral, setShowAddReferral] = useState(false);
+
   return (
     <div className="border-t pt-4 mt-4">
       <div className="flex items-center justify-between mb-4">
         <h4 className="text-sm font-medium text-muted-foreground">Referrals</h4>
-        {primaryApplicant && !isEditingReferrals && (
-          <Button variant="ghost" size="sm" onClick={() => setIsEditingReferrals(true)}>
-            <Edit2 className="h-4 w-4 mr-1" />
-            Edit
-          </Button>
-        )}
-        {isEditingReferrals && (
-          <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={handleCancel}>
-              <X className="h-4 w-4 mr-1" />
-              Cancel
+        <div className="flex gap-2">
+          {primaryApplicant && (
+            <Button variant="outline" size="sm" onClick={() => setShowAddReferral(true)}>
+              <Plus className="h-4 w-4 mr-1" />
+              Add Referral
             </Button>
-            <Button size="sm" onClick={handleSave} disabled={saveReferralsMutation.isPending}>
-              <Save className="h-4 w-4 mr-1" />
-              {saveReferralsMutation.isPending ? "Saving..." : "Save"}
+          )}
+          {primaryApplicant && !isEditingReferrals && (
+            <Button variant="ghost" size="sm" onClick={() => setIsEditingReferrals(true)}>
+              <Edit2 className="h-4 w-4 mr-1" />
+              Edit
             </Button>
-          </div>
-        )}
+          )}
+          {isEditingReferrals && (
+            <div className="flex gap-2">
+              <Button variant="ghost" size="sm" onClick={handleCancel}>
+                <X className="h-4 w-4 mr-1" />
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleSave} disabled={saveReferralsMutation.isPending}>
+                <Save className="h-4 w-4 mr-1" />
+                {saveReferralsMutation.isPending ? "Saving..." : "Save"}
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
-      {!primaryApplicant && (
+      {primaryApplicant && showAddReferral && (
+        <AddReferralDialog
+          open={showAddReferral}
+          onClose={() => setShowAddReferral(false)}
+          applicationId={applicationId}
+          applicantId={primaryApplicant.id}
+          orgId={orgId}
+        />
+      )}
         <p className="text-sm text-muted-foreground">No applicant record found. Referral information cannot be added.</p>
       )}
 
@@ -295,6 +331,26 @@ function ReferralsSection({
               )}
             </div>
           </div>
+
+          {/* Additional Referrals */}
+          {additionalReferrals.length > 0 && (
+            <div className="mt-4 pt-4 border-t">
+              <h5 className="text-sm font-medium mb-3">Additional Referrals</h5>
+              <div className="grid gap-3 md:grid-cols-2">
+                {additionalReferrals.map((ref: any) => (
+                  <div key={ref.id} className="p-3 rounded-lg border bg-muted/30">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant="outline" className="capitalize text-xs">{ref.referral_type}</Badge>
+                      {ref.relationship && <span className="text-xs text-muted-foreground">({ref.relationship})</span>}
+                    </div>
+                    <p className="text-sm font-medium">{ref.name}</p>
+                    {ref.mobile && <p className="text-xs text-muted-foreground">{ref.mobile}</p>}
+                    {ref.email && <p className="text-xs text-muted-foreground">{ref.email}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -772,6 +828,13 @@ export default function ApplicationDetail() {
             </CardContent>
           </Card>
 
+          {/* Bank Details Section */}
+          <BankDetailsSection
+            applicationId={application.id}
+            orgId={orgId!}
+            applicantId={primaryApplicant?.id}
+          />
+
           {/* Parsed Document Data Card */}
           {(panData || aadhaarData) && (
             <Card>
@@ -920,6 +983,11 @@ export default function ApplicationDetail() {
               {/* Approval History - shown for approval stages and beyond */}
               {["approval_pending", "sanctioned", "disbursement_pending", "disbursed", "closed"].includes(application.current_stage) && (
                 <ApprovalHistory applicationId={id!} />
+              )}
+
+              {/* Full Application Summary for sanctioned stages */}
+              {["sanctioned", "disbursement_pending", "disbursed"].includes(application.current_stage) && (
+                <ApplicationSummary applicationId={id!} orgId={orgId!} />
               )}
 
               {/* Disbursement Section */}

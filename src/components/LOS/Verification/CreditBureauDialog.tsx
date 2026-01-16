@@ -214,7 +214,7 @@ export default function CreditBureauDialog({
         <DialogHeader>
           <DialogTitle>Credit Bureau Check</DialogTitle>
           <DialogDescription>
-            Upload CIBIL report for AI parsing or enter data manually
+            Upload credit bureau report (CIBIL, Experian, Equifax, CRIF) for AI parsing or enter data manually
           </DialogDescription>
         </DialogHeader>
 
@@ -223,16 +223,16 @@ export default function CreditBureauDialog({
           <div className="border-2 border-dashed border-primary/30 rounded-lg p-4 bg-primary/5">
             <div className="flex items-center gap-2 mb-2">
               <Sparkles className="h-5 w-5 text-primary" />
-              <Label className="text-base font-medium">Upload CIBIL Report (AI Parsed)</Label>
+              <Label className="text-base font-medium">Upload Credit Bureau Report (AI Parsed)</Label>
             </div>
             <p className="text-sm text-muted-foreground mb-3">
-              Upload the CIBIL/Credit Bureau report and AI will automatically extract the details
+              Supports CIBIL, Experian, Equifax, and CRIF report formats (PDF, Image, HTML, Excel)
             </p>
             
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf,.jpg,.jpeg,.png"
+              accept=".pdf,.jpg,.jpeg,.png,.html,.htm,.xlsx,.xls"
               onChange={handleFileSelect}
               className="hidden"
               id="cibil-file-upload"
