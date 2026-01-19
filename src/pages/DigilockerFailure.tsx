@@ -1,7 +1,8 @@
+import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { XCircle } from "lucide-react";
+import { XCircle, Loader2 } from "lucide-react";
 
 export default function DigilockerFailure() {
   const navigate = useNavigate();
@@ -9,6 +10,23 @@ export default function DigilockerFailure() {
 
   const applicationId = searchParams.get("applicationId");
   const reason = searchParams.get("reason") || "Verification was cancelled or failed";
+  const source = searchParams.get("source"); // Check if coming from referral form
+
+  // Check if this is a referral form callback
+  const isReferralCallback = source === "referral";
+  const referralContext = isReferralCallback 
+    ? JSON.parse(localStorage.getItem("referral_aadhaar_pending") || "null")
+    : null;
+
+  useEffect(() => {
+    // If this is a referral callback, redirect back to the referral form
+    if (isReferralCallback && referralContext?.returnUrl) {
+      localStorage.removeItem("referral_aadhaar_pending");
+      const returnUrl = new URL(referralContext.returnUrl);
+      returnUrl.searchParams.set("digilocker_failure", "true");
+      window.location.href = returnUrl.toString();
+    }
+  }, [isReferralCallback, referralContext]);
 
   const handleRetry = () => {
     if (applicationId) {
@@ -17,6 +35,25 @@ export default function DigilockerFailure() {
       navigate("/los/applications");
     }
   };
+
+  // If redirecting to referral form, show loading state
+  if (isReferralCallback && referralContext?.returnUrl) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4">
+              <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            </div>
+            <CardTitle>Verification Incomplete</CardTitle>
+            <CardDescription>
+              Redirecting you back to the application form...
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">

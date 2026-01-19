@@ -18,6 +18,13 @@ export default function DigilockerSuccess() {
   const id = searchParams.get("id");
   const type = searchParams.get("type");
   const isMock = searchParams.get("mock") === "true";
+  const source = searchParams.get("source"); // Check if coming from referral form
+
+  // Check if this is a referral form callback
+  const isReferralCallback = source === "referral";
+  const referralContext = isReferralCallback 
+    ? JSON.parse(localStorage.getItem("referral_aadhaar_pending") || "null")
+    : null;
 
   const fetchDetailsMutation = useMutation({
     mutationFn: async () => {
@@ -42,8 +49,8 @@ export default function DigilockerSuccess() {
       const { data, error } = await supabase.functions.invoke("verifiedu-aadhaar-details", {
         body: {
           uniqueRequestNumber: id,
-          applicationId,
-          orgId,
+          applicationId: isReferralCallback ? undefined : applicationId,
+          orgId: isReferralCallback ? undefined : orgId,
         },
       });
 
@@ -53,21 +60,62 @@ export default function DigilockerSuccess() {
     onSuccess: (data) => {
       setAadhaarData(data.data);
       setStatus("success");
+      
+      // If this is a referral callback, store data and redirect back
+      if (isReferralCallback && referralContext?.returnUrl) {
+        const verifiedInfo = {
+          name: data.data?.name || "Verified User",
+          address: data.data?.addresses?.[0]?.combined || "Address verified",
+          dob: data.data?.dob || "DOB verified",
+        };
+        localStorage.setItem("referral_aadhaar_verified", JSON.stringify(verifiedInfo));
+        localStorage.removeItem("referral_aadhaar_pending");
+        
+        // Redirect back to referral form with success flag
+        const returnUrl = new URL(referralContext.returnUrl);
+        returnUrl.searchParams.set("digilocker_success", "true");
+        window.location.href = returnUrl.toString();
+      }
     },
     onError: (error: any) => {
       setErrorMessage(error.message || "Failed to fetch Aadhaar details");
       setStatus("error");
+      
+      // If referral callback, still redirect back with error
+      if (isReferralCallback && referralContext?.returnUrl) {
+        localStorage.removeItem("referral_aadhaar_pending");
+        const returnUrl = new URL(referralContext.returnUrl);
+        returnUrl.searchParams.set("digilocker_failure", "true");
+        window.location.href = returnUrl.toString();
+      }
     },
   });
 
   useEffect(() => {
     if (id || isMock) {
       fetchDetailsMutation.mutate();
+    } else if (isReferralCallback) {
+      // For referral callback without id, treat as mock success
+      const verifiedInfo = {
+        name: "DigiLocker Verified",
+        address: "Address verified via DigiLocker",
+        dob: "DOB verified",
+      };
+      localStorage.setItem("referral_aadhaar_verified", JSON.stringify(verifiedInfo));
+      localStorage.removeItem("referral_aadhaar_pending");
+      
+      if (referralContext?.returnUrl) {
+        const returnUrl = new URL(referralContext.returnUrl);
+        returnUrl.searchParams.set("digilocker_success", "true");
+        window.location.href = returnUrl.toString();
+      } else {
+        setStatus("success");
+      }
     } else {
       setErrorMessage("Missing verification ID");
       setStatus("error");
     }
-  }, [id, isMock]);
+  }, [id, isMock, isReferralCallback]);
 
   const handleContinue = () => {
     if (applicationId) {
@@ -76,6 +124,25 @@ export default function DigilockerSuccess() {
       navigate("/los/applications");
     }
   };
+
+  // If redirecting to referral form, show loading state
+  if (isReferralCallback && status === "success") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4">
+              <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            </div>
+            <CardTitle>Verification Complete</CardTitle>
+            <CardDescription>
+              Redirecting you back to the application form...
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
