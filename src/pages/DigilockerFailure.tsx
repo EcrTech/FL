@@ -10,13 +10,10 @@ export default function DigilockerFailure() {
 
   const applicationId = searchParams.get("applicationId");
   const reason = searchParams.get("reason") || "Verification was cancelled or failed";
-  const source = searchParams.get("source"); // Check if coming from referral form
 
-  // Check if this is a referral form callback
-  const isReferralCallback = source === "referral";
-  const referralContext = isReferralCallback 
-    ? JSON.parse(localStorage.getItem("referral_aadhaar_pending") || "null")
-    : null;
+  // Check if this is a referral form callback (from localStorage)
+  const referralContext = JSON.parse(localStorage.getItem("referral_aadhaar_pending") || "null");
+  const isReferralCallback = !!referralContext;
 
   useEffect(() => {
     // If this is a referral callback, redirect back to the referral form
