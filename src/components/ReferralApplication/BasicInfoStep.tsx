@@ -242,7 +242,7 @@ export function BasicInfoStep({
 
   const allConsentsChecked = consents.householdIncome && consents.termsAndConditions && consents.aadhaarConsent;
   const isValidPhone = formData.phone.replace(/\D/g, '').length === 10;
-  const isValidLoanAmount = formData.requestedAmount >= 25000 && formData.requestedAmount <= 200000;
+  const isValidLoanAmount = formData.requestedAmount >= 5000 && formData.requestedAmount <= 100000;
   const isValidTenure = formData.tenureDays >= 30 && formData.tenureDays <= 180;
   const canProceed = formData.name && isValidPhone && isValidLoanAmount && isValidTenure && allConsentsChecked;
 
@@ -274,23 +274,23 @@ export function BasicInfoStep({
             <Input
               id="loanAmount"
               type="number"
-              placeholder="Enter amount (₹25,000 - ₹2,00,000)"
+              placeholder="Enter amount (₹5,000 - ₹1,00,000)"
               value={formData.requestedAmount || ''}
               onChange={(e) => {
                 const value = parseInt(e.target.value) || 0;
                 onUpdate({ requestedAmount: value });
               }}
-              min={25000}
-              max={200000}
+              min={5000}
+              max={100000}
               className="h-12 bg-background border-2 border-border rounded-xl pl-10 text-base font-body focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
             />
           </div>
           <p className="text-xs text-muted-foreground font-body">
-            Minimum ₹25,000 • Maximum ₹2,00,000
+            Minimum ₹5,000 • Maximum ₹1,00,000
           </p>
-          {formData.requestedAmount > 0 && (formData.requestedAmount < 25000 || formData.requestedAmount > 200000) && (
+          {formData.requestedAmount > 0 && (formData.requestedAmount < 5000 || formData.requestedAmount > 100000) && (
             <p className="text-xs text-[hsl(var(--coral-500))] font-body">
-              Please enter an amount between ₹25,000 and ₹2,00,000
+              Please enter an amount between ₹5,000 and ₹1,00,000
             </p>
           )}
         </div>
