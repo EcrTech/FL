@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 
 import CreditBureauDialog from "@/components/LOS/Verification/CreditBureauDialog";
 import { VideoKYCRetryButton } from "@/components/LOS/Verification/VideoKYCRetryButton";
+import { VideoKYCViewDialog } from "@/components/LOS/Verification/VideoKYCViewDialog";
 import { SendWhatsAppDialog } from "@/components/Contact/SendWhatsAppDialog";
 import { SendEmailDialog } from "@/components/Contact/SendEmailDialog";
 interface Document {
@@ -245,6 +246,8 @@ export function ApplicantProfileCard({
   
   const [cibilDialogOpen, setCibilDialogOpen] = useState(false);
   const [showRetryLinkDialog, setShowRetryLinkDialog] = useState(false);
+  const [videoKYCViewOpen, setVideoKYCViewOpen] = useState(false);
+  const [videoKYCRecordingUrl, setVideoKYCRecordingUrl] = useState<string | null>(null);
   const [whatsappDialogOpen, setWhatsappDialogOpen] = useState(false);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
 
@@ -311,6 +314,33 @@ export function ApplicantProfileCard({
   const keyDocs = [panDoc, aadhaarDoc].filter(Boolean) as Document[];
   const videoKycVerification = getVerification('video_kyc');
   const cibilVerification = getVerification('credit_bureau');
+
+  // Handle Video KYC card click - show view dialog if completed, otherwise show retry link dialog
+  const handleVideoKYCClick = async () => {
+    // First check response_data in loan_verifications
+    let recordingUrl = (videoKycVerification?.response_data as any)?.recording_url;
+    
+    // If not in loan_verifications, fetch from videokyc_recordings table
+    if (!recordingUrl && videoKycVerification?.status === 'success') {
+      const { data: videoKycRecording } = await supabase
+        .from('videokyc_recordings')
+        .select('recording_url')
+        .eq('application_id', applicationId)
+        .eq('status', 'completed')
+        .order('completed_at', { ascending: false })
+        .limit(1)
+        .single();
+      
+      recordingUrl = videoKycRecording?.recording_url;
+    }
+    
+    if (videoKycVerification?.status === 'success' && recordingUrl) {
+      setVideoKYCRecordingUrl(recordingUrl);
+      setVideoKYCViewOpen(true);
+    } else {
+      setShowRetryLinkDialog(true);
+    }
+  };
 
   return (
     <>
@@ -410,16 +440,14 @@ export function ApplicantProfileCard({
                     </div>
                   )}
 
-                  {/* Video KYC - Generate Retry Link Only */}
-                  <div onClick={() => setShowRetryLinkDialog(true)}>
-                    <VerificationCard 
-                      type="video_kyc"
-                      label="Video KYC"
-                      icon={Video}
-                      verification={videoKycVerification}
-                      onClick={() => setShowRetryLinkDialog(true)}
-                    />
-                  </div>
+                  {/* Video KYC - View Recording or Generate Retry Link */}
+                  <VerificationCard 
+                    type="video_kyc"
+                    label="Video KYC"
+                    icon={Video}
+                    verification={videoKycVerification}
+                    onClick={handleVideoKYCClick}
+                  />
 
                   {/* CIBIL Report */}
                   <VerificationCard 
@@ -462,6 +490,15 @@ export function ApplicantProfileCard({
         </DialogContent>
       </Dialog>
 
+
+      {/* Video KYC View Dialog */}
+      <VideoKYCViewDialog
+        open={videoKYCViewOpen}
+        onOpenChange={setVideoKYCViewOpen}
+        recordingUrl={videoKYCRecordingUrl || ''}
+        applicantName={applicantName}
+        completedAt={videoKycVerification?.verified_at || undefined}
+      />
 
       {/* Video KYC Retry Link Dialog (controlled mode) */}
       <VideoKYCRetryButton
