@@ -129,8 +129,8 @@ export function AadhaarVerificationStep({
       
       const { data, error } = await supabase.functions.invoke('verifiedu-public-aadhaar-initiate', {
         body: {
-          surl: `${baseUrl}/digilocker/success?source=referral`,
-          furl: `${baseUrl}/digilocker/failure?source=referral`,
+          surl: `${baseUrl}/digilocker/success`,
+          furl: `${baseUrl}/digilocker/failure`,
         },
       });
 
