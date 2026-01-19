@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { DollarSign, Shield, AlertCircle, CheckCircle } from "lucide-react";
+import { IndianRupee, Shield, AlertCircle, CheckCircle } from "lucide-react";
 import { useLOSPermissions } from "@/hooks/useLOSPermissions";
 import ProofUploadDialog from "./ProofUploadDialog";
 import { useState } from "react";
@@ -179,7 +179,7 @@ export default function DisbursementForm({ applicationId }: DisbursementFormProp
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <DollarSign className="h-5 w-5" />
+            <IndianRupee className="h-5 w-5" />
             Complete Disbursement
           </CardTitle>
           <CardDescription>

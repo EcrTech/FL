@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useOrgContext } from "@/hooks/useOrgContext";
 import { 
   BarChart3, TrendingUp, Mail, Eye, 
-  MousePointer, DollarSign, Clock, Calendar,
+  MousePointer, Clock, Calendar,
   Download
 } from "lucide-react";
 import {

@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useEMISchedule } from "@/hooks/useEMISchedule";
-import { Calendar, DollarSign } from "lucide-react";
+import { Calendar, IndianRupee } from "lucide-react";
 import { LoadingState } from "@/components/common/LoadingState";
 import RecordPaymentDialog from "./RecordPaymentDialog";
 
@@ -152,7 +152,7 @@ export default function EMIScheduleTable({ applicationId }: EMIScheduleTableProp
                           variant="outline"
                           onClick={() => setSelectedEMI(emi)}
                         >
-                          <DollarSign className="h-3 w-3 mr-1" />
+                          <IndianRupee className="h-3 w-3 mr-1" />
                           Pay
                         </Button>
                       )}

@@ -11,7 +11,7 @@ import {
   CheckCircle,
   Clock,
   TrendingUp,
-  DollarSign,
+  IndianRupee,
   Users,
   AlertCircle,
 } from "lucide-react";
@@ -254,7 +254,7 @@ export default function LOSDashboard() {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <DollarSign className="h-4 w-4" />
+                <IndianRupee className="h-4 w-4" />
                 Total Sanctioned Amount
               </CardTitle>
             </CardHeader>
@@ -268,7 +268,7 @@ export default function LOSDashboard() {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-green-600" />
+                <IndianRupee className="h-4 w-4 text-green-600" />
                 Total Disbursed Amount
               </CardTitle>
             </CardHeader>

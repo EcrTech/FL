@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, User, FileText, Calculator, FileCheck, DollarSign, XCircle, CreditCard, CheckCircle, MapPin, Edit2, Save, X, RefreshCw, Loader2, Sparkles, Plus } from "lucide-react";
+import { ArrowLeft, User, FileText, Calculator, FileCheck, XCircle, CreditCard, CheckCircle, MapPin, Edit2, Save, X, RefreshCw, Loader2, Sparkles, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { LoadingState } from "@/components/common/LoadingState";
 import { format } from "date-fns";
