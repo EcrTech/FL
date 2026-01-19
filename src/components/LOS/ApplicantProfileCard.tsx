@@ -1,12 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -14,9 +8,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
-import { User, FileText, CheckCircle, Eye, Loader2, Video, CreditCard, Link, MessageSquare, Mail } from "lucide-react";
+import { User, FileText, CheckCircle, Eye, Loader2, Video, CreditCard, MessageSquare, Mail } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { VideoKYCDialog } from "@/components/LOS/Verification/VideoKYCDialog";
+
 import CreditBureauDialog from "@/components/LOS/Verification/CreditBureauDialog";
 import { VideoKYCRetryButton } from "@/components/LOS/Verification/VideoKYCRetryButton";
 import { SendWhatsAppDialog } from "@/components/Contact/SendWhatsAppDialog";
@@ -248,7 +242,7 @@ export function ApplicantProfileCard({
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerImage, setViewerImage] = useState<{ url: string; name: string; isPdf: boolean } | null>(null);
-  const [videoKycOpen, setVideoKycOpen] = useState(false);
+  
   const [cibilDialogOpen, setCibilDialogOpen] = useState(false);
   const [showRetryLinkDialog, setShowRetryLinkDialog] = useState(false);
   const [whatsappDialogOpen, setWhatsappDialogOpen] = useState(false);
@@ -416,30 +410,16 @@ export function ApplicantProfileCard({
                     </div>
                   )}
 
-                  {/* Video KYC with Dropdown */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <div>
-                        <VerificationCard 
-                          type="video_kyc"
-                          label="Video KYC"
-                          icon={Video}
-                          verification={videoKycVerification}
-                          onClick={() => {}}
-                        />
-                      </div>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="center">
-                      <DropdownMenuItem onClick={() => setVideoKycOpen(true)}>
-                        <Video className="mr-2 h-4 w-4" />
-                        Start Video Call
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setShowRetryLinkDialog(true)}>
-                        <Link className="mr-2 h-4 w-4" />
-                        Generate Retry Link
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  {/* Video KYC - Generate Retry Link Only */}
+                  <div onClick={() => setShowRetryLinkDialog(true)}>
+                    <VerificationCard 
+                      type="video_kyc"
+                      label="Video KYC"
+                      icon={Video}
+                      verification={videoKycVerification}
+                      onClick={() => setShowRetryLinkDialog(true)}
+                    />
+                  </div>
 
                   {/* CIBIL Report */}
                   <VerificationCard 
@@ -482,14 +462,6 @@ export function ApplicantProfileCard({
         </DialogContent>
       </Dialog>
 
-      {/* Video KYC Dialog */}
-      <VideoKYCDialog
-        open={videoKycOpen}
-        onOpenChange={setVideoKycOpen}
-        applicationId={applicationId}
-        orgId={orgId}
-        applicant={applicant}
-      />
 
       {/* Video KYC Retry Link Dialog (controlled mode) */}
       <VideoKYCRetryButton

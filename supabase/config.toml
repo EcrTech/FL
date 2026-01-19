@@ -48,18 +48,6 @@ verify_jwt = true
 [functions.whatsapp-webhook]
 verify_jwt = false
 
-[functions.videosdk-generate-token]
-verify_jwt = true
-
-[functions.videosdk-create-meeting]
-verify_jwt = true
-
-[functions.videosdk-start-recording]
-verify_jwt = true
-
-[functions.videosdk-stop-recording]
-verify_jwt = true
-
 [functions.videokyc-create-retry-link]
 verify_jwt = true
 

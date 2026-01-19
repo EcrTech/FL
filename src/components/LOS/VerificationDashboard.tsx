@@ -11,7 +11,7 @@ import AadhaarVerificationDialog from "./Verification/AadhaarVerificationDialog"
 import EmploymentVerificationDialog from "./Verification/EmploymentVerificationDialog";
 import BankAnalysisDialog from "./Verification/BankAnalysisDialog";
 import CreditBureauDialog from "./Verification/CreditBureauDialog";
-import { VideoKYCDialog } from "./Verification/VideoKYCDialog";
+
 import BankAccountVerificationDialog from "./Verification/BankAccountVerificationDialog";
 import VerificationDetailsDialog from "./Verification/VerificationDetailsDialog";
 import { VideoKYCRetryButton } from "./Verification/VideoKYCRetryButton";
@@ -479,19 +479,6 @@ export default function VerificationDashboard({ applicationId, orgId }: Verifica
         />
       )}
       {/* Verification Dialogs */}
-      {selectedVerification?.type === "video_kyc" && (
-        <VideoKYCDialog
-          open={true}
-          onOpenChange={(open) => !open && setSelectedVerification(null)}
-          applicationId={applicationId}
-          orgId={orgId}
-          applicant={primaryApplicant}
-          onVerificationComplete={() => {
-            queryClient.invalidateQueries({ queryKey: ["loan-verifications", applicationId] });
-            setSelectedVerification(null);
-          }}
-        />
-      )}
 
       {selectedVerification?.type === "pan" && (
         <PANVerificationDialog
