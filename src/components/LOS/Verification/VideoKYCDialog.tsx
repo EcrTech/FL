@@ -53,8 +53,10 @@ function MeetingView({
   });
 
   useEffect(() => {
+    // Join the meeting immediately when MeetingView mounts
+    // This only happens after user clicks "Start Video KYC"
     join();
-  }, []);
+  }, [join]);
 
   const handleToggleMic = () => {
     toggleMic();
@@ -222,6 +224,7 @@ export function VideoKYCDialog({
   const [isLoading, setIsLoading] = useState(false);
   const [verificationId, setVerificationId] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false);
   const { toast } = useToast();
 
   const initializeMeeting = async () => {
@@ -299,6 +302,7 @@ export function VideoKYCDialog({
     setToken(null);
     setMeetingId(null);
     setVerificationId(null);
+    setHasStarted(false);
     onVerificationComplete?.();
   };
 
@@ -386,7 +390,37 @@ export function VideoKYCDialog({
           </div>
         )}
 
-        {token && meetingId && !isLoading && (
+        {/* Lobby Screen - Before starting */}
+        {token && meetingId && !isLoading && !hasStarted && (
+          <div className="flex flex-col items-center justify-center py-12 space-y-6">
+            <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
+              <Video className="h-10 w-10 text-primary" />
+            </div>
+            <div className="text-center space-y-2">
+              <h3 className="text-lg font-semibold">Ready to Start Video KYC</h3>
+              <p className="text-sm text-muted-foreground max-w-md">
+                Click the button below to begin the video verification session. 
+                Your camera and microphone will be activated.
+              </p>
+            </div>
+            <div className="flex flex-col items-center gap-3">
+              <Button 
+                size="lg" 
+                onClick={() => setHasStarted(true)}
+                className="gap-2"
+              >
+                <Video className="h-5 w-5" />
+                Start Video KYC
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Make sure you are in a well-lit area with a stable internet connection
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Active Meeting */}
+        {token && meetingId && !isLoading && hasStarted && (
           <MeetingProvider
             config={{
               meetingId,
