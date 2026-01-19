@@ -661,26 +661,8 @@ export default function ApplicationDetail() {
       aadhaarVerData?.address
   } : null;
 
-  if (isLoading || isOrgLoading) {
-    return (
-      <DashboardLayout>
-        <LoadingState message="Loading application..." />
-      </DashboardLayout>
-    );
-  }
-
-  if (!application) {
-    return (
-      <DashboardLayout>
-        <div className="text-center py-12">
-          <h3 className="text-lg font-semibold">Application not found</h3>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
-  const primaryApplicant = application.loan_applicants?.[0];
-  const tenureDays = application.tenure_days;
+  const primaryApplicant = application?.loan_applicants?.[0];
+  const tenureDays = application?.tenure_days;
 
   // Initialize applicant data when primaryApplicant changes
   useEffect(() => {
@@ -700,6 +682,24 @@ export default function ApplicationDetail() {
       });
     }
   }, [primaryApplicant]);
+
+  if (isLoading || isOrgLoading) {
+    return (
+      <DashboardLayout>
+        <LoadingState message="Loading application..." />
+      </DashboardLayout>
+    );
+  }
+
+  if (!application) {
+    return (
+      <DashboardLayout>
+        <div className="text-center py-12">
+          <h3 className="text-lg font-semibold">Application not found</h3>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
