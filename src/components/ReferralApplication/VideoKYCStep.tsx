@@ -2,9 +2,11 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Check, Loader2, Video, Camera, Mic, ArrowLeft, Play, Square, Upload } from "lucide-react";
+import { Check, Loader2, Video, Camera, Mic, ArrowLeft, Play, Square, Upload, Eye, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { RecordingStageOverlay, RECORDING_STAGES } from "@/components/VideoKYC/RecordingStageOverlay";
+import { useRecordingStages } from "@/hooks/useRecordingStages";
 
 interface VideoKYCStepProps {
   onComplete: () => void;
@@ -36,6 +38,15 @@ export function VideoKYCStep({
   const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+
+  // Recording stages hook
+  const {
+    currentStageIndex,
+    stageTimeRemaining,
+    allStagesComplete,
+    advanceStage,
+    minRecordingTime,
+  } = useRecordingStages({ isRecording });
 
   // DEBUG: useEffect to re-attach stream when video element becomes available
   // Using a small delay to ensure DOM is fully updated after step change
@@ -312,8 +323,6 @@ export function VideoKYCStep({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const minRecordingTime = 10;
-
   if (isCompleted) {
     return (
       <div className="space-y-8">
@@ -368,24 +377,36 @@ export function VideoKYCStep({
         <Card className="border-2 border-[hsl(var(--coral-500))]/20 rounded-xl overflow-hidden">
           <div className="h-1.5 bg-gradient-to-r from-[hsl(var(--coral-500))] to-[hsl(var(--coral-400))]" />
           <CardContent className="p-6">
-            <h4 className="text-lg font-heading font-bold text-foreground mb-5">Mandatory Instructions for Video KYC</h4>
+            <h4 className="text-lg font-heading font-bold text-foreground mb-5">You will be guided through 4 steps</h4>
             
-            <div className="bg-[hsl(var(--coral-500))]/5 border border-[hsl(var(--coral-500))]/20 rounded-xl p-5 mb-6">
-              <p className="font-heading font-bold text-foreground mb-4">During the recording, you must:</p>
-              <ol className="space-y-3 list-decimal list-inside">
-                <li className="text-foreground font-body">
-                  <span className="font-semibold">Speak your full name and Date of Birth</span> clearly
-                </li>
-                <li className="text-foreground font-body">
-                  <span className="font-semibold">Show the front and back of your Aadhaar card</span> to the camera
-                </li>
-                <li className="text-foreground font-body">
-                  <span className="font-semibold">Stop recording</span> after you have completed the above steps
-                </li>
-              </ol>
+            <div className="space-y-3 mb-6">
+              {RECORDING_STAGES.map((stage, index) => {
+                const StageIcon = stage.icon;
+                return (
+                  <div key={stage.id} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold" style={{ backgroundColor: stage.color }}>
+                      {index + 1}
+                    </div>
+                    <StageIcon className="h-5 w-5 text-primary" />
+                    <div className="flex-1">
+                      <p className="font-medium font-heading">{stage.title}</p>
+                      <p className="text-sm text-muted-foreground font-body">{stage.instruction}</p>
+                    </div>
+                    <Badge variant="outline" className="text-xs">
+                      {stage.duration}s
+                    </Badge>
+                  </div>
+                );
+              })}
             </div>
 
-            <ul className="space-y-4">
+            <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-center mb-6">
+              <p className="text-sm text-muted-foreground font-body">
+                Total recording time: <span className="font-semibold text-foreground">{minRecordingTime} seconds</span>
+              </p>
+            </div>
+
+            <ul className="space-y-4 mb-6">
               <li className="flex items-start gap-4">
                 <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center flex-shrink-0">
                   <Camera className="h-5 w-5 text-primary" />
@@ -393,15 +414,6 @@ export function VideoKYCStep({
                 <div>
                   <p className="font-heading font-semibold text-foreground">Good Lighting</p>
                   <p className="text-sm text-muted-foreground font-body">Ensure you are in a well-lit area with your face clearly visible</p>
-                </div>
-              </li>
-              <li className="flex items-start gap-4">
-                <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Mic className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="font-heading font-semibold text-foreground">Clear Audio</p>
-                  <p className="text-sm text-muted-foreground font-body">Speak clearly when stating your name and DOB</p>
                 </div>
               </li>
               <li className="flex items-start gap-4">
@@ -418,7 +430,7 @@ export function VideoKYCStep({
             <Button
               onClick={checkPermissions}
               disabled={checkingPermissions}
-              className="w-full h-14 text-base font-heading font-bold btn-electric rounded-xl mt-6"
+              className="w-full h-14 text-base font-heading font-bold btn-electric rounded-xl"
             >
               {checkingPermissions ? (
                 <>
@@ -473,13 +485,16 @@ export function VideoKYCStep({
               className="w-full h-full object-cover transform scale-x-[-1]"
             />
             
+            {/* Recording Stage Overlay */}
             {isRecording && (
-              <div className="absolute top-4 left-4">
-                <Badge className="bg-[hsl(var(--error))] text-white border-0 font-heading px-4 py-2 text-sm animate-pulse-record">
-                  <span className="w-2.5 h-2.5 bg-white rounded-full mr-2 inline-block" />
-                  REC {formatTime(recordingTime)}
-                </Badge>
-              </div>
+              <RecordingStageOverlay
+                currentStageIndex={currentStageIndex}
+                stageTimeRemaining={stageTimeRemaining}
+                totalRecordingTime={recordingTime}
+                onAdvanceStage={advanceStage}
+                allStagesComplete={allStagesComplete}
+                formatTime={formatTime}
+              />
             )}
 
             {step === 'permissions' && (
@@ -494,18 +509,6 @@ export function VideoKYCStep({
             )}
           </div>
 
-          {step === 'permissions' && (
-            <Card className="bg-[hsl(var(--electric-blue-100))] border-0 rounded-xl">
-              <CardContent className="p-5">
-                <p className="text-sm text-foreground font-body font-semibold mb-2">Remember to:</p>
-                <ol className="text-sm text-foreground font-body list-decimal list-inside space-y-1">
-                  <li>Speak your <span className="text-primary font-semibold">Name</span> and <span className="text-primary font-semibold">Date of Birth</span></li>
-                  <li>Show <span className="text-primary font-semibold">front and back of Aadhaar</span></li>
-                  <li>Click <span className="text-primary font-semibold">Stop Recording</span> when done</li>
-                </ol>
-              </CardContent>
-            </Card>
-          )}
 
           <div className="flex gap-4">
             {step === 'permissions' && (
@@ -521,11 +524,11 @@ export function VideoKYCStep({
             {step === 'recording' && (
               <Button
                 onClick={stopRecording}
-                disabled={recordingTime < minRecordingTime}
+                disabled={!allStagesComplete}
                 className="flex-1 h-14 text-base font-heading font-bold bg-[hsl(var(--error))] hover:bg-[hsl(var(--error))]/90 text-white rounded-xl shadow-lg transition-all disabled:opacity-50"
               >
-                {recordingTime < minRecordingTime ? (
-                  `Wait ${minRecordingTime - recordingTime}s...`
+                {!allStagesComplete ? (
+                  `Complete all steps first...`
                 ) : (
                   <>
                     <Square className="h-5 w-5 mr-2" />

@@ -4,8 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Video, Camera, Mic, CheckCircle, XCircle, Clock, Play, Square, AlertTriangle } from "lucide-react";
+import { Loader2, Video, Camera, Mic, CheckCircle, XCircle, Clock, Play, Square, AlertTriangle, Eye, CreditCard } from "lucide-react";
 import { toast } from "sonner";
+import { RecordingStageOverlay, RECORDING_STAGES } from "@/components/VideoKYC/RecordingStageOverlay";
+import { useRecordingStages } from "@/hooks/useRecordingStages";
 
 type PageState = "loading" | "instructions" | "permissions" | "recording" | "uploading" | "success" | "error" | "expired" | "completed";
 
@@ -24,6 +26,15 @@ export default function VideoKYC() {
   const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+
+  // Recording stages hook
+  const {
+    currentStageIndex,
+    stageTimeRemaining,
+    allStagesComplete,
+    advanceStage,
+    minRecordingTime,
+  } = useRecordingStages({ isRecording });
 
   useEffect(() => {
     if (token) {
@@ -286,8 +297,6 @@ export default function VideoKYC() {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const minRecordingTime = 10;
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted/30 flex items-center justify-center p-4">
       <div className="w-full max-w-lg">
@@ -362,38 +371,36 @@ export default function VideoKYC() {
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
                   <div>
-                    <p className="font-semibold text-amber-800 dark:text-amber-200">During the recording, you must:</p>
-                    <ol className="mt-2 space-y-1 text-sm text-amber-700 dark:text-amber-300 list-decimal list-inside">
-                      <li>Speak your <strong>full name</strong> and <strong>Date of Birth</strong></li>
-                      <li>Show the <strong>front and back of your Aadhaar card</strong></li>
-                      <li>Click <strong>Stop Recording</strong> when done</li>
-                    </ol>
+                    <p className="font-semibold text-amber-800 dark:text-amber-200">You will be guided through 4 steps:</p>
                   </div>
                 </div>
               </div>
 
               <div className="space-y-3">
-                <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                  <Camera className="h-5 w-5 text-primary" />
-                  <div>
-                    <p className="font-medium">Good Lighting</p>
-                    <p className="text-sm text-muted-foreground">Ensure your face is clearly visible</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                  <Mic className="h-5 w-5 text-primary" />
-                  <div>
-                    <p className="font-medium">Clear Audio</p>
-                    <p className="text-sm text-muted-foreground">Speak clearly when stating your details</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                  <Video className="h-5 w-5 text-primary" />
-                  <div>
-                    <p className="font-medium">Keep Aadhaar Ready</p>
-                    <p className="text-sm text-muted-foreground">Have your Aadhaar card ready to show</p>
-                  </div>
-                </div>
+                {RECORDING_STAGES.map((stage, index) => {
+                  const StageIcon = stage.icon;
+                  return (
+                    <div key={stage.id} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold" style={{ backgroundColor: stage.color }}>
+                        {index + 1}
+                      </div>
+                      <StageIcon className="h-5 w-5 text-primary" />
+                      <div className="flex-1">
+                        <p className="font-medium">{stage.title}</p>
+                        <p className="text-sm text-muted-foreground">{stage.instruction}</p>
+                      </div>
+                      <Badge variant="outline" className="text-xs">
+                        {stage.duration}s
+                      </Badge>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Total recording time: <span className="font-semibold text-foreground">{minRecordingTime} seconds</span>
+                </p>
               </div>
 
               <Button onClick={checkPermissions} className="w-full h-12" size="lg">
@@ -422,13 +429,16 @@ export default function VideoKYC() {
                   className="w-full h-full object-cover transform scale-x-[-1]"
                 />
 
+                {/* Recording Stage Overlay */}
                 {isRecording && (
-                  <div className="absolute top-3 left-3">
-                    <Badge className="bg-destructive text-white border-0 animate-pulse">
-                      <span className="w-2 h-2 bg-white rounded-full mr-2 inline-block" />
-                      REC {formatTime(recordingTime)}
-                    </Badge>
-                  </div>
+                  <RecordingStageOverlay
+                    currentStageIndex={currentStageIndex}
+                    stageTimeRemaining={stageTimeRemaining}
+                    totalRecordingTime={recordingTime}
+                    onAdvanceStage={advanceStage}
+                    allStagesComplete={allStagesComplete}
+                    formatTime={formatTime}
+                  />
                 )}
 
                 {pageState === "permissions" && hasPermissions && (
@@ -464,13 +474,13 @@ export default function VideoKYC() {
               {pageState === "recording" && (
                 <Button
                   onClick={stopRecording}
-                  disabled={recordingTime < minRecordingTime}
+                  disabled={!allStagesComplete}
                   variant="destructive"
                   className="w-full h-12"
                   size="lg"
                 >
-                  {recordingTime < minRecordingTime ? (
-                    `Wait ${minRecordingTime - recordingTime}s...`
+                  {!allStagesComplete ? (
+                    `Complete all steps first...`
                   ) : (
                     <>
                       <Square className="h-5 w-5 mr-2" />
