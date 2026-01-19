@@ -131,7 +131,7 @@ serve(async (req) => {
       .single();
 
     if (existingVerification) {
-      await supabase
+      const { error: updateVerificationError } = await supabase
         .from("loan_verifications")
         .update({
           status: "success",
@@ -140,18 +140,25 @@ serve(async (req) => {
           remarks: "Video KYC completed successfully via retry link",
         })
         .eq("id", existingVerification.id);
+      
+      if (updateVerificationError) {
+        console.error("Error updating loan_verifications:", updateVerificationError);
+      }
     } else {
-      await supabase
+      const { error: insertVerificationError } = await supabase
         .from("loan_verifications")
         .insert({
           loan_application_id: recording.application_id,
-          org_id: recording.org_id,
           verification_type: "video_kyc",
           status: "success",
           response_data: { recording_url: recordingUrl },
           verified_at: new Date().toISOString(),
           remarks: "Video KYC completed successfully via retry link",
         });
+      
+      if (insertVerificationError) {
+        console.error("Error inserting loan_verifications:", insertVerificationError);
+      }
     }
 
     console.log(`VideoKYC upload completed successfully: ${recording.id}`);
