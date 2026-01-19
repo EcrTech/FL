@@ -144,48 +144,66 @@ function MeetingView({
 // Participant video component
 function ParticipantView({ participantId }: { participantId: string }) {
   const micRef = useRef<HTMLAudioElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const { webcamStream, micStream, webcamOn, micOn, displayName } = useParticipant(participantId);
 
-  const videoRef = useRef<HTMLVideoElement>(null);
-
   useEffect(() => {
-    if (webcamOn && webcamStream && videoRef.current) {
-      const mediaStream = new MediaStream();
-      mediaStream.addTrack(webcamStream.track);
-      videoRef.current.srcObject = mediaStream;
-      videoRef.current.play().catch(err => console.error("Error playing video:", err));
+    if (videoRef.current) {
+      if (webcamOn && webcamStream) {
+        const mediaStream = new MediaStream();
+        mediaStream.addTrack(webcamStream.track);
+        videoRef.current.srcObject = mediaStream;
+        
+        // Ensure video plays
+        videoRef.current.play().catch(err => {
+          console.error("Error playing video:", err);
+          // Retry play on user interaction
+          const playOnClick = () => {
+            videoRef.current?.play();
+            document.removeEventListener('click', playOnClick);
+          };
+          document.addEventListener('click', playOnClick);
+        });
+      } else {
+        // Clear the video when webcam is off
+        videoRef.current.srcObject = null;
+      }
     }
   }, [webcamStream, webcamOn]);
 
   useEffect(() => {
-    if (micOn && micStream && micRef.current) {
-      const mediaStream = new MediaStream();
-      mediaStream.addTrack(micStream.track);
-      micRef.current.srcObject = mediaStream;
-      micRef.current.play().catch(err => console.error("Error playing audio:", err));
+    if (micRef.current) {
+      if (micOn && micStream) {
+        const mediaStream = new MediaStream();
+        mediaStream.addTrack(micStream.track);
+        micRef.current.srcObject = mediaStream;
+        micRef.current.play().catch(err => console.error("Error playing audio:", err));
+      } else {
+        micRef.current.srcObject = null;
+      }
     }
   }, [micStream, micOn]);
 
   return (
     <div className="relative bg-gray-900 rounded-lg overflow-hidden aspect-video">
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        className="w-full h-full object-cover"
-      />
+      {webcamOn && webcamStream ? (
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className="w-full h-full object-cover"
+        />
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
+          <VideoOff className="h-12 w-12 text-gray-400" />
+        </div>
+      )}
       <audio ref={micRef} autoPlay playsInline muted={false} />
       
       <div className="absolute bottom-4 left-4 bg-black/50 px-3 py-1 rounded text-white text-sm">
         {displayName || participantId}
       </div>
-
-      {!webcamOn && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
-          <VideoOff className="h-12 w-12 text-gray-400" />
-        </div>
-      )}
     </div>
   );
 }
