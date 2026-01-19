@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useEMIPayments } from "@/hooks/useEMIPayments";
-import { DollarSign } from "lucide-react";
+import { IndianRupee } from "lucide-react";
 
 interface RecordPaymentDialogProps {
   open: boolean;
@@ -79,7 +79,7 @@ export default function RecordPaymentDialog({
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <DollarSign className="h-5 w-5" />
+            <IndianRupee className="h-5 w-5" />
             Record Payment - EMI #{emiSchedule.emi_number}
           </DialogTitle>
           <DialogDescription>

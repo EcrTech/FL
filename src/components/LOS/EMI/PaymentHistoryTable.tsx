@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useEMIPayments } from "@/hooks/useEMIPayments";
-import { DollarSign } from "lucide-react";
+import { IndianRupee } from "lucide-react";
 import { LoadingState } from "@/components/common/LoadingState";
 
 interface PaymentHistoryTableProps {
@@ -62,7 +62,7 @@ export default function PaymentHistoryTable({ applicationId }: PaymentHistoryTab
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <DollarSign className="h-5 w-5" />
+          <IndianRupee className="h-5 w-5" />
           Payment History
         </CardTitle>
       </CardHeader>
