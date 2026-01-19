@@ -31,6 +31,7 @@ interface Verification {
   status: string;
   verified_at: string | null;
   response_data: any;
+  created_at?: string;
 }
 
 interface Applicant {
@@ -279,11 +280,12 @@ export function ApplicantProfileCard({
         }
       }
 
-      // Fetch verifications
+      // Fetch verifications - ordered by created_at DESC to get newest first
       const { data: verData, error: verError } = await supabase
         .from('loan_verifications')
-        .select('id, verification_type, status, verified_at, response_data')
-        .eq('loan_application_id', applicationId);
+        .select('id, verification_type, status, verified_at, response_data, created_at')
+        .eq('loan_application_id', applicationId)
+        .order('created_at', { ascending: false });
 
       if (!verError && verData) {
         setVerifications(verData);
@@ -301,7 +303,13 @@ export function ApplicantProfileCard({
   };
 
   const getVerification = (type: string) => {
-    return verifications.find(v => v.verification_type === type);
+    // Filter all verifications of this type
+    const typeVerifications = verifications.filter(v => v.verification_type === type);
+    // Prioritize "success" status over other statuses
+    const successVerification = typeVerifications.find(v => v.status === 'success');
+    if (successVerification) return successVerification;
+    // Fallback to the first (most recent due to ordering)
+    return typeVerifications[0];
   };
 
   // Filter key documents (PAN and Aadhaar only)
