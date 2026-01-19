@@ -127,7 +127,7 @@ export function AadhaarVerificationStep({
         isDifferentAddress: localDifferentAddress,
       }));
       
-      const { data, error } = await supabase.functions.invoke('verifiedu-aadhaar-initiate', {
+      const { data, error } = await supabase.functions.invoke('verifiedu-public-aadhaar-initiate', {
         body: {
           surl: `${baseUrl}/digilocker/success?source=referral`,
           furl: `${baseUrl}/digilocker/failure?source=referral`,
