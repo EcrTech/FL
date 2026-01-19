@@ -38,6 +38,7 @@ export function VideoKYCStep({
   const chunksRef = useRef<Blob[]>([]);
 
   // DEBUG: useEffect to re-attach stream when video element becomes available
+  // Using a small delay to ensure DOM is fully updated after step change
   useEffect(() => {
     console.log('[VideoKYC] useEffect triggered - step:', step, 
       'streamRef exists:', !!streamRef.current, 
@@ -45,13 +46,34 @@ export function VideoKYCStep({
       'videoRef.srcObject exists:', !!videoRef.current?.srcObject);
     
     // Re-attach stream when video element becomes available
-    if (videoRef.current && streamRef.current && !videoRef.current.srcObject) {
-      console.log('[VideoKYC] Re-attaching stream to newly mounted video element');
-      videoRef.current.srcObject = streamRef.current;
-      videoRef.current.play().then(() => {
-        console.log('[VideoKYC] Video playback started after re-attach');
-      }).catch(err => {
-        console.error('[VideoKYC] Video playback failed after re-attach:', err);
+    const attachStream = () => {
+      if (videoRef.current && streamRef.current) {
+        console.log('[VideoKYC] Attempting to attach stream to video element');
+        console.log('[VideoKYC] Stream still active:', streamRef.current.active);
+        console.log('[VideoKYC] Video tracks:', streamRef.current.getVideoTracks().map(t => ({
+          enabled: t.enabled,
+          readyState: t.readyState,
+          muted: t.muted
+        })));
+        
+        videoRef.current.srcObject = streamRef.current;
+        console.log('[VideoKYC] srcObject assigned, calling play()...');
+        
+        videoRef.current.play().then(() => {
+          console.log('[VideoKYC] Video playback started successfully!');
+        }).catch(err => {
+          console.error('[VideoKYC] Video playback failed:', err);
+        });
+      } else {
+        console.warn('[VideoKYC] Cannot attach stream - videoRef:', !!videoRef.current, 'streamRef:', !!streamRef.current);
+      }
+    };
+
+    // Use requestAnimationFrame + small timeout to ensure DOM is ready
+    if ((step === 'permissions' || step === 'recording') && streamRef.current) {
+      console.log('[VideoKYC] Step requires video, scheduling stream attachment...');
+      requestAnimationFrame(() => {
+        setTimeout(attachStream, 100);
       });
     }
   }, [step]);
