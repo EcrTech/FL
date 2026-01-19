@@ -33,6 +33,7 @@ export default function Login() {
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [userPhone, setUserPhone] = useState<string | null>(null);
+  const [pendingOtpVerification, setPendingOtpVerification] = useState(false);
 
   useEffect(() => {
     console.log('[Login] useEffect - setting up auth listener...');
@@ -42,7 +43,8 @@ export default function Login() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
       console.log("[Login] Auth state change:", event, session ? "Session exists" : "No session");
-      if (event === 'SIGNED_IN' && session) {
+      // Don't redirect if we're in the middle of 2FA flow (will sign out shortly)
+      if (event === 'SIGNED_IN' && session && !pendingOtpVerification) {
         console.log("[Login] User signed in, redirecting to LOS dashboard");
         navigate("/los/dashboard", { replace: true });
       }
@@ -63,7 +65,7 @@ export default function Login() {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [navigate]);
+  }, [navigate, pendingOtpVerification]);
 
   // Resend cooldown timer
   useEffect(() => {
@@ -79,6 +81,9 @@ export default function Login() {
     setLoading(true);
 
     try {
+      // Set flag to prevent auth listener from redirecting during 2FA check
+      setPendingOtpVerification(true);
+      
       // First verify credentials
       console.log('[Login] Verifying credentials...');
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -88,6 +93,7 @@ export default function Login() {
 
       if (authError) {
         console.error('[Login] Credentials verification error:', authError);
+        setPendingOtpVerification(false);
         throw authError;
       }
 
@@ -102,7 +108,9 @@ export default function Login() {
 
       if (profileError || !profile?.phone) {
         console.log('[Login] No phone number found, completing login without 2FA');
+        setPendingOtpVerification(false);
         notify.success("Welcome back!", "You've successfully signed in");
+        navigate("/los/dashboard", { replace: true });
         return;
       }
 
@@ -176,6 +184,9 @@ export default function Login() {
       if (data.success && data.verified) {
         console.log('[Login] OTP verified, completing login...');
         
+        // Reset the flag so auth listener can redirect
+        setPendingOtpVerification(false);
+        
         // Complete login with credentials
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email,
@@ -185,7 +196,7 @@ export default function Login() {
         if (signInError) throw signInError;
 
         notify.success("Welcome back!", "You've successfully signed in with 2FA");
-        // Navigation will be handled by the auth state change listener
+        navigate("/los/dashboard", { replace: true });
       } else {
         throw new Error(data.error || 'Invalid OTP');
       }
