@@ -242,8 +242,8 @@ export function BasicInfoStep({
 
   const allConsentsChecked = consents.householdIncome && consents.termsAndConditions && consents.aadhaarConsent;
   const isValidPhone = formData.phone.replace(/\D/g, '').length === 10;
-  const isValidLoanAmount = formData.requestedAmount >= 10000 && formData.requestedAmount <= 100000;
-  const isValidTenure = formData.tenureDays >= 1 && formData.tenureDays <= 365;
+  const isValidLoanAmount = formData.requestedAmount >= 25000 && formData.requestedAmount <= 200000;
+  const isValidTenure = formData.tenureDays >= 30 && formData.tenureDays <= 180;
   const canProceed = formData.name && isValidPhone && isValidLoanAmount && isValidTenure && allConsentsChecked;
 
   return (
@@ -274,23 +274,23 @@ export function BasicInfoStep({
             <Input
               id="loanAmount"
               type="number"
-              placeholder="Enter amount (₹15,000 - ₹1,00,000)"
+              placeholder="Enter amount (₹25,000 - ₹2,00,000)"
               value={formData.requestedAmount || ''}
               onChange={(e) => {
                 const value = parseInt(e.target.value) || 0;
                 onUpdate({ requestedAmount: value });
               }}
-              min={10000}
-              max={100000}
+              min={25000}
+              max={200000}
               className="h-12 bg-background border-2 border-border rounded-xl pl-10 text-base font-body focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
             />
           </div>
           <p className="text-xs text-muted-foreground font-body">
-            Minimum ₹10,000 • Maximum ₹1,00,000
+            Minimum ₹25,000 • Maximum ₹2,00,000
           </p>
-          {formData.requestedAmount > 0 && (formData.requestedAmount < 10000 || formData.requestedAmount > 100000) && (
+          {formData.requestedAmount > 0 && (formData.requestedAmount < 25000 || formData.requestedAmount > 200000) && (
             <p className="text-xs text-[hsl(var(--coral-500))] font-body">
-              Please enter an amount between ₹10,000 and ₹1,00,000
+              Please enter an amount between ₹25,000 and ₹2,00,000
             </p>
           )}
         </div>
@@ -304,22 +304,22 @@ export function BasicInfoStep({
           <Input
             id="tenureDays"
             type="number"
-            placeholder="Enter tenure in days (15 - 90)"
+            placeholder="Enter tenure in days (30 - 180)"
             value={formData.tenureDays || ''}
             onChange={(e) => {
               const value = parseInt(e.target.value) || 0;
               onUpdate({ tenureDays: value });
             }}
-            min={15}
-            max={90}
+            min={30}
+            max={180}
             className="h-12 bg-background border-2 border-border rounded-xl text-base font-body focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
           />
           <p className="text-xs text-muted-foreground font-body">
-            Minimum 15 days • Maximum 90 days
+            Minimum 30 days • Maximum 180 days
           </p>
-          {formData.tenureDays > 0 && (formData.tenureDays < 15 || formData.tenureDays > 90) && (
+          {formData.tenureDays > 0 && (formData.tenureDays < 30 || formData.tenureDays > 180) && (
             <p className="text-xs text-[hsl(var(--coral-500))] font-body">
-              Please enter a tenure between 15 and 90 days
+              Please enter a tenure between 30 and 180 days
             </p>
           )}
         </div>
@@ -518,7 +518,7 @@ export function BasicInfoStep({
             <Label htmlFor="aadhaarConsent" className="text-sm text-muted-foreground font-body leading-relaxed cursor-pointer">
               <span className="font-heading font-semibold text-foreground">Aadhaar Consent:</span> I hereby give my consent to fetch my CKYCR record from the Central KYC Records Registry 
               using my KYC identifier. I/we further express my interest and accord consent to receive calls/emails/SMS 
-              from MoneyBoxx Finance Limited pertaining to their financial products and offers.
+              from Skyrise Credit and Marketing Limited pertaining to their financial products and offers.
             </Label>
           </div>
         </div>
