@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -37,24 +37,61 @@ export function VideoKYCStep({
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
+  // DEBUG: useEffect to re-attach stream when video element becomes available
+  useEffect(() => {
+    console.log('[VideoKYC] useEffect triggered - step:', step, 
+      'streamRef exists:', !!streamRef.current, 
+      'videoRef exists:', !!videoRef.current,
+      'videoRef.srcObject exists:', !!videoRef.current?.srcObject);
+    
+    // Re-attach stream when video element becomes available
+    if (videoRef.current && streamRef.current && !videoRef.current.srcObject) {
+      console.log('[VideoKYC] Re-attaching stream to newly mounted video element');
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().then(() => {
+        console.log('[VideoKYC] Video playback started after re-attach');
+      }).catch(err => {
+        console.error('[VideoKYC] Video playback failed after re-attach:', err);
+      });
+    }
+  }, [step]);
+
   const checkPermissions = async () => {
+    console.log('[VideoKYC] checkPermissions started, current step:', step);
     setCheckingPermissions(true);
     try {
+      console.log('[VideoKYC] Requesting getUserMedia...');
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user', width: 640, height: 480 },
         audio: true,
       });
       
+      console.log('[VideoKYC] Stream obtained:', {
+        id: stream.id,
+        active: stream.active,
+        videoTracks: stream.getVideoTracks().length,
+        audioTracks: stream.getAudioTracks().length,
+        videoTrackSettings: stream.getVideoTracks()[0]?.getSettings(),
+        videoTrackEnabled: stream.getVideoTracks()[0]?.enabled,
+        videoTrackReadyState: stream.getVideoTracks()[0]?.readyState
+      });
+      
       streamRef.current = stream;
+      console.log('[VideoKYC] videoRef.current exists?', !!videoRef.current);
+      
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        console.log('[VideoKYC] Stream assigned to video element directly');
+      } else {
+        console.warn('[VideoKYC] VIDEO ELEMENT NOT MOUNTED - stream will be attached via useEffect');
       }
       
       setHasPermissions(true);
       setStep('permissions');
+      console.log('[VideoKYC] Step changed to permissions, hasPermissions set to true');
       toast.success("Camera and microphone access granted");
     } catch (error) {
-      console.error('Permission error:', error);
+      console.error('[VideoKYC] Permission error:', error);
       toast.error("Please allow camera and microphone access to proceed");
     } finally {
       setCheckingPermissions(false);
@@ -62,25 +99,73 @@ export function VideoKYCStep({
   };
 
   const startRecording = useCallback(async () => {
+    console.log('[VideoKYC] startRecording called');
+    console.log('[VideoKYC] streamRef exists:', !!streamRef.current);
+    console.log('[VideoKYC] Stream active:', streamRef.current?.active);
+    console.log('[VideoKYC] Stream tracks:', streamRef.current?.getTracks().map(t => ({
+      kind: t.kind,
+      enabled: t.enabled,
+      readyState: t.readyState
+    })));
+    
     if (!streamRef.current) {
+      console.error('[VideoKYC] No stream available for recording');
       toast.error("Camera not available");
       return;
     }
 
     try {
+      // Check for supported mime types
+      const mimeTypes = [
+        'video/webm;codecs=vp9,opus',
+        'video/webm;codecs=vp8,opus',
+        'video/webm;codecs=vp9',
+        'video/webm;codecs=vp8',
+        'video/webm',
+        'video/mp4'
+      ];
+
+      let selectedMimeType = '';
+      console.log('[VideoKYC] Checking mime type support...');
+      for (const type of mimeTypes) {
+        const supported = MediaRecorder.isTypeSupported(type);
+        console.log(`[VideoKYC] ${type}: ${supported ? 'SUPPORTED' : 'not supported'}`);
+        if (supported && !selectedMimeType) {
+          selectedMimeType = type;
+        }
+      }
+
+      if (!selectedMimeType) {
+        console.error('[VideoKYC] No supported mime type found!');
+        toast.error("Your browser doesn't support video recording");
+        return;
+      }
+
+      console.log('[VideoKYC] Using mime type:', selectedMimeType);
+      
       chunksRef.current = [];
       const mediaRecorder = new MediaRecorder(streamRef.current, {
-        mimeType: 'video/webm;codecs=vp9,opus',
+        mimeType: selectedMimeType,
       });
 
+      console.log('[VideoKYC] MediaRecorder created, state:', mediaRecorder.state);
+
       mediaRecorder.ondataavailable = (event) => {
+        console.log('[VideoKYC] Data chunk received, size:', event.data.size, 'type:', event.data.type);
         if (event.data.size > 0) {
           chunksRef.current.push(event.data);
+          console.log('[VideoKYC] Total chunks:', chunksRef.current.length);
         }
+      };
+
+      mediaRecorder.onerror = (event) => {
+        console.error('[VideoKYC] MediaRecorder error:', event);
       };
 
       mediaRecorderRef.current = mediaRecorder;
       mediaRecorder.start(1000);
+      console.log('[VideoKYC] MediaRecorder started, state:', mediaRecorder.state);
+      
       setIsRecording(true);
       setStep('recording');
       setRecordingTime(0);
@@ -90,7 +175,7 @@ export function VideoKYCStep({
       }, 1000);
 
     } catch (error) {
-      console.error('Recording error:', error);
+      console.error('[VideoKYC] Recording error:', error);
       toast.error("Failed to start recording");
     }
   }, []);
@@ -141,27 +226,41 @@ export function VideoKYCStep({
   };
 
   const stopRecording = useCallback(() => {
+    console.log('[VideoKYC] stopRecording called');
+    console.log('[VideoKYC] mediaRecorderRef exists:', !!mediaRecorderRef.current);
+    console.log('[VideoKYC] isRecording:', isRecording);
+    
     if (mediaRecorderRef.current && isRecording) {
+      console.log('[VideoKYC] Stopping MediaRecorder, current state:', mediaRecorderRef.current.state);
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       
       if (timerRef.current) {
         clearInterval(timerRef.current);
+        console.log('[VideoKYC] Timer cleared');
       }
 
       // Handle the recording completion
       mediaRecorderRef.current.onstop = async () => {
+        console.log('[VideoKYC] MediaRecorder onstop fired');
+        console.log('[VideoKYC] Chunks count:', chunksRef.current.length);
+        console.log('[VideoKYC] Chunks sizes:', chunksRef.current.map(c => c.size));
+        
         // Stop the camera stream
         if (streamRef.current) {
-          streamRef.current.getTracks().forEach(track => track.stop());
+          streamRef.current.getTracks().forEach(track => {
+            console.log('[VideoKYC] Stopping track:', track.kind);
+            track.stop();
+          });
         }
 
         // Create video blob from chunks
         const videoBlob = new Blob(chunksRef.current, { type: 'video/webm' });
-        console.log('Recording completed, blob size:', videoBlob.size);
+        console.log('[VideoKYC] Recording completed, blob size:', videoBlob.size, 'type:', videoBlob.type);
 
         // Upload the video if we have application context
         if (applicationId && orgId) {
+          console.log('[VideoKYC] Starting upload with applicationId:', applicationId, 'orgId:', orgId);
           const uploadSuccess = await uploadVideo(videoBlob);
           if (uploadSuccess) {
             setStep('completed');
@@ -169,16 +268,19 @@ export function VideoKYCStep({
             onComplete();
           } else {
             // Reset to allow retry
+            console.log('[VideoKYC] Upload failed, resetting to instructions');
             setStep('instructions');
           }
         } else {
           // Fallback: No applicationId/orgId (legacy behavior)
-          console.warn('No applicationId/orgId provided, skipping upload');
+          console.warn('[VideoKYC] No applicationId/orgId provided, skipping upload');
           setStep('completed');
           onComplete();
           toast.success("Video KYC completed successfully");
         }
       };
+    } else {
+      console.warn('[VideoKYC] stopRecording called but conditions not met');
     }
   }, [isRecording, onComplete, applicationId, orgId]);
 
@@ -341,6 +443,11 @@ export function VideoKYCStep({
               autoPlay
               playsInline
               muted
+              onLoadedMetadata={() => console.log('[VideoKYC] Video loadedmetadata event fired')}
+              onPlay={() => console.log('[VideoKYC] Video play event fired')}
+              onCanPlay={() => console.log('[VideoKYC] Video canplay event fired')}
+              onError={(e) => console.error('[VideoKYC] Video error event:', e.currentTarget.error)}
+              onStalled={() => console.warn('[VideoKYC] Video stalled event fired')}
               className="w-full h-full object-cover transform scale-x-[-1]"
             />
             
