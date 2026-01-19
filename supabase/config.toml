@@ -80,3 +80,6 @@ verify_jwt = false
 
 [functions.verifiedu-public-pan-verify]
 verify_jwt = false
+
+[functions.verifiedu-public-aadhaar-initiate]
+verify_jwt = false
