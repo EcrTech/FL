@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -6,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Check, Loader2, AlertCircle, ArrowLeft, ArrowRight, FileCheck, ShieldCheck, Clock, MapPin } from "lucide-react";
+import { Check, Loader2, AlertCircle, ArrowLeft, ArrowRight, FileCheck, ShieldCheck, MapPin, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -55,12 +56,8 @@ export function AadhaarVerificationStep({
   isDifferentAddress = false,
   onDifferentAddressChange,
 }: AadhaarVerificationStepProps) {
-  const [otpSent, setOtpSent] = useState(false);
-  const [otp, setOtp] = useState("");
-  const [referenceId, setReferenceId] = useState("");
-  const [sendingOtp, setSendingOtp] = useState(false);
-  const [verifying, setVerifying] = useState(false);
-  const [timer, setTimer] = useState(0);
+  const [searchParams] = useSearchParams();
+  const [initiatingDigilocker, setInitiatingDigilocker] = useState(false);
   
   const [localDifferentAddress, setLocalDifferentAddress] = useState(isDifferentAddress);
   const [localCommAddress, setLocalCommAddress] = useState<CommunicationAddress>(
@@ -68,6 +65,35 @@ export function AadhaarVerificationStep({
   );
 
   const isValidAadhaar = /^\d{12}$/.test(aadhaarNumber.replace(/\s/g, ''));
+
+  // Check for DigiLocker return on mount
+  useEffect(() => {
+    const digilockerSuccess = searchParams.get("digilocker_success");
+    const digilockerFailure = searchParams.get("digilocker_failure");
+    
+    if (digilockerSuccess === "true") {
+      // Retrieve verified data from localStorage
+      const storedData = localStorage.getItem("referral_aadhaar_verified");
+      if (storedData) {
+        try {
+          const verifiedInfo = JSON.parse(storedData);
+          onVerified(verifiedInfo);
+          toast.success("Aadhaar verified successfully via DigiLocker");
+        } catch (e) {
+          console.error("Failed to parse verified Aadhaar data:", e);
+        }
+        localStorage.removeItem("referral_aadhaar_verified");
+      }
+      // Clean URL params
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, "", newUrl);
+    } else if (digilockerFailure === "true") {
+      toast.error("DigiLocker verification was not completed. You can try again or continue without verification.");
+      // Clean URL params
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, "", newUrl);
+    }
+  }, [searchParams, onVerified]);
 
   const formatAadhaar = (value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, 12);
@@ -82,106 +108,49 @@ export function AadhaarVerificationStep({
     return aadhaarNumber;
   };
 
-  const startTimer = () => {
-    setTimer(120);
-    const interval = setInterval(() => {
-      setTimer((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  };
-
-  const formatTimer = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const sendAadhaarOtp = async () => {
+  const initiateDigilocker = async () => {
     if (!isValidAadhaar) {
       toast.error("Please enter a valid 12-digit Aadhaar number");
       return;
     }
 
-    setSendingOtp(true);
+    setInitiatingDigilocker(true);
     try {
-      const { data, error } = await supabase.functions.invoke('sandbox-aadhaar-okyc', {
+      const currentUrl = window.location.href.split('?')[0]; // Remove existing params
+      const baseUrl = window.location.origin;
+      
+      // Store referral context for return
+      localStorage.setItem('referral_aadhaar_pending', JSON.stringify({
+        aadhaarNumber: aadhaarNumber.replace(/\s/g, ''),
+        returnUrl: currentUrl,
+        commAddress: localDifferentAddress ? localCommAddress : null,
+        isDifferentAddress: localDifferentAddress,
+      }));
+      
+      const { data, error } = await supabase.functions.invoke('verifiedu-aadhaar-initiate', {
         body: {
-          action: 'initiate',
-          aadhaarNumber: aadhaarNumber.replace(/\s/g, ''),
+          surl: `${baseUrl}/digilocker/success?source=referral`,
+          furl: `${baseUrl}/digilocker/failure?source=referral`,
         },
       });
 
       if (error) throw error;
-
-      if (data.reference_id) {
-        setReferenceId(data.reference_id);
-        setOtpSent(true);
-        startTimer();
-        toast.success("OTP sent to your Aadhaar-linked mobile");
+      
+      if (data?.redirect_url) {
+        window.location.href = data.redirect_url;
+      } else if (data?.is_mock && data?.mock_redirect_url) {
+        // Handle mock mode redirect
+        window.location.href = data.mock_redirect_url;
       } else {
-        throw new Error(data.message || "Failed to send OTP");
+        throw new Error(data?.message || "Failed to initiate DigiLocker verification");
       }
     } catch (error: any) {
-      console.error('Error sending Aadhaar OTP:', error);
-      toast.error(error.message || "Failed to send OTP");
+      console.error('Error initiating DigiLocker:', error);
+      toast.error(error.message || "Failed to initiate DigiLocker verification");
+      localStorage.removeItem('referral_aadhaar_pending');
     } finally {
-      setSendingOtp(false);
+      setInitiatingDigilocker(false);
     }
-  };
-
-  const verifyAadhaarOtp = async () => {
-    if (otp.length !== 6) {
-      toast.error("Please enter a valid 6-digit OTP");
-      return;
-    }
-
-    setVerifying(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('sandbox-aadhaar-okyc', {
-        body: {
-          action: 'verify',
-          referenceId,
-          otp,
-        },
-      });
-
-      if (error) throw error;
-
-      if (data.status === 'success' || data.verified) {
-        const verifiedInfo = {
-          name: data.name || data.full_name || 'Name not available',
-          address: data.address || data.full_address || 'Address not available',
-          dob: data.dob || data.date_of_birth || 'DOB not available',
-        };
-        onVerified(verifiedInfo);
-        toast.success("Aadhaar verified successfully");
-      } else {
-        throw new Error(data.message || "Verification failed");
-      }
-    } catch (error: any) {
-      console.error('Error verifying Aadhaar:', error);
-      toast.error(error.message || "Failed to verify Aadhaar");
-    } finally {
-      setVerifying(false);
-    }
-  };
-
-  const skipVerification = () => {
-    if (!isValidAadhaar) {
-      toast.error("Please enter a valid 12-digit Aadhaar number to continue");
-      return;
-    }
-    onVerified({
-      name: 'Pending Verification',
-      address: 'Pending Verification',
-      dob: 'Pending Verification',
-    });
-    toast.info("Aadhaar saved. Verification can be done later.");
   };
 
   return (
@@ -193,7 +162,7 @@ export function AadhaarVerificationStep({
         </div>
         <div>
           <h3 className="text-xl font-heading font-bold text-foreground">Aadhaar Details</h3>
-          <p className="text-sm text-muted-foreground font-body">Enter your Aadhaar number and optionally verify via OTP</p>
+          <p className="text-sm text-muted-foreground font-body">Enter your Aadhaar number and optionally verify via DigiLocker</p>
         </div>
       </div>
 
@@ -217,7 +186,7 @@ export function AadhaarVerificationStep({
             placeholder="XXXX XXXX XXXX"
             value={isVerified ? getMaskedAadhaar() : formatAadhaar(aadhaarNumber)}
             onChange={(e) => onAadhaarChange(e.target.value.replace(/\D/g, '').slice(0, 12))}
-            disabled={isVerified || otpSent}
+            disabled={isVerified}
             className="h-14 bg-background border-2 border-border rounded-xl tracking-[0.3em] font-mono text-lg text-center focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
             maxLength={14}
           />
@@ -237,35 +206,6 @@ export function AadhaarVerificationStep({
           12-digit unique identification number
         </p>
       </div>
-
-      {/* OTP Input */}
-      {otpSent && !isVerified && (
-        <div className="p-5 bg-[hsl(var(--electric-blue-100))] rounded-xl border border-[hsl(var(--electric-blue-400))]/20 space-y-4">
-          <Label className="text-sm font-heading font-semibold text-foreground">Enter OTP sent to your Aadhaar-linked mobile</Label>
-          <div className="flex gap-3">
-            <Input
-              placeholder="Enter 6-digit OTP"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              className="h-12 bg-white border-2 border-border rounded-xl tracking-[0.3em] font-mono text-center"
-              maxLength={6}
-            />
-            <Button
-              onClick={verifyAadhaarOtp}
-              disabled={verifying || otp.length !== 6}
-              className="h-12 px-6 btn-electric rounded-xl font-heading"
-            >
-              {verifying ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verify OTP'}
-            </Button>
-          </div>
-          {timer > 0 && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground font-body">
-              <Clock className="h-4 w-4" />
-              Resend OTP in {formatTimer(timer)}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Verified Details */}
       {isVerified && verifiedData && (
@@ -444,27 +384,31 @@ export function AadhaarVerificationStep({
         </div>
       )}
 
-      {/* Optional Verification Button */}
-      {!otpSent && !isVerified && isValidAadhaar && (
+      {/* DigiLocker Verification Button */}
+      {!isVerified && isValidAadhaar && (
         <div className="space-y-3">
           <Button
-            onClick={sendAadhaarOtp}
-            disabled={sendingOtp}
+            onClick={initiateDigilocker}
+            disabled={initiatingDigilocker}
             variant="outline"
             className="w-full h-12 font-heading font-semibold rounded-xl border-2 border-primary text-primary hover:bg-primary/10"
           >
-            {sendingOtp ? (
+            {initiatingDigilocker ? (
               <>
                 <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                Sending OTP...
+                Redirecting to DigiLocker...
               </>
             ) : (
               <>
                 <ShieldCheck className="h-5 w-5 mr-2" />
-                Verify via OTP (Optional)
+                Verify via DigiLocker (Optional)
+                <ExternalLink className="h-4 w-4 ml-2" />
               </>
             )}
           </Button>
+          <p className="text-xs text-muted-foreground font-body text-center">
+            You will be redirected to DigiLocker to verify your Aadhaar. This is optional - you can continue without verification.
+          </p>
         </div>
       )}
 
