@@ -20,6 +20,7 @@ export default function DigilockerSuccess() {
   const id = searchParams.get("id");
   const isMock = searchParams.get("mock") === "true";
   const returnUrlParam = searchParams.get("returnUrl"); // From callback chain
+  const callbackStatus = searchParams.get("status"); // Status from VerifiedU callback
 
   // Check if this is a referral form callback
   // Priority: URL param (survives cross-domain) > localStorage (same-domain fallback)
@@ -67,60 +68,91 @@ export default function DigilockerSuccess() {
         setResolvedApplicationId(data.applicationId);
       }
       
-      // If this is a referral callback, store data and redirect back
-      if (isReferralCallback && effectiveReturnUrl) {
-        const verifiedInfo = {
-          name: data.data?.name || "Verified User",
-          address: data.data?.addresses?.[0]?.combined || "Address verified",
-          dob: data.data?.dob || "DOB verified",
-        };
-        localStorage.setItem("referral_aadhaar_verified", JSON.stringify(verifiedInfo));
-        localStorage.removeItem("referral_aadhaar_pending");
-        
-        // Redirect back to referral form with success flag
-        const returnUrl = new URL(effectiveReturnUrl);
-        returnUrl.searchParams.set("digilocker_success", "true");
-        window.location.href = returnUrl.toString();
-      } else {
-        // Start auto-redirect countdown for regular application flow
-        setRedirectCountdown(3);
-      }
+      // Start auto-redirect countdown for regular application flow
+      setRedirectCountdown(3);
     },
     onError: (error: any) => {
       setErrorMessage(error.message || "Failed to fetch Aadhaar details");
       setStatus("error");
-      
-      // If referral callback, still redirect back with error
-      if (isReferralCallback && effectiveReturnUrl) {
-        localStorage.removeItem("referral_aadhaar_pending");
-        const returnUrl = new URL(effectiveReturnUrl);
-        returnUrl.searchParams.set("digilocker_failure", "true");
-        window.location.href = returnUrl.toString();
-      }
     },
   });
 
-  useEffect(() => {
-    if (id || isMock) {
-      fetchDetailsMutation.mutate();
-    } else if (isReferralCallback && effectiveReturnUrl) {
-      // For referral callback without id, treat as mock success
+  // Handle referral callback - redirect back immediately with success/failure
+  const handleReferralCallback = (success: boolean) => {
+    if (!effectiveReturnUrl) {
+      setErrorMessage("Missing return URL for referral callback");
+      setStatus("error");
+      return;
+    }
+
+    // Clean up localStorage
+    localStorage.removeItem("referral_aadhaar_pending");
+
+    if (success) {
+      // Store verified info for the form to consume
       const verifiedInfo = {
         name: "DigiLocker Verified",
         address: "Address verified via DigiLocker",
         dob: "DOB verified",
       };
       localStorage.setItem("referral_aadhaar_verified", JSON.stringify(verifiedInfo));
-      localStorage.removeItem("referral_aadhaar_pending");
-      
+    }
+
+    // Build redirect URL
+    try {
       const returnUrl = new URL(effectiveReturnUrl);
-      returnUrl.searchParams.set("digilocker_success", "true");
+      // Remove any existing digilocker params
+      returnUrl.searchParams.delete("digilocker_success");
+      returnUrl.searchParams.delete("digilocker_failure");
+      returnUrl.searchParams.delete("id");
+      // Add the appropriate flag
+      if (success) {
+        returnUrl.searchParams.set("digilocker_success", "true");
+      } else {
+        returnUrl.searchParams.set("digilocker_failure", "true");
+      }
+      
+      console.log("[DigilockerSuccess] Redirecting to:", returnUrl.toString());
       window.location.href = returnUrl.toString();
+    } catch (e) {
+      console.error("[DigilockerSuccess] Failed to parse returnUrl:", e);
+      setErrorMessage("Failed to redirect back to application");
+      setStatus("error");
+    }
+  };
+
+  useEffect(() => {
+    console.log("[DigilockerSuccess] Mounted with params:", {
+      id,
+      isMock,
+      isReferralCallback,
+      effectiveReturnUrl,
+      callbackStatus,
+      returnUrlParam,
+    });
+
+    // For referral callbacks, skip the authenticated API call
+    // Just redirect back with success/failure based on the callback status
+    if (isReferralCallback) {
+      // Determine success based on: presence of 'id' or callback status
+      const isSuccess = (id && callbackStatus !== "failure") || callbackStatus === "success" || isMock;
+      console.log("[DigilockerSuccess] Referral callback - isSuccess:", isSuccess);
+      
+      // Small delay to ensure page renders before redirect
+      setTimeout(() => {
+        handleReferralCallback(isSuccess);
+      }, 500);
+      return;
+    }
+
+    // For regular application flow, fetch details via authenticated API
+    if (id || isMock) {
+      fetchDetailsMutation.mutate();
     } else {
       setErrorMessage("Missing verification ID");
       setStatus("error");
     }
-  }, [id, isMock, isReferralCallback, effectiveReturnUrl]);
+  }, [id, isMock, isReferralCallback, effectiveReturnUrl, callbackStatus]);
 
   // Auto-redirect countdown effect
   useEffect(() => {
