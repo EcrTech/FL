@@ -18,5 +18,24 @@
       "*.json",
       "*.map"
     ]
+  },
+  "routes": [
+    {
+      "route": "/digilocker/*",
+      "allowedRoles": ["anonymous", "authenticated"]
+    },
+    {
+      "route": "/*",
+      "allowedRoles": ["anonymous", "authenticated"]
+    }
+  ],
+  "responseOverrides": {
+    "404": {
+      "rewrite": "/index.html",
+      "statusCode": 200
+    }
+  },
+  "platform": {
+    "apiRuntime": "node:18"
   }
 }
