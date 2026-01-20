@@ -22,6 +22,8 @@
   "routes": [
     {
       "route": "/digilocker/*",
+      "methods": ["GET", "POST"],
+      "rewrite": "/index.html",
       "allowedRoles": ["anonymous", "authenticated"]
     },
     {
