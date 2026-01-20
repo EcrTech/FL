@@ -26,7 +26,16 @@ const STEPS = [
 ];
 
 export default function ReferralLoanApplication() {
+  // Debug: Component mount logging
+  console.log('[ReferralLoanApplication] Component mounting at', new Date().toISOString());
+  
   const { referralCode } = useParams<{ referralCode: string }>();
+  
+  // Debug: Log referral code and environment
+  console.log('[ReferralLoanApplication] URL referralCode param:', referralCode);
+  console.log('[ReferralLoanApplication] Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
+  console.log('[ReferralLoanApplication] Supabase Key exists:', !!import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
+  
   const [currentStep, setCurrentStep] = useState(1);
   const [referrerInfo, setReferrerInfo] = useState<ReferrerInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -119,14 +128,23 @@ export default function ReferralLoanApplication() {
 
   // Fetch referrer info
   useEffect(() => {
+    console.log('[ReferralLoanApplication] useEffect triggered for fetchReferrerInfo');
+    
     async function fetchReferrerInfo() {
+      console.log('[ReferralLoanApplication] fetchReferrerInfo() called');
+      console.log('[ReferralLoanApplication] referralCode value:', referralCode);
+      
       if (!referralCode) {
+        console.log('[ReferralLoanApplication] No referralCode - setting error');
         setError("Invalid referral link");
         setLoading(false);
         return;
       }
 
       try {
+        console.log('[ReferralLoanApplication] Starting Supabase query for referral code:', referralCode);
+        console.time('[ReferralLoanApplication] Supabase query duration');
+        
         const { data, error: fetchError } = await supabase
           .from("user_referral_codes")
           .select("user_id, org_id")
@@ -134,13 +152,18 @@ export default function ReferralLoanApplication() {
           .eq("is_active", true)
           .single();
 
+        console.timeEnd('[ReferralLoanApplication] Supabase query duration');
+        console.log('[ReferralLoanApplication] Supabase response - data:', data);
+        console.log('[ReferralLoanApplication] Supabase response - error:', fetchError);
+
         if (fetchError || !data) {
-          console.error("Error fetching referral code:", fetchError);
+          console.error('[ReferralLoanApplication] Query failed:', fetchError?.message, fetchError?.code);
           setError("Invalid or expired referral link");
           setLoading(false);
           return;
         }
 
+        console.log('[ReferralLoanApplication] Setting referrerInfo with orgId:', data.org_id, 'userId:', data.user_id);
         setReferrerInfo({
           name: "Your Loan Advisor",
           email: "",
@@ -149,15 +172,27 @@ export default function ReferralLoanApplication() {
           userId: data.user_id,
         });
       } catch (err) {
-        console.error("Error fetching referrer:", err);
+        console.error('[ReferralLoanApplication] Exception in fetchReferrerInfo:', err);
         setError("Failed to load referral information");
       } finally {
+        console.log('[ReferralLoanApplication] Setting loading to false');
         setLoading(false);
       }
     }
 
     fetchReferrerInfo();
   }, [referralCode]);
+
+  // Debug: State monitoring
+  useEffect(() => {
+    console.log('[ReferralLoanApplication] State changed:', {
+      loading,
+      error,
+      hasReferrerInfo: !!referrerInfo,
+      referrerInfoOrgId: referrerInfo?.orgId,
+      currentStep,
+    });
+  }, [loading, error, referrerInfo, currentStep]);
 
   const handleVerificationComplete = (type: 'email' | 'phone') => {
     setVerificationStatus((prev) => ({
