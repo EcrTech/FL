@@ -27,6 +27,7 @@ interface DocumentUploadProps {
 }
 
 const DOCUMENT_CATEGORIES = {
+  identity: "Identity Proof",
   address: "Address Proof",
   income: "Income Proof",
   bank: "Bank Statements",
@@ -35,6 +36,8 @@ const DOCUMENT_CATEGORIES = {
 };
 
 const REQUIRED_DOCUMENTS = [
+  { type: "pan_card", name: "PAN Card", category: "identity", mandatory: true, verifiable: false, parseable: false },
+  { type: "aadhaar_card", name: "Aadhaar Card", category: "identity", mandatory: true, verifiable: false, parseable: false },
   { type: "salary_slip_1", name: "Salary Slip - Month 1", category: "income", mandatory: true, verifiable: false, parseable: true },
   { type: "salary_slip_2", name: "Salary Slip - Month 2", category: "income", mandatory: true, verifiable: false, parseable: true },
   { type: "salary_slip_3", name: "Salary Slip - Month 3", category: "income", mandatory: true, verifiable: false, parseable: true },
@@ -630,6 +633,7 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
   // Custom category labels
   const getCategoryLabel = (category: string) => {
     if (category === "bank_employment") return "Bank & Employment";
+    if (category === "identity") return "Identity Proof";
     return DOCUMENT_CATEGORIES[category as keyof typeof DOCUMENT_CATEGORIES] || category;
   };
 
