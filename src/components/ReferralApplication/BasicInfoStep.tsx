@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -54,6 +54,10 @@ export function BasicInfoStep({
   const [phoneTimer, setPhoneTimer] = useState(0);
   const [phoneTestOtp, setPhoneTestOtp] = useState<string | null>(null);
 
+  // Refs to track if OTP was already sent for current value
+  const lastPhoneSentRef = useRef<string>("");
+  const lastEmailSentRef = useRef<string>("");
+
   const startTimer = (type: 'email' | 'phone') => {
     const setTimer = type === 'email' ? setEmailTimer : setPhoneTimer;
     setTimer(120);
@@ -78,12 +82,12 @@ export function BasicInfoStep({
     const identifier = type === 'email' ? formData.email : formData.phone;
     
     if (type === 'email' && !formData.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-      toast.error("Please enter a valid email address");
+      // Don't show toast for auto-send, just return
       return;
     }
     
     if (type === 'phone' && formData.phone.replace(/\D/g, '').length < 10) {
-      toast.error("Please enter a valid 10-digit phone number");
+      // Don't show toast for auto-send, just return
       return;
     }
 
@@ -106,6 +110,13 @@ export function BasicInfoStep({
       setOtpSent(true);
       startTimer(type);
       
+      // Track that we sent OTP for this value
+      if (type === 'phone') {
+        lastPhoneSentRef.current = formData.phone;
+      } else {
+        lastEmailSentRef.current = formData.email;
+      }
+      
       // Handle test mode for phone OTP
       if (type === 'phone' && data.isTestMode && data.testOtp) {
         setPhoneTestOtp(data.testOtp);
@@ -120,6 +131,42 @@ export function BasicInfoStep({
       setSending(false);
     }
   };
+
+  // Auto-send OTP when valid phone number is entered
+  useEffect(() => {
+    const cleanPhone = formData.phone.replace(/\D/g, '');
+    if (
+      cleanPhone.length === 10 && 
+      !phoneOtpSent && 
+      !verificationStatus.phoneVerified && 
+      !sendingPhoneOtp &&
+      lastPhoneSentRef.current !== formData.phone
+    ) {
+      // Debounce to avoid sending while user is still typing
+      const timer = setTimeout(() => {
+        sendOtp('phone');
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [formData.phone, phoneOtpSent, verificationStatus.phoneVerified, sendingPhoneOtp]);
+
+  // Auto-send OTP when valid email is entered
+  useEffect(() => {
+    const isValidEmail = formData.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
+    if (
+      isValidEmail && 
+      !emailOtpSent && 
+      !verificationStatus.emailVerified && 
+      !sendingEmailOtp &&
+      lastEmailSentRef.current !== formData.email
+    ) {
+      // Debounce to avoid sending while user is still typing
+      const timer = setTimeout(() => {
+        sendOtp('email');
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [formData.email, emailOtpSent, verificationStatus.emailVerified, sendingEmailOtp]);
 
   const verifyOtp = async (type: 'email' | 'phone') => {
     const startTime = Date.now();
@@ -149,9 +196,11 @@ export function BasicInfoStep({
       if (type === 'email') {
         setEmailOtpSent(false);
         setEmailOtp("");
+        lastEmailSentRef.current = ""; // Reset to allow resend
       } else {
         setPhoneOtpSent(false);
         setPhoneOtp("");
+        lastPhoneSentRef.current = ""; // Reset to allow resend
       }
       console.log(`[OTP Verify] ========== END (no session) ==========`);
       return;
@@ -242,9 +291,20 @@ export function BasicInfoStep({
 
   const allConsentsChecked = consents.householdIncome && consents.termsAndConditions && consents.aadhaarConsent;
   const isValidPhone = formData.phone.replace(/\D/g, '').length === 10;
+  const isValidEmail = formData.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
   const isValidLoanAmount = formData.requestedAmount >= 5000 && formData.requestedAmount <= 100000;
   const isValidTenure = formData.tenureDays >= 1 && formData.tenureDays <= 90;
-  const canProceed = formData.name && isValidPhone && isValidLoanAmount && isValidTenure && allConsentsChecked;
+  
+  // Updated canProceed: requires both phone AND email verification
+  const canProceed = 
+    formData.name && 
+    isValidPhone && 
+    isValidEmail &&
+    isValidLoanAmount && 
+    isValidTenure && 
+    allConsentsChecked &&
+    verificationStatus.phoneVerified &&
+    verificationStatus.emailVerified;
 
   return (
     <div className="space-y-8">
@@ -338,46 +398,39 @@ export function BasicInfoStep({
           />
         </div>
 
-        {/* Phone Field with OTP - Now first and mandatory */}
+        {/* Phone Field with Auto OTP */}
         <div className="space-y-2">
           <Label htmlFor="phone" className="text-sm font-heading font-semibold text-foreground flex items-center gap-2">
             <Phone className="h-4 w-4 text-muted-foreground" />
             Mobile Number <span className="text-[hsl(var(--coral-500))]">*</span>
           </Label>
-          <div className="flex gap-3">
-            <div className="relative flex-1">
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-heading font-semibold text-sm">
-                +91
-              </div>
-              <Input
-                id="phone"
-                type="tel"
-                placeholder="Enter 10-digit mobile"
-                value={formData.phone}
-                onChange={(e) => onUpdate({ phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
-                disabled={verificationStatus.phoneVerified}
-                className="h-12 bg-background border-2 border-border rounded-xl pl-14 pr-28 text-base font-body focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
-                maxLength={10}
-              />
-              {verificationStatus.phoneVerified && (
-                <Badge className="absolute right-3 top-1/2 -translate-y-1/2 bg-[hsl(var(--success))] text-white border-0 font-heading">
-                  <Check className="h-3 w-3 mr-1" /> Verified
-                </Badge>
-              )}
+          <div className="relative">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-heading font-semibold text-sm">
+              +91
             </div>
-            {!verificationStatus.phoneVerified && !phoneOtpSent && (
-              <Button
-                type="button"
-                onClick={() => sendOtp('phone')}
-                disabled={sendingPhoneOtp || formData.phone.length !== 10}
-                className="h-12 px-6 btn-electric rounded-xl font-heading"
-              >
-                {sendingPhoneOtp ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Send OTP'}
-              </Button>
-            )}
+            <Input
+              id="phone"
+              type="tel"
+              placeholder="Enter 10-digit mobile"
+              value={formData.phone}
+              onChange={(e) => onUpdate({ phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+              disabled={verificationStatus.phoneVerified}
+              className="h-12 bg-background border-2 border-border rounded-xl pl-14 pr-28 text-base font-body focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+              maxLength={10}
+            />
+            {verificationStatus.phoneVerified ? (
+              <Badge className="absolute right-3 top-1/2 -translate-y-1/2 bg-[hsl(var(--success))] text-white border-0 font-heading">
+                <Check className="h-3 w-3 mr-1" /> Verified
+              </Badge>
+            ) : sendingPhoneOtp ? (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Sending OTP...</span>
+              </div>
+            ) : null}
           </div>
 
-          {/* Phone OTP Input */}
+          {/* Phone OTP Input - Shows automatically when OTP is sent */}
           {phoneOtpSent && !verificationStatus.phoneVerified && (
             <div className="space-y-2 mt-3">
               {phoneTestOtp && (
@@ -412,42 +465,35 @@ export function BasicInfoStep({
           )}
         </div>
 
-        {/* Email Field with OTP - Now second and optional */}
+        {/* Email Field with Auto OTP - Now Mandatory */}
         <div className="space-y-2">
           <Label htmlFor="email" className="text-sm font-heading font-semibold text-foreground flex items-center gap-2">
             <Mail className="h-4 w-4 text-muted-foreground" />
-            Email Address <span className="text-muted-foreground text-xs font-normal">(optional)</span>
+            Email Address <span className="text-[hsl(var(--coral-500))]">*</span>
           </Label>
-          <div className="flex gap-3">
-            <div className="relative flex-1">
-              <Input
-                id="email"
-                type="email"
-                placeholder="Enter your email"
-                value={formData.email}
-                onChange={(e) => onUpdate({ email: e.target.value })}
-                disabled={verificationStatus.emailVerified}
-                className="h-12 bg-background border-2 border-border rounded-xl text-base font-body pr-28 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
-              />
-              {verificationStatus.emailVerified && (
-                <Badge className="absolute right-3 top-1/2 -translate-y-1/2 bg-[hsl(var(--success))] text-white border-0 font-heading">
-                  <Check className="h-3 w-3 mr-1" /> Verified
-                </Badge>
-              )}
-            </div>
-            {!verificationStatus.emailVerified && !emailOtpSent && (
-              <Button
-                type="button"
-                onClick={() => sendOtp('email')}
-                disabled={sendingEmailOtp || !formData.email}
-                className="h-12 px-6 btn-electric rounded-xl font-heading"
-              >
-                {sendingEmailOtp ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Send OTP'}
-              </Button>
-            )}
+          <div className="relative">
+            <Input
+              id="email"
+              type="email"
+              placeholder="Enter your email"
+              value={formData.email}
+              onChange={(e) => onUpdate({ email: e.target.value })}
+              disabled={verificationStatus.emailVerified}
+              className="h-12 bg-background border-2 border-border rounded-xl text-base font-body pr-36 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+            />
+            {verificationStatus.emailVerified ? (
+              <Badge className="absolute right-3 top-1/2 -translate-y-1/2 bg-[hsl(var(--success))] text-white border-0 font-heading">
+                <Check className="h-3 w-3 mr-1" /> Verified
+              </Badge>
+            ) : sendingEmailOtp ? (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Sending OTP...</span>
+              </div>
+            ) : null}
           </div>
 
-          {/* Email OTP Input */}
+          {/* Email OTP Input - Shows automatically when OTP is sent */}
           {emailOtpSent && !verificationStatus.emailVerified && (
             <div className="flex gap-3 mt-3 p-4 bg-[hsl(var(--electric-blue-100))] rounded-xl border border-[hsl(var(--electric-blue-400))]/20">
               <Input
