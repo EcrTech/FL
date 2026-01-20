@@ -619,7 +619,8 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
     );
   };
 
-  // Merge bank and employment into one column but keep them as separate sections
+  // Group documents by display column
+  // Left column: identity + income, Right column: bank_employment
   const groupedDocs = REQUIRED_DOCUMENTS.reduce((acc, doc) => {
     // Merge bank and employment categories into one column
     const columnKey = doc.category === "bank" || doc.category === "employment" 
@@ -629,6 +630,9 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
     acc[columnKey].push(doc);
     return acc;
   }, {} as Record<string, typeof REQUIRED_DOCUMENTS>);
+
+  // Define display order to control layout
+  const categoryOrder = ["identity", "income", "bank_employment"];
 
   // Custom category labels
   const getCategoryLabel = (category: string) => {
@@ -791,18 +795,44 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {Object.entries(groupedDocs).map(([category, docs]) => (
-            <Card key={category} className="h-fit">
-              <CardHeader className="py-3 px-4">
-                <CardTitle className="text-sm font-medium">
-                  {getCategoryLabel(category)}
-                </CardTitle>
-            </CardHeader>
-            <CardContent className="p-3 pt-0 space-y-2">
-              {category === "bank_employment" ? (
-                <>
+          {/* Left column: Identity + Income */}
+          <div className="space-y-4">
+            {categoryOrder.filter(cat => cat !== "bank_employment").map((category) => {
+              const docs = groupedDocs[category];
+              if (!docs) return null;
+              return (
+                <Card key={category} className="h-fit">
+                  <CardHeader className="py-3 px-4">
+                    <CardTitle className="text-sm font-medium">
+                      {getCategoryLabel(category)}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-3 pt-0 space-y-2">
+                    {docs.map((doc) => {
+                      const document = getDocument(doc.type);
+                      const status = document?.verification_status || "pending";
+                      const isUploading = uploadingDoc === doc.type;
+                      const isVerified = status === "verified";
+                      return renderDocumentRow(doc, document, isUploading, isVerified);
+                    })}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Right column: Bank & Employment */}
+          <div className="space-y-4">
+            {groupedDocs["bank_employment"] && (
+              <Card className="h-fit">
+                <CardHeader className="py-3 px-4">
+                  <CardTitle className="text-sm font-medium">
+                    {getCategoryLabel("bank_employment")}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3 pt-0 space-y-2">
                   {/* Bank Statements Section */}
-                  {docs.filter(d => d.category === "bank").map((doc) => {
+                  {groupedDocs["bank_employment"].filter(d => d.category === "bank").map((doc) => {
                     const document = getDocument(doc.type);
                     const status = document?.verification_status || "pending";
                     const isUploading = uploadingDoc === doc.type;
@@ -816,26 +846,17 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
                       Employment Proof
                     </span>
                   </div>
-                  {docs.filter(d => d.category === "employment").map((doc) => {
+                  {groupedDocs["bank_employment"].filter(d => d.category === "employment").map((doc) => {
                     const document = getDocument(doc.type);
                     const status = document?.verification_status || "pending";
                     const isUploading = uploadingDoc === doc.type;
                     const isVerified = status === "verified";
                     return renderDocumentRow(doc, document, isUploading, isVerified);
                   })}
-                </>
-              ) : (
-                docs.map((doc) => {
-                  const document = getDocument(doc.type);
-                  const status = document?.verification_status || "pending";
-                  const isUploading = uploadingDoc === doc.type;
-                  const isVerified = status === "verified";
-                  return renderDocumentRow(doc, document, isUploading, isVerified);
-                })
-              )}
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
       </div>
 
