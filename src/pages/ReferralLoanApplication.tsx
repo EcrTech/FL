@@ -154,7 +154,7 @@ export default function ReferralLoanApplication() {
 
   const [aadhaarNumber, setAadhaarNumber] = useState("");
   const [aadhaarVerified, setAadhaarVerified] = useState(false);
-  const [aadhaarData, setAadhaarData] = useState<{ name: string; address: string; dob: string } | undefined>();
+  const [aadhaarData, setAadhaarData] = useState<{ name: string; address: string; dob: string; aadhaarNumber?: string } | undefined>();
 
   const [videoKycCompleted, setVideoKycCompleted] = useState(false);
 
@@ -298,9 +298,13 @@ export default function ReferralLoanApplication() {
     setPanVerified(true);
   };
 
-  const handleAadhaarVerified = (data: { name: string; address: string; dob: string }) => {
+  const handleAadhaarVerified = (data: { name: string; address: string; dob: string; aadhaarNumber?: string }) => {
     setAadhaarData(data);
     setAadhaarVerified(true);
+    // Store aadhaar number if provided from DigiLocker
+    if (data.aadhaarNumber) {
+      setAadhaarNumber(data.aadhaarNumber);
+    }
   };
 
   // Create draft application before entering Video KYC step
@@ -640,8 +644,6 @@ export default function ReferralLoanApplication() {
 
               {currentStep === 3 && (
                 <AadhaarVerificationStep
-                  aadhaarNumber={aadhaarNumber}
-                  onAadhaarChange={setAadhaarNumber}
                   onVerified={handleAadhaarVerified}
                   onNext={handleEnterVideoStep}
                   onBack={() => setCurrentStep(2)}

@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Check, Loader2, AlertCircle, ArrowLeft, ArrowRight, FileCheck, ShieldCheck, MapPin, ExternalLink } from "lucide-react";
+import { Check, Loader2, ArrowLeft, ArrowRight, FileCheck, ShieldCheck, MapPin, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -20,9 +20,7 @@ interface CommunicationAddress {
 }
 
 interface AadhaarVerificationStepProps {
-  aadhaarNumber: string;
-  onAadhaarChange: (aadhaar: string) => void;
-  onVerified: (data: { name: string; address: string; dob: string }) => void;
+  onVerified: (data: { name: string; address: string; dob: string; aadhaarNumber?: string }) => void;
   onNext: () => void;
   onBack: () => void;
   isVerified: boolean;
@@ -44,8 +42,6 @@ const INDIAN_STATES = [
 ];
 
 export function AadhaarVerificationStep({
-  aadhaarNumber,
-  onAadhaarChange,
   onVerified,
   onNext,
   onBack,
@@ -63,8 +59,6 @@ export function AadhaarVerificationStep({
   const [localCommAddress, setLocalCommAddress] = useState<CommunicationAddress>(
     communicationAddress || { addressLine1: "", addressLine2: "", city: "", state: "", pincode: "" }
   );
-
-  const isValidAadhaar = /^\d{12}$/.test(aadhaarNumber.replace(/\s/g, ''));
 
   // Check for DigiLocker return on mount
   useEffect(() => {
@@ -88,32 +82,14 @@ export function AadhaarVerificationStep({
       const newUrl = window.location.pathname;
       window.history.replaceState({}, "", newUrl);
     } else if (digilockerFailure === "true") {
-      toast.error("DigiLocker verification was not completed. You can try again or continue without verification.");
+      toast.error("DigiLocker verification failed. Please try again.");
       // Clean URL params
       const newUrl = window.location.pathname;
       window.history.replaceState({}, "", newUrl);
     }
   }, [searchParams, onVerified]);
 
-  const formatAadhaar = (value: string) => {
-    const digits = value.replace(/\D/g, '').slice(0, 12);
-    return digits.replace(/(\d{4})(?=\d)/g, '$1 ').trim();
-  };
-
-  const getMaskedAadhaar = () => {
-    const digits = aadhaarNumber.replace(/\s/g, '');
-    if (digits.length === 12) {
-      return `XXXX XXXX ${digits.slice(-4)}`;
-    }
-    return aadhaarNumber;
-  };
-
   const initiateDigilocker = async () => {
-    if (!isValidAadhaar) {
-      toast.error("Please enter a valid 12-digit Aadhaar number");
-      return;
-    }
-
     setInitiatingDigilocker(true);
     try {
       const currentUrl = window.location.href.split('?')[0]; // Remove existing params
@@ -121,7 +97,6 @@ export function AadhaarVerificationStep({
       
       // Store referral context for return
       localStorage.setItem('referral_aadhaar_pending', JSON.stringify({
-        aadhaarNumber: aadhaarNumber.replace(/\s/g, ''),
         returnUrl: currentUrl,
         commAddress: localDifferentAddress ? localCommAddress : null,
         isDifferentAddress: localDifferentAddress,
@@ -153,6 +128,13 @@ export function AadhaarVerificationStep({
     }
   };
 
+  const getMaskedAadhaar = (aadhaarNumber?: string) => {
+    if (aadhaarNumber && aadhaarNumber.length >= 4) {
+      return `XXXX XXXX ${aadhaarNumber.slice(-4)}`;
+    }
+    return "XXXX XXXX XXXX";
+  };
+
   return (
     <div className="space-y-8">
       {/* Section Header */}
@@ -161,8 +143,10 @@ export function AadhaarVerificationStep({
           <FileCheck className="h-6 w-6 text-primary" />
         </div>
         <div>
-          <h3 className="text-xl font-heading font-bold text-foreground">Aadhaar Details</h3>
-          <p className="text-sm text-muted-foreground font-body">Enter your Aadhaar number and optionally verify via DigiLocker</p>
+          <h3 className="text-xl font-heading font-bold text-foreground">Identity Verification</h3>
+          <p className="text-sm text-muted-foreground font-body">
+            {isVerified ? "Your identity has been verified" : "Verify your identity using DigiLocker"}
+          </p>
         </div>
       </div>
 
@@ -175,48 +159,16 @@ export function AadhaarVerificationStep({
         Back to PAN Verification
       </button>
 
-      {/* Aadhaar Input */}
-      <div className="space-y-2">
-        <Label htmlFor="aadhaar" className="text-sm font-heading font-semibold text-foreground">
-          Aadhaar Number <span className="text-[hsl(var(--coral-500))]">*</span>
-        </Label>
-        <div className="relative">
-          <Input
-            id="aadhaar"
-            placeholder="XXXX XXXX XXXX"
-            value={isVerified ? getMaskedAadhaar() : formatAadhaar(aadhaarNumber)}
-            onChange={(e) => onAadhaarChange(e.target.value.replace(/\D/g, '').slice(0, 12))}
-            disabled={isVerified}
-            className="h-14 bg-background border-2 border-border rounded-xl tracking-[0.3em] font-mono text-lg text-center focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
-            maxLength={14}
-          />
-          {isVerified && (
-            <Badge className="absolute right-3 top-1/2 -translate-y-1/2 bg-[hsl(var(--success))] text-white border-0 font-heading">
-              <Check className="h-3 w-3 mr-1" /> {verifiedData?.name === 'Pending Verification' ? 'Saved' : 'Verified'}
-            </Badge>
-          )}
-        </div>
-        {aadhaarNumber && !isValidAadhaar && (
-          <p className="text-sm text-[hsl(var(--coral-500))] flex items-center gap-1.5 font-body mt-2">
-            <AlertCircle className="h-4 w-4" />
-            Please enter a valid 12-digit Aadhaar number
-          </p>
-        )}
-        <p className="text-xs text-muted-foreground font-body">
-          12-digit unique identification number
-        </p>
-      </div>
-
-      {/* Verified Details */}
+      {/* Verified Details Card */}
       {isVerified && verifiedData && (
-        <Card className={`rounded-xl overflow-hidden ${verifiedData.name === 'Pending Verification' ? 'bg-muted/50 border-2 border-border' : 'bg-[hsl(var(--success))]/5 border-2 border-[hsl(var(--success))]/20'}`}>
+        <Card className="rounded-xl overflow-hidden bg-[hsl(var(--success))]/5 border-2 border-[hsl(var(--success))]/20">
           <CardContent className="p-5">
             <div className="flex items-center gap-3 mb-4">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${verifiedData.name === 'Pending Verification' ? 'bg-muted-foreground' : 'bg-[hsl(var(--success))]'}`}>
+              <div className="w-10 h-10 rounded-full flex items-center justify-center bg-[hsl(var(--success))]">
                 <ShieldCheck className="h-5 w-5 text-white" />
               </div>
-              <span className={`font-heading font-bold ${verifiedData.name === 'Pending Verification' ? 'text-muted-foreground' : 'text-[hsl(var(--success))]'}`}>
-                {verifiedData.name === 'Pending Verification' ? 'Aadhaar Saved (Pending Verification)' : 'Aadhaar Verified Successfully'}
+              <span className="font-heading font-bold text-[hsl(var(--success))]">
+                Aadhaar Verified Successfully
               </span>
             </div>
             <div className="space-y-3">
@@ -224,29 +176,68 @@ export function AadhaarVerificationStep({
                 <span className="text-muted-foreground font-body text-sm">Aadhaar Number</span>
                 <span className="font-heading font-semibold text-foreground">{getMaskedAadhaar()}</span>
               </div>
-              {verifiedData.name !== 'Pending Verification' && (
-                <>
-                  <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground font-body text-sm">Name</span>
-                    <span className="font-heading font-semibold text-foreground">{verifiedData.name}</span>
-                  </div>
-                  <div className="flex justify-between items-start">
-                    <span className="text-muted-foreground font-body text-sm">Address</span>
-                    <span className="font-body text-foreground text-right max-w-[220px] text-sm">{verifiedData.address}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground font-body text-sm">Date of Birth</span>
-                    <span className="font-heading font-semibold text-foreground">{verifiedData.dob}</span>
-                  </div>
-                </>
-              )}
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground font-body text-sm">Name</span>
+                <span className="font-heading font-semibold text-foreground">{verifiedData.name}</span>
+              </div>
+              <div className="flex justify-between items-start">
+                <span className="text-muted-foreground font-body text-sm">Address</span>
+                <span className="font-body text-foreground text-right max-w-[220px] text-sm">{verifiedData.address}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground font-body text-sm">Date of Birth</span>
+                <span className="font-heading font-semibold text-foreground">{verifiedData.dob}</span>
+              </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Communication Address Checkbox - show when valid Aadhaar entered */}
-      {isValidAadhaar && (
+      {/* DigiLocker Verification Section - Show when not verified */}
+      {!isVerified && (
+        <div className="space-y-4">
+          <Card className="rounded-xl border-2 border-primary/20 bg-primary/5">
+            <CardContent className="p-6 text-center space-y-4">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                <ShieldCheck className="h-8 w-8 text-primary" />
+              </div>
+              <div>
+                <h4 className="font-heading font-bold text-lg text-foreground mb-2">
+                  Verify via DigiLocker
+                </h4>
+                <p className="text-sm text-muted-foreground font-body">
+                  Complete your Aadhaar verification securely through DigiLocker. 
+                  This is required to proceed with your loan application.
+                </p>
+              </div>
+              <Button
+                onClick={initiateDigilocker}
+                disabled={initiatingDigilocker}
+                className="w-full h-14 text-lg font-heading font-bold btn-electric rounded-xl"
+              >
+                {initiatingDigilocker ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                    Redirecting to DigiLocker...
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="h-5 w-5 mr-2" />
+                    Verify with DigiLocker
+                    <ExternalLink className="h-4 w-4 ml-2" />
+                  </>
+                )}
+              </Button>
+              <p className="text-xs text-muted-foreground font-body">
+                You will be redirected to DigiLocker to verify your Aadhaar securely
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Communication Address Section - Show only when verified */}
+      {isVerified && (
         <div className="space-y-4">
           <div className="flex items-start space-x-3 p-4 bg-muted/30 rounded-xl border border-border">
             <Checkbox
@@ -384,45 +375,9 @@ export function AadhaarVerificationStep({
         </div>
       )}
 
-      {/* DigiLocker Verification Button */}
-      {!isVerified && isValidAadhaar && (
-        <div className="space-y-3">
-          <Button
-            onClick={initiateDigilocker}
-            disabled={initiatingDigilocker}
-            variant="outline"
-            className="w-full h-12 font-heading font-semibold rounded-xl border-2 border-primary text-primary hover:bg-primary/10"
-          >
-            {initiatingDigilocker ? (
-              <>
-                <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                Redirecting to DigiLocker...
-              </>
-            ) : (
-              <>
-                <ShieldCheck className="h-5 w-5 mr-2" />
-                Verify via DigiLocker (Optional)
-                <ExternalLink className="h-4 w-4 ml-2" />
-              </>
-            )}
-          </Button>
-          <p className="text-xs text-muted-foreground font-body text-center">
-            You will be redirected to DigiLocker to verify your Aadhaar. This is optional - you can continue without verification.
-          </p>
-        </div>
-      )}
-
-      {/* Next Button - always enabled when Aadhaar is valid */}
+      {/* Next Button - only enabled when verified */}
       <Button
         onClick={() => {
-          if (!isVerified && isValidAadhaar) {
-            // Save as unverified and continue
-            onVerified({
-              name: 'Pending Verification',
-              address: 'Pending Verification',
-              dob: 'Pending Verification',
-            });
-          }
           // Validate communication address if checkbox is checked
           if (localDifferentAddress) {
             if (!localCommAddress.addressLine1 || !localCommAddress.city || !localCommAddress.state || !localCommAddress.pincode) {
@@ -436,11 +391,19 @@ export function AadhaarVerificationStep({
           }
           onNext();
         }}
-        disabled={!isValidAadhaar}
+        disabled={!isVerified}
         className="w-full h-14 text-lg font-heading font-bold btn-electric rounded-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
       >
-        Continue to Video KYC
-        <ArrowRight className="h-5 w-5 ml-2" />
+        {isVerified ? (
+          <>
+            Continue to Video KYC
+            <ArrowRight className="h-5 w-5 ml-2" />
+          </>
+        ) : (
+          <>
+            Complete DigiLocker Verification to Continue
+          </>
+        )}
       </Button>
     </div>
   );
