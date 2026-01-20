@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, User, FileText, Calculator, FileCheck, XCircle, CreditCard, CheckCircle, MapPin, Edit2, Save, X, RefreshCw, Loader2, Sparkles, Plus } from "lucide-react";
+import { ArrowLeft, User, FileText, Calculator, FileCheck, XCircle, CreditCard, CheckCircle, MapPin, Edit2, Save, X, RefreshCw, Loader2, Sparkles, Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { LoadingState } from "@/components/common/LoadingState";
 import { format } from "date-fns";
@@ -24,7 +24,7 @@ import DisbursementForm from "@/components/LOS/Disbursement/DisbursementForm";
 import DisbursementStatus from "@/components/LOS/Disbursement/DisbursementStatus";
 import { ApplicantProfileCard } from "@/components/LOS/ApplicantProfileCard";
 import { BankDetailsSection } from "@/components/LOS/BankDetailsSection";
-import { AddReferralDialog } from "@/components/LOS/AddReferralDialog";
+import { ReferralDialog } from "@/components/LOS/ReferralDialog";
 import { ApplicationSummary } from "@/components/LOS/ApplicationSummary";
 
 const STAGE_LABELS: Record<string, string> = {
@@ -150,7 +150,23 @@ function ReferralsSection({
     enabled: !!applicationId,
   });
 
-  const [showAddReferral, setShowAddReferral] = useState(false);
+  const [showReferralDialog, setShowReferralDialog] = useState(false);
+  const [editingReferral, setEditingReferral] = useState<any>(null);
+
+  const handleEditReferral = (ref: any) => {
+    setEditingReferral(ref);
+    setShowReferralDialog(true);
+  };
+
+  const handleAddReferral = () => {
+    setEditingReferral(null);
+    setShowReferralDialog(true);
+  };
+
+  const handleCloseReferralDialog = () => {
+    setShowReferralDialog(false);
+    setEditingReferral(null);
+  };
 
   return (
     <div className="border-t pt-4 mt-4">
@@ -158,7 +174,7 @@ function ReferralsSection({
         <h4 className="text-sm font-medium text-muted-foreground">Referrals</h4>
         <div className="flex gap-2">
           {primaryApplicant && (
-            <Button variant="outline" size="sm" onClick={() => setShowAddReferral(true)}>
+            <Button variant="outline" size="sm" onClick={handleAddReferral}>
               <Plus className="h-4 w-4 mr-1" />
               Add Referral
             </Button>
@@ -184,13 +200,14 @@ function ReferralsSection({
         </div>
       </div>
 
-      {primaryApplicant && showAddReferral && (
-        <AddReferralDialog
-          open={showAddReferral}
-          onClose={() => setShowAddReferral(false)}
+      {primaryApplicant && (
+        <ReferralDialog
+          open={showReferralDialog}
+          onClose={handleCloseReferralDialog}
           applicationId={applicationId}
           applicantId={primaryApplicant.id}
           orgId={orgId}
+          referral={editingReferral}
         />
       )}
 
@@ -336,14 +353,26 @@ function ReferralsSection({
 
           {/* Additional Referrals */}
           {additionalReferrals.length > 0 && (
-            <div className="mt-4 pt-4 border-t">
+            <div className="md:col-span-2 mt-4 pt-4 border-t">
               <h5 className="text-sm font-medium mb-3">Additional Referrals</h5>
               <div className="grid gap-3 md:grid-cols-2">
                 {additionalReferrals.map((ref: any) => (
                   <div key={ref.id} className="p-3 rounded-lg border bg-muted/30">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Badge variant="outline" className="capitalize text-xs">{ref.referral_type}</Badge>
-                      {ref.relationship && <span className="text-xs text-muted-foreground">({ref.relationship})</span>}
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="capitalize text-xs">{ref.referral_type}</Badge>
+                        {ref.relationship && <span className="text-xs text-muted-foreground">({ref.relationship})</span>}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => handleEditReferral(ref)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
                     <p className="text-sm font-medium">{ref.name}</p>
                     {ref.mobile && <p className="text-xs text-muted-foreground">{ref.mobile}</p>}
