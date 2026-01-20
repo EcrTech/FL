@@ -92,12 +92,15 @@ export function AadhaarVerificationStep({
   const initiateDigilocker = async () => {
     setInitiatingDigilocker(true);
     try {
-      const currentUrl = window.location.href.split('?')[0]; // Remove existing params
+      // Build a clean returnUrl without any query params
+      const cleanUrl = `${window.location.origin}${window.location.pathname}`;
       const baseUrl = window.location.origin;
+      
+      console.log("[AadhaarVerificationStep] Initiating DigiLocker with returnUrl:", cleanUrl);
       
       // Store referral context for return
       localStorage.setItem('referral_aadhaar_pending', JSON.stringify({
-        returnUrl: currentUrl,
+        returnUrl: cleanUrl,
         commAddress: localDifferentAddress ? localCommAddress : null,
         isDifferentAddress: localDifferentAddress,
       }));
@@ -106,7 +109,7 @@ export function AadhaarVerificationStep({
         body: {
           surl: `${baseUrl}/digilocker/success`,
           furl: `${baseUrl}/digilocker/failure`,
-          returnUrl: currentUrl, // Pass returnUrl to survive cross-domain redirect
+          returnUrl: cleanUrl, // Pass clean returnUrl to survive cross-domain redirect
         },
       });
 
