@@ -19,10 +19,13 @@ export default function DigilockerSuccess() {
   const orgId = searchParams.get("orgId");
   const id = searchParams.get("id");
   const isMock = searchParams.get("mock") === "true";
+  const returnUrlParam = searchParams.get("returnUrl"); // From callback chain
 
-  // Check if this is a referral form callback (from localStorage)
+  // Check if this is a referral form callback
+  // Priority: URL param (survives cross-domain) > localStorage (same-domain fallback)
   const referralContext = JSON.parse(localStorage.getItem("referral_aadhaar_pending") || "null");
-  const isReferralCallback = !!referralContext;
+  const isReferralCallback = !!returnUrlParam || !!referralContext;
+  const effectiveReturnUrl = returnUrlParam || referralContext?.returnUrl;
 
   const fetchDetailsMutation = useMutation({
     mutationFn: async () => {
@@ -65,7 +68,7 @@ export default function DigilockerSuccess() {
       }
       
       // If this is a referral callback, store data and redirect back
-      if (isReferralCallback && referralContext?.returnUrl) {
+      if (isReferralCallback && effectiveReturnUrl) {
         const verifiedInfo = {
           name: data.data?.name || "Verified User",
           address: data.data?.addresses?.[0]?.combined || "Address verified",
@@ -75,7 +78,7 @@ export default function DigilockerSuccess() {
         localStorage.removeItem("referral_aadhaar_pending");
         
         // Redirect back to referral form with success flag
-        const returnUrl = new URL(referralContext.returnUrl);
+        const returnUrl = new URL(effectiveReturnUrl);
         returnUrl.searchParams.set("digilocker_success", "true");
         window.location.href = returnUrl.toString();
       } else {
@@ -88,9 +91,9 @@ export default function DigilockerSuccess() {
       setStatus("error");
       
       // If referral callback, still redirect back with error
-      if (isReferralCallback && referralContext?.returnUrl) {
+      if (isReferralCallback && effectiveReturnUrl) {
         localStorage.removeItem("referral_aadhaar_pending");
-        const returnUrl = new URL(referralContext.returnUrl);
+        const returnUrl = new URL(effectiveReturnUrl);
         returnUrl.searchParams.set("digilocker_failure", "true");
         window.location.href = returnUrl.toString();
       }
@@ -100,7 +103,7 @@ export default function DigilockerSuccess() {
   useEffect(() => {
     if (id || isMock) {
       fetchDetailsMutation.mutate();
-    } else if (isReferralCallback) {
+    } else if (isReferralCallback && effectiveReturnUrl) {
       // For referral callback without id, treat as mock success
       const verifiedInfo = {
         name: "DigiLocker Verified",
@@ -110,18 +113,14 @@ export default function DigilockerSuccess() {
       localStorage.setItem("referral_aadhaar_verified", JSON.stringify(verifiedInfo));
       localStorage.removeItem("referral_aadhaar_pending");
       
-      if (referralContext?.returnUrl) {
-        const returnUrl = new URL(referralContext.returnUrl);
-        returnUrl.searchParams.set("digilocker_success", "true");
-        window.location.href = returnUrl.toString();
-      } else {
-        setStatus("success");
-      }
+      const returnUrl = new URL(effectiveReturnUrl);
+      returnUrl.searchParams.set("digilocker_success", "true");
+      window.location.href = returnUrl.toString();
     } else {
       setErrorMessage("Missing verification ID");
       setStatus("error");
     }
-  }, [id, isMock, isReferralCallback]);
+  }, [id, isMock, isReferralCallback, effectiveReturnUrl]);
 
   // Auto-redirect countdown effect
   useEffect(() => {
