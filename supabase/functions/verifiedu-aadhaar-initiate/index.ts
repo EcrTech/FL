@@ -68,9 +68,12 @@ serve(async (req) => {
       });
     }
 
-    // Build callback URLs with application context
-    const surl = `${successUrl}?applicationId=${applicationId}&orgId=${orgId}`;
-    const furl = `${failureUrl}?applicationId=${applicationId}&orgId=${orgId}`;
+    // Build callback URLs - NO query params!
+    // IMPORTANT: VerifiedU appends ?id=...&type=... to the URL
+    // Adding our own params causes double '?' which breaks URL parsing
+    // applicationId and orgId are stored in loan_verifications and retrieved during callback
+    const surl = successUrl;
+    const furl = failureUrl;
 
     // Call VerifiedU API
     const response = await fetch(`${baseUrl}/api/verifiedu/VerifyAadhaarViaDigilocker`, {

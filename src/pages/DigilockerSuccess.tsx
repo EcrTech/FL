@@ -12,11 +12,12 @@ export default function DigilockerSuccess() {
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [aadhaarData, setAadhaarData] = useState<any>(null);
   const [errorMessage, setErrorMessage] = useState<string>("");
+  const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null);
+  const [resolvedApplicationId, setResolvedApplicationId] = useState<string | null>(null);
 
   const applicationId = searchParams.get("applicationId");
   const orgId = searchParams.get("orgId");
   const id = searchParams.get("id");
-  const type = searchParams.get("type");
   const isMock = searchParams.get("mock") === "true";
 
   // Check if this is a referral form callback (from localStorage)
@@ -58,6 +59,11 @@ export default function DigilockerSuccess() {
       setAadhaarData(data.data);
       setStatus("success");
       
+      // Capture resolved applicationId from response (from database lookup)
+      if (data.applicationId) {
+        setResolvedApplicationId(data.applicationId);
+      }
+      
       // If this is a referral callback, store data and redirect back
       if (isReferralCallback && referralContext?.returnUrl) {
         const verifiedInfo = {
@@ -72,6 +78,9 @@ export default function DigilockerSuccess() {
         const returnUrl = new URL(referralContext.returnUrl);
         returnUrl.searchParams.set("digilocker_success", "true");
         window.location.href = returnUrl.toString();
+      } else {
+        // Start auto-redirect countdown for regular application flow
+        setRedirectCountdown(3);
       }
     },
     onError: (error: any) => {
@@ -114,9 +123,33 @@ export default function DigilockerSuccess() {
     }
   }, [id, isMock, isReferralCallback]);
 
+  // Auto-redirect countdown effect
+  useEffect(() => {
+    if (redirectCountdown === null) return;
+    
+    if (redirectCountdown === 0) {
+      // Auto-redirect to application page
+      const targetAppId = resolvedApplicationId || applicationId;
+      if (targetAppId) {
+        navigate(`/los/applications/${targetAppId}`);
+      } else {
+        navigate("/los/applications");
+      }
+      return;
+    }
+    
+    const timer = setTimeout(() => {
+      setRedirectCountdown(prev => (prev !== null ? prev - 1 : null));
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, [redirectCountdown, resolvedApplicationId, applicationId, navigate]);
+
   const handleContinue = () => {
-    if (applicationId) {
-      navigate(`/los/applications/${applicationId}`);
+    setRedirectCountdown(null); // Cancel auto-redirect
+    const targetAppId = resolvedApplicationId || applicationId;
+    if (targetAppId) {
+      navigate(`/los/applications/${targetAppId}`);
     } else {
       navigate("/los/applications");
     }
@@ -165,6 +198,11 @@ export default function DigilockerSuccess() {
               <CardTitle className="text-green-600">Verification Successful</CardTitle>
               <CardDescription>
                 Your Aadhaar has been verified successfully via DigiLocker
+                {redirectCountdown !== null && (
+                  <span className="block mt-2 text-primary font-medium">
+                    Redirecting in {redirectCountdown} seconds...
+                  </span>
+                )}
               </CardDescription>
             </>
           )}
@@ -220,7 +258,9 @@ export default function DigilockerSuccess() {
           )}
 
           <Button onClick={handleContinue} className="w-full">
-            {status === "success" ? "Continue to Application" : "Go Back"}
+            {status === "success" 
+              ? `Continue Now${redirectCountdown !== null ? ` (${redirectCountdown})` : ''}`
+              : "Go Back"}
           </Button>
         </CardContent>
       </Card>

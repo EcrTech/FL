@@ -48,6 +48,52 @@ serve(async (req) => {
     const companyId = Deno.env.get("VERIFIEDU_COMPANY_ID");
     const baseUrl = Deno.env.get("VERIFIEDU_API_BASE_URL");
 
+    // Initialize admin client for database lookups
+    const adminClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    // Resolve applicationId and orgId from database if not provided
+    // This handles the case where VerifiedU callback URL doesn't include these params
+    let resolvedApplicationId = applicationId;
+    let resolvedOrgId = orgId;
+
+    if (!applicationId || !orgId) {
+      console.log("Looking up application context from database for uniqueRequestNumber:", uniqueRequestNumber);
+      
+      // Find the pending verification record by unique_request_number in request_data
+      const { data: pendingRecords, error: lookupError } = await adminClient
+        .from("loan_verifications")
+        .select("loan_application_id, org_id, request_data")
+        .eq("status", "in_progress")
+        .eq("verification_type", "aadhaar")
+        .eq("verification_source", "verifiedu")
+        .order("created_at", { ascending: false })
+        .limit(20);
+      
+      if (lookupError) {
+        console.error("Error looking up pending verification:", lookupError);
+      } else if (pendingRecords && pendingRecords.length > 0) {
+        // Find the record matching our unique_request_number
+        const matchingRecord = pendingRecords.find(r => {
+          const requestData = r.request_data as Record<string, unknown> | null;
+          return requestData?.unique_request_number === uniqueRequestNumber;
+        });
+        
+        if (matchingRecord) {
+          resolvedApplicationId = matchingRecord.loan_application_id;
+          resolvedOrgId = matchingRecord.org_id;
+          console.log("Found matching verification record:", {
+            applicationId: resolvedApplicationId,
+            orgId: resolvedOrgId
+          });
+        } else {
+          console.log("No matching verification record found for uniqueRequestNumber:", uniqueRequestNumber);
+        }
+      }
+    }
+
     if (!verifieduToken || !companyId || !baseUrl) {
       console.log("VerifiedU credentials not configured, using mock mode");
       // Mock response for testing
@@ -75,6 +121,8 @@ serve(async (req) => {
           photo: null,
         },
         is_mock: true,
+        applicationId: resolvedApplicationId,
+        orgId: resolvedOrgId,
       };
 
       return new Response(JSON.stringify(mockResponse), {
@@ -108,18 +156,13 @@ serve(async (req) => {
       });
     }
 
-    // Update verification record in database if applicationId is provided
-    if (applicationId && orgId) {
-      const adminClient = createClient(
-        Deno.env.get("SUPABASE_URL")!,
-        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-      );
-
+    // Update verification record in database if we have applicationId (original or resolved)
+    if (resolvedApplicationId && resolvedOrgId) {
       // Find and update the existing verification record
       const { data: existingVerification } = await adminClient
         .from("loan_verifications")
         .select("id")
-        .eq("loan_application_id", applicationId)
+        .eq("loan_application_id", resolvedApplicationId)
         .eq("verification_type", "aadhaar")
         .eq("verification_source", "verifiedu")
         .order("created_at", { ascending: false })
@@ -147,8 +190,8 @@ serve(async (req) => {
           .eq("id", existingVerification.id);
       } else {
         await adminClient.from("loan_verifications").insert({
-          loan_application_id: applicationId,
-          org_id: orgId,
+          loan_application_id: resolvedApplicationId,
+          org_id: resolvedOrgId,
           verification_type: "aadhaar",
           verification_source: "verifiedu",
           request_data: { unique_request_number: uniqueRequestNumber },
@@ -167,6 +210,8 @@ serve(async (req) => {
         addresses: responseData.addresses,
         is_valid: responseData.is_valid,
       },
+      applicationId: resolvedApplicationId,
+      orgId: resolvedOrgId,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
