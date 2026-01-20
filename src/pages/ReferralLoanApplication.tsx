@@ -25,6 +25,37 @@ const STEPS = [
   { id: 4, title: "Video KYC", icon: Video },
 ];
 
+// Storage key for persisting form state across DigiLocker redirects
+const REFERRAL_FORM_STORAGE_KEY = "referral_form_state";
+
+interface StoredFormState {
+  currentStep: number;
+  basicInfo: {
+    name: string;
+    email: string;
+    phone: string;
+    requestedAmount: number;
+    tenureDays: number;
+  };
+  consents: {
+    householdIncome: boolean;
+    termsAndConditions: boolean;
+    aadhaarConsent: boolean;
+  };
+  verificationStatus: {
+    emailVerified: boolean;
+    phoneVerified: boolean;
+  };
+  panNumber: string;
+  panVerified: boolean;
+  panData?: { name: string; status: string };
+  aadhaarNumber: string;
+  aadhaarVerified: boolean;
+  aadhaarData?: { name: string; address: string; dob: string };
+  geolocation?: { latitude: number; longitude: number; accuracy: number };
+  referralCode?: string;
+}
+
 export default function ReferralLoanApplication() {
   // Debug: Component mount logging
   console.log('[ReferralLoanApplication] Component mounting at', new Date().toISOString());
@@ -52,6 +83,7 @@ export default function ReferralLoanApplication() {
   } | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [stateRestored, setStateRestored] = useState(false);
 
   // Capture geolocation function
   const captureGeolocation = () => {
@@ -125,6 +157,62 @@ export default function ReferralLoanApplication() {
   const [aadhaarData, setAadhaarData] = useState<{ name: string; address: string; dob: string } | undefined>();
 
   const [videoKycCompleted, setVideoKycCompleted] = useState(false);
+
+  // Restore form state from localStorage on mount (for DigiLocker redirect return)
+  useEffect(() => {
+    const storedState = localStorage.getItem(REFERRAL_FORM_STORAGE_KEY);
+    if (storedState) {
+      try {
+        const parsed: StoredFormState = JSON.parse(storedState);
+        // Only restore if same referral code
+        if (parsed.referralCode === referralCode) {
+          console.log('[ReferralLoanApplication] Restoring form state from localStorage');
+          setCurrentStep(parsed.currentStep);
+          setBasicInfo(parsed.basicInfo);
+          setConsents(parsed.consents);
+          setVerificationStatus(parsed.verificationStatus);
+          setPanNumber(parsed.panNumber);
+          setPanVerified(parsed.panVerified);
+          if (parsed.panData) setPanData(parsed.panData);
+          setAadhaarNumber(parsed.aadhaarNumber);
+          setAadhaarVerified(parsed.aadhaarVerified);
+          if (parsed.aadhaarData) setAadhaarData(parsed.aadhaarData);
+          if (parsed.geolocation) setGeolocation(parsed.geolocation);
+        } else {
+          console.log('[ReferralLoanApplication] Stored state is for different referral code, clearing');
+          localStorage.removeItem(REFERRAL_FORM_STORAGE_KEY);
+        }
+      } catch (e) {
+        console.error('[ReferralLoanApplication] Failed to restore form state:', e);
+        localStorage.removeItem(REFERRAL_FORM_STORAGE_KEY);
+      }
+    }
+    setStateRestored(true);
+  }, [referralCode]);
+
+  // Persist form state to localStorage whenever key fields change
+  useEffect(() => {
+    // Only save after initial state restoration and if we have meaningful data
+    if (!stateRestored) return;
+    if (currentStep > 1 || panNumber || aadhaarNumber) {
+      const state: StoredFormState = {
+        currentStep,
+        basicInfo,
+        consents,
+        verificationStatus,
+        panNumber,
+        panVerified,
+        panData,
+        aadhaarNumber,
+        aadhaarVerified,
+        aadhaarData,
+        geolocation: geolocation || undefined,
+        referralCode,
+      };
+      localStorage.setItem(REFERRAL_FORM_STORAGE_KEY, JSON.stringify(state));
+      console.log('[ReferralLoanApplication] Form state saved to localStorage');
+    }
+  }, [stateRestored, currentStep, basicInfo, consents, verificationStatus, panNumber, panVerified, panData, aadhaarNumber, aadhaarVerified, aadhaarData, geolocation, referralCode]);
 
   // Fetch referrer info
   useEffect(() => {
@@ -348,6 +436,9 @@ export default function ReferralLoanApplication() {
 
       setApplicationNumber(data?.applicationNumber);
       setSubmissionSuccess(true);
+      // Clear saved form state after successful submission
+      localStorage.removeItem(REFERRAL_FORM_STORAGE_KEY);
+      console.log('[ReferralLoanApplication] Form state cleared from localStorage after submission');
       toast.success("Application submitted successfully!");
     } catch (err: any) {
       console.error("Error submitting application:", err);
