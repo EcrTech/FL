@@ -106,6 +106,7 @@ export function AadhaarVerificationStep({
         body: {
           surl: `${baseUrl}/digilocker/success`,
           furl: `${baseUrl}/digilocker/failure`,
+          returnUrl: currentUrl, // Pass returnUrl to survive cross-domain redirect
         },
       });
 

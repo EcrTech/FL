@@ -44,6 +44,7 @@ serve(async (req) => {
     let id: string | null = null;
     let type: string | null = null;
     let status: string | null = null;
+    let returnUrl: string | null = null;
 
     // Try to extract parameters from different sources
     // VerifiedU may send data as query params, form data, or JSON body
@@ -52,8 +53,9 @@ serve(async (req) => {
     id = url.searchParams.get("id");
     type = url.searchParams.get("type");
     status = url.searchParams.get("status");
+    returnUrl = url.searchParams.get("returnUrl");
     
-    console.log("[digilocker-callback] Query params - id:", id, "type:", type, "status:", status);
+    console.log("[digilocker-callback] Query params - id:", id, "type:", type, "status:", status, "returnUrl:", returnUrl);
 
     // 2. If POST request, try to parse body
     if (req.method === "POST") {
@@ -106,16 +108,28 @@ serve(async (req) => {
     // Default type to aadhaar if not specified
     type = type || "aadhaar";
 
-    console.log("[digilocker-callback] Final extracted - id:", id, "type:", type, "status:", status);
+    console.log("[digilocker-callback] Final extracted - id:", id, "type:", type, "status:", status, "returnUrl:", returnUrl);
 
     // Build the frontend redirect URL
-    const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://ps.in-sync.co.in";
+    // If returnUrl is provided, use the origin from it; otherwise fall back to FRONTEND_URL
+    let frontendUrl = Deno.env.get("FRONTEND_URL") || "https://ps.in-sync.co.in";
+    
+    if (returnUrl) {
+      try {
+        const returnOrigin = new URL(returnUrl).origin;
+        frontendUrl = returnOrigin;
+        console.log("[digilocker-callback] Using origin from returnUrl:", frontendUrl);
+      } catch (e) {
+        console.log("[digilocker-callback] Failed to parse returnUrl, using FRONTEND_URL");
+      }
+    }
     
     // Build query string
     const queryParams = new URLSearchParams();
     if (id) queryParams.set("id", id);
     if (type) queryParams.set("type", type);
     if (status) queryParams.set("status", status);
+    if (returnUrl) queryParams.set("returnUrl", returnUrl);
     
     const queryString = queryParams.toString();
     const redirectUrl = `${frontendUrl}${targetPath}${queryString ? "?" + queryString : ""}`;

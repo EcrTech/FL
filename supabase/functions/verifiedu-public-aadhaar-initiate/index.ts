@@ -22,14 +22,22 @@ serve(async (req) => {
     // This ensures POST callbacks from VerifiedU are properly handled
     const body = await req.json();
     
+    // Extract returnUrl from request body - this is where user should be redirected after verification
+    const returnUrl = body.returnUrl;
+    console.log("[verifiedu-public-aadhaar-initiate] Return URL from client:", returnUrl);
+    
     // Build callback URLs pointing to our edge function
+    // Include returnUrl as a query param so it survives the redirect chain
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const surl = `${supabaseUrl}/functions/v1/digilocker-callback/success`;
-    const furl = `${supabaseUrl}/functions/v1/digilocker-callback/failure`;
+    const encodedReturnUrl = returnUrl ? encodeURIComponent(returnUrl) : "";
+    const returnParam = encodedReturnUrl ? `?returnUrl=${encodedReturnUrl}` : "";
+    const surl = `${supabaseUrl}/functions/v1/digilocker-callback/success${returnParam}`;
+    const furl = `${supabaseUrl}/functions/v1/digilocker-callback/failure${returnParam}`;
     
     console.log("[verifiedu-public-aadhaar-initiate] Using edge function callbacks:", {
       surl,
       furl,
+      returnUrl,
     });
 
     if (!surl || !furl) {
