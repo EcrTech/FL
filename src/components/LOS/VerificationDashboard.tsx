@@ -16,6 +16,9 @@ import BankAccountVerificationDialog from "./Verification/BankAccountVerificatio
 import VerificationDetailsDialog from "./Verification/VerificationDetailsDialog";
 import { VideoKYCRetryButton } from "./Verification/VideoKYCRetryButton";
 import { VideoKYCViewDialog } from "./Verification/VideoKYCViewDialog";
+import { IdentityDocumentCard } from "./Verification/IdentityDocumentCard";
+import { IdentityDocumentUploadDialog } from "./Verification/IdentityDocumentUploadDialog";
+import { DocumentPreviewDialog } from "./Verification/DocumentPreviewDialog";
 
 interface VerificationDashboardProps {
   applicationId: string;
@@ -81,6 +84,8 @@ export default function VerificationDashboard({ applicationId, orgId }: Verifica
   const [detailsVerification, setDetailsVerification] = useState<{ verification: any; type: typeof VERIFICATION_TYPES[0] } | null>(null);
   const [videoKYCViewOpen, setVideoKYCViewOpen] = useState(false);
   const [videoKYCRecordingUrl, setVideoKYCRecordingUrl] = useState<string | null>(null);
+  const [uploadDocType, setUploadDocType] = useState<"pan_card" | "aadhaar_card" | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<{ document: any; title: string } | null>(null);
 
   const { data: verifications = [], isLoading } = useQuery({
     queryKey: ["loan-verifications", applicationId],
@@ -111,6 +116,27 @@ export default function VerificationDashboard({ applicationId, orgId }: Verifica
     },
     enabled: !!applicationId,
   });
+
+  // Query for identity documents (PAN and Aadhaar cards)
+  const { data: identityDocuments = [] } = useQuery({
+    queryKey: ["identity-documents", applicationId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("loan_documents")
+        .select("*")
+        .eq("loan_application_id", applicationId)
+        .in("document_type", ["pan_card", "aadhaar_card", "aadhaar_front", "aadhaar_back"]);
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!applicationId,
+  });
+
+  const getPanDocument = () => identityDocuments.find(d => d.document_type === "pan_card");
+  const getAadhaarDocument = () => identityDocuments.find(d => 
+    d.document_type === "aadhaar_card" || d.document_type === "aadhaar_front"
+  );
 
   const updateStageMutation = useMutation({
     mutationFn: async (newStage: string) => {
@@ -463,6 +489,39 @@ export default function VerificationDashboard({ applicationId, orgId }: Verifica
                     </Button>
                   )}
                 </div>
+
+                {/* Identity Document Upload Section for PAN and Aadhaar */}
+                {(verificationType.type === "pan" || verificationType.type === "aadhaar") && (
+                  <div className="mt-4 pt-4 border-t">
+                    <p className="text-xs font-medium text-muted-foreground mb-3">Document</p>
+                    <div className="flex gap-3">
+                      {verificationType.type === "pan" && (
+                        <IdentityDocumentCard
+                          type="pan_card"
+                          label="PAN Card"
+                          document={getPanDocument()}
+                          onUpload={() => setUploadDocType("pan_card")}
+                          onView={() => {
+                            const doc = getPanDocument();
+                            if (doc) setPreviewDoc({ document: doc, title: "PAN Card" });
+                          }}
+                        />
+                      )}
+                      {verificationType.type === "aadhaar" && (
+                        <IdentityDocumentCard
+                          type="aadhaar_card"
+                          label="Aadhaar Card"
+                          document={getAadhaarDocument()}
+                          onUpload={() => setUploadDocType("aadhaar_card")}
+                          onView={() => {
+                            const doc = getAadhaarDocument();
+                            if (doc) setPreviewDoc({ document: doc, title: "Aadhaar Card" });
+                          }}
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           );
@@ -553,6 +612,32 @@ export default function VerificationDashboard({ applicationId, orgId }: Verifica
           onOpenChange={setVideoKYCViewOpen}
           recordingUrl={videoKYCRecordingUrl}
           applicantName={primaryApplicant ? `${primaryApplicant.first_name || ''} ${primaryApplicant.last_name || ''}`.trim() : undefined}
+        />
+      )}
+
+      {/* Identity Document Upload Dialog */}
+      {uploadDocType && (
+        <IdentityDocumentUploadDialog
+          open={true}
+          onClose={() => setUploadDocType(null)}
+          applicationId={applicationId}
+          orgId={orgId}
+          documentType={uploadDocType}
+          existingDocumentId={
+            uploadDocType === "pan_card" 
+              ? getPanDocument()?.id 
+              : getAadhaarDocument()?.id
+          }
+        />
+      )}
+
+      {/* Document Preview Dialog */}
+      {previewDoc && (
+        <DocumentPreviewDialog
+          open={true}
+          onClose={() => setPreviewDoc(null)}
+          document={previewDoc.document}
+          title={previewDoc.title}
         />
       )}
     </div>
