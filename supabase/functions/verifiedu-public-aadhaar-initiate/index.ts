@@ -18,13 +18,19 @@ serve(async (req) => {
 
   try {
     console.log("[verifiedu-public-aadhaar-initiate] Parsing request body...");
+    // Note: surl/furl from client are ignored - we use our edge function callback
+    // This ensures POST callbacks from VerifiedU are properly handled
     const body = await req.json();
-    const { surl, furl } = body;
     
-    console.log("[verifiedu-public-aadhaar-initiate] Request body:", JSON.stringify({
-      surl: surl ? surl.substring(0, 50) + "..." : null,
-      furl: furl ? furl.substring(0, 50) + "..." : null,
-    }));
+    // Build callback URLs pointing to our edge function
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const surl = `${supabaseUrl}/functions/v1/digilocker-callback/success`;
+    const furl = `${supabaseUrl}/functions/v1/digilocker-callback/failure`;
+    
+    console.log("[verifiedu-public-aadhaar-initiate] Using edge function callbacks:", {
+      surl,
+      furl,
+    });
 
     if (!surl || !furl) {
       console.log("[verifiedu-public-aadhaar-initiate] ERROR: Missing required parameters");

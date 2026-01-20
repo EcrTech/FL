@@ -68,12 +68,12 @@ serve(async (req) => {
       });
     }
 
-    // Build callback URLs - NO query params!
-    // IMPORTANT: VerifiedU appends ?id=...&type=... to the URL
-    // Adding our own params causes double '?' which breaks URL parsing
-    // applicationId and orgId are stored in loan_verifications and retrieved during callback
-    const surl = successUrl;
-    const furl = failureUrl;
+    // Build callback URLs pointing to our edge function
+    // VerifiedU sends POST callbacks which Azure/static hosts can't handle
+    // Our edge function receives the POST and redirects to the React page via GET
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const surl = `${supabaseUrl}/functions/v1/digilocker-callback/success`;
+    const furl = `${supabaseUrl}/functions/v1/digilocker-callback/failure`;
 
     // Call VerifiedU API
     const response = await fetch(`${baseUrl}/api/verifiedu/VerifyAadhaarViaDigilocker`, {
