@@ -5,9 +5,19 @@
   },
   "routes": [
     {
+      "route": "/digilocker/*",
+      "methods": ["GET", "POST"],
+      "rewrite": "/index.html"
+    },
+    {
       "route": "/*",
-      "serve": "/index.html",
+      "rewrite": "/index.html"
+    }
+  ],
+  "responseOverrides": {
+    "405": {
+      "rewrite": "/index.html",
       "statusCode": 200
     }
-  ]
+  }
 }
