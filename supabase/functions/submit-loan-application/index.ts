@@ -232,6 +232,23 @@ Deno.serve(async (req) => {
         throw appError;
       }
 
+      // Assign using round-robin
+      try {
+        const { data: assigneeId } = await supabase.rpc('get_next_assignee', {
+          p_org_id: formConfig.org_id
+        });
+        
+        if (assigneeId) {
+          await supabase
+            .from('loan_applications')
+            .update({ assigned_to: assigneeId })
+            .eq('id', application.id);
+          console.log(`[submit-loan-application] Assigned referral application to user: ${assigneeId}`);
+        }
+      } catch (assignError) {
+        console.log('[submit-loan-application] Round-robin assignment skipped (no assignable users configured)');
+      }
+
       console.log(`[submit-loan-application] Created referral application: ${application.id}`);
 
       // Check for existing contact
@@ -506,6 +523,23 @@ Deno.serve(async (req) => {
         throw appError;
       }
       application = newApp;
+
+      // Assign using round-robin
+      try {
+        const { data: assigneeId } = await supabase.rpc('get_next_assignee', {
+          p_org_id: formConfig.org_id
+        });
+        
+        if (assigneeId) {
+          await supabase
+            .from('loan_applications')
+            .update({ assigned_to: assigneeId })
+            .eq('id', application.id);
+          console.log(`[submit-loan-application] Assigned application to user: ${assigneeId}`);
+        }
+      } catch (assignError) {
+        console.log('[submit-loan-application] Round-robin assignment skipped (no assignable users configured)');
+      }
 
       // Update referral count if this is a referral
       if (referrerUserId && body.referralCode) {

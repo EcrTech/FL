@@ -26,6 +26,7 @@ import { ApplicantProfileCard } from "@/components/LOS/ApplicantProfileCard";
 import { BankDetailsSection } from "@/components/LOS/BankDetailsSection";
 import { ReferralDialog } from "@/components/LOS/ReferralDialog";
 import { ApplicationSummary } from "@/components/LOS/ApplicationSummary";
+import { AssignmentDialog } from "@/components/LOS/AssignmentDialog";
 
 const STAGE_LABELS: Record<string, string> = {
   application_login: "Application Login",
@@ -395,6 +396,7 @@ export default function ApplicationDetail() {
   const isReviewMode = searchParams.get("mode") === "review";
   const { orgId, isLoading: isOrgLoading } = useOrgContext();
   const [approvalAction, setApprovalAction] = useState<"approve" | "reject" | null>(null);
+  const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
   const [isEditingReferrals, setIsEditingReferrals] = useState(false);
   const [isEditingApplicant, setIsEditingApplicant] = useState(false);
   const [applicantData, setApplicantData] = useState({
@@ -434,8 +436,9 @@ export default function ApplicationDetail() {
         .from("loan_applications")
         .select(`
           *,
+          assigned_to,
           contacts(first_name, last_name, email, phone),
-          assigned_profile:profiles!assigned_to(first_name, last_name),
+          assigned_profile:profiles!loan_applications_assigned_to_fkey(first_name, last_name),
           loan_applicants(*),
           loan_verifications(*)
         `)
@@ -784,8 +787,14 @@ export default function ApplicationDetail() {
                 : "N/A"}
             </div>
           </Card>
-          <Card className="p-3">
-            <div className="text-xs text-muted-foreground">Assigned To</div>
+          <Card 
+            className="p-3 cursor-pointer hover:bg-muted/50 transition-colors group"
+            onClick={() => setIsAssignmentDialogOpen(true)}
+          >
+            <div className="text-xs text-muted-foreground flex items-center justify-between">
+              <span>Assigned To</span>
+              <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
             <div className="text-sm font-medium truncate">
               {(application as any).assigned_profile
                 ? `${(application as any).assigned_profile.first_name} ${(application as any).assigned_profile.last_name || ""}`
@@ -1248,6 +1257,20 @@ export default function ApplicationDetail() {
           userId={user.id}
         />
       )}
+
+      {/* Assignment Dialog */}
+      <AssignmentDialog
+        open={isAssignmentDialogOpen}
+        onOpenChange={setIsAssignmentDialogOpen}
+        applicationId={id!}
+        currentAssigneeId={(application as any).assigned_to || null}
+        currentAssigneeName={
+          (application as any).assigned_profile
+            ? `${(application as any).assigned_profile.first_name} ${(application as any).assigned_profile.last_name || ""}`.trim()
+            : null
+        }
+        orgId={orgId!}
+      />
     </DashboardLayout>
   );
 }
