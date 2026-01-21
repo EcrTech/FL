@@ -3493,6 +3493,7 @@ export type Database = {
           professional_ref_email: string | null
           professional_ref_mobile: string | null
           professional_ref_name: string | null
+          religion: string | null
           residence_type: string | null
           updated_at: string
           years_at_current_address: number | null
@@ -3535,6 +3536,7 @@ export type Database = {
           professional_ref_email?: string | null
           professional_ref_mobile?: string | null
           professional_ref_name?: string | null
+          religion?: string | null
           residence_type?: string | null
           updated_at?: string
           years_at_current_address?: number | null
@@ -3577,6 +3579,7 @@ export type Database = {
           professional_ref_email?: string | null
           professional_ref_mobile?: string | null
           professional_ref_name?: string | null
+          religion?: string | null
           residence_type?: string | null
           updated_at?: string
           years_at_current_address?: number | null
