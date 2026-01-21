@@ -3850,48 +3850,6 @@ export type Database = {
           },
         ]
       }
-      loan_assignable_users: {
-        Row: {
-          created_at: string | null
-          id: string
-          is_active: boolean | null
-          org_id: string
-          priority_order: number | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          org_id: string
-          priority_order?: number | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          is_active?: boolean | null
-          org_id?: string
-          priority_order?: number | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "loan_assignable_users_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "loan_assignable_users_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       loan_assignment_config: {
         Row: {
           created_at: string | null
