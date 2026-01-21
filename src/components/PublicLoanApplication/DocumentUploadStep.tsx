@@ -31,6 +31,8 @@ const DOCUMENT_LABELS: Record<string, { label: string; description: string }> = 
   photo: { label: "Passport Photo", description: "Recent passport size photo" },
   selfie: { label: "Selfie Photo", description: "Take a clear selfie photo with good lighting" },
   address_proof: { label: "Address Proof", description: "Utility bill or rent agreement" },
+  rental_agreement: { label: "Rental Agreement", description: "Current rental/lease agreement" },
+  utility_bill: { label: "Utility Bill", description: "Recent electricity, water, or gas bill" },
 };
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -52,10 +54,10 @@ export function DocumentUploadStep({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // Default documents if none specified - now includes voter_card and selfie
+  // Default documents if none specified - now includes voter_card, selfie, photo, rental_agreement, utility_bill
   const documents = requiredDocuments.length > 0 
     ? requiredDocuments 
-    : ["pan_card", "aadhaar_front", "aadhaar_back", "voter_card", "selfie", "salary_slip", "bank_statement"];
+    : ["pan_card", "aadhaar_front", "aadhaar_back", "voter_card", "selfie", "photo", "rental_agreement", "utility_bill", "salary_slip", "bank_statement"];
 
   const getDocumentByType = (type: string) => {
     return data.find(d => d.type === type);
@@ -160,15 +162,21 @@ export function DocumentUploadStep({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Check required documents (PAN, Aadhaar, and Selfie are required)
+    // Check required documents (PAN, Aadhaar, Selfie, Photo, Rental Agreement, Utility Bill are required)
     const hasPan = data.some(d => d.type === "pan_card");
     const hasAadhaar = data.some(d => d.type === "aadhaar_card" || d.type === "aadhaar_front");
     const hasSelfie = data.some(d => d.type === "selfie");
+    const hasPhoto = data.some(d => d.type === "photo");
+    const hasRentalAgreement = data.some(d => d.type === "rental_agreement");
+    const hasUtilityBill = data.some(d => d.type === "utility_bill");
     
     const newErrors: Record<string, string> = {};
     if (!hasPan) newErrors.pan_card = "PAN Card is required";
     if (!hasAadhaar) newErrors.aadhaar_front = "Aadhaar Card is required";
     if (!hasSelfie) newErrors.selfie = "Selfie photo is required";
+    if (!hasPhoto) newErrors.photo = "Passport Photo is required";
+    if (!hasRentalAgreement) newErrors.rental_agreement = "Rental Agreement is required";
+    if (!hasUtilityBill) newErrors.utility_bill = "Utility Bill is required";
     
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -186,7 +194,7 @@ export function DocumentUploadStep({
   };
 
   const isRequired = (docType: string) => {
-    return docType === "pan_card" || docType === "aadhaar_front" || docType === "aadhaar_card" || docType === "selfie";
+    return ["pan_card", "aadhaar_front", "aadhaar_card", "selfie", "photo", "rental_agreement", "utility_bill"].includes(docType);
   };
 
   return (

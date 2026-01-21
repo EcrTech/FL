@@ -338,6 +338,8 @@ function formatDocumentType(type: string): string {
     bank_statement: "Bank Statement",
     address_proof: "Address Proof",
     photo: "Photograph",
+    rental_agreement: "Rental Agreement",
+    utility_bill: "Utility Bill",
   };
   return map[type] || type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
