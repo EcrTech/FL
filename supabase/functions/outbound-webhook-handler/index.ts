@@ -123,7 +123,7 @@ async function processWebhook(
     // Build headers
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'User-Agent': 'PaisaSarthi-LOS-Webhook/1.0',
+      'User-Agent': 'PaisaaSaarthi-LOS-Webhook/1.0',
       ...webhook.headers,
     };
 

@@ -1,7 +1,7 @@
 import { ReactNode, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import logo from "@/assets/insync-logo.png";
+import logo from "@/assets/paisaa-saarthi-logo.jpeg";
 import {
   LayoutDashboard,
   Settings,
