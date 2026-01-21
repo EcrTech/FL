@@ -5360,6 +5360,291 @@ export type Database = {
         }
         Relationships: []
       }
+      nupay_auth_tokens: {
+        Row: {
+          created_at: string
+          environment: string
+          expires_at: string
+          id: string
+          org_id: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          environment: string
+          expires_at: string
+          id?: string
+          org_id: string
+          token: string
+        }
+        Update: {
+          created_at?: string
+          environment?: string
+          expires_at?: string
+          id?: string
+          org_id?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nupay_auth_tokens_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nupay_banks: {
+        Row: {
+          bank_code: string
+          bank_id: number
+          cached_at: string
+          id: number
+          is_active: boolean | null
+          mode: string
+          name: string
+          org_id: string
+        }
+        Insert: {
+          bank_code: string
+          bank_id: number
+          cached_at?: string
+          id?: number
+          is_active?: boolean | null
+          mode: string
+          name: string
+          org_id: string
+        }
+        Update: {
+          bank_code?: string
+          bank_id?: number
+          cached_at?: string
+          id?: number
+          is_active?: boolean | null
+          mode?: string
+          name?: string
+          org_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nupay_banks_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nupay_config: {
+        Row: {
+          api_endpoint: string
+          api_key: string
+          created_at: string
+          environment: string
+          id: string
+          is_active: boolean | null
+          org_id: string
+          redirect_url: string | null
+          updated_at: string
+          webhook_url: string | null
+        }
+        Insert: {
+          api_endpoint?: string
+          api_key: string
+          created_at?: string
+          environment: string
+          id?: string
+          is_active?: boolean | null
+          org_id: string
+          redirect_url?: string | null
+          updated_at?: string
+          webhook_url?: string | null
+        }
+        Update: {
+          api_endpoint?: string
+          api_key?: string
+          created_at?: string
+          environment?: string
+          id?: string
+          is_active?: boolean | null
+          org_id?: string
+          redirect_url?: string | null
+          updated_at?: string
+          webhook_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nupay_config_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nupay_mandates: {
+        Row: {
+          account_holder_name: string
+          account_type: string
+          additional_data: Json | null
+          auth_type: string | null
+          bank_account_no: string
+          bank_id: number
+          bank_name: string | null
+          category_id: number
+          collection_amount: number
+          collection_until_cancel: boolean | null
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          debit_type: boolean | null
+          email: string | null
+          expires_at: string | null
+          final_collection_date: string | null
+          first_collection_date: string
+          frequency: string
+          id: string
+          ifsc_code: string | null
+          loan_application_id: string
+          loan_no: string
+          mobile_no: string
+          npci_ref: string | null
+          nupay_id: string | null
+          nupay_ref_no: string | null
+          org_id: string
+          registration_url: string | null
+          rejected_by: string | null
+          rejection_reason_code: string | null
+          rejection_reason_desc: string | null
+          request_payload: Json | null
+          response_payload: Json | null
+          seq_type: string
+          status: string
+          umrn: string | null
+          updated_at: string
+          webhook_payload: Json | null
+        }
+        Insert: {
+          account_holder_name: string
+          account_type: string
+          additional_data?: Json | null
+          auth_type?: string | null
+          bank_account_no: string
+          bank_id: number
+          bank_name?: string | null
+          category_id?: number
+          collection_amount: number
+          collection_until_cancel?: boolean | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          debit_type?: boolean | null
+          email?: string | null
+          expires_at?: string | null
+          final_collection_date?: string | null
+          first_collection_date: string
+          frequency: string
+          id?: string
+          ifsc_code?: string | null
+          loan_application_id: string
+          loan_no: string
+          mobile_no: string
+          npci_ref?: string | null
+          nupay_id?: string | null
+          nupay_ref_no?: string | null
+          org_id: string
+          registration_url?: string | null
+          rejected_by?: string | null
+          rejection_reason_code?: string | null
+          rejection_reason_desc?: string | null
+          request_payload?: Json | null
+          response_payload?: Json | null
+          seq_type: string
+          status?: string
+          umrn?: string | null
+          updated_at?: string
+          webhook_payload?: Json | null
+        }
+        Update: {
+          account_holder_name?: string
+          account_type?: string
+          additional_data?: Json | null
+          auth_type?: string | null
+          bank_account_no?: string
+          bank_id?: number
+          bank_name?: string | null
+          category_id?: number
+          collection_amount?: number
+          collection_until_cancel?: boolean | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          debit_type?: boolean | null
+          email?: string | null
+          expires_at?: string | null
+          final_collection_date?: string | null
+          first_collection_date?: string
+          frequency?: string
+          id?: string
+          ifsc_code?: string | null
+          loan_application_id?: string
+          loan_no?: string
+          mobile_no?: string
+          npci_ref?: string | null
+          nupay_id?: string | null
+          nupay_ref_no?: string | null
+          org_id?: string
+          registration_url?: string | null
+          rejected_by?: string | null
+          rejection_reason_code?: string | null
+          rejection_reason_desc?: string | null
+          request_payload?: Json | null
+          response_payload?: Json | null
+          seq_type?: string
+          status?: string
+          umrn?: string | null
+          updated_at?: string
+          webhook_payload?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nupay_mandates_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nupay_mandates_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_with_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nupay_mandates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nupay_mandates_loan_application_id_fkey"
+            columns: ["loan_application_id"]
+            isOneToOne: false
+            referencedRelation: "loan_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nupay_mandates_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       operation_queue: {
         Row: {
           completed_at: string | null
@@ -6312,253 +6597,6 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
-      }
-      rbl_bank_config: {
-        Row: {
-          api_endpoint: string
-          client_id: string | null
-          created_at: string
-          environment: string
-          id: string
-          is_active: boolean | null
-          org_id: string
-          updated_at: string
-        }
-        Insert: {
-          api_endpoint: string
-          client_id?: string | null
-          created_at?: string
-          environment: string
-          id?: string
-          is_active?: boolean | null
-          org_id: string
-          updated_at?: string
-        }
-        Update: {
-          api_endpoint?: string
-          client_id?: string | null
-          created_at?: string
-          environment?: string
-          id?: string
-          is_active?: boolean | null
-          org_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "rbl_bank_config_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      rbl_nach_mandates: {
-        Row: {
-          account_holder_name: string
-          account_number: string
-          bank_name: string | null
-          contact_id: string | null
-          created_at: string
-          created_by: string | null
-          end_date: string | null
-          frequency: string
-          id: string
-          ifsc_code: string
-          loan_application_id: string
-          mandate_id: string | null
-          max_amount: number
-          org_id: string
-          rejection_reason: string | null
-          request_payload: Json | null
-          response_payload: Json | null
-          start_date: string
-          status: string
-          umrn: string | null
-          updated_at: string
-        }
-        Insert: {
-          account_holder_name: string
-          account_number: string
-          bank_name?: string | null
-          contact_id?: string | null
-          created_at?: string
-          created_by?: string | null
-          end_date?: string | null
-          frequency: string
-          id?: string
-          ifsc_code: string
-          loan_application_id: string
-          mandate_id?: string | null
-          max_amount: number
-          org_id: string
-          rejection_reason?: string | null
-          request_payload?: Json | null
-          response_payload?: Json | null
-          start_date: string
-          status?: string
-          umrn?: string | null
-          updated_at?: string
-        }
-        Update: {
-          account_holder_name?: string
-          account_number?: string
-          bank_name?: string | null
-          contact_id?: string | null
-          created_at?: string
-          created_by?: string | null
-          end_date?: string | null
-          frequency?: string
-          id?: string
-          ifsc_code?: string
-          loan_application_id?: string
-          mandate_id?: string | null
-          max_amount?: number
-          org_id?: string
-          rejection_reason?: string | null
-          request_payload?: Json | null
-          response_payload?: Json | null
-          start_date?: string
-          status?: string
-          umrn?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "rbl_nach_mandates_contact_id_fkey"
-            columns: ["contact_id"]
-            isOneToOne: false
-            referencedRelation: "contacts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "rbl_nach_mandates_contact_id_fkey"
-            columns: ["contact_id"]
-            isOneToOne: false
-            referencedRelation: "contacts_with_stages"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "rbl_nach_mandates_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "rbl_nach_mandates_loan_application_id_fkey"
-            columns: ["loan_application_id"]
-            isOneToOne: false
-            referencedRelation: "loan_applications"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "rbl_nach_mandates_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      rbl_payment_transactions: {
-        Row: {
-          amount: number | null
-          beneficiary_account: string | null
-          beneficiary_ifsc: string | null
-          beneficiary_name: string | null
-          callback_data: Json | null
-          created_at: string
-          disbursement_id: string | null
-          error_message: string | null
-          id: string
-          initiated_by: string | null
-          loan_application_id: string | null
-          org_id: string
-          payment_mode: string | null
-          reference_id: string
-          request_payload: Json | null
-          response_payload: Json | null
-          status: string
-          transaction_type: string
-          updated_at: string
-          utr_number: string | null
-        }
-        Insert: {
-          amount?: number | null
-          beneficiary_account?: string | null
-          beneficiary_ifsc?: string | null
-          beneficiary_name?: string | null
-          callback_data?: Json | null
-          created_at?: string
-          disbursement_id?: string | null
-          error_message?: string | null
-          id?: string
-          initiated_by?: string | null
-          loan_application_id?: string | null
-          org_id: string
-          payment_mode?: string | null
-          reference_id: string
-          request_payload?: Json | null
-          response_payload?: Json | null
-          status?: string
-          transaction_type: string
-          updated_at?: string
-          utr_number?: string | null
-        }
-        Update: {
-          amount?: number | null
-          beneficiary_account?: string | null
-          beneficiary_ifsc?: string | null
-          beneficiary_name?: string | null
-          callback_data?: Json | null
-          created_at?: string
-          disbursement_id?: string | null
-          error_message?: string | null
-          id?: string
-          initiated_by?: string | null
-          loan_application_id?: string | null
-          org_id?: string
-          payment_mode?: string | null
-          reference_id?: string
-          request_payload?: Json | null
-          response_payload?: Json | null
-          status?: string
-          transaction_type?: string
-          updated_at?: string
-          utr_number?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "rbl_payment_transactions_disbursement_id_fkey"
-            columns: ["disbursement_id"]
-            isOneToOne: false
-            referencedRelation: "loan_disbursements"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "rbl_payment_transactions_initiated_by_fkey"
-            columns: ["initiated_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "rbl_payment_transactions_loan_application_id_fkey"
-            columns: ["loan_application_id"]
-            isOneToOne: false
-            referencedRelation: "loan_applications"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "rbl_payment_transactions_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       redefine_data_repository: {
         Row: {
