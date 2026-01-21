@@ -8,11 +8,13 @@ if (typeof window !== 'undefined' && (window as any).updateBootStatus) {
 
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter } from "react-router-dom";
 import App from "./App.tsx";
 import "./index.css";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { setupErrorLogging } from "./lib/errorLogger";
 import { AuthProvider } from "./contexts/AuthContext";
+import { IdleTimeoutProvider } from "./components/Auth/IdleTimeoutProvider";
 
 console.log('[BOOT] All imports loaded successfully');
 
@@ -63,7 +65,11 @@ try {
     <QueryClientProvider client={queryClient}>
       <ErrorBoundary>
         <AuthProvider>
-          <App />
+          <BrowserRouter>
+            <IdleTimeoutProvider>
+              <App />
+            </IdleTimeoutProvider>
+          </BrowserRouter>
         </AuthProvider>
       </ErrorBoundary>
     </QueryClientProvider>
