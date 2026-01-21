@@ -8,7 +8,7 @@ import { BasicInfoStep } from "@/components/ReferralApplication/BasicInfoStep";
 import { PANVerificationStep } from "@/components/ReferralApplication/PANVerificationStep";
 import { AadhaarVerificationStep } from "@/components/ReferralApplication/AadhaarVerificationStep";
 import { VideoKYCStep } from "@/components/ReferralApplication/VideoKYCStep";
-import logo from "@/assets/insync-logo.png";
+import logo from "@/assets/paisaa-saarthi-logo.jpeg";
 
 interface ReferrerInfo {
   name: string;
@@ -514,7 +514,7 @@ export default function ReferralLoanApplication() {
       {/* Header */}
       <header className="bg-card/95 border-b border-border sticky top-0 z-50 shadow-sm backdrop-blur-md">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <img src={logo} alt="In-sync" className="h-12 drop-shadow-sm" />
+          <img src={logo} alt="Paisaa Saarthi" className="h-12 drop-shadow-sm" />
           <h1 className="text-xl md:text-2xl font-heading font-bold text-foreground">
             Apply for a <span className="text-primary">Loan</span>
           </h1>
