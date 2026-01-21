@@ -13,7 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Plus, Search, Eye, FileText, Sparkles, UserPlus, CalendarIcon, X, MapPinOff } from "lucide-react";
+import { Plus, Search, Eye, FileText, Sparkles, UserPlus, CalendarIcon, X, MapPinOff, Pencil } from "lucide-react";
+import { AssignmentDialog } from "@/components/LOS/AssignmentDialog";
 import { differenceInHours, format } from "date-fns";
 import { LoadingState } from "@/components/common/LoadingState";
 import { usePagination } from "@/hooks/usePagination";
@@ -77,6 +78,12 @@ export default function Applications() {
   const [stageFilter, setStageFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+  const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
+  const [selectedAppForAssignment, setSelectedAppForAssignment] = useState<{
+    id: string;
+    assigneeId: string | null;
+    assigneeName: string | null;
+  } | null>(null);
 
   const isFreshApplication = (createdAt: string) => {
     return differenceInHours(new Date(), new Date(createdAt)) < 48;
@@ -97,6 +104,7 @@ const { data: applications = [], isLoading } = useQuery({
           tenure_days,
           source,
           created_at,
+          assigned_to,
           loan_applicants(first_name, last_name, mobile, current_address),
           contacts(first_name, last_name, phone),
           assigned_profile:profiles!loan_applications_assigned_to_fkey(first_name, last_name)
@@ -354,6 +362,7 @@ const { data: applications = [], isLoading } = useQuery({
                         <TableHead className="font-semibold text-foreground py-2 text-xs">Applicant</TableHead>
                         <TableHead className="font-semibold text-foreground py-2 text-xs">Status</TableHead>
                         <TableHead className="font-semibold text-foreground py-2 text-xs">Stage</TableHead>
+                        <TableHead className="font-semibold text-foreground py-2 text-xs">Assigned To</TableHead>
                         <TableHead className="font-semibold text-foreground py-2 text-xs">Amount</TableHead>
                         <TableHead className="font-semibold text-foreground py-2 text-xs">Tenure</TableHead>
                         <TableHead className="font-semibold text-foreground py-2 text-xs">Created</TableHead>
@@ -409,6 +418,33 @@ const { data: applications = [], isLoading } = useQuery({
                               {STAGE_LABELS[app.current_stage] || app.current_stage}
                             </Badge>
                           </TableCell>
+                          <TableCell className="py-2">
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs truncate max-w-[100px]">
+                                {app.assigned_profile
+                                  ? `${app.assigned_profile.first_name} ${app.assigned_profile.last_name || ""}`.trim()
+                                  : "Unassigned"}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-5 w-5 shrink-0"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedAppForAssignment({
+                                    id: app.id,
+                                    assigneeId: app.assigned_to || null,
+                                    assigneeName: app.assigned_profile
+                                      ? `${app.assigned_profile.first_name} ${app.assigned_profile.last_name || ""}`.trim()
+                                      : null,
+                                  });
+                                  setAssignmentDialogOpen(true);
+                                }}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </TableCell>
                           <TableCell className="py-2 text-xs font-medium text-green-600">
                             {formatCurrency(app.requested_amount)}
                           </TableCell>
@@ -453,6 +489,18 @@ const { data: applications = [], isLoading } = useQuery({
             )}
           </CardContent>
         </Card>
+
+        {/* Assignment Dialog */}
+        {selectedAppForAssignment && (
+          <AssignmentDialog
+            open={assignmentDialogOpen}
+            onOpenChange={setAssignmentDialogOpen}
+            applicationId={selectedAppForAssignment.id}
+            currentAssigneeId={selectedAppForAssignment.assigneeId}
+            currentAssigneeName={selectedAppForAssignment.assigneeName}
+            orgId={orgId!}
+          />
+        )}
       </div>
     </DashboardLayout>
   );
