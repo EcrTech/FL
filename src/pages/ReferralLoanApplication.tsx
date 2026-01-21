@@ -327,6 +327,7 @@ export default function ReferralLoanApplication() {
           referred_by: referrerInfo.userId,
           requested_amount: basicInfo.requestedAmount,
           tenure_days: basicInfo.tenureDays,
+          interest_rate: 1, // 1% daily interest rate
           status: "draft",
           current_stage: "video_kyc",
           application_number: tempAppNumber,
