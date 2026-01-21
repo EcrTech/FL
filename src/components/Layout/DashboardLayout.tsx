@@ -250,6 +250,17 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
 
               {isAdmin && (
                 <Link
+                  to="/los/settings/nupay"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <Webhook size={18} />
+                  <span>eMandate Settings</span>
+                </Link>
+              )}
+
+              {isAdmin && (
+                <Link
                   to="/los/negative-pincodes"
                   className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
                   onClick={() => setSidebarOpen(false)}
