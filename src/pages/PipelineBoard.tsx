@@ -30,10 +30,6 @@ interface LoanApplication {
   source: string | null;
   created_at: string;
   assigned_to: string | null;
-  assigned_user: {
-    first_name: string;
-    last_name: string | null;
-  } | null;
   loan_applicants: {
     first_name: string | null;
     last_name: string | null;
@@ -220,10 +216,6 @@ export default function PipelineBoard() {
           source,
           created_at,
           assigned_to,
-          assigned_user:profiles!loan_applications_assigned_to_fkey (
-            first_name,
-            last_name
-          ),
           loan_applicants (
             first_name,
             last_name,
@@ -292,6 +284,31 @@ export default function PipelineBoard() {
       return counts;
     },
     enabled: applicationIds.length > 0,
+  });
+
+  // Fetch assigned users for applications
+  const assignedUserIds = [...new Set(applicationsData?.data?.filter(a => a.assigned_to).map(a => a.assigned_to) || [])];
+  
+  const { data: assignedUsers } = useQuery({
+    queryKey: ['assigned-users', assignedUserIds],
+    queryFn: async () => {
+      if (assignedUserIds.length === 0) return {};
+      
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name")
+        .in("id", assignedUserIds as string[]);
+      
+      if (error) throw error;
+      
+      const userMap: Record<string, { first_name: string; last_name: string | null }> = {};
+      (data || []).forEach((user) => {
+        userMap[user.id] = { first_name: user.first_name, last_name: user.last_name };
+      });
+      
+      return userMap;
+    },
+    enabled: assignedUserIds.length > 0,
   });
 
   // Update status mutation
@@ -554,15 +571,15 @@ export default function PipelineBoard() {
                         </TableCell>
                         <TableCell className="py-2 px-3" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center gap-2">
-                            {app.assigned_user ? (
+                            {app.assigned_to && assignedUsers?.[app.assigned_to] ? (
                               <div className="flex items-center gap-1.5">
                                 <Avatar className="h-5 w-5">
                                   <AvatarFallback className="text-[10px] bg-primary/10">
-                                    {getInitials(app.assigned_user.first_name, app.assigned_user.last_name)}
+                                    {getInitials(assignedUsers[app.assigned_to].first_name, assignedUsers[app.assigned_to].last_name)}
                                   </AvatarFallback>
                                 </Avatar>
                                 <span className="text-xs">
-                                  {app.assigned_user.first_name} {app.assigned_user.last_name || ''}
+                                  {assignedUsers[app.assigned_to].first_name} {assignedUsers[app.assigned_to].last_name || ''}
                                 </span>
                               </div>
                             ) : (
@@ -574,12 +591,13 @@ export default function PipelineBoard() {
                               className="h-6 w-6"
                               onClick={(e) => {
                                 e.stopPropagation();
+                                const assignedUser = app.assigned_to && assignedUsers?.[app.assigned_to];
                                 setAssignmentDialog({
                                   open: true,
                                   applicationId: app.id,
                                   currentAssigneeId: app.assigned_to,
-                                  currentAssigneeName: app.assigned_user 
-                                    ? `${app.assigned_user.first_name} ${app.assigned_user.last_name || ''}`.trim()
+                                  currentAssigneeName: assignedUser
+                                    ? `${assignedUser.first_name} ${assignedUser.last_name || ''}`.trim()
                                     : null
                                 });
                               }}
@@ -633,6 +651,7 @@ export default function PipelineBoard() {
           orgId={orgId || ""}
           onAssigned={() => {
             queryClient.invalidateQueries({ queryKey: ['leads-applications'] });
+            queryClient.invalidateQueries({ queryKey: ['assigned-users'] });
           }}
         />
       )}
