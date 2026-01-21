@@ -476,7 +476,7 @@ export default function VerificationDashboard({ applicationId, orgId }: Verifica
                       className="bg-primary hover:bg-primary/90"
                     >
                       <Upload className="h-4 w-4 mr-2" />
-                      Upload CIBIL Report
+                      {verification?.response_data?.is_live_fetch ? "View Report" : "Credit Bureau Check"}
                     </Button>
                   ) : (
                     <Button

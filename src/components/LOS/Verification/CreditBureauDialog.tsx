@@ -8,8 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, X, Loader2, Sparkles, CheckCircle } from "lucide-react";
+import { Upload, FileText, X, Loader2, Sparkles, CheckCircle, Zap, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
+import { CreditReportViewer } from "./CreditReportViewer";
 
 interface CreditBureauDialogProps {
   open: boolean;
@@ -32,6 +35,15 @@ export default function CreditBureauDialog({
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [activeTab, setActiveTab] = useState<string>(
+    existingVerification?.response_data?.is_live_fetch ? "live" : "upload"
+  );
+  const [consentChecked, setConsentChecked] = useState(false);
+  const [isFetchingLive, setIsFetchingLive] = useState(false);
+  const [liveReportData, setLiveReportData] = useState<any>(
+    existingVerification?.response_data?.is_live_fetch ? existingVerification?.response_data : null
+  );
+
   const [formData, setFormData] = useState({
     bureau_type: existingVerification?.response_data?.bureau_type || "cibil",
     credit_score: existingVerification?.response_data?.credit_score || "",
@@ -52,6 +64,92 @@ export default function CreditBureauDialog({
   const [isUploading, setIsUploading] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [parsedSuccessfully, setParsedSuccessfully] = useState(false);
+
+  const applicantName = applicant ? 
+    `${applicant.first_name || ''} ${applicant.middle_name || ''} ${applicant.last_name || ''}`.trim() : 
+    'Unknown';
+  const applicantPAN = applicant?.pan_number || '';
+  const applicantDOB = applicant?.date_of_birth || '';
+  const applicantMobile = applicant?.mobile || '';
+  const applicantAddress = applicant?.current_address || applicant?.address_line1 || '';
+  const applicantCity = applicant?.city || '';
+  const applicantState = applicant?.state || '';
+  const applicantPincode = applicant?.pincode || applicant?.postal_code || '';
+
+  const handleFetchLiveReport = async () => {
+    if (!consentChecked) {
+      toast({
+        title: "Consent required",
+        description: "Please confirm consent has been obtained from the applicant",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!applicant?.id) {
+      toast({
+        title: "Missing applicant data",
+        description: "Applicant information is required to fetch credit report",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsFetchingLive(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const { data, error } = await supabase.functions.invoke("equifax-credit-report", {
+        body: {
+          applicantId: applicant.id,
+          applicationId,
+          orgId,
+        },
+      });
+
+      if (error) throw error;
+
+      if (!data.success) {
+        throw new Error(data.error || "Failed to fetch credit report");
+      }
+
+      setLiveReportData(data.data);
+      
+      // Update form data with live report results
+      const reportData = data.data;
+      setFormData(prev => ({
+        ...prev,
+        bureau_type: "equifax",
+        credit_score: reportData.creditScore?.toString() || "",
+        active_accounts: reportData.summary?.activeAccounts?.toString() || "0",
+        total_outstanding: reportData.summary?.totalOutstanding?.toString() || "",
+        total_overdue: reportData.summary?.totalPastDue?.toString() || "",
+        enquiry_count_30d: reportData.enquiries?.total30Days?.toString() || "0",
+        enquiry_count_90d: reportData.enquiries?.total90Days?.toString() || "0",
+        name_on_report: reportData.personalInfo?.name || "",
+        pan_on_report: reportData.personalInfo?.pan || "",
+        status: "success",
+        remarks: `Live fetch from Equifax. Score: ${reportData.creditScore} (${reportData.scoreType} ${reportData.scoreVersion || "4.0"})`,
+      }));
+
+      toast({
+        title: "Credit report fetched successfully",
+        description: `Credit score: ${reportData.creditScore}`,
+      });
+
+      // Invalidate queries to refresh verification status
+      queryClient.invalidateQueries({ queryKey: ["loan-verifications", applicationId] });
+    } catch (error: any) {
+      console.error("Error fetching live report:", error);
+      toast({
+        title: "Failed to fetch credit report",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsFetchingLive(false);
+    }
+  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -77,7 +175,6 @@ export default function CreditBureauDialog({
       const fileExt = uploadedFile.name.split('.').pop();
       const fileName = `${applicationId}/cibil_report_${Date.now()}.${fileExt}`;
       
-      // Upload file to storage
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from("loan-documents")
         .upload(fileName, uploadedFile, {
@@ -90,7 +187,6 @@ export default function CreditBureauDialog({
       setIsUploading(false);
       setIsParsing(true);
 
-      // Call edge function to parse the report with AI
       const { data: parseResult, error: parseError } = await supabase.functions
         .invoke("parse-cibil-report", {
           body: { 
@@ -108,7 +204,6 @@ export default function CreditBureauDialog({
         throw new Error(parseResult.error || "Failed to parse report");
       }
 
-      // Update form with parsed data
       const parsed = parseResult.data;
       setFormData(prev => ({
         ...prev,
@@ -168,6 +263,13 @@ export default function CreditBureauDialog({
           report_file_path: formData.report_file_path,
           name_on_report: formData.name_on_report,
           pan_on_report: formData.pan_on_report,
+          is_live_fetch: activeTab === "live",
+          ...(liveReportData && activeTab === "live" ? {
+            summary: liveReportData.summary,
+            accounts: liveReportData.accounts,
+            enquiries: liveReportData.enquiries,
+            personal_info: liveReportData.personalInfo,
+          } : {}),
         },
         remarks: formData.remarks,
         verified_at: new Date().toISOString(),
@@ -210,242 +312,345 @@ export default function CreditBureauDialog({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Credit Bureau Check</DialogTitle>
           <DialogDescription>
-            Upload credit bureau report (CIBIL, Experian, Equifax, CRIF) for AI parsing or enter data manually
+            Fetch credit report from Equifax or upload report for AI parsing
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          {/* File Upload Section */}
-          <div className="border-2 border-dashed border-primary/30 rounded-lg p-4 bg-primary/5">
-            <div className="flex items-center gap-2 mb-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              <Label className="text-base font-medium">Upload Credit Bureau Report (AI Parsed)</Label>
-            </div>
-            <p className="text-sm text-muted-foreground mb-3">
-              Supports CIBIL, Experian, Equifax, and CRIF report formats (PDF, Image, HTML, Excel)
-            </p>
-            
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf,.jpg,.jpeg,.png,.html,.htm,.xlsx,.xls"
-              onChange={handleFileSelect}
-              className="hidden"
-              id="cibil-file-upload"
-            />
-            
-            {!uploadedFile && !formData.report_file_path ? (
-              <Button
-                variant="outline"
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full border-primary/30 hover:bg-primary/10"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Choose CIBIL Report File
-              </Button>
-            ) : (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between p-3 bg-background rounded-md border">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-primary" />
-                    <span className="text-sm font-medium">
-                      {uploadedFile ? uploadedFile.name : "CIBIL Report Uploaded"}
-                    </span>
-                    {parsedSuccessfully && (
-                      <Badge variant="default" className="bg-green-500">
-                        <CheckCircle className="h-3 w-3 mr-1" />
-                        Parsed
-                      </Badge>
-                    )}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={removeFile}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="live" className="flex items-center gap-2">
+              <Zap className="h-4 w-4" />
+              Fetch from Bureau
+            </TabsTrigger>
+            <TabsTrigger value="upload" className="flex items-center gap-2">
+              <Upload className="h-4 w-4" />
+              Upload Report
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="live" className="space-y-4 mt-4">
+            {/* Applicant Details Preview */}
+            <div className="p-4 bg-muted/50 rounded-lg border">
+              <p className="text-sm font-medium mb-3">Applicant Details for Bureau Check</p>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Name: </span>
+                  <span className="font-medium">{applicantName || "Not available"}</span>
                 </div>
-                
-                {uploadedFile && !parsedSuccessfully && (
-                  <Button
-                    onClick={uploadAndParseFile}
-                    disabled={isUploading || isParsing}
-                    className="w-full"
-                  >
-                    {isUploading ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Uploading...
-                      </>
-                    ) : isParsing ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        AI Parsing Report...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        Parse with AI
-                      </>
-                    )}
-                  </Button>
+                <div>
+                  <span className="text-muted-foreground">PAN: </span>
+                  <span className="font-medium">{applicantPAN || "Not available"}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">DOB: </span>
+                  <span className="font-medium">{applicantDOB || "Not available"}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Mobile: </span>
+                  <span className="font-medium">{applicantMobile || "Not available"}</span>
+                </div>
+                {applicantAddress && (
+                  <div className="col-span-2">
+                    <span className="text-muted-foreground">Address: </span>
+                    <span className="font-medium">
+                      {[applicantAddress, applicantCity, applicantState, applicantPincode]
+                        .filter(Boolean)
+                        .join(", ")}
+                    </span>
+                  </div>
                 )}
               </div>
+
+              {(!applicantPAN && !applicant?.aadhaar_number) && (
+                <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-amber-600" />
+                  <span className="text-sm text-amber-800">
+                    PAN or Aadhaar number required for bureau check
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Consent Checkbox */}
+            <div className="flex items-start space-x-3 p-4 border rounded-lg">
+              <Checkbox 
+                id="consent" 
+                checked={consentChecked} 
+                onCheckedChange={(checked) => setConsentChecked(checked === true)}
+              />
+              <label htmlFor="consent" className="text-sm leading-tight cursor-pointer">
+                I confirm that consent has been obtained from the applicant to fetch their credit report from Equifax Credit Bureau.
+              </label>
+            </div>
+
+            {/* Fetch Button */}
+            <Button 
+              onClick={handleFetchLiveReport}
+              disabled={isFetchingLive || !consentChecked || (!applicantPAN && !applicant?.aadhaar_number)}
+              className="w-full"
+              size="lg"
+            >
+              {isFetchingLive ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Fetching Credit Report...
+                </>
+              ) : (
+                <>
+                  <Zap className="h-4 w-4 mr-2" />
+                  Fetch Credit Report from Equifax
+                </>
+              )}
+            </Button>
+
+            {/* Live Report Viewer */}
+            {liveReportData && (
+              <div className="mt-4 border rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  <span className="font-medium">Credit Report Fetched Successfully</span>
+                  <Badge variant="outline" className="ml-auto">
+                    Score: {liveReportData.creditScore}
+                  </Badge>
+                </div>
+                <CreditReportViewer data={liveReportData} />
+              </div>
             )}
-          </div>
+          </TabsContent>
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
+          <TabsContent value="upload" className="space-y-4 mt-4">
+            {/* File Upload Section */}
+            <div className="border-2 border-dashed border-primary/30 rounded-lg p-4 bg-primary/5">
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                <Label className="text-base font-medium">Upload Credit Bureau Report (AI Parsed)</Label>
+              </div>
+              <p className="text-sm text-muted-foreground mb-3">
+                Supports CIBIL, Experian, Equifax, and CRIF report formats (PDF, Image, HTML, Excel)
+              </p>
+              
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.html,.htm,.xlsx,.xls"
+                onChange={handleFileSelect}
+                className="hidden"
+                id="cibil-file-upload"
+              />
+              
+              {!uploadedFile && !formData.report_file_path ? (
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full border-primary/30 hover:bg-primary/10"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Choose Credit Report File
+                </Button>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-3 bg-background rounded-md border">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-primary" />
+                      <span className="text-sm font-medium">
+                        {uploadedFile ? uploadedFile.name : "Credit Report Uploaded"}
+                      </span>
+                      {parsedSuccessfully && (
+                        <Badge variant="default" className="bg-green-500">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Parsed
+                        </Badge>
+                      )}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={removeFile}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  
+                  {uploadedFile && !parsedSuccessfully && (
+                    <Button
+                      onClick={uploadAndParseFile}
+                      disabled={isUploading || isParsing}
+                      className="w-full"
+                    >
+                      {isUploading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : isParsing ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          AI Parsing Report...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          Parse with AI
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                Report Details {parsedSuccessfully && "(Auto-filled from report)"}
-              </span>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-4">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  Report Details {parsedSuccessfully && "(Auto-filled from report)"}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Bureau Type</Label>
+                <Select value={formData.bureau_type} onValueChange={(value) => setFormData({ ...formData, bureau_type: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cibil">CIBIL</SelectItem>
+                    <SelectItem value="experian">Experian</SelectItem>
+                    <SelectItem value="equifax">Equifax</SelectItem>
+                    <SelectItem value="crif">CRIF</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Credit Score</Label>
+                <Input
+                  type="number"
+                  value={formData.credit_score}
+                  onChange={(e) => setFormData({ ...formData, credit_score: e.target.value })}
+                  placeholder="750"
+                  min="300"
+                  max="900"
+                />
+              </div>
+            </div>
+
+            {formData.name_on_report && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Name on Report</Label>
+                  <Input
+                    value={formData.name_on_report}
+                    onChange={(e) => setFormData({ ...formData, name_on_report: e.target.value })}
+                    placeholder="Name as per report"
+                  />
+                </div>
+                <div>
+                  <Label>PAN on Report</Label>
+                  <Input
+                    value={formData.pan_on_report}
+                    onChange={(e) => setFormData({ ...formData, pan_on_report: e.target.value })}
+                    placeholder="PAN number"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Active Accounts</Label>
+                <Input
+                  type="number"
+                  value={formData.active_accounts}
+                  onChange={(e) => setFormData({ ...formData, active_accounts: e.target.value })}
+                  placeholder="5"
+                />
+              </div>
+              <div>
+                <Label>Total Outstanding (₹)</Label>
+                <Input
+                  type="number"
+                  value={formData.total_outstanding}
+                  onChange={(e) => setFormData({ ...formData, total_outstanding: e.target.value })}
+                  placeholder="500000"
+                />
+              </div>
+            </div>
+
             <div>
-              <Label>Bureau Type</Label>
-              <Select value={formData.bureau_type} onValueChange={(value) => setFormData({ ...formData, bureau_type: value })}>
+              <Label>Total Overdue (₹)</Label>
+              <Input
+                type="number"
+                value={formData.total_overdue}
+                onChange={(e) => setFormData({ ...formData, total_overdue: e.target.value })}
+                placeholder="0"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Enquiries (30 days)</Label>
+                <Input
+                  type="number"
+                  value={formData.enquiry_count_30d}
+                  onChange={(e) => setFormData({ ...formData, enquiry_count_30d: e.target.value })}
+                  placeholder="2"
+                />
+              </div>
+              <div>
+                <Label>Enquiries (90 days)</Label>
+                <Input
+                  type="number"
+                  value={formData.enquiry_count_90d}
+                  onChange={(e) => setFormData({ ...formData, enquiry_count_90d: e.target.value })}
+                  placeholder="4"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label>DPD History Summary</Label>
+              <Textarea
+                value={formData.dpd_history}
+                onChange={(e) => setFormData({ ...formData, dpd_history: e.target.value })}
+                placeholder="e.g., No DPD in last 12 months, or 30+ DPD twice in last 24 months"
+                rows={2}
+              />
+            </div>
+
+            <div>
+              <Label>Verification Status</Label>
+              <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="cibil">CIBIL</SelectItem>
-                  <SelectItem value="experian">Experian</SelectItem>
-                  <SelectItem value="equifax">Equifax</SelectItem>
-                  <SelectItem value="crif">CRIF</SelectItem>
+                  <SelectItem value="success">Success</SelectItem>
+                  <SelectItem value="failed">Failed</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+
             <div>
-              <Label>Credit Score</Label>
-              <Input
-                type="number"
-                value={formData.credit_score}
-                onChange={(e) => setFormData({ ...formData, credit_score: e.target.value })}
-                placeholder="750"
-                min="300"
-                max="900"
+              <Label>Remarks</Label>
+              <Textarea
+                value={formData.remarks}
+                onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+                placeholder="Additional observations from the credit report"
+                rows={3}
               />
             </div>
-          </div>
-
-          {formData.name_on_report && (
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Name on Report</Label>
-                <Input
-                  value={formData.name_on_report}
-                  onChange={(e) => setFormData({ ...formData, name_on_report: e.target.value })}
-                  placeholder="Name as per report"
-                />
-              </div>
-              <div>
-                <Label>PAN on Report</Label>
-                <Input
-                  value={formData.pan_on_report}
-                  onChange={(e) => setFormData({ ...formData, pan_on_report: e.target.value })}
-                  placeholder="PAN number"
-                />
-              </div>
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Active Accounts</Label>
-              <Input
-                type="number"
-                value={formData.active_accounts}
-                onChange={(e) => setFormData({ ...formData, active_accounts: e.target.value })}
-                placeholder="5"
-              />
-            </div>
-            <div>
-              <Label>Total Outstanding (₹)</Label>
-              <Input
-                type="number"
-                value={formData.total_outstanding}
-                onChange={(e) => setFormData({ ...formData, total_outstanding: e.target.value })}
-                placeholder="500000"
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label>Total Overdue (₹)</Label>
-            <Input
-              type="number"
-              value={formData.total_overdue}
-              onChange={(e) => setFormData({ ...formData, total_overdue: e.target.value })}
-              placeholder="0"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Enquiries (30 days)</Label>
-              <Input
-                type="number"
-                value={formData.enquiry_count_30d}
-                onChange={(e) => setFormData({ ...formData, enquiry_count_30d: e.target.value })}
-                placeholder="2"
-              />
-            </div>
-            <div>
-              <Label>Enquiries (90 days)</Label>
-              <Input
-                type="number"
-                value={formData.enquiry_count_90d}
-                onChange={(e) => setFormData({ ...formData, enquiry_count_90d: e.target.value })}
-                placeholder="4"
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label>DPD History Summary</Label>
-            <Textarea
-              value={formData.dpd_history}
-              onChange={(e) => setFormData({ ...formData, dpd_history: e.target.value })}
-              placeholder="e.g., No DPD in last 12 months, or 30+ DPD twice in last 24 months"
-              rows={2}
-            />
-          </div>
-
-          <div>
-            <Label>Verification Status</Label>
-            <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="success">Success</SelectItem>
-                <SelectItem value="failed">Failed</SelectItem>
-                <SelectItem value="in_progress">In Progress</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <Label>Remarks</Label>
-            <Textarea
-              value={formData.remarks}
-              onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
-              placeholder="Additional observations from the credit report"
-              rows={3}
-            />
-          </div>
-        </div>
+          </TabsContent>
+        </Tabs>
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
@@ -453,7 +658,7 @@ export default function CreditBureauDialog({
           </Button>
           <Button 
             onClick={() => saveMutation.mutate()} 
-            disabled={saveMutation.isPending || isUploading || isParsing}
+            disabled={saveMutation.isPending || isUploading || isParsing || isFetchingLive}
           >
             {saveMutation.isPending ? (
               <>
