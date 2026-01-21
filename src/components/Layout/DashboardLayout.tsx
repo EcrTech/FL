@@ -139,7 +139,7 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
           <div className="h-full lg:h-screen flex flex-col overflow-y-auto">
             {/* Logo */}
             <div className="p-6 border-b border-border flex flex-col items-center bg-gradient-to-br from-primary/5 to-transparent">
-              <img src={orgLogo || logo} alt="Logo" className="h-16 object-contain mb-3" />
+              <img src={orgLogo || logo} alt="Logo" className="h-48 w-auto object-contain mb-3" />
               <Link 
                 to="/profile" 
                 className="text-sm font-medium text-foreground hover:text-primary transition-colors text-center"
