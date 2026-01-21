@@ -61,7 +61,7 @@ import NupaySettings from "./pages/LOS/NupaySettings";
 import ReferralLoanApplication from "./pages/ReferralLoanApplication";
 import NegativePinCodes from "./pages/NegativePinCodes";
 import Profile from "./pages/Profile";
-import ESignDocument from "./pages/ESignDocument";
+
 import VideoKYC from "./pages/VideoKYC";
 import DigilockerSuccess from "./pages/DigilockerSuccess";
 import DigilockerFailure from "./pages/DigilockerFailure";
@@ -84,7 +84,7 @@ const App = () => {
             <Route path="/form/:formId" element={<PublicForm />} />
             <Route path="/apply/:slug" element={<PublicLoanApplication />} />
             <Route path="/apply/ref/:referralCode" element={<ReferralLoanApplication />} />
-            <Route path="/esign/:token" element={<ESignDocument />} />
+            
             <Route path="/videokyc/:token" element={<VideoKYC />} />
             <Route path="/digilocker/success" element={<DigilockerSuccess />} />
             <Route path="/digilocker/failure" element={<DigilockerFailure />} />

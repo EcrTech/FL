@@ -21,27 +21,6 @@ verify_jwt = false
 [functions.verify-public-otp]
 verify_jwt = false
 
-[functions.verify-public-pan]
-verify_jwt = false
-
-[functions.sandbox-authenticate]
-verify_jwt = false
-
-[functions.sandbox-ifsc-verify]
-verify_jwt = false
-
-[functions.parse-pan-document]
-verify_jwt = false
-
-[functions.esign-verify-token]
-verify_jwt = false
-
-[functions.esign-initiate-aadhaar]
-verify_jwt = false
-
-[functions.esign-complete-sign]
-verify_jwt = false
-
 [functions.send-sanction-documents]
 verify_jwt = true
 
@@ -56,12 +35,6 @@ verify_jwt = false
 
 [functions.videokyc-upload-recording]
 verify_jwt = false
-
-[functions.sandbox-aadhaar-okyc]
-verify_jwt = true
-
-[functions.sandbox-pan-verify]
-verify_jwt = true
 
 [functions.referral-videokyc-upload]
 verify_jwt = false
