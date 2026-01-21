@@ -506,6 +506,10 @@ export function ApplicantProfileCard({
         recordingUrl={videoKYCRecordingUrl || ''}
         applicantName={applicantName}
         completedAt={videoKycVerification?.verified_at || undefined}
+        applicationId={applicationId}
+        orgId={orgId}
+        applicantPhone={mobile}
+        applicantEmail={applicant.email}
       />
 
       {/* Video KYC Retry Link Dialog (controlled mode) */}

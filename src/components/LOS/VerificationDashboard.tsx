@@ -612,6 +612,10 @@ export default function VerificationDashboard({ applicationId, orgId }: Verifica
           onOpenChange={setVideoKYCViewOpen}
           recordingUrl={videoKYCRecordingUrl}
           applicantName={primaryApplicant ? `${primaryApplicant.first_name || ''} ${primaryApplicant.last_name || ''}`.trim() : undefined}
+          applicationId={applicationId}
+          orgId={orgId}
+          applicantPhone={primaryApplicant?.mobile}
+          applicantEmail={primaryApplicant?.email}
         />
       )}
 
