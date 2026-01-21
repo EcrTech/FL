@@ -5,13 +5,15 @@ import { supabase } from "@/integrations/supabase/client";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Upload } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowLeft, Upload, User } from "lucide-react";
 import { LoadingState } from "@/components/common/LoadingState";
 import { format } from "date-fns";
 import DisbursementDashboard from "@/components/LOS/Disbursement/DisbursementDashboard";
 import SanctionGenerator from "@/components/LOS/Sanction/SanctionGenerator";
 import UploadSignedDocumentDialog from "@/components/LOS/Sanction/UploadSignedDocumentDialog";
 import { useOrgContext } from "@/hooks/useOrgContext";
+import { ApplicantProfileCard } from "@/components/LOS/ApplicantProfileCard";
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-muted",
@@ -19,6 +21,13 @@ const STATUS_COLORS: Record<string, string> = {
   approved: "bg-green-500",
   rejected: "bg-red-500",
   disbursed: "bg-purple-500",
+};
+
+const formatAddress = (address: any) => {
+  if (!address) return "N/A";
+  if (typeof address === "string") return address;
+  const parts = [address.line1, address.line2, address.city, address.state, address.pincode].filter(Boolean);
+  return parts.length > 0 ? parts.join(", ") : "N/A";
 };
 
 export default function SanctionDetail() {
@@ -35,7 +44,11 @@ export default function SanctionDetail() {
         .from("loan_applications")
         .select(`
           *,
-          loan_applicants(first_name, last_name),
+          loan_applicants(
+            id, first_name, middle_name, last_name, 
+            dob, gender, marital_status, religion, 
+            pan_number, aadhaar_number, mobile, current_address
+          ),
           approved_by_profile:profiles!loan_applications_approved_by_fkey(first_name, last_name)
         `)
         .eq("id", id)
@@ -138,7 +151,70 @@ export default function SanctionDetail() {
           </div>
         </div>
 
-        {/* Sanction Content - Only Loan Summary & Documents */}
+        {/* Applicant Profile Card */}
+        {primaryApplicant && orgId && (
+          <ApplicantProfileCard
+            applicationId={id!}
+            orgId={orgId}
+            applicant={primaryApplicant}
+            applicantName={`${primaryApplicant.first_name} ${primaryApplicant.middle_name || ''} ${primaryApplicant.last_name || ''}`.trim()}
+            panNumber={primaryApplicant.pan_number}
+            aadhaarNumber={primaryApplicant.aadhaar_number}
+            mobile={primaryApplicant.mobile}
+            dateOfBirth={primaryApplicant.dob}
+            gender={primaryApplicant.gender}
+          />
+        )}
+
+        {/* Applicant Details Card */}
+        {primaryApplicant && (
+          <Card>
+            <CardHeader className="py-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <User className="h-4 w-4" />
+                Applicant Details
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="grid gap-x-4 gap-y-2 md:grid-cols-4">
+                <div>
+                  <label className="text-xs text-muted-foreground">Full Name</label>
+                  <p className="text-sm">{primaryApplicant.first_name} {primaryApplicant.middle_name || ""} {primaryApplicant.last_name || ""}</p>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Date of Birth</label>
+                  <p className="text-sm">{primaryApplicant.dob ? format(new Date(primaryApplicant.dob), "MMM dd, yyyy") : "N/A"}</p>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Gender</label>
+                  <p className="text-sm">{primaryApplicant.gender || "N/A"}</p>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Marital Status</label>
+                  <p className="text-sm">{primaryApplicant.marital_status || "N/A"}</p>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Religion</label>
+                  <p className="text-sm capitalize">{primaryApplicant.religion || "N/A"}</p>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">PAN Number</label>
+                  <p className="text-sm font-mono">{primaryApplicant.pan_number || "N/A"}</p>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Mobile</label>
+                  <p className="text-sm">{primaryApplicant.mobile || "N/A"}</p>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-xs text-muted-foreground">Current Address</label>
+                  <p className="text-sm">{formatAddress(primaryApplicant.current_address)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Sanction Content - Loan Summary & Documents */}
         <DisbursementDashboard applicationId={application.id} />
       </div>
 
