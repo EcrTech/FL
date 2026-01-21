@@ -5156,7 +5156,7 @@ export type Database = {
           sanction_letter_path?: string | null
           sanction_number: string
           sanctioned_amount: number
-          sanctioned_rate: number
+          sanctioned_rate?: number
           sanctioned_tenure_days: number
           status?: string
           updated_at?: string
