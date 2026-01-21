@@ -18,10 +18,6 @@ import LoanAgreementDocument from "../Sanction/templates/LoanAgreementDocument";
 import DailyRepaymentScheduleDocument from "../Sanction/templates/DailyRepaymentScheduleDocument";
 import UploadSignedDocumentDialog from "../Sanction/UploadSignedDocumentDialog";
 
-// ESign imports
-import { RequestESignButton } from "../ESign/RequestESignButton";
-import { ESignStatusBadge } from "../ESign/ESignStatusBadge";
-import { useESignRequestByDocument } from "../ESign/useESignRequests";
 
 interface DisbursementDashboardProps {
   applicationId: string;
