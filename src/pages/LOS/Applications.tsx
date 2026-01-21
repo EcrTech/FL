@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Plus, Search, Eye, FileText, Sparkles, UserPlus, CalendarIcon, X } from "lucide-react";
+import { Plus, Search, Eye, FileText, Sparkles, UserPlus, CalendarIcon, X, MapPinOff } from "lucide-react";
 import { differenceInHours, format } from "date-fns";
 import { LoadingState } from "@/components/common/LoadingState";
 import { usePagination } from "@/hooks/usePagination";
@@ -97,7 +97,7 @@ const { data: applications = [], isLoading } = useQuery({
           tenure_days,
           source,
           created_at,
-          loan_applicants(first_name, last_name, mobile),
+          loan_applicants(first_name, last_name, mobile, current_address),
           contacts(first_name, last_name, phone),
           assigned_profile:profiles!loan_applications_assigned_to_fkey(first_name, last_name)
         `)
@@ -113,6 +113,28 @@ const { data: applications = [], isLoading } = useQuery({
     enabled: !!orgId,
     staleTime: 30000, // 30 seconds - reduce unnecessary refetches
   });
+
+  // Fetch negative areas list
+  const { data: negativeAreas = [] } = useQuery({
+    queryKey: ["negative-areas", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("loan_negative_areas")
+        .select("area_value")
+        .eq("org_id", orgId)
+        .eq("area_type", "pincode")
+        .eq("is_active", true);
+      if (error) throw error;
+      return data.map(a => a.area_value);
+    },
+    enabled: !!orgId,
+  });
+
+  // Helper function to check if application is from negative area
+  const isNegativeAreaApplication = (app: any) => {
+    const pincode = app.loan_applicants?.[0]?.current_address?.pincode;
+    return pincode && negativeAreas.includes(pincode);
+  };
 
   const filteredApplications = applications.filter((app) => {
     if (statusFilter !== "all" && app.status !== statusFilter) return false;
@@ -342,7 +364,10 @@ const { data: applications = [], isLoading } = useQuery({
                       {paginatedApplications.map((app) => (
                         <TableRow
                           key={app.id}
-                          className="cursor-pointer hover:bg-muted/30"
+                          className={cn(
+                            "cursor-pointer hover:bg-muted/30",
+                            isNegativeAreaApplication(app) && "bg-red-50 hover:bg-red-100 border-red-200"
+                          )}
                           onClick={() => navigate(`/los/applications/${app.id}`)}
                         >
                           <TableCell className="py-2">
@@ -361,6 +386,12 @@ const { data: applications = [], isLoading } = useQuery({
                                 <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 border-blue-500/20 text-[10px] px-1.5 py-0 h-4">
                                   <UserPlus className="h-2.5 w-2.5 mr-0.5" />
                                   Referral
+                                </Badge>
+                              )}
+                              {isNegativeAreaApplication(app) && (
+                                <Badge className="bg-red-500 text-white border-0 text-[10px] px-1.5 py-0 h-4">
+                                  <MapPinOff className="h-2.5 w-2.5 mr-0.5" />
+                                  Negative Area
                                 </Badge>
                               )}
                             </div>
