@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LoadingState } from "@/components/common/LoadingState";
 import { useNotification } from "@/hooks/useNotification";
-import { Search, FileCheck, FileX, Phone, Mail } from "lucide-react";
+import { Search, FileCheck, FileX, Phone, Mail, UserPlus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,6 +19,8 @@ import PaginationControls from "@/components/common/PaginationControls";
 import { useOrgContext } from "@/hooks/useOrgContext";
 import { toast } from "sonner";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { AssignmentDialog } from "@/components/LOS/AssignmentDialog";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 interface LoanApplication {
   id: string;
@@ -27,6 +29,11 @@ interface LoanApplication {
   status: string | null;
   source: string | null;
   created_at: string;
+  assigned_to: string | null;
+  assigned_user: {
+    first_name: string;
+    last_name: string | null;
+  } | null;
   loan_applicants: {
     first_name: string | null;
     last_name: string | null;
@@ -184,6 +191,17 @@ export default function PipelineBoard() {
   
   const tablePagination = usePagination({ defaultPageSize: 50 });
 
+  const [assignmentDialog, setAssignmentDialog] = useState<{
+    open: boolean;
+    applicationId: string;
+    currentAssigneeId: string | null;
+    currentAssigneeName: string | null;
+  } | null>(null);
+
+  const getInitials = (firstName: string, lastName?: string | null) => {
+    return `${firstName?.charAt(0) || ""}${lastName?.charAt(0) || ""}`.toUpperCase();
+  };
+
   // Fetch loan applications with applicant info
   const { data: applicationsData, isLoading } = useQuery({
     queryKey: ['leads-applications', orgId, filters, tablePagination.currentPage, tablePagination.pageSize],
@@ -201,6 +219,11 @@ export default function PipelineBoard() {
           status,
           source,
           created_at,
+          assigned_to,
+          assigned_user:profiles!loan_applications_assigned_to_fkey (
+            first_name,
+            last_name
+          ),
           loan_applicants (
             first_name,
             last_name,
@@ -461,6 +484,7 @@ export default function PipelineBoard() {
                     <TableHead className="text-xs font-medium py-2 px-3 text-center">Docs</TableHead>
                     <TableHead className="text-xs font-medium py-2 px-3">Status</TableHead>
                     <TableHead className="text-xs font-medium py-2 px-3">Source</TableHead>
+                    <TableHead className="text-xs font-medium py-2 px-3">Assigned To</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -528,12 +552,48 @@ export default function PipelineBoard() {
                             {SOURCE_DISPLAY[app.source || ''] || app.source || '-'}
                           </Badge>
                         </TableCell>
+                        <TableCell className="py-2 px-3" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center gap-2">
+                            {app.assigned_user ? (
+                              <div className="flex items-center gap-1.5">
+                                <Avatar className="h-5 w-5">
+                                  <AvatarFallback className="text-[10px] bg-primary/10">
+                                    {getInitials(app.assigned_user.first_name, app.assigned_user.last_name)}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span className="text-xs">
+                                  {app.assigned_user.first_name} {app.assigned_user.last_name || ''}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">Unassigned</span>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setAssignmentDialog({
+                                  open: true,
+                                  applicationId: app.id,
+                                  currentAssigneeId: app.assigned_to,
+                                  currentAssigneeName: app.assigned_user 
+                                    ? `${app.assigned_user.first_name} ${app.assigned_user.last_name || ''}`.trim()
+                                    : null
+                                });
+                              }}
+                            >
+                              <UserPlus className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     );
                   })}
                   {filteredApplications.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground text-sm">
+                      <TableCell colSpan={11} className="text-center py-8 text-muted-foreground text-sm">
                         No leads found
                       </TableCell>
                     </TableRow>
@@ -560,6 +620,22 @@ export default function PipelineBoard() {
           </CardContent>
         </Card>
       </div>
+
+      {assignmentDialog && (
+        <AssignmentDialog
+          open={assignmentDialog.open}
+          onOpenChange={(open) => {
+            if (!open) setAssignmentDialog(null);
+          }}
+          applicationId={assignmentDialog.applicationId}
+          currentAssigneeId={assignmentDialog.currentAssigneeId}
+          currentAssigneeName={assignmentDialog.currentAssigneeName}
+          orgId={orgId || ""}
+          onAssigned={() => {
+            queryClient.invalidateQueries({ queryKey: ['leads-applications'] });
+          }}
+        />
+      )}
     </DashboardLayout>
   );
 }
