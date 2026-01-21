@@ -57,6 +57,7 @@ import CustomerRelationships from "./pages/LOS/CustomerRelationships";
 import Sanctions from "./pages/LOS/Sanctions";
 import SanctionDetail from "./pages/LOS/SanctionDetail";
 import Disbursals from "./pages/LOS/Disbursals";
+import NupaySettings from "./pages/LOS/NupaySettings";
 import ReferralLoanApplication from "./pages/ReferralLoanApplication";
 import NegativePinCodes from "./pages/NegativePinCodes";
 import Profile from "./pages/Profile";
@@ -356,6 +357,12 @@ const App = () => {
             <Route path="/los/relationships" element={
               <ProtectedRoute>
                 <CustomerRelationships />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/los/settings/nupay" element={
+              <ProtectedRoute requiredRole="admin">
+                <NupaySettings />
               </ProtectedRoute>
             } />
             

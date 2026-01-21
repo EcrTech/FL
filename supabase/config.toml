@@ -89,3 +89,18 @@ verify_jwt = false
 
 [functions.equifax-credit-report]
 verify_jwt = true
+
+[functions.nupay-authenticate]
+verify_jwt = true
+
+[functions.nupay-get-banks]
+verify_jwt = true
+
+[functions.nupay-create-mandate]
+verify_jwt = true
+
+[functions.nupay-get-status]
+verify_jwt = true
+
+[functions.nupay-webhook-handler]
+verify_jwt = false
