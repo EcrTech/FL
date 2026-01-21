@@ -11,11 +11,14 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Search, Eye, FileText, Sparkles, UserPlus } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Plus, Search, Eye, FileText, Sparkles, UserPlus, CalendarIcon, X } from "lucide-react";
 import { differenceInHours, format } from "date-fns";
 import { LoadingState } from "@/components/common/LoadingState";
 import { usePagination } from "@/hooks/usePagination";
 import PaginationControls from "@/components/common/PaginationControls";
+import { cn } from "@/lib/utils";
 
 const STAGE_LABELS: Record<string, string> = {
   application_login: "Application Login",
@@ -72,6 +75,8 @@ export default function Applications() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [stageFilter, setStageFilter] = useState("all");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
 
   const isFreshApplication = (createdAt: string) => {
     return differenceInHours(new Date(), new Date(createdAt)) < 48;
@@ -112,6 +117,19 @@ const { data: applications = [], isLoading } = useQuery({
   const filteredApplications = applications.filter((app) => {
     if (statusFilter !== "all" && app.status !== statusFilter) return false;
     if (stageFilter !== "all" && app.current_stage !== stageFilter) return false;
+    
+    // Date range filter
+    const appDate = new Date(app.created_at);
+    if (dateFrom) {
+      const fromStart = new Date(dateFrom);
+      fromStart.setHours(0, 0, 0, 0);
+      if (appDate < fromStart) return false;
+    }
+    if (dateTo) {
+      const toEnd = new Date(dateTo);
+      toEnd.setHours(23, 59, 59, 999);
+      if (appDate > toEnd) return false;
+    }
     
     const searchLower = searchQuery.toLowerCase();
     if (!searchLower) return true;
@@ -215,6 +233,69 @@ const { data: applications = [], isLoading } = useQuery({
               ))}
             </SelectContent>
           </Select>
+
+          {/* Date Range Filter */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-[240px] justify-start text-left font-normal",
+                  !dateFrom && !dateTo && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {dateFrom && dateTo
+                  ? `${format(dateFrom, "MMM dd")} - ${format(dateTo, "MMM dd")}`
+                  : dateFrom
+                  ? `From ${format(dateFrom, "MMM dd, yyyy")}`
+                  : dateTo
+                  ? `Until ${format(dateTo, "MMM dd, yyyy")}`
+                  : "Filter by date"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <div className="flex items-center justify-between gap-2 p-3 border-b">
+                <span className="text-sm font-medium">Date Range</span>
+                {(dateFrom || dateTo) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => {
+                      setDateFrom(undefined);
+                      setDateTo(undefined);
+                    }}
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Clear
+                  </Button>
+                )}
+              </div>
+              <div className="flex">
+                <div className="p-2 border-r">
+                  <p className="text-xs text-muted-foreground mb-2 px-2">From Date</p>
+                  <Calendar
+                    mode="single"
+                    selected={dateFrom}
+                    onSelect={setDateFrom}
+                    className="pointer-events-auto"
+                    disabled={(date) => dateTo ? date > dateTo : false}
+                  />
+                </div>
+                <div className="p-2">
+                  <p className="text-xs text-muted-foreground mb-2 px-2">To Date</p>
+                  <Calendar
+                    mode="single"
+                    selected={dateTo}
+                    onSelect={setDateTo}
+                    className="pointer-events-auto"
+                    disabled={(date) => dateFrom ? date < dateFrom : false}
+                  />
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* Applications Table */}
