@@ -33,6 +33,7 @@ interface StoredFormState {
   basicInfo: {
     name: string;
     email: string;
+    officeEmail: string;
     phone: string;
     requestedAmount: number;
     tenureDays: number;
@@ -45,6 +46,7 @@ interface StoredFormState {
   verificationStatus: {
     emailVerified: boolean;
     phoneVerified: boolean;
+    officeEmailVerified: boolean;
   };
   panNumber: string;
   panVerified: boolean;
@@ -132,6 +134,7 @@ export default function ReferralLoanApplication() {
   const [basicInfo, setBasicInfo] = useState({
     name: "",
     email: "",
+    officeEmail: "",
     phone: "",
     requestedAmount: 0,
     tenureDays: 0,
@@ -146,6 +149,7 @@ export default function ReferralLoanApplication() {
   const [verificationStatus, setVerificationStatus] = useState({
     emailVerified: false,
     phoneVerified: false,
+    officeEmailVerified: false,
   });
 
   const [panNumber, setPanNumber] = useState("");
@@ -282,10 +286,10 @@ export default function ReferralLoanApplication() {
     });
   }, [loading, error, referrerInfo, currentStep]);
 
-  const handleVerificationComplete = (type: 'email' | 'phone') => {
+  const handleVerificationComplete = (type: 'email' | 'phone' | 'officeEmail') => {
     setVerificationStatus((prev) => ({
       ...prev,
-      [type === 'email' ? 'emailVerified' : 'phoneVerified']: true,
+      [type === 'email' ? 'emailVerified' : type === 'phone' ? 'phoneVerified' : 'officeEmailVerified']: true,
     }));
   };
 
@@ -403,23 +407,25 @@ export default function ReferralLoanApplication() {
   const submitApplication = async () => {
     setSubmitting(true);
     try {
-      const applicationData = {
-        applicant: {
-          name: basicInfo.name,
-          email: basicInfo.email,
-          phone: basicInfo.phone,
-          requestedAmount: basicInfo.requestedAmount,
-          tenureDays: basicInfo.tenureDays,
-          pan: panNumber,
-          panVerified,
-          panName: panData?.name,
-          aadhaar: aadhaarNumber,
-          aadhaarVerified,
-          aadhaarName: aadhaarData?.name,
-          aadhaarAddress: aadhaarData?.address,
-          aadhaarDob: aadhaarData?.dob,
-          videoKycCompleted: true,
-        },
+    const applicationData = {
+      applicant: {
+        name: basicInfo.name,
+        email: basicInfo.email,
+        officeEmail: basicInfo.officeEmail || null,
+        officeEmailVerified: verificationStatus.officeEmailVerified,
+        phone: basicInfo.phone,
+        requestedAmount: basicInfo.requestedAmount,
+        tenureDays: basicInfo.tenureDays,
+        pan: panNumber,
+        panVerified,
+        panName: panData?.name,
+        aadhaar: aadhaarNumber,
+        aadhaarVerified,
+        aadhaarName: aadhaarData?.name,
+        aadhaarAddress: aadhaarData?.address,
+        aadhaarDob: aadhaarData?.dob,
+        videoKycCompleted: true,
+      },
         consents,
         referrerInfo,
         referralCode,

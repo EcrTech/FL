@@ -39,6 +39,8 @@ export const translations = {
     resend: "Resend",
     emailOptional: "Email Address (Optional)",
     enterEmail: "Enter your email",
+    officeEmailOptional: "Office Email ID (Optional)",
+    enterOfficeEmail: "Enter your office email",
     
     // Consents
     consentSection: "Required Consents",
@@ -132,6 +134,8 @@ export const translations = {
     resend: "पुनः भेजें",
     emailOptional: "ईमेल पता (वैकल्पिक)",
     enterEmail: "अपना ईमेल दर्ज करें",
+    officeEmailOptional: "कार्यालय ईमेल आईडी (वैकल्पिक)",
+    enterOfficeEmail: "अपना कार्यालय ईमेल दर्ज करें",
     
     // Consents
     consentSection: "आवश्यक सहमतियां",
