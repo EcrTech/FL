@@ -3483,6 +3483,8 @@ export type Database = {
           middle_name: string | null
           mobile: string
           mother_name: string | null
+          office_email: string | null
+          office_email_verified: boolean | null
           pan_number: string | null
           permanent_address: Json | null
           personal_ref_address: string | null
@@ -3526,6 +3528,8 @@ export type Database = {
           middle_name?: string | null
           mobile: string
           mother_name?: string | null
+          office_email?: string | null
+          office_email_verified?: boolean | null
           pan_number?: string | null
           permanent_address?: Json | null
           personal_ref_address?: string | null
@@ -3569,6 +3573,8 @@ export type Database = {
           middle_name?: string | null
           mobile?: string
           mother_name?: string | null
+          office_email?: string | null
+          office_email_verified?: boolean | null
           pan_number?: string | null
           permanent_address?: Json | null
           personal_ref_address?: string | null

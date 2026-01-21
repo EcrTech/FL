@@ -12,11 +12,12 @@ interface BasicInfoStepProps {
   formData: {
     name: string;
     email: string;
+    officeEmail: string;
     phone: string;
     requestedAmount: number;
     tenureDays: number;
   };
-  onUpdate: (data: Partial<{ name: string; email: string; phone: string; requestedAmount: number; tenureDays: number }>) => void;
+  onUpdate: (data: Partial<{ name: string; email: string; officeEmail: string; phone: string; requestedAmount: number; tenureDays: number }>) => void;
   consents: {
     householdIncome: boolean;
     termsAndConditions: boolean;
@@ -26,8 +27,9 @@ interface BasicInfoStepProps {
   verificationStatus: {
     emailVerified: boolean;
     phoneVerified: boolean;
+    officeEmailVerified: boolean;
   };
-  onVerificationComplete: (type: 'email' | 'phone') => void;
+  onVerificationComplete: (type: 'email' | 'phone' | 'officeEmail') => void;
   onNext: () => void;
 }
 
@@ -42,24 +44,31 @@ export function BasicInfoStep({
 }: BasicInfoStepProps) {
   const [emailOtpSent, setEmailOtpSent] = useState(false);
   const [phoneOtpSent, setPhoneOtpSent] = useState(false);
+  const [officeEmailOtpSent, setOfficeEmailOtpSent] = useState(false);
   const [emailOtp, setEmailOtp] = useState("");
   const [phoneOtp, setPhoneOtp] = useState("");
+  const [officeEmailOtp, setOfficeEmailOtp] = useState("");
   const [emailSessionId, setEmailSessionId] = useState("");
   const [phoneSessionId, setPhoneSessionId] = useState("");
+  const [officeEmailSessionId, setOfficeEmailSessionId] = useState("");
   const [sendingEmailOtp, setSendingEmailOtp] = useState(false);
   const [sendingPhoneOtp, setSendingPhoneOtp] = useState(false);
+  const [sendingOfficeEmailOtp, setSendingOfficeEmailOtp] = useState(false);
   const [verifyingEmail, setVerifyingEmail] = useState(false);
   const [verifyingPhone, setVerifyingPhone] = useState(false);
+  const [verifyingOfficeEmail, setVerifyingOfficeEmail] = useState(false);
   const [emailTimer, setEmailTimer] = useState(0);
   const [phoneTimer, setPhoneTimer] = useState(0);
+  const [officeEmailTimer, setOfficeEmailTimer] = useState(0);
   const [phoneTestOtp, setPhoneTestOtp] = useState<string | null>(null);
 
   // Refs to track if OTP was already sent for current value
   const lastPhoneSentRef = useRef<string>("");
   const lastEmailSentRef = useRef<string>("");
+  const lastOfficeEmailSentRef = useRef<string>("");
 
-  const startTimer = (type: 'email' | 'phone') => {
-    const setTimer = type === 'email' ? setEmailTimer : setPhoneTimer;
+  const startTimer = (type: 'email' | 'phone' | 'officeEmail') => {
+    const setTimer = type === 'email' ? setEmailTimer : type === 'phone' ? setPhoneTimer : setOfficeEmailTimer;
     setTimer(120);
     const interval = setInterval(() => {
       setTimer((prev) => {
@@ -78,10 +87,10 @@ export function BasicInfoStep({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const sendOtp = async (type: 'email' | 'phone') => {
-    const identifier = type === 'email' ? formData.email : formData.phone;
+  const sendOtp = async (type: 'email' | 'phone' | 'officeEmail') => {
+    const identifier = type === 'email' ? formData.email : type === 'phone' ? formData.phone : formData.officeEmail;
     
-    if (type === 'email' && !formData.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+    if ((type === 'email' || type === 'officeEmail') && !identifier.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
       // Don't show toast for auto-send, just return
       return;
     }
@@ -91,16 +100,16 @@ export function BasicInfoStep({
       return;
     }
 
-    const setSending = type === 'email' ? setSendingEmailOtp : setSendingPhoneOtp;
-    const setOtpSent = type === 'email' ? setEmailOtpSent : setPhoneOtpSent;
-    const setSessionId = type === 'email' ? setEmailSessionId : setPhoneSessionId;
+    const setSending = type === 'email' ? setSendingEmailOtp : type === 'phone' ? setSendingPhoneOtp : setSendingOfficeEmailOtp;
+    const setOtpSent = type === 'email' ? setEmailOtpSent : type === 'phone' ? setPhoneOtpSent : setOfficeEmailOtpSent;
+    const setSessionId = type === 'email' ? setEmailSessionId : type === 'phone' ? setPhoneSessionId : setOfficeEmailSessionId;
 
     setSending(true);
     try {
       const { data, error } = await supabase.functions.invoke('send-public-otp', {
         body: {
           identifier: type === 'phone' ? `+91${formData.phone.replace(/\D/g, '')}` : identifier,
-          identifierType: type,
+          identifierType: type === 'officeEmail' ? 'email' : type,
         },
       });
 
@@ -113,8 +122,10 @@ export function BasicInfoStep({
       // Track that we sent OTP for this value
       if (type === 'phone') {
         lastPhoneSentRef.current = formData.phone;
-      } else {
+      } else if (type === 'email') {
         lastEmailSentRef.current = formData.email;
+      } else {
+        lastOfficeEmailSentRef.current = formData.officeEmail;
       }
       
       // Handle test mode for phone OTP
@@ -122,7 +133,8 @@ export function BasicInfoStep({
         setPhoneTestOtp(data.testOtp);
         toast.success(`Test Mode: WhatsApp not configured. Use OTP: ${data.testOtp}`);
       } else {
-        toast.success(type === 'phone' ? 'OTP sent via WhatsApp' : `OTP sent to your ${type}`);
+        const label = type === 'officeEmail' ? 'office email' : type;
+        toast.success(type === 'phone' ? 'OTP sent via WhatsApp' : `OTP sent to your ${label}`);
       }
     } catch (error: any) {
       console.error('Error sending OTP:', error);
@@ -168,26 +180,48 @@ export function BasicInfoStep({
     }
   }, [formData.email, emailOtpSent, verificationStatus.emailVerified, sendingEmailOtp]);
 
-  const verifyOtp = async (type: 'email' | 'phone') => {
+  // Auto-send OTP when valid office email is entered (optional field)
+  useEffect(() => {
+    const isValidOfficeEmail = formData.officeEmail?.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
+    if (
+      isValidOfficeEmail && 
+      !officeEmailOtpSent && 
+      !verificationStatus.officeEmailVerified && 
+      !sendingOfficeEmailOtp &&
+      lastOfficeEmailSentRef.current !== formData.officeEmail
+    ) {
+      // Debounce to avoid sending while user is still typing
+      const timer = setTimeout(() => {
+        sendOtp('officeEmail');
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [formData.officeEmail, officeEmailOtpSent, verificationStatus.officeEmailVerified, sendingOfficeEmailOtp]);
+
+  const verifyOtp = async (type: 'email' | 'phone' | 'officeEmail') => {
     const startTime = Date.now();
     console.log(`[OTP Verify] ========== START ==========`);
     console.log(`[OTP Verify] Timestamp: ${new Date().toISOString()}`);
     console.log(`[OTP Verify] Type: ${type}`);
     console.log(`[OTP Verify] Supabase URL configured: ${!!import.meta.env.VITE_SUPABASE_URL}`);
     
-    const sessionId = type === 'email' ? emailSessionId : phoneSessionId;
-    const otp = type === 'email' ? emailOtp : phoneOtp;
-    const setVerifying = type === 'email' ? setVerifyingEmail : setVerifyingPhone;
+    const sessionId = type === 'email' ? emailSessionId : type === 'phone' ? phoneSessionId : officeEmailSessionId;
+    const otp = type === 'email' ? emailOtp : type === 'phone' ? phoneOtp : officeEmailOtp;
+    const setVerifying = type === 'email' ? setVerifyingEmail : type === 'phone' ? setVerifyingPhone : setVerifyingOfficeEmail;
 
     console.log(`[OTP Verify] State snapshot:`, {
       emailSessionId: emailSessionId ? `${emailSessionId.substring(0, 8)}...` : 'null',
       phoneSessionId: phoneSessionId ? `${phoneSessionId.substring(0, 8)}...` : 'null',
+      officeEmailSessionId: officeEmailSessionId ? `${officeEmailSessionId.substring(0, 8)}...` : 'null',
       emailOtp: emailOtp ? `length=${emailOtp.length}` : 'empty',
       phoneOtp: phoneOtp ? `length=${phoneOtp.length}` : 'empty',
+      officeEmailOtp: officeEmailOtp ? `length=${officeEmailOtp.length}` : 'empty',
       verifyingEmail,
       verifyingPhone,
+      verifyingOfficeEmail,
       emailVerified: verificationStatus.emailVerified,
       phoneVerified: verificationStatus.phoneVerified,
+      officeEmailVerified: verificationStatus.officeEmailVerified,
     });
 
     if (!sessionId) {
@@ -197,10 +231,14 @@ export function BasicInfoStep({
         setEmailOtpSent(false);
         setEmailOtp("");
         lastEmailSentRef.current = ""; // Reset to allow resend
-      } else {
+      } else if (type === 'phone') {
         setPhoneOtpSent(false);
         setPhoneOtp("");
         lastPhoneSentRef.current = ""; // Reset to allow resend
+      } else {
+        setOfficeEmailOtpSent(false);
+        setOfficeEmailOtp("");
+        lastOfficeEmailSentRef.current = ""; // Reset to allow resend
       }
       console.log(`[OTP Verify] ========== END (no session) ==========`);
       return;
@@ -272,7 +310,8 @@ export function BasicInfoStep({
         console.log(`[OTP Verify] Branch: data.verified is true - calling onVerificationComplete`);
         onVerificationComplete(type);
         console.log(`[OTP Verify] onVerificationComplete called successfully`);
-        toast.success(`${type === 'email' ? 'Email' : 'Phone'} verified successfully`);
+        const label = type === 'officeEmail' ? 'Office email' : type === 'email' ? 'Email' : 'Phone';
+        toast.success(`${label} verified successfully`);
       } else {
         console.log(`[OTP Verify] Branch: data.verified is falsy - value: ${data?.verified}`);
         toast.error("Verification failed. Please try again.");
@@ -295,7 +334,10 @@ export function BasicInfoStep({
   const isValidLoanAmount = formData.requestedAmount >= 5000 && formData.requestedAmount <= 100000;
   const isValidTenure = formData.tenureDays >= 1 && formData.tenureDays <= 90;
   
-  // Updated canProceed: requires both phone AND email verification
+  // Office email is optional, but if provided, it must be verified
+  const officeEmailValid = !formData.officeEmail || verificationStatus.officeEmailVerified;
+  
+  // Updated canProceed: requires both phone AND email verification, office email optional
   const canProceed = 
     formData.name && 
     isValidPhone && 
@@ -304,7 +346,8 @@ export function BasicInfoStep({
     isValidTenure && 
     allConsentsChecked &&
     verificationStatus.phoneVerified &&
-    verificationStatus.emailVerified;
+    verificationStatus.emailVerified &&
+    officeEmailValid;
 
   return (
     <div className="space-y-8">
@@ -518,6 +561,69 @@ export function BasicInfoStep({
                 </div>
               )}
             </div>
+          )}
+        </div>
+
+        {/* Office Email Field - Optional with OTP */}
+        <div className="space-y-2">
+          <Label htmlFor="officeEmail" className="text-sm font-heading font-semibold text-foreground flex items-center gap-2">
+            <Mail className="h-4 w-4 text-muted-foreground" />
+            Office Email ID <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
+          </Label>
+          <div className="relative">
+            <Input
+              id="officeEmail"
+              type="email"
+              placeholder="Enter your office email"
+              value={formData.officeEmail}
+              onChange={(e) => onUpdate({ officeEmail: e.target.value })}
+              disabled={verificationStatus.officeEmailVerified}
+              className="h-12 bg-background border-2 border-border rounded-xl text-base font-body pr-36 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+            />
+            {verificationStatus.officeEmailVerified ? (
+              <Badge className="absolute right-3 top-1/2 -translate-y-1/2 bg-[hsl(var(--success))] text-white border-0 font-heading">
+                <Check className="h-3 w-3 mr-1" /> Verified
+              </Badge>
+            ) : sendingOfficeEmailOtp ? (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Sending OTP...</span>
+              </div>
+            ) : null}
+          </div>
+
+          {/* Office Email OTP Input - Shows automatically when OTP is sent */}
+          {officeEmailOtpSent && !verificationStatus.officeEmailVerified && (
+            <div className="flex gap-3 mt-3 p-4 bg-[hsl(var(--electric-blue-100))] rounded-xl border border-[hsl(var(--electric-blue-400))]/20">
+              <Input
+                placeholder="Enter 6-digit OTP"
+                value={officeEmailOtp}
+                onChange={(e) => setOfficeEmailOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                className="h-11 bg-white border-2 border-border rounded-xl font-body tracking-widest"
+                maxLength={6}
+              />
+              <Button
+                type="button"
+                onClick={() => verifyOtp('officeEmail')}
+                disabled={verifyingOfficeEmail || officeEmailOtp.length !== 6}
+                className="h-11 px-5 btn-electric rounded-xl font-heading"
+              >
+                {verifyingOfficeEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verify'}
+              </Button>
+              {officeEmailTimer > 0 && (
+                <div className="flex items-center gap-1.5 text-sm text-muted-foreground font-body min-w-[60px]">
+                  <Clock className="h-3.5 w-3.5" />
+                  {formatTimer(officeEmailTimer)}
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Hint text for optional field */}
+          {!formData.officeEmail && !verificationStatus.officeEmailVerified && (
+            <p className="text-xs text-muted-foreground font-body">
+              Provide your work email for official communications (if applicable)
+            </p>
           )}
         </div>
       </div>

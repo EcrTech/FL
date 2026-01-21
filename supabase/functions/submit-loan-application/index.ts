@@ -311,6 +311,8 @@ Deno.serve(async (req) => {
           aadhaar_verified: applicant.aadhaarVerified || false,
           mobile: applicant.phone,
           email: applicant.email || null,
+          office_email: applicant.officeEmail || null,
+          office_email_verified: applicant.officeEmailVerified || false,
           video_kyc_completed: applicant.videoKycCompleted || false
         });
 
