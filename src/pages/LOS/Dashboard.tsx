@@ -14,6 +14,7 @@ import {
   IndianRupee,
   Users,
   AlertCircle,
+  MapPinOff,
 } from "lucide-react";
 import { LoadingState } from "@/components/common/LoadingState";
 
@@ -39,7 +40,9 @@ export default function LOSDashboard() {
         approvedAppsRes,
         disbursementsRes,
         pendingEMIsRes,
-        overdueEMIsRes
+        overdueEMIsRes,
+        negativeAreasRes,
+        applicantsWithAddressRes
       ] = await Promise.all([
         // Total applications
         supabase
@@ -98,7 +101,21 @@ export default function LOSDashboard() {
         supabase
           .from("loan_repayment_schedule")
           .select("*", { count: "exact", head: true })
-          .or(`status.eq.overdue,and(status.eq.pending,due_date.lt.${today})`)
+          .or(`status.eq.overdue,and(status.eq.pending,due_date.lt.${today})`),
+        
+        // Negative area pin codes
+        supabase
+          .from("loan_negative_areas")
+          .select("area_value")
+          .eq("org_id", orgId)
+          .eq("area_type", "pincode")
+          .eq("is_active", true),
+        
+        // Applicants with address to check against negative areas
+        supabase
+          .from("loan_applicants")
+          .select("loan_application_id, current_address")
+          .not("current_address", "is", null)
       ]);
 
       const totalSanctioned = approvedAppsRes.data?.reduce(
@@ -111,6 +128,13 @@ export default function LOSDashboard() {
         0
       ) || 0;
 
+      // Count applications from negative areas
+      const negativePincodes = new Set(negativeAreasRes.data?.map(a => a.area_value) || []);
+      const negativeAreaApps = applicantsWithAddressRes.data?.filter(a => {
+        const pincode = (a.current_address as any)?.pincode;
+        return pincode && negativePincodes.has(pincode);
+      }).length || 0;
+
       return {
         totalApps: totalAppsRes.count || 0,
         pendingApproval: pendingApprovalRes.count || 0,
@@ -120,6 +144,7 @@ export default function LOSDashboard() {
         totalDisbursedAmount,
         pendingEMIs: pendingEMIsRes.count || 0,
         overdueEMIs: overdueEMIsRes.count || 0,
+        negativeAreaApps,
       };
     },
     enabled: !!orgId,
@@ -304,6 +329,23 @@ export default function LOSDashboard() {
               <div className="text-2xl font-bold text-red-600">
                 {stats?.overdueEMIs || 0}
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-red-200 bg-red-50/50">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <MapPinOff className="h-4 w-4 text-red-600" />
+                Negative Area Applications
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">
+                {stats?.negativeAreaApps || 0}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                From blocked pin codes
+              </p>
             </CardContent>
           </Card>
         </div>
