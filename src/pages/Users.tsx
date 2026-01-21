@@ -203,8 +203,9 @@ export default function Users() {
 
     try {
       if (dialog.isEditing) {
-        // Update existing user via edge function
+        // Update existing user via edge function - use PUT method for updates
         const { data, error } = await supabase.functions.invoke('manage-user', {
+          method: 'PUT',
           body: {
             userId: dialog.editingItem.user_id,
             first_name: dialog.formData.first_name,
