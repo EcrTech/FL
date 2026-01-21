@@ -1,5 +1,6 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Video } from "lucide-react";
+import { Video, AlertTriangle } from "lucide-react";
+import { VideoKYCRetryButton } from "./VideoKYCRetryButton";
 
 interface VideoKYCViewDialogProps {
   open: boolean;
@@ -7,6 +8,10 @@ interface VideoKYCViewDialogProps {
   recordingUrl: string;
   applicantName?: string;
   completedAt?: string;
+  applicationId: string;
+  orgId: string;
+  applicantPhone?: string;
+  applicantEmail?: string;
 }
 
 export function VideoKYCViewDialog({
@@ -15,6 +20,10 @@ export function VideoKYCViewDialog({
   recordingUrl,
   applicantName,
   completedAt,
+  applicationId,
+  orgId,
+  applicantPhone,
+  applicantEmail,
 }: VideoKYCViewDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -40,6 +49,22 @@ export function VideoKYCViewDialog({
             >
               Your browser does not support the video tag.
             </video>
+          </div>
+
+          {/* Retry Link Section */}
+          <div className="mt-4 flex items-center justify-between p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-center gap-2 text-amber-800">
+              <AlertTriangle className="h-4 w-4" />
+              <span className="text-sm">Video incorrect? Request a new recording.</span>
+            </div>
+            <VideoKYCRetryButton
+              applicationId={applicationId}
+              orgId={orgId}
+              applicantName={applicantName || "Applicant"}
+              applicantPhone={applicantPhone}
+              applicantEmail={applicantEmail}
+              showTrigger={true}
+            />
           </div>
         </div>
       </DialogContent>
