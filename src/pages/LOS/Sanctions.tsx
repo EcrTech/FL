@@ -29,6 +29,7 @@ interface SanctionApplication {
   sanction_status: string | null;
   sanction_number: string | null;
   documents_emailed_at: string | null;
+  approver_name: string | null;
 }
 
 export default function Sanctions() {
@@ -50,7 +51,8 @@ export default function Sanctions() {
         .select(`
           *,
           loan_applicants!inner(first_name, last_name, email, applicant_type),
-          loan_sanctions(id, status, sanction_number, documents_emailed_at)
+          loan_sanctions(id, status, sanction_number, documents_emailed_at),
+          approved_by_profile:profiles!loan_applications_approved_by_fkey(first_name, last_name)
         `)
         .eq("org_id", orgId as string)
         .eq("status", "approved")
@@ -64,6 +66,7 @@ export default function Sanctions() {
       return applicationsData.map((app: any) => {
         const applicant = app.loan_applicants?.[0];
         const sanction = app.loan_sanctions?.[0];
+        const approverProfile = app.approved_by_profile;
         return {
           id: app.id,
           application_number: app.application_number,
@@ -81,6 +84,9 @@ export default function Sanctions() {
           sanction_status: sanction?.status || null,
           sanction_number: sanction?.sanction_number || null,
           documents_emailed_at: sanction?.documents_emailed_at || null,
+          approver_name: approverProfile
+            ? [approverProfile.first_name, approverProfile.last_name].filter(Boolean).join(" ")
+            : null,
         };
       }) as SanctionApplication[];
     },
@@ -264,6 +270,7 @@ export default function Sanctions() {
                       <TableHead className="text-right">Total Interest</TableHead>
                       <TableHead className="text-right">Total Repayment</TableHead>
                       <TableHead className="text-right">Daily EMI</TableHead>
+                      <TableHead>Approved By</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -325,6 +332,9 @@ export default function Sanctions() {
                           </TableCell>
                           <TableCell className="text-right">
                             {formatCurrency(loanCalc.dailyEMI)}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {app.approver_name || "—"}
                           </TableCell>
                           <TableCell>
                             {getStatusBadge(app)}

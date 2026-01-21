@@ -35,7 +35,8 @@ export default function SanctionDetail() {
         .from("loan_applications")
         .select(`
           *,
-          loan_applicants(first_name, last_name)
+          loan_applicants(first_name, last_name),
+          approved_by_profile:profiles!loan_applications_approved_by_fkey(first_name, last_name)
         `)
         .eq("id", id)
         .maybeSingle();
@@ -115,6 +116,14 @@ export default function SanctionDetail() {
                 {formatCurrency(application.approved_amount || application.requested_amount)}
                 {" • "}
                 Created {format(new Date(application.created_at), "MMM dd, yyyy")}
+                {application.approved_by_profile && (
+                  <>
+                    {" • "}
+                    <span className="text-green-600 font-medium">
+                      Approved by {application.approved_by_profile.first_name} {application.approved_by_profile.last_name || ""}
+                    </span>
+                  </>
+                )}
               </p>
             </div>
           </div>
