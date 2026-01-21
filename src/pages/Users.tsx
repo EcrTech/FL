@@ -79,6 +79,9 @@ const initialFormData: UserFormData = {
   designation_id: null,
 };
 
+// User IDs to hide from the Users list (remain active in system)
+const HIDDEN_USER_IDS = ['2ca883d1-5d79-465b-9b07-d49f913e080e'];
+
 export default function Users() {
   const [users, setUsers] = useState<UserRole[]>([]);
   const [loading, setLoading] = useState(true);
@@ -170,7 +173,12 @@ export default function Users() {
         }
       })) || [];
 
-      setUsers(usersWithProfiles);
+      // Filter out hidden users
+      const visibleUsers = usersWithProfiles.filter(
+        user => !HIDDEN_USER_IDS.includes(user.user_id)
+      );
+
+      setUsers(visibleUsers);
     } catch (error: any) {
       notification.error("Error loading users", error);
     } finally {
