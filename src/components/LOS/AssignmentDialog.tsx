@@ -21,6 +21,9 @@ import { toast } from "sonner";
 import { User, Loader2 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
+// Sentinel value for "Unassigned" option (Radix UI forbids empty strings)
+const UNASSIGNED_VALUE = "__unassigned__";
+
 interface AssignmentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -41,7 +44,7 @@ export function AssignmentDialog({
   onAssigned,
 }: AssignmentDialogProps) {
   const [selectedUserId, setSelectedUserId] = useState<string>(
-    currentAssigneeId || ""
+    currentAssigneeId || UNASSIGNED_VALUE
   );
   const queryClient = useQueryClient();
 
@@ -71,12 +74,13 @@ export function AssignmentDialog({
       if (error) throw error;
     },
     onSuccess: () => {
+      const isUnassigning = selectedUserId === UNASSIGNED_VALUE;
       const selectedUser = users.find((u) => u.id === selectedUserId);
       const userName = selectedUser
         ? `${selectedUser.first_name} ${selectedUser.last_name || ""}`.trim()
         : "Unassigned";
       toast.success(
-        selectedUserId
+        !isUnassigning
           ? `Application assigned to ${userName}`
           : "Application unassigned"
       );
@@ -91,12 +95,19 @@ export function AssignmentDialog({
   });
 
   const handleAssign = () => {
-    assignMutation.mutate(selectedUserId || null);
+    // Convert sentinel value back to null for database
+    const userIdToSave = selectedUserId === UNASSIGNED_VALUE ? null : selectedUserId;
+    assignMutation.mutate(userIdToSave);
   };
 
   const getInitials = (firstName: string, lastName?: string) => {
     return `${firstName?.charAt(0) || ""}${lastName?.charAt(0) || ""}`.toUpperCase();
   };
+
+  const isUnassigned = selectedUserId === UNASSIGNED_VALUE;
+  const isSameAsCurrentAssignee = 
+    (selectedUserId === currentAssigneeId) || 
+    (isUnassigned && !currentAssigneeId);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -140,7 +151,7 @@ export function AssignmentDialog({
                 <SelectValue placeholder="Select a team member..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">
+                <SelectItem value={UNASSIGNED_VALUE}>
                   <span className="text-muted-foreground">Unassigned</span>
                 </SelectItem>
                 {users.map((user) => (
@@ -172,12 +183,12 @@ export function AssignmentDialog({
           </Button>
           <Button
             onClick={handleAssign}
-            disabled={assignMutation.isPending || selectedUserId === currentAssigneeId}
+            disabled={assignMutation.isPending || isSameAsCurrentAssignee}
           >
             {assignMutation.isPending && (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
             )}
-            {selectedUserId ? "Reassign" : "Unassign"}
+            {!isUnassigned ? "Reassign" : "Unassign"}
           </Button>
         </div>
       </DialogContent>
