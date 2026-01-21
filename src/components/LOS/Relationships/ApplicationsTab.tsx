@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { format } from "date-fns";
+import { format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { useApplicationsList, ApplicationListItem } from "@/hooks/useApplicationsList";
 import { ApplicationDetailDialog } from "./ApplicationDetailDialog";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,15 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { LoadingState } from "@/components/common/LoadingState";
 import { EmptyState } from "@/components/common/EmptyState";
-import { Search, FileText, Download, CheckCircle, Clock, XCircle, Banknote, Eye, Check, X } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { 
+  Search, FileText, Download, CheckCircle, Clock, XCircle, Banknote, Eye, Check, X, 
+  CalendarIcon, ChevronDown, ChevronUp, SlidersHorizontal, RotateCcw 
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const stageConfig: Record<string, { label: string; color: string }> = {
   application: { label: "Application", color: "bg-slate-500" },
@@ -36,6 +44,15 @@ const stageConfig: Record<string, { label: string; color: string }> = {
   rejected: { label: "Rejected", color: "bg-red-500" },
 };
 
+const tenureOptions = [
+  { value: "all", label: "All Tenures" },
+  { value: "1-7", label: "1-7 Days" },
+  { value: "8-14", label: "8-14 Days" },
+  { value: "15-30", label: "15-30 Days" },
+  { value: "31-60", label: "31-60 Days" },
+  { value: "60+", label: "60+ Days" },
+];
+
 export function ApplicationsTab() {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -43,6 +60,16 @@ export function ApplicationsTab() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedApplication, setSelectedApplication] = useState<ApplicationListItem | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  
+  // Advanced filters
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [fromDate, setFromDate] = useState<Date | undefined>(undefined);
+  const [toDate, setToDate] = useState<Date | undefined>(undefined);
+  const [minAmount, setMinAmount] = useState<string>("");
+  const [maxAmount, setMaxAmount] = useState<string>("");
+  const [tenureFilter, setTenureFilter] = useState<string>("all");
+  const [sanctionedFilter, setSanctionedFilter] = useState<string>("all");
+  const [disbursedFilter, setDisbursedFilter] = useState<string>("all");
 
   const { data: applications, isLoading } = useApplicationsList(debouncedSearch);
 
@@ -54,11 +81,37 @@ export function ApplicationsTab() {
     return () => clearTimeout(timer);
   };
 
+  const resetFilters = () => {
+    setStageFilter("all");
+    setStatusFilter("all");
+    setFromDate(undefined);
+    setToDate(undefined);
+    setMinAmount("");
+    setMaxAmount("");
+    setTenureFilter("all");
+    setSanctionedFilter("all");
+    setDisbursedFilter("all");
+  };
+
+  const hasActiveFilters = 
+    stageFilter !== "all" || 
+    statusFilter !== "all" || 
+    fromDate || 
+    toDate || 
+    minAmount || 
+    maxAmount || 
+    tenureFilter !== "all" ||
+    sanctionedFilter !== "all" ||
+    disbursedFilter !== "all";
+
   // Filter applications
   const filteredApplications = applications?.filter((app) => {
+    // Stage filter
     if (stageFilter !== "all" && app.currentStage !== stageFilter) {
       return false;
     }
+    
+    // Status filter
     if (statusFilter === "approved" && !app.isApproved) {
       return false;
     }
@@ -74,6 +127,49 @@ export function ApplicationsTab() {
     if (statusFilter === "rejected" && app.status !== "rejected") {
       return false;
     }
+
+    // Date range filter
+    if (fromDate || toDate) {
+      const appDate = new Date(app.createdAt);
+      if (fromDate && toDate) {
+        if (!isWithinInterval(appDate, { start: startOfDay(fromDate), end: endOfDay(toDate) })) {
+          return false;
+        }
+      } else if (fromDate && appDate < startOfDay(fromDate)) {
+        return false;
+      } else if (toDate && appDate > endOfDay(toDate)) {
+        return false;
+      }
+    }
+
+    // Amount range filter
+    const minAmt = minAmount ? parseFloat(minAmount) : null;
+    const maxAmt = maxAmount ? parseFloat(maxAmount) : null;
+    if (minAmt !== null && app.requestedAmount < minAmt) {
+      return false;
+    }
+    if (maxAmt !== null && app.requestedAmount > maxAmt) {
+      return false;
+    }
+
+    // Tenure filter
+    if (tenureFilter !== "all") {
+      const tenure = app.tenureDays;
+      if (tenureFilter === "1-7" && (tenure < 1 || tenure > 7)) return false;
+      if (tenureFilter === "8-14" && (tenure < 8 || tenure > 14)) return false;
+      if (tenureFilter === "15-30" && (tenure < 15 || tenure > 30)) return false;
+      if (tenureFilter === "31-60" && (tenure < 31 || tenure > 60)) return false;
+      if (tenureFilter === "60+" && tenure <= 60) return false;
+    }
+
+    // Sanctioned filter
+    if (sanctionedFilter === "yes" && !app.isSanctioned) return false;
+    if (sanctionedFilter === "no" && app.isSanctioned) return false;
+
+    // Disbursed filter
+    if (disbursedFilter === "yes" && !app.isDisbursed) return false;
+    if (disbursedFilter === "no" && app.isDisbursed) return false;
+
     return true;
   }) || [];
 
@@ -98,12 +194,19 @@ export function ApplicationsTab() {
     if (stageFilter !== "all") filename += `_stage-${stageFilter}`;
     if (statusFilter !== "all") filename += `_status-${statusFilter}`;
     if (debouncedSearch) filename += `_search`;
+    if (fromDate) filename += `_from-${format(fromDate, "yyyyMMdd")}`;
+    if (toDate) filename += `_to-${format(toDate, "yyyyMMdd")}`;
 
     // Build filter metadata row
     const filterParts = [];
     filterParts.push(`Stage: ${stageFilter === "all" ? "All" : stageFilter}`);
     filterParts.push(`Status: ${statusFilter === "all" ? "All" : statusFilter}`);
     if (debouncedSearch) filterParts.push(`Search: "${debouncedSearch}"`);
+    if (fromDate) filterParts.push(`From: ${format(fromDate, "dd/MM/yyyy")}`);
+    if (toDate) filterParts.push(`To: ${format(toDate, "dd/MM/yyyy")}`);
+    if (minAmount) filterParts.push(`Min Amount: ${minAmount}`);
+    if (maxAmount) filterParts.push(`Max Amount: ${maxAmount}`);
+    if (tenureFilter !== "all") filterParts.push(`Tenure: ${tenureFilter}`);
     const filterInfo = [`"Filters Applied: ${filterParts.join(", ")}"`];
 
     const headers = [
@@ -118,6 +221,7 @@ export function ApplicationsTab() {
       "Approved Amount",
       "Sanctioned Amount",
       "Disbursed Amount",
+      "Tenure (Days)",
       "Created Date",
     ];
 
@@ -133,6 +237,7 @@ export function ApplicationsTab() {
       app.approvedAmount || "",
       app.sanctionedAmount || "",
       app.disbursedAmount || "",
+      app.tenureDays,
       format(new Date(app.createdAt), "dd/MM/yyyy"),
     ]);
 
@@ -236,13 +341,22 @@ export function ApplicationsTab() {
               <CardTitle className="text-lg">Search & Filter</CardTitle>
               <CardDescription>Find applications by number, PAN, mobile, or name</CardDescription>
             </div>
-            <Button onClick={handleExportCSV} variant="outline" disabled={!filteredApplications.length}>
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
+            <div className="flex items-center gap-2">
+              {hasActiveFilters && (
+                <Button onClick={resetFilters} variant="ghost" size="sm">
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Reset
+                </Button>
+              )}
+              <Button onClick={handleExportCSV} variant="outline" disabled={!filteredApplications.length}>
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {/* Primary Filters Row */}
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -283,6 +397,159 @@ export function ApplicationsTab() {
               </SelectContent>
             </Select>
           </div>
+
+          {/* Advanced Filters - Collapsible */}
+          <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="w-full justify-between border border-dashed">
+                <span className="flex items-center gap-2">
+                  <SlidersHorizontal className="h-4 w-4" />
+                  Advanced Filters
+                  {hasActiveFilters && (
+                    <Badge variant="secondary" className="ml-2">
+                      Active
+                    </Badge>
+                  )}
+                </span>
+                {advancedOpen ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-muted/30 rounded-lg border">
+                {/* Date Range */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">From Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !fromDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {fromDate ? format(fromDate, "dd/MM/yyyy") : "Select date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 bg-background" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={fromDate}
+                        onSelect={setFromDate}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">To Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !toDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {toDate ? format(toDate, "dd/MM/yyyy") : "Select date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 bg-background" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={toDate}
+                        onSelect={setToDate}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* Amount Range */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Min Amount (₹)</Label>
+                  <Input
+                    type="number"
+                    placeholder="0"
+                    value={minAmount}
+                    onChange={(e) => setMinAmount(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Max Amount (₹)</Label>
+                  <Input
+                    type="number"
+                    placeholder="No limit"
+                    value={maxAmount}
+                    onChange={(e) => setMaxAmount(e.target.value)}
+                  />
+                </div>
+
+                {/* Tenure Filter */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Tenure</Label>
+                  <Select value={tenureFilter} onValueChange={setTenureFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Tenures" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tenureOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Sanctioned Filter */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Sanctioned</Label>
+                  <Select value={sanctionedFilter} onValueChange={setSanctionedFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="yes">Yes</SelectItem>
+                      <SelectItem value="no">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Disbursed Filter */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Disbursed</Label>
+                  <Select value={disbursedFilter} onValueChange={setDisbursedFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="yes">Yes</SelectItem>
+                      <SelectItem value="no">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
+          {/* Active filters count */}
+          {hasActiveFilters && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>Showing {filteredApplications.length} of {applications?.length || 0} applications</span>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -296,7 +563,7 @@ export function ApplicationsTab() {
               icon={<FileText className="h-12 w-12" />}
               title="No applications found"
               message={
-                searchTerm
+                searchTerm || hasActiveFilters
                   ? "Try adjusting your search or filters"
                   : "Applications will appear here once created"
               }
