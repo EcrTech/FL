@@ -11,10 +11,17 @@ interface ErrorLogData {
 export const logError = async (error: Error, errorInfo?: any) => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
+    
+    // Early return if no authenticated user - don't query with empty ID
+    if (!user?.id) {
+      console.error('Cannot log error: No authenticated user');
+      return;
+    }
+    
     const { data: profile } = await supabase
       .from('profiles')
       .select('org_id')
-      .eq('id', user?.id || '')
+      .eq('id', user.id)
       .maybeSingle();
 
     if (!profile?.org_id) {
