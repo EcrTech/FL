@@ -20,6 +20,8 @@ const DOCUMENT_TYPE_LABELS: Record<string, string> = {
   address_proof: "Address Proof",
   photo: "Photograph",
   signature: "Signature",
+  rental_agreement: "Rental Agreement",
+  utility_bill: "Utility Bill",
   other: "Other Document",
 };
 

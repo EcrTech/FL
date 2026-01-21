@@ -38,6 +38,9 @@ const DOCUMENT_CATEGORIES = {
 const REQUIRED_DOCUMENTS = [
   { type: "pan_card", name: "PAN Card", category: "identity", mandatory: true, verifiable: false, parseable: false },
   { type: "aadhaar_card", name: "Aadhaar Card", category: "identity", mandatory: true, verifiable: false, parseable: false },
+  { type: "photo", name: "Passport Photo", category: "identity", mandatory: true, verifiable: false, parseable: false },
+  { type: "rental_agreement", name: "Rental Agreement", category: "address", mandatory: true, verifiable: false, parseable: true },
+  { type: "utility_bill", name: "Utility Bill", category: "address", mandatory: true, verifiable: false, parseable: true },
   { type: "salary_slip_1", name: "Salary Slip - Month 1", category: "income", mandatory: true, verifiable: false, parseable: true },
   { type: "salary_slip_2", name: "Salary Slip - Month 2", category: "income", mandatory: true, verifiable: false, parseable: true },
   { type: "salary_slip_3", name: "Salary Slip - Month 3", category: "income", mandatory: true, verifiable: false, parseable: true },
@@ -620,7 +623,7 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
   };
 
   // Group documents by display column
-  // Left column: identity + income, Right column: bank_employment
+  // Left column: identity + income, Right column: address + bank_employment
   const groupedDocs = REQUIRED_DOCUMENTS.reduce((acc, doc) => {
     // Merge bank and employment categories into one column
     const columnKey = doc.category === "bank" || doc.category === "employment" 
@@ -632,12 +635,13 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
   }, {} as Record<string, typeof REQUIRED_DOCUMENTS>);
 
   // Define display order to control layout
-  const categoryOrder = ["identity", "income", "bank_employment"];
+  const categoryOrder = ["identity", "income", "address", "bank_employment"];
 
   // Custom category labels
   const getCategoryLabel = (category: string) => {
     if (category === "bank_employment") return "Bank & Employment";
     if (category === "identity") return "Identity Proof";
+    if (category === "address") return "Address Proof";
     return DOCUMENT_CATEGORIES[category as keyof typeof DOCUMENT_CATEGORIES] || category;
   };
 
@@ -797,7 +801,7 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Left column: Identity + Income */}
           <div className="space-y-4">
-            {categoryOrder.filter(cat => cat !== "bank_employment").map((category) => {
+            {categoryOrder.filter(cat => cat !== "bank_employment" && cat !== "address").map((category) => {
               const docs = groupedDocs[category];
               if (!docs) return null;
               return (
@@ -821,8 +825,29 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
             })}
           </div>
 
-          {/* Right column: Bank & Employment */}
+          {/* Right column: Address Proof + Bank & Employment */}
           <div className="space-y-4">
+            {/* Address Proof Section */}
+            {groupedDocs["address"] && (
+              <Card className="h-fit">
+                <CardHeader className="py-3 px-4">
+                  <CardTitle className="text-sm font-medium">
+                    {getCategoryLabel("address")}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3 pt-0 space-y-2">
+                  {groupedDocs["address"].map((doc) => {
+                    const document = getDocument(doc.type);
+                    const status = document?.verification_status || "pending";
+                    const isUploading = uploadingDoc === doc.type;
+                    const isVerified = status === "verified";
+                    return renderDocumentRow(doc, document, isUploading, isVerified);
+                  })}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Bank & Employment Section */}
             {groupedDocs["bank_employment"] && (
               <Card className="h-fit">
                 <CardHeader className="py-3 px-4">
