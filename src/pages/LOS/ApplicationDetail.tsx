@@ -400,6 +400,7 @@ export default function ApplicationDetail() {
   const [applicantData, setApplicantData] = useState({
     gender: "",
     marital_status: "",
+    religion: "",
     pan_number: "",
     mobile: "",
     current_address: "",
@@ -594,6 +595,7 @@ export default function ApplicationDetail() {
       const updateData: Record<string, any> = {};
       if (data.gender) updateData.gender = data.gender;
       if (data.marital_status) updateData.marital_status = data.marital_status;
+      if (data.religion) updateData.religion = data.religion;
       if (data.pan_number) updateData.pan_number = data.pan_number;
       if (data.mobile) updateData.mobile = data.mobile;
       if (data.current_address) updateData.current_address = { line1: data.current_address };
@@ -705,6 +707,7 @@ export default function ApplicationDetail() {
       setApplicantData({
         gender: (primaryApplicant.gender as string) || "",
         marital_status: (primaryApplicant.marital_status as string) || "",
+        religion: (primaryApplicant.religion as string) || "",
         pan_number: (primaryApplicant.pan_number as string) || "",
         mobile: (primaryApplicant.mobile as string) || "",
         current_address: addressStr,
@@ -919,6 +922,26 @@ export default function ApplicationDetail() {
                       </Select>
                     </div>
                     <div>
+                      <Label className="text-xs">Religion</Label>
+                      <Select
+                        value={applicantData.religion}
+                        onValueChange={(value) => setApplicantData({ ...applicantData, religion: value })}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Select religion" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="hindu">Hindu</SelectItem>
+                          <SelectItem value="muslim">Muslim</SelectItem>
+                          <SelectItem value="christian">Christian</SelectItem>
+                          <SelectItem value="sikh">Sikh</SelectItem>
+                          <SelectItem value="buddhist">Buddhist</SelectItem>
+                          <SelectItem value="jain">Jain</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
                       <Label className="text-xs">PAN Number</Label>
                       <Input
                         value={applicantData.pan_number}
@@ -972,6 +995,10 @@ export default function ApplicationDetail() {
                     <div>
                       <label className="text-xs text-muted-foreground">Marital Status</label>
                       <p className="text-sm">{(primaryApplicant.marital_status as string) || "N/A"}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Religion</label>
+                      <p className="text-sm capitalize">{(primaryApplicant.religion as string) || "N/A"}</p>
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground">PAN Number</label>
