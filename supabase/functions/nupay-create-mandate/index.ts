@@ -1,0 +1,301 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+interface CreateMandateRequest {
+  org_id: string;
+  environment: "uat" | "production";
+  loan_application_id: string;
+  contact_id?: string;
+  
+  // Mandate details
+  loan_no: string;
+  seq_type: "RCUR" | "OOFF";
+  frequency: "ADHO" | "INDA" | "DAIL" | "WEEK" | "MNTH" | "QURT" | "MIAN" | "YEAR" | "BIMN";
+  category_id?: number;
+  
+  // Amount
+  collection_amount: number;
+  debit_type?: boolean;
+  
+  // Dates
+  first_collection_date: string;
+  final_collection_date?: string;
+  collection_until_cancel?: boolean;
+  
+  // Bank account
+  account_holder_name: string;
+  bank_account_no: string;
+  bank_account_no_confirmation: string;
+  ifsc_code?: string;
+  bank_id: number;
+  bank_name?: string;
+  account_type: "Savings" | "Current" | "OTHER";
+  auth_type?: "NetBanking" | "DebitCard" | "Aadhaar" | "";
+  
+  // Contact
+  mobile_no: string;
+  email?: string;
+  
+  // Additional fields
+  additional_data?: Record<string, string>;
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Authorization header required" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Get user from token
+    const { data: { user }, error: userError } = await supabase.auth.getUser(
+      authHeader.replace("Bearer ", "")
+    );
+
+    if (userError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Invalid authorization token" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const requestData: CreateMandateRequest = await req.json();
+
+    // Validate required fields
+    const requiredFields = [
+      "org_id", "environment", "loan_application_id", "loan_no",
+      "seq_type", "frequency", "collection_amount", "first_collection_date",
+      "account_holder_name", "bank_account_no", "bank_account_no_confirmation",
+      "bank_id", "account_type", "mobile_no"
+    ];
+
+    for (const field of requiredFields) {
+      if (!requestData[field as keyof CreateMandateRequest]) {
+        return new Response(
+          JSON.stringify({ error: `Missing required field: ${field}` }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // Verify account numbers match
+    if (requestData.bank_account_no !== requestData.bank_account_no_confirmation) {
+      return new Response(
+        JSON.stringify({ error: "Account numbers do not match" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Get auth token
+    const authFunctionUrl = `${supabaseUrl}/functions/v1/nupay-authenticate`;
+    const tokenResponse = await fetch(authFunctionUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${supabaseServiceKey}`,
+      },
+      body: JSON.stringify({ org_id: requestData.org_id, environment: requestData.environment }),
+    });
+
+    if (!tokenResponse.ok) {
+      const errorData = await tokenResponse.json();
+      return new Response(
+        JSON.stringify({ error: "Failed to authenticate", details: errorData }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { token } = await tokenResponse.json();
+
+    // Fetch Nupay config
+    const { data: config } = await supabase
+      .from("nupay_config")
+      .select("*")
+      .eq("org_id", requestData.org_id)
+      .eq("environment", requestData.environment)
+      .eq("is_active", true)
+      .single();
+
+    if (!config) {
+      return new Response(
+        JSON.stringify({ error: "Nupay configuration not found" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Build Nupay API payload (field mapping as per API doc)
+    const nupayPayload: Record<string, any> = {
+      loan_no: requestData.loan_no,
+      seq_tp: requestData.seq_type,
+      frqcy: requestData.frequency,
+      category_id: requestData.category_id || 7, // Default: Loan instalment
+      colltn_amt: requestData.collection_amount,
+      debit_type: requestData.debit_type || false,
+      frst_colltn_dt: requestData.first_collection_date,
+      colltn_until_cncl: requestData.collection_until_cancel || false,
+      account_holder_name: requestData.account_holder_name,
+      bank_account_no: requestData.bank_account_no,
+      bank_account_no_confirmation: requestData.bank_account_no_confirmation,
+      bank_id: requestData.bank_id,
+      acc_tp: requestData.account_type,
+      mobile_no: requestData.mobile_no,
+    };
+
+    // Optional fields
+    if (requestData.final_collection_date) {
+      nupayPayload.fnl_colltn_dt = requestData.final_collection_date;
+    }
+    if (requestData.ifsc_code) {
+      nupayPayload.ifsc = requestData.ifsc_code;
+    }
+    if (requestData.email) {
+      nupayPayload.email = requestData.email;
+    }
+    if (requestData.auth_type) {
+      nupayPayload.auth_type = requestData.auth_type;
+    }
+
+    // Additional data fields (addnl2-5)
+    if (requestData.additional_data) {
+      if (requestData.additional_data.addnl2) nupayPayload.addnl2 = requestData.additional_data.addnl2;
+      if (requestData.additional_data.addnl3) nupayPayload.addnl3 = requestData.additional_data.addnl3;
+      if (requestData.additional_data.addnl4) nupayPayload.addnl4 = requestData.additional_data.addnl4;
+      if (requestData.additional_data.addnl5) nupayPayload.addnl5 = requestData.additional_data.addnl5;
+    }
+
+    // Add redirect and webhook URLs from config
+    if (config.redirect_url) {
+      nupayPayload.redirect_url = config.redirect_url;
+    }
+    if (config.webhook_url) {
+      nupayPayload.webhook_url = config.webhook_url;
+    }
+
+    // Call Nupay eMandate API
+    const mandateEndpoint = `${config.api_endpoint}/api/EMandate/eManadate`;
+    console.log(`[Nupay-CreateMandate] Creating mandate at ${mandateEndpoint}`);
+    console.log(`[Nupay-CreateMandate] Payload:`, JSON.stringify(nupayPayload));
+
+    const mandateResponse = await fetch(mandateEndpoint, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(nupayPayload),
+    });
+
+    const responseText = await mandateResponse.text();
+    let responseData;
+    
+    try {
+      responseData = JSON.parse(responseText);
+    } catch {
+      console.error("[Nupay-CreateMandate] Failed to parse response:", responseText);
+      responseData = { raw_response: responseText };
+    }
+
+    console.log(`[Nupay-CreateMandate] Response:`, JSON.stringify(responseData));
+
+    // Extract Nupay mandate details
+    const nupayId = responseData.id || responseData.Id || responseData.uniq_id;
+    const nupayRefNo = responseData.ref_no || responseData.RefNo || responseData.reference_no;
+    const registrationUrl = responseData.registration_url || responseData.RegistrationUrl || responseData.url;
+
+    // Store mandate in database
+    const { data: mandate, error: insertError } = await supabase
+      .from("nupay_mandates")
+      .insert({
+        org_id: requestData.org_id,
+        loan_application_id: requestData.loan_application_id,
+        contact_id: requestData.contact_id,
+        nupay_id: nupayId,
+        nupay_ref_no: nupayRefNo,
+        loan_no: requestData.loan_no,
+        status: mandateResponse.ok ? "submitted" : "pending",
+        seq_type: requestData.seq_type,
+        frequency: requestData.frequency,
+        category_id: requestData.category_id || 7,
+        collection_amount: requestData.collection_amount,
+        debit_type: requestData.debit_type || false,
+        first_collection_date: requestData.first_collection_date,
+        final_collection_date: requestData.final_collection_date,
+        collection_until_cancel: requestData.collection_until_cancel || false,
+        account_holder_name: requestData.account_holder_name,
+        bank_account_no: requestData.bank_account_no,
+        ifsc_code: requestData.ifsc_code,
+        bank_id: requestData.bank_id,
+        bank_name: requestData.bank_name,
+        account_type: requestData.account_type,
+        auth_type: requestData.auth_type || "",
+        mobile_no: requestData.mobile_no,
+        email: requestData.email,
+        additional_data: requestData.additional_data || {},
+        registration_url: registrationUrl,
+        request_payload: nupayPayload,
+        response_payload: responseData,
+        created_by: user.id,
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error("[Nupay-CreateMandate] Failed to save mandate:", insertError);
+      return new Response(
+        JSON.stringify({ 
+          error: "Failed to save mandate record", 
+          details: insertError.message,
+          nupay_response: responseData 
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!mandateResponse.ok) {
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: "Nupay API error",
+          mandate_id: mandate.id,
+          nupay_response: responseData 
+        }),
+        { status: mandateResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    return new Response(
+      JSON.stringify({ 
+        success: true,
+        mandate_id: mandate.id,
+        nupay_id: nupayId,
+        registration_url: registrationUrl,
+        status: "submitted"
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+
+  } catch (error: unknown) {
+    console.error("[Nupay-CreateMandate] Error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return new Response(
+      JSON.stringify({ error: errorMessage }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+});
