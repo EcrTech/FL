@@ -588,6 +588,42 @@ export default function ApplicationDetail() {
     },
   });
 
+  // Mutation to create applicant from contact data (fallback when no applicant record exists)
+  const createApplicantFromContactMutation = useMutation({
+    mutationFn: async () => {
+      if (!application?.contacts) {
+        throw new Error("No contact data available");
+      }
+      
+      const contactData = application.contacts as any;
+      const applicantData = {
+        loan_application_id: id,
+        applicant_type: 'primary',
+        first_name: contactData.first_name || 'Unknown',
+        last_name: contactData.last_name || null,
+        mobile: contactData.phone || '0000000000',
+        email: contactData.email || null,
+        dob: '1990-01-01', // Placeholder - required field
+      };
+      
+      const { data, error } = await supabase
+        .from("loan_applicants")
+        .insert(applicantData)
+        .select()
+        .single();
+        
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Applicant profile created from contact data");
+      queryClient.invalidateQueries({ queryKey: ["loan-application", id, orgId] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to create applicant profile");
+    },
+  });
+
   // Mutation to save applicant details
   const saveApplicantMutation = useMutation({
     mutationFn: async (data: typeof applicantData) => {
@@ -1047,6 +1083,38 @@ export default function ApplicationDetail() {
                       ) : (
                         <>
                           <RefreshCw className="h-4 w-4 mr-2" />
+                          Create Applicant Profile
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              ) : application?.contacts ? (
+                // Fallback: Show contact data with option to create applicant
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                    <User className="h-5 w-5 text-amber-600" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Contact data available</p>
+                      <p className="text-xs text-muted-foreground">
+                        Name: {(application.contacts as any).first_name} {(application.contacts as any).last_name || ''}
+                        {(application.contacts as any).phone && ` • Phone: ${(application.contacts as any).phone}`}
+                        {(application.contacts as any).email && ` • Email: ${(application.contacts as any).email}`}
+                      </p>
+                    </div>
+                    <Button 
+                      onClick={() => createApplicantFromContactMutation.mutate()}
+                      disabled={createApplicantFromContactMutation.isPending}
+                      size="sm"
+                    >
+                      {createApplicantFromContactMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="h-4 w-4 mr-2" />
                           Create Applicant Profile
                         </>
                       )}
