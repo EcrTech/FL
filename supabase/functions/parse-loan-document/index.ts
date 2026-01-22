@@ -159,6 +159,29 @@ Return ONLY valid JSON with these fields. Use null for missing values.`,
 - bank_name: Bank name if visible
 - transaction_status: Transaction status (e.g., "Success", "Completed", "Processed")
 Return ONLY valid JSON with these fields. Use null for missing values.`,
+
+  rental_agreement: `Extract the following from this Rental Agreement:
+- landlord_name: Name of the landlord/owner
+- tenant_name: Name of the tenant/renter
+- property_address: Complete address of the rented property
+- rent_amount: Monthly rent amount (number only)
+- security_deposit: Security deposit paid (number only)
+- agreement_start_date: Start date of agreement (YYYY-MM-DD)
+- agreement_end_date: End date of agreement (YYYY-MM-DD)
+- agreement_duration: Duration in months (number only)
+- registration_number: Registration number if registered
+Return ONLY valid JSON with these fields. Use null for missing values.`,
+
+  utility_bill: `Extract the following from this Utility Bill:
+- customer_name: Name of the customer/account holder
+- service_address: Service address shown on bill
+- bill_date: Bill date (YYYY-MM-DD)
+- due_date: Payment due date (YYYY-MM-DD)
+- bill_amount: Total bill amount (number only)
+- utility_type: Type of utility (Electricity/Water/Gas/Internet)
+- account_number: Customer/account number
+- provider_name: Utility provider/company name
+Return ONLY valid JSON with these fields. Use null for missing values.`,
 };
 
 serve(async (req) => {
