@@ -195,10 +195,14 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
     },
     onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ["loan-documents", applicationId] });
+      
+      // Invalidate bank statement query to update Bank Details section
+      if (data.docType === "bank_statement") {
+        queryClient.invalidateQueries({ queryKey: ["bank-statement-parsed", applicationId] });
+      }
+      
       toast({ title: "Document parsed successfully", description: "Data extracted using AI" });
       setParsingDoc(null);
-
-      // Bank verification now handled via VerifiedU integration
     },
     onError: (error: any) => {
       toast({ title: "Parsing failed", description: error.message, variant: "destructive" });
@@ -251,6 +255,7 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
 
     setIsParsingAll(false);
     queryClient.invalidateQueries({ queryKey: ["loan-documents", applicationId] });
+    queryClient.invalidateQueries({ queryKey: ["bank-statement-parsed", applicationId] });
     
     if (errorCount === 0) {
       toast({ title: "All documents parsed", description: `Successfully parsed ${successCount} documents` });
