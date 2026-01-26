@@ -4,10 +4,16 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Paisaa Saarthi Design System - Bold Flat Fintech Aesthetic */
+/* Paisaa Saarthi Design System - Teal Mobile-First Aesthetic */
 @layer base {
   :root {
-    /* Primary Colors - Electric Blue Scale */
+    /* Primary Colors - Teal Scale (New) */
+    --teal-600: 172 66% 35%;  /* #0F766E - Hover/headers */
+    --teal-500: 174 61% 32%;  /* #0D9488 - Primary CTA */
+    --teal-400: 174 61% 42%;  /* Lighter teal */
+    --teal-100: 174 61% 95%;  /* Very light teal bg */
+    
+    /* Legacy - Electric Blue Scale (kept for compatibility) */
     --electric-blue-700: 216 100% 30%;
     --electric-blue-600: 216 100% 40%;
     --electric-blue-500: 216 100% 50%;
@@ -36,6 +42,9 @@
     --info: 217 91% 60%;
     --info-bg: 217 91% 95%;
     
+    /* Background for referral pages */
+    --referral-bg: 210 40% 98%;  /* #F8FAFC */
+    
     /* Neutral Scale */
     --neutral-900: 210 13% 9%;
     --neutral-700: 214 10% 26%;
@@ -53,7 +62,8 @@
     --popover: 0 0% 100%;
     --popover-foreground: var(--neutral-900);
     
-    --primary: var(--electric-blue-500);
+    /* Use teal as primary for referral flow */
+    --primary: var(--teal-500);
     --primary-foreground: 0 0% 100%;
     
     --secondary: var(--purple-500);
@@ -68,23 +78,25 @@
     --destructive: var(--error);
     --destructive-foreground: 0 0% 100%;
     
-    --border: var(--neutral-300);
-    --input: var(--neutral-300);
-    --ring: var(--electric-blue-500);
+    --border: 214 20% 89%;  /* #E2E8F0 */
+    --input: 214 20% 89%;
+    --ring: var(--teal-500);
     
-    --radius: 0.75rem;
+    --radius: 0.875rem;  /* 14px for mobile-first rounded corners */
     
     /* Shadows with Color */
     --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.05);
     --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.1), 0 2px 4px -2px hsl(0 0% 0% / 0.1);
     --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.1), 0 4px 6px -4px hsl(0 0% 0% / 0.1);
     --shadow-xl: 0 20px 25px -5px hsl(0 0% 0% / 0.1), 0 8px 10px -6px hsl(0 0% 0% / 0.1);
-    --shadow-primary: 0 10px 30px -5px hsl(var(--electric-blue-500) / 0.35);
+    --shadow-primary: 0 6px 16px -4px hsl(var(--teal-500) / 0.25);
+    --shadow-teal: 0 6px 16px -4px hsl(var(--teal-500) / 0.25);
     --shadow-coral: 0 10px 30px -5px hsl(var(--coral-500) / 0.35);
     --shadow-gold: 0 10px 30px -5px hsl(var(--gold-500) / 0.35);
     
     /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(var(--electric-blue-500)) 0%, hsl(var(--electric-blue-600)) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(var(--teal-500)) 0%, hsl(var(--teal-600)) 100%);
+    --gradient-teal: linear-gradient(135deg, hsl(var(--teal-500)) 0%, hsl(var(--teal-600)) 100%);
     --gradient-coral: linear-gradient(135deg, hsl(var(--coral-500)) 0%, hsl(var(--coral-600)) 100%);
     --gradient-purple: linear-gradient(135deg, hsl(var(--purple-500)) 0%, hsl(var(--purple-400)) 100%);
     --gradient-gold: linear-gradient(135deg, hsl(var(--gold-500)) 0%, hsl(38 92% 45%) 100%);
@@ -248,6 +260,43 @@
 
   .animate-fade-in-up {
     animation: fade-in-up 0.5s ease-out forwards;
+  }
+
+  /* Screen Slide Animations for 2-screen flow */
+  @keyframes slide-in-right {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  @keyframes slide-out-left {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(-100%); opacity: 0; }
+  }
+
+  @keyframes slide-in-left {
+    from { transform: translateX(-100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  @keyframes slide-out-right {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(100%); opacity: 0; }
+  }
+
+  .animate-slide-in-right {
+    animation: slide-in-right 0.3s ease-out forwards;
+  }
+
+  .animate-slide-out-left {
+    animation: slide-out-left 0.3s ease-out forwards;
+  }
+
+  .animate-slide-in-left {
+    animation: slide-in-left 0.3s ease-out forwards;
+  }
+
+  .animate-slide-out-right {
+    animation: slide-out-right 0.3s ease-out forwards;
   }
 
   /* Pulse Recording */

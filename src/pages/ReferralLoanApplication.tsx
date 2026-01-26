@@ -2,13 +2,15 @@ import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, CheckCircle, User, CreditCard, FileCheck, Video, Shield, MapPin, RefreshCw, AlertTriangle } from "lucide-react";
+import { Loader2, CheckCircle, Shield, RefreshCw, AlertTriangle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { BasicInfoStep } from "@/components/ReferralApplication/BasicInfoStep";
+import { ApplicationHeader } from "@/components/ReferralApplication/ApplicationHeader";
+import { StepProgressBar } from "@/components/ReferralApplication/StepProgressBar";
+import { LoanRequirementsScreen } from "@/components/ReferralApplication/LoanRequirementsScreen";
+import { ContactConsentScreen } from "@/components/ReferralApplication/ContactConsentScreen";
 import { PANVerificationStep } from "@/components/ReferralApplication/PANVerificationStep";
 import { AadhaarVerificationStep } from "@/components/ReferralApplication/AadhaarVerificationStep";
 import { VideoKYCStep } from "@/components/ReferralApplication/VideoKYCStep";
-import logo from "@/assets/paisaa-saarthi-logo.jpeg";
 
 interface ReferrerInfo {
   name: string;
@@ -19,12 +21,8 @@ interface ReferrerInfo {
   referralCode: string;
 }
 
-const STEPS = [
-  { id: 1, title: "Personal Details", icon: User },
-  { id: 2, title: "PAN Verification", icon: CreditCard },
-  { id: 3, title: "Aadhaar Verification", icon: FileCheck },
-  { id: 4, title: "Video KYC", icon: Video },
-];
+// Main application steps (PAN = step 2, etc)
+// Within step 1, we have 2 sub-screens: LoanRequirements and ContactConsent
 
 // Storage key for persisting form state across DigiLocker redirects
 const REFERRAL_FORM_STORAGE_KEY = "referral_form_state";
@@ -67,10 +65,10 @@ export default function ReferralLoanApplication() {
   
   // Debug: Log referral code and environment
   console.log('[ReferralLoanApplication] URL referralCode param:', referralCode);
-  console.log('[ReferralLoanApplication] Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
-  console.log('[ReferralLoanApplication] Supabase Key exists:', !!import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
   
   const [currentStep, setCurrentStep] = useState(1);
+  // Sub-step within Step 1: 1 = LoanRequirements, 2 = ContactConsent
+  const [basicInfoSubStep, setBasicInfoSubStep] = useState<1 | 2>(1);
   const [referrerInfo, setReferrerInfo] = useState<ReferrerInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -490,143 +488,114 @@ export default function ReferralLoanApplication() {
     );
   }
 
-  const progressPercentage = ((currentStep - 1) / (STEPS.length - 1)) * 100;
+  // Determine if we should show back button in header
+  const showHeaderBack = currentStep === 1 && basicInfoSubStep === 2;
+
+  // Handle back navigation
+  const handleHeaderBack = () => {
+    if (currentStep === 1 && basicInfoSubStep === 2) {
+      setBasicInfoSubStep(1);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[hsl(var(--referral-bg))]">
       {/* Header */}
-      <header className="bg-card/95 border-b border-border sticky top-0 z-50 shadow-sm backdrop-blur-md">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <img src={logo} alt="Paisaa Saarthi" className="h-12 drop-shadow-sm" />
-          <h1 className="text-xl md:text-2xl font-heading font-bold text-foreground">
-            Apply for a <span className="text-primary">Loan</span>
-          </h1>
-          <div className="w-12" /> {/* Spacer for balance */}
+      <ApplicationHeader
+        showBack={showHeaderBack}
+        onBack={handleHeaderBack}
+        locationLoading={locationLoading}
+        hasLocation={!!geolocation}
+      />
+
+      {/* Progress Stepper */}
+      <StepProgressBar currentStep={currentStep} />
+
+      {/* Location Error Alert */}
+      {!locationLoading && !geolocation && (
+        <div className="px-4 pb-2">
+          <div className="max-w-lg mx-auto flex flex-col items-center gap-2 p-3 bg-destructive/10 rounded-xl border border-destructive/20">
+            <div className="flex items-center gap-2 text-sm text-destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <span>{locationError || "Location required"}</span>
+            </div>
+            <button
+              onClick={captureGeolocation}
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-full text-sm font-medium hover:bg-primary/90 transition-colors"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Retry
+            </button>
+          </div>
         </div>
-      </header>
+      )}
 
       {/* Main Content */}
-      <main className="max-w-2xl mx-auto px-4 py-8 md:py-12">
-        {/* Hero Section */}
-        <div className="text-center mb-10 relative">
-          {/* Decorative gradient background */}
-          <div className="absolute inset-0 -mx-4 -mt-4 h-40 bg-gradient-to-b from-primary/5 via-primary/3 to-transparent rounded-3xl -z-10" />
-          
-          
-          <p className="text-lg text-muted-foreground font-body max-w-md mx-auto">
-            Complete 4 simple steps to submit your application
-          </p>
-
-          {/* Location Status Indicator */}
-          <div className="mt-4">
-            {locationLoading ? (
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-muted rounded-full text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Capturing location...</span>
-              </div>
-            ) : geolocation ? (
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-[hsl(var(--success))]/10 rounded-full text-sm text-[hsl(var(--success))]">
-                <MapPin className="h-4 w-4" />
-                <span>Location captured</span>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center gap-2">
-                <div className="inline-flex items-center gap-2 px-4 py-2 bg-destructive/10 rounded-full text-sm text-destructive">
-                  <AlertTriangle className="h-4 w-4" />
-                  <span>{locationError || "Location required"}</span>
-                </div>
-                <button
-                  onClick={captureGeolocation}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-full text-sm font-medium hover:bg-primary/90 transition-colors"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  <span>Retry Location Capture</span>
-                </button>
+      <main className="max-w-lg mx-auto">
+        {/* Step 1: Basic Info (2 sub-screens) */}
+        {currentStep === 1 && (
+          <div className="relative overflow-hidden">
+            {basicInfoSubStep === 1 && (
+              <div className="animate-fade-in-up">
+                <LoanRequirementsScreen
+                  formData={{
+                    name: basicInfo.name,
+                    requestedAmount: basicInfo.requestedAmount,
+                    tenureDays: basicInfo.tenureDays,
+                  }}
+                  onUpdate={(data) => setBasicInfo((prev) => ({ ...prev, ...data }))}
+                  onContinue={() => setBasicInfoSubStep(2)}
+                />
               </div>
             )}
-          </div>
-        </div>
-
-        {/* Progress Bar */}
-        <div className="mb-8">
-          <div className="progress-bar h-1.5 mb-6">
-            <div 
-              className="progress-bar-fill" 
-              style={{ width: `${progressPercentage}%` }}
-            />
-          </div>
-
-          {/* Step Indicators */}
-          <div className="flex justify-between">
-            {STEPS.map((step) => {
-              const Icon = step.icon;
-              const isCompleted = currentStep > step.id;
-              const isCurrent = currentStep === step.id;
-              
-              return (
-                <div key={step.id} className="flex flex-col items-center flex-1">
-                  <div
-                    className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 mb-2 ${
-                      isCompleted
-                        ? "bg-[hsl(var(--success))] text-white"
-                        : isCurrent
-                        ? "bg-primary text-primary-foreground shadow-lg ring-4 ring-primary/20"
-                        : "bg-muted text-muted-foreground border-2 border-border"
-                    }`}
-                  >
-                    {isCompleted ? (
-                      <CheckCircle className="h-5 w-5" />
-                    ) : (
-                      <Icon className="h-5 w-5" />
-                    )}
-                  </div>
-                  <span className={`text-xs font-heading font-medium text-center hidden sm:block ${
-                    isCurrent ? "text-primary" : isCompleted ? "text-[hsl(var(--success))]" : "text-muted-foreground"
-                  }`}>
-                    {step.title}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Mobile Step Title */}
-        <div className="sm:hidden text-center mb-6">
-          <p className="text-sm font-heading font-semibold text-primary">
-            Step {currentStep}: {STEPS[currentStep - 1].title}
-          </p>
-        </div>
-
-        {/* Form Card */}
-        <Card className="border-0 shadow-xl bg-card rounded-2xl overflow-hidden">
-          <CardContent className="p-6 md:p-8">
-            <div className="animate-fade-in-up">
-              {currentStep === 1 && (
-                <BasicInfoStep
-                  formData={basicInfo}
+            
+            {basicInfoSubStep === 2 && (
+              <div className="animate-slide-in-right">
+                <ContactConsentScreen
+                  formData={{
+                    phone: basicInfo.phone,
+                    email: basicInfo.email,
+                    officeEmail: basicInfo.officeEmail,
+                  }}
                   onUpdate={(data) => setBasicInfo((prev) => ({ ...prev, ...data }))}
                   consents={consents}
                   onConsentChange={handleConsentChange}
                   verificationStatus={verificationStatus}
                   onVerificationComplete={handleVerificationComplete}
-                  onNext={() => setCurrentStep(2)}
+                  onContinue={() => setCurrentStep(2)}
                 />
-              )}
+              </div>
+            )}
+          </div>
+        )}
 
-              {currentStep === 2 && (
+        {/* Step 2: PAN Verification */}
+        {currentStep === 2 && (
+          <div className="px-4 py-4">
+            <Card className="border-0 shadow-lg bg-card rounded-2xl overflow-hidden">
+              <CardContent className="p-5">
                 <PANVerificationStep
                   panNumber={panNumber}
                   onPanChange={setPanNumber}
                   onVerified={handlePanVerified}
                   onNext={() => setCurrentStep(3)}
-                  onBack={() => setCurrentStep(1)}
+                  onBack={() => {
+                    setCurrentStep(1);
+                    setBasicInfoSubStep(2);
+                  }}
                   isVerified={panVerified}
                   verifiedData={panData}
                 />
-              )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
-              {currentStep === 3 && (
+        {/* Step 3: Aadhaar Verification */}
+        {currentStep === 3 && (
+          <div className="px-4 py-4">
+            <Card className="border-0 shadow-lg bg-card rounded-2xl overflow-hidden">
+              <CardContent className="p-5">
                 <AadhaarVerificationStep
                   onVerified={handleAadhaarVerified}
                   onNext={handleEnterVideoStep}
@@ -634,16 +603,24 @@ export default function ReferralLoanApplication() {
                   isVerified={aadhaarVerified}
                   verifiedData={aadhaarData}
                 />
-              )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
-              {creatingDraft && (
-                <div className="flex flex-col items-center justify-center py-16">
-                  <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-                  <span className="text-muted-foreground font-body text-lg">Preparing Video KYC...</span>
-                </div>
-              )}
+        {/* Creating Draft Loader */}
+        {creatingDraft && (
+          <div className="flex flex-col items-center justify-center py-16 px-4">
+            <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+            <span className="text-muted-foreground font-body text-lg">Preparing Video KYC...</span>
+          </div>
+        )}
 
-              {currentStep === 4 && !creatingDraft && (
+        {/* Step 4: Video KYC */}
+        {currentStep === 4 && !creatingDraft && (
+          <div className="px-4 py-4">
+            <Card className="border-0 shadow-lg bg-card rounded-2xl overflow-hidden">
+              <CardContent className="p-5">
                 <VideoKYCStep
                   onComplete={handleVideoKycComplete}
                   onBack={() => setCurrentStep(3)}
@@ -652,24 +629,25 @@ export default function ReferralLoanApplication() {
                   applicationId={draftApplicationId || undefined}
                   orgId={referrerInfo?.orgId}
                 />
-              )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
-              {submitting && (
-                <div className="flex flex-col items-center justify-center py-16">
-                  <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-                  <span className="text-muted-foreground font-body text-lg">Submitting your application...</span>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Footer */}
-        <div className="mt-8 text-center flex items-center justify-center gap-2 text-sm text-muted-foreground font-body">
-          <Shield className="h-4 w-4" />
-          <span>Your data is 256-bit encrypted and secure</span>
-        </div>
+        {/* Submitting Loader */}
+        {submitting && (
+          <div className="flex flex-col items-center justify-center py-16 px-4">
+            <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+            <span className="text-muted-foreground font-body text-lg">Submitting your application...</span>
+          </div>
+        )}
       </main>
+
+      {/* Footer */}
+      <div className="py-6 text-center flex items-center justify-center gap-2 text-xs text-muted-foreground font-body">
+        <Shield className="h-3.5 w-3.5" />
+        <span>Your data is 256-bit encrypted and secure</span>
+      </div>
     </div>
   );
 }
