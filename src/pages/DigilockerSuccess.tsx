@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { CheckCircle, Loader2, AlertCircle } from "lucide-react";
 
 export default function DigilockerSuccess() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [aadhaarData, setAadhaarData] = useState<any>(null);
@@ -162,6 +163,9 @@ export default function DigilockerSuccess() {
       // Auto-redirect to application page
       const targetAppId = resolvedApplicationId || applicationId;
       if (targetAppId) {
+        // Invalidate caches before navigating to ensure fresh data
+        queryClient.invalidateQueries({ queryKey: ["loan-verifications", targetAppId] });
+        queryClient.invalidateQueries({ queryKey: ["loan-application", targetAppId] });
         navigate(`/los/applications/${targetAppId}`);
       } else {
         navigate("/los/applications");
@@ -180,6 +184,9 @@ export default function DigilockerSuccess() {
     setRedirectCountdown(null); // Cancel auto-redirect
     const targetAppId = resolvedApplicationId || applicationId;
     if (targetAppId) {
+      // Invalidate caches before navigating to ensure fresh data
+      queryClient.invalidateQueries({ queryKey: ["loan-verifications", targetAppId] });
+      queryClient.invalidateQueries({ queryKey: ["loan-application", targetAppId] });
       navigate(`/los/applications/${targetAppId}`);
     } else {
       navigate("/los/applications");
