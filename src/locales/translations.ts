@@ -17,36 +17,44 @@ export const translations = {
     aadhaarVerification: "Aadhaar Verification",
     videoKYC: "Video KYC",
     
-    // Basic Info Step
-    personalInformation: "Personal Information",
-    enterBasicDetails: "Enter your basic details to get started",
+    // Screen 1: Loan Requirements
+    whatDoYouNeed: "What do you need?",
+    tellUsAboutLoanRequirement: "Tell us about your loan requirement",
     loanAmountRequired: "Loan Amount Required",
-    enterAmount: "Enter amount (₹5,000 - ₹1,00,000)",
+    enterAmount: "Enter amount (₹5,000-₹1,00,000)",
     minimumAmount: "Minimum ₹5,000 • Maximum ₹1,00,000",
     invalidAmount: "Please enter an amount between ₹5,000 and ₹1,00,000",
-    tenureDays: "Tenure (Number of Days)",
-    enterTenure: "Enter tenure in days (1 - 90)",
+    tenureDays: "Tenure (Days)",
+    enterTenure: "Select tenure (1-90 days)",
     minMaxTenure: "Minimum 1 day • Maximum 90 days",
     invalidTenure: "Please enter a tenure between 1 and 90 days",
     fullNameAsPan: "Full Name (as per PAN)",
     enterFullName: "Enter your full name",
+    nameMustMatchPan: "Name must match your PAN card exactly",
+    dataSecure256: "Your data is 256-bit secure",
+    
+    // Screen 2: Contact & Consent
+    howDoWeReachYou: "How do we reach you?",
+    wellSendUpdates: "We'll send updates on this number",
     mobileNumber: "Mobile Number",
     enter10Digit: "Enter 10-digit mobile",
+    emailAddress: "Email Address",
+    enterEmail: "Enter your email",
+    officeEmailOptional: "Office Email (Optional)",
+    enterOfficeEmail: "Enter work email",
+    forOfficialCommunications: "For official communications",
+    declarations: "Declarations",
+    householdIncomeConsent: "Household income > ₹3 Lakh/year",
+    termsConsent: "I agree to Terms, Privacy Policy & Gradation of Risk",
+    aadhaarConsent: "I consent to CKYC verification & communications from Skyrise Credit",
+    secureRbiCkyc: "Secure · RBI Registered · CKYC",
+    
+    // OTP
     sendOtp: "Send OTP",
     verified: "Verified",
     enterOtp: "Enter 6-digit OTP",
     verify: "Verify",
     resend: "Resend",
-    emailOptional: "Email Address (Optional)",
-    enterEmail: "Enter your email",
-    officeEmailOptional: "Office Email ID (Optional)",
-    enterOfficeEmail: "Enter your office email",
-    
-    // Consents
-    consentSection: "Required Consents",
-    householdIncomeConsent: "I confirm that I am the highest earning member of my household with an annual household income of less than ₹3,00,000",
-    termsConsent: "I accept the Terms & Conditions and Privacy Policy",
-    aadhaarConsent: "I consent to Aadhaar verification for identity confirmation",
     
     // PAN Step
     verifyPan: "Verify your PAN",
@@ -62,6 +70,8 @@ export const translations = {
     panStatus: "PAN Status",
     back: "Back",
     continue: "Continue",
+    continueToNext: "Continue",
+    continueToPanVerification: "Continue to PAN Verification",
     verifyingPan: "Verifying PAN...",
     
     // Aadhaar Step
@@ -79,7 +89,6 @@ export const translations = {
     videoDescription: "Record a short video to complete identity verification",
     
     // Buttons
-    continueToNext: "Continue",
     submit: "Submit Application",
     
     // Footer
@@ -112,36 +121,44 @@ export const translations = {
     aadhaarVerification: "आधार सत्यापन",
     videoKYC: "वीडियो केवाईसी",
     
-    // Basic Info Step
-    personalInformation: "व्यक्तिगत जानकारी",
-    enterBasicDetails: "शुरू करने के लिए अपना बुनियादी विवरण दर्ज करें",
+    // Screen 1: Loan Requirements
+    whatDoYouNeed: "आपको क्या चाहिए?",
+    tellUsAboutLoanRequirement: "हमें अपनी ऋण आवश्यकता के बारे में बताएं",
     loanAmountRequired: "आवश्यक ऋण राशि",
-    enterAmount: "राशि दर्ज करें (₹5,000 - ₹1,00,000)",
+    enterAmount: "राशि दर्ज करें (₹5,000-₹1,00,000)",
     minimumAmount: "न्यूनतम ₹5,000 • अधिकतम ₹1,00,000",
     invalidAmount: "कृपया ₹5,000 और ₹1,00,000 के बीच राशि दर्ज करें",
-    tenureDays: "अवधि (दिनों में)",
-    enterTenure: "दिनों में अवधि दर्ज करें (1 - 90)",
+    tenureDays: "अवधि (दिन)",
+    enterTenure: "अवधि चुनें (1-90 दिन)",
     minMaxTenure: "न्यूनतम 1 दिन • अधिकतम 90 दिन",
     invalidTenure: "कृपया 1 और 90 दिनों के बीच अवधि दर्ज करें",
     fullNameAsPan: "पूरा नाम (पैन के अनुसार)",
     enterFullName: "अपना पूरा नाम दर्ज करें",
+    nameMustMatchPan: "नाम आपके पैन कार्ड से मेल खाना चाहिए",
+    dataSecure256: "आपका डेटा 256-बिट सुरक्षित है",
+    
+    // Screen 2: Contact & Consent
+    howDoWeReachYou: "हम आपसे कैसे संपर्क करें?",
+    wellSendUpdates: "हम इस नंबर पर अपडेट भेजेंगे",
     mobileNumber: "मोबाइल नंबर",
     enter10Digit: "10 अंकों का मोबाइल दर्ज करें",
+    emailAddress: "ईमेल पता",
+    enterEmail: "अपना ईमेल दर्ज करें",
+    officeEmailOptional: "कार्यालय ईमेल (वैकल्पिक)",
+    enterOfficeEmail: "कार्यालय ईमेल दर्ज करें",
+    forOfficialCommunications: "आधिकारिक संचार के लिए",
+    declarations: "घोषणाएं",
+    householdIncomeConsent: "घरेलू आय > ₹3 लाख/वर्ष",
+    termsConsent: "मैं नियम, गोपनीयता नीति और जोखिम श्रेणीकरण से सहमत हूं",
+    aadhaarConsent: "मैं CKYC सत्यापन और स्काईराइज क्रेडिट से संचार की सहमति देता/देती हूं",
+    secureRbiCkyc: "सुरक्षित · RBI पंजीकृत · CKYC",
+    
+    // OTP
     sendOtp: "OTP भेजें",
     verified: "सत्यापित",
     enterOtp: "6 अंकों का OTP दर्ज करें",
     verify: "सत्यापित करें",
     resend: "पुनः भेजें",
-    emailOptional: "ईमेल पता (वैकल्पिक)",
-    enterEmail: "अपना ईमेल दर्ज करें",
-    officeEmailOptional: "कार्यालय ईमेल आईडी (वैकल्पिक)",
-    enterOfficeEmail: "अपना कार्यालय ईमेल दर्ज करें",
-    
-    // Consents
-    consentSection: "आवश्यक सहमतियां",
-    householdIncomeConsent: "मैं पुष्टि करता/करती हूं कि मैं अपने घर का सबसे अधिक कमाने वाला सदस्य हूं जिसकी वार्षिक घरेलू आय ₹3,00,000 से कम है",
-    termsConsent: "मैं नियम और शर्तें तथा गोपनीयता नीति स्वीकार करता/करती हूं",
-    aadhaarConsent: "मैं पहचान की पुष्टि के लिए आधार सत्यापन की सहमति देता/देती हूं",
     
     // PAN Step
     verifyPan: "अपना पैन सत्यापित करें",
@@ -157,6 +174,8 @@ export const translations = {
     panStatus: "पैन स्थिति",
     back: "वापस",
     continue: "जारी रखें",
+    continueToNext: "जारी रखें",
+    continueToPanVerification: "पैन सत्यापन जारी रखें",
     verifyingPan: "पैन सत्यापित हो रहा है...",
     
     // Aadhaar Step
@@ -174,7 +193,6 @@ export const translations = {
     videoDescription: "पहचान सत्यापन पूरा करने के लिए एक छोटा वीडियो रिकॉर्ड करें",
     
     // Buttons
-    continueToNext: "जारी रखें",
     submit: "आवेदन जमा करें",
     
     // Footer
