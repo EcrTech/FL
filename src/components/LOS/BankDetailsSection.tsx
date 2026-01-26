@@ -76,8 +76,12 @@ export function BankDetailsSection({ applicationId, orgId, applicantId }: BankDe
   });
 
   // Populate form with existing data or parsed data
+  // Priority: 1) Saved applicant bank data, 2) OCR-parsed bank statement data
   useEffect(() => {
-    if (applicant) {
+    const applicantHasBankData = applicant?.bank_account_number || applicant?.bank_ifsc_code;
+    
+    if (applicant && applicantHasBankData) {
+      // Use saved applicant bank details (priority 1)
       setFormData({
         bank_account_number: applicant.bank_account_number || "",
         bank_ifsc_code: applicant.bank_ifsc_code || "",
@@ -89,15 +93,20 @@ export function BankDetailsSection({ applicationId, orgId, applicantId }: BankDe
         bank_verified_at: applicant.bank_verified_at || null,
       });
     } else if (bankStatementDoc?.ocr_data) {
+      // Auto-fill from parsed bank statement (priority 2)
       const parsed = bankStatementDoc.ocr_data as Record<string, any>;
-      setFormData(prev => ({
-        ...prev,
-        bank_account_number: parsed.account_number || prev.bank_account_number,
-        bank_ifsc_code: parsed.ifsc_code || prev.bank_ifsc_code,
-        bank_name: parsed.bank_name || prev.bank_name,
-        bank_branch: parsed.branch_name || prev.bank_branch,
-        bank_account_holder_name: parsed.account_holder_name || prev.bank_account_holder_name,
-      }));
+      setFormData({
+        bank_account_number: parsed.account_number || "",
+        bank_ifsc_code: parsed.ifsc_code || "",
+        bank_name: parsed.bank_name || "",
+        bank_branch: parsed.branch_name || "",
+        bank_account_holder_name: parsed.account_holder_name || "",
+        bank_account_type: "savings",
+        bank_verified: false,
+        bank_verified_at: null,
+      });
+      // Auto-enter edit mode when OCR data is detected so user can review and save
+      setIsEditing(true);
     }
   }, [applicant, bankStatementDoc]);
 
@@ -118,6 +127,59 @@ export function BankDetailsSection({ applicationId, orgId, applicantId }: BankDe
     },
     onError: (error: any) => {
       toast.error(error.message || "Failed to save bank details");
+    },
+  });
+
+  // Bank verification mutation via VerifiedU API
+  const verifyBankMutation = useMutation({
+    mutationFn: async () => {
+      if (!formData.bank_account_number || !formData.bank_ifsc_code) {
+        throw new Error("Account number and IFSC code are required for verification");
+      }
+      const { data, error } = await supabase.functions.invoke("verifiedu-bank-verify", {
+        body: {
+          accountNumber: formData.bank_account_number,
+          ifscCode: formData.bank_ifsc_code,
+          applicationId,
+          orgId,
+        },
+      });
+      if (error) throw error;
+      if (!data.success) throw new Error(data.error || "Verification failed");
+      return data;
+    },
+    onSuccess: async (data) => {
+      if (data.data?.is_valid) {
+        // Update applicant record with verified status
+        const { error } = await supabase
+          .from("loan_applicants")
+          .update({
+            bank_verified: true,
+            bank_verified_at: new Date().toISOString(),
+            bank_account_holder_name: data.data.account_holder_name || formData.bank_account_holder_name,
+          })
+          .eq("id", applicantId);
+        
+        if (error) {
+          toast.error("Verified but failed to save status");
+          return;
+        }
+        
+        setFormData(prev => ({
+          ...prev,
+          bank_verified: true,
+          bank_verified_at: new Date().toISOString(),
+          bank_account_holder_name: data.data.account_holder_name || prev.bank_account_holder_name,
+        }));
+        
+        queryClient.invalidateQueries({ queryKey: ["applicant-bank-details", applicantId] });
+        toast.success("Bank account verified successfully");
+      } else {
+        toast.error("Bank verification failed - account details may be incorrect");
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to verify bank account");
     },
   });
 
@@ -308,15 +370,29 @@ export function BankDetailsSection({ applicationId, orgId, applicantId }: BankDe
           </div>
         )}
 
-        {/* Verification placeholder */}
+        {/* Bank verification */}
         {hasBankDetails && !formData.bank_verified && !isEditing && (
           <div className="mt-4 pt-4 border-t">
-            <Button variant="outline" size="sm" disabled className="opacity-60">
-              <CheckCircle className="h-4 w-4 mr-2" />
-              Verify Bank Account (Coming Soon)
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => verifyBankMutation.mutate()}
+              disabled={verifyBankMutation.isPending || !formData.bank_account_number || !formData.bank_ifsc_code}
+            >
+              {verifyBankMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Verifying...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Verify Bank Account
+                </>
+              )}
             </Button>
             <p className="text-xs text-muted-foreground mt-1">
-              Bank account verification via API will be enabled soon
+              Verify account details via VerifiedU API
             </p>
           </div>
         )}
