@@ -80,6 +80,7 @@ serve(async (req) => {
         "companyid": companyId,
       },
       body: JSON.stringify({
+        verification_type: "pennyless",
         account_number: accountNumber,
         account_ifsc: ifscCode,
       }),
