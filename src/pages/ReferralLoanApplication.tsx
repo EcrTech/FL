@@ -16,6 +16,7 @@ interface ReferrerInfo {
   phone: string;
   orgId: string;
   userId: string;
+  referralCode: string;
 }
 
 const STEPS = [
@@ -262,6 +263,7 @@ export default function ReferralLoanApplication() {
           phone: "",
           orgId: data.org_id,
           userId: data.user_id,
+          referralCode: referralCode,
         });
       } catch (err) {
         console.error('[ReferralLoanApplication] Exception in fetchReferrerInfo:', err);
@@ -311,7 +313,7 @@ export default function ReferralLoanApplication() {
     }
   };
 
-  // Create draft application before entering Video KYC step
+  // Create draft application before entering Video KYC step using edge function (bypasses RLS)
   const createDraftApplication = async (): Promise<string | null> => {
     if (!referrerInfo) {
       toast.error("Referrer information not available");
@@ -320,61 +322,36 @@ export default function ReferralLoanApplication() {
 
     setCreatingDraft(true);
     try {
-      // Generate a temporary application number for draft
-      const tempAppNumber = `DRAFT-${Date.now()}`;
+      const { data, error } = await supabase.functions.invoke('create-draft-referral-application', {
+        body: {
+          referralCode: referrerInfo.referralCode,
+          basicInfo: {
+            name: basicInfo.name,
+            phone: basicInfo.phone,
+            email: basicInfo.email,
+            requestedAmount: basicInfo.requestedAmount,
+            tenureDays: basicInfo.tenureDays,
+          },
+          panNumber,
+          aadhaarNumber,
+          aadhaarData,
+        }
+      });
 
-      // 1. Create the loan application (without applicant details - those go in loan_applicants)
-      const { data: draft, error: draftError } = await supabase
-        .from("loan_applications")
-        .insert({
-          org_id: referrerInfo.orgId,
-          referred_by: referrerInfo.userId,
-          requested_amount: basicInfo.requestedAmount,
-          tenure_days: basicInfo.tenureDays,
-          interest_rate: 1, // 1% daily interest rate
-          status: "draft",
-          current_stage: "video_kyc",
-          application_number: tempAppNumber,
-          source: "referral",
-        })
-        .select("id")
-        .single();
-
-      if (draftError) {
-        console.error("Error creating draft application:", draftError);
+      if (error) {
+        console.error("Error creating draft application:", error);
         toast.error("Failed to prepare application. Please try again.");
         return null;
       }
 
-      // 2. Create the loan applicant record with personal details
-      const nameParts = basicInfo.name.trim().split(' ');
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.slice(1).join(' ') || '';
-
-      // Extract DOB from Aadhaar verification data if available, otherwise use placeholder
-      const dob = aadhaarData?.dob || '1990-01-01';
-
-      const { error: applicantError } = await supabase
-        .from("loan_applicants")
-        .insert({
-          loan_application_id: draft.id,
-          applicant_type: 'primary',
-          first_name: firstName,
-          last_name: lastName || null,
-          mobile: basicInfo.phone,
-          email: basicInfo.email || null,
-          pan_number: panNumber?.toUpperCase() || null,
-          aadhaar_number: aadhaarNumber?.replace(/\s/g, '') || null,
-          dob: dob,
-        });
-
-      if (applicantError) {
-        console.error("Error creating loan applicant:", applicantError);
-        // Don't fail the whole process - application is created
+      if (!data?.success || !data?.draftId) {
+        console.error("Invalid response from draft creation:", data);
+        toast.error(data?.error || "Failed to prepare application. Please try again.");
+        return null;
       }
 
-      console.log("Draft application created:", draft.id);
-      return draft.id;
+      console.log("Draft application created:", data.draftId);
+      return data.draftId;
     } catch (err) {
       console.error("Error creating draft:", err);
       toast.error("Failed to prepare application. Please try again.");
