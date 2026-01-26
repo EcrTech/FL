@@ -298,7 +298,7 @@ export default function DocumentDataVerification({ applicationId }: DocumentData
             Document Data Verification
             <div className="flex gap-2">
               <Badge variant="outline" className="text-xs">
-                {fieldComparisons.filter((f) => f.matchStatus === "match").length} Matched
+                {fieldComparisons.filter((f) => f.matchStatus === "match" || f.matchStatus === "valid").length} Matched
               </Badge>
               {fieldComparisons.filter((f) => f.matchStatus === "mismatch").length > 0 && (
                 <Badge variant="destructive" className="text-xs">
