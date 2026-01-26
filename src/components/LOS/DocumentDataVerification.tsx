@@ -20,7 +20,7 @@ interface FieldComparison {
   field: string;
   label: string;
   values: ExtractedField[];
-  matchStatus: "match" | "partial" | "mismatch" | "insufficient";
+  matchStatus: "match" | "partial" | "mismatch" | "insufficient" | "valid";
 }
 
 // Normalize strings for comparison
@@ -216,6 +216,14 @@ export default function DocumentDataVerification({ applicationId }: DocumentData
     return fields.map((field) => {
       const nonEmptyValues = field.values.filter((v) => v.value && v.value.trim() !== "");
 
+      // For PAN field: if only PAN Card source has value, it's valid (mandatory verified source)
+      if (field.field === "pan" && nonEmptyValues.length === 1) {
+        const singleSource = nonEmptyValues[0];
+        if (singleSource.source === "PAN Card" && singleSource.value) {
+          return { ...field, matchStatus: "valid" as const };
+        }
+      }
+
       if (nonEmptyValues.length < 2) {
         return { ...field, matchStatus: "insufficient" as const };
       }
@@ -239,6 +247,8 @@ export default function DocumentDataVerification({ applicationId }: DocumentData
     switch (status) {
       case "match":
         return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case "valid":
+        return <CheckCircle className="h-4 w-4 text-green-500" />;
       case "partial":
         return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
       case "mismatch":
@@ -252,6 +262,8 @@ export default function DocumentDataVerification({ applicationId }: DocumentData
     switch (status) {
       case "match":
         return <Badge className="bg-green-500/10 text-green-600 border-green-500/20">Match</Badge>;
+      case "valid":
+        return <Badge className="bg-green-500/10 text-green-600 border-green-500/20">Valid</Badge>;
       case "partial":
         return <Badge className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20">Partial</Badge>;
       case "mismatch":
