@@ -490,11 +490,41 @@ serve(async (req) => {
     const securityCode = Deno.env.get("EQUIFAX_SECURITY_CODE");
     const apiUrl = Deno.env.get("EQUIFAX_API_URL");
 
+    // Debug logging for credentials check
+    console.log("[EQUIFAX-DEBUG] ========== CREDENTIAL CHECK ==========");
+    console.log("[EQUIFAX-DEBUG] Credential check:", {
+      hasCustomerId: !!customerId,
+      customerIdLength: customerId?.length || 0,
+      hasUserId: !!userId,
+      userIdLength: userId?.length || 0,
+      hasPassword: !!password,
+      passwordLength: password?.length || 0,
+      hasMemberNumber: !!memberNumber,
+      memberNumberLength: memberNumber?.length || 0,
+      hasSecurityCode: !!securityCode,
+      securityCodeLength: securityCode?.length || 0,
+      hasApiUrl: !!apiUrl,
+      apiUrlPrefix: apiUrl ? apiUrl.substring(0, 50) + "..." : "NOT SET"
+    });
+
     let reportData;
+    let rawApiResponse: any = null;
+    let usedMockData = false;
+    let mockReason = "";
 
     // Check if credentials are configured
     if (!customerId || !userId || !password || !apiUrl) {
-      console.log("Equifax credentials not configured, using mock data");
+      const missingCreds = [];
+      if (!customerId) missingCreds.push("EQUIFAX_CUSTOMER_ID");
+      if (!userId) missingCreds.push("EQUIFAX_USER_ID");
+      if (!password) missingCreds.push("EQUIFAX_PASSWORD");
+      if (!apiUrl) missingCreds.push("EQUIFAX_API_URL");
+      
+      mockReason = `Missing credentials: ${missingCreds.join(", ")}`;
+      console.log("[EQUIFAX-DEBUG] " + mockReason);
+      console.log("[EQUIFAX-DEBUG] Using mock data due to missing credentials");
+      
+      usedMockData = true;
       reportData = generateMockResponse(applicantData);
     } else {
       // Build Equifax request
@@ -562,8 +592,22 @@ serve(async (req) => {
         },
       };
 
+      // Log redacted request payload for debugging
+      const redactedRequest = {
+        ...equifaxRequest,
+        RequestHeader: {
+          ...equifaxRequest.RequestHeader,
+          Password: "***REDACTED***",
+          SecurityCode: "***REDACTED***",
+        }
+      };
+      console.log("[EQUIFAX-DEBUG] ========== REQUEST PAYLOAD ==========");
+      console.log("[EQUIFAX-DEBUG] Request payload:", JSON.stringify(redactedRequest, null, 2));
+      console.log("[EQUIFAX-DEBUG] API URL:", apiUrl);
+
       try {
-        console.log("Calling Equifax API:", apiUrl);
+        console.log("[EQUIFAX-DEBUG] ========== CALLING EQUIFAX API ==========");
+        console.log("[EQUIFAX-DEBUG] Starting API call at:", new Date().toISOString());
         
         const response = await fetch(apiUrl, {
           method: "POST",
@@ -574,24 +618,94 @@ serve(async (req) => {
           body: JSON.stringify(equifaxRequest),
         });
 
+        console.log("[EQUIFAX-DEBUG] API Response Status:", response.status, response.statusText);
+        console.log("[EQUIFAX-DEBUG] Response Headers:", JSON.stringify(Object.fromEntries(response.headers.entries())));
+
+        const responseText = await response.text();
+        console.log("[EQUIFAX-DEBUG] ========== RAW RESPONSE ==========");
+        console.log("[EQUIFAX-DEBUG] Raw response length:", responseText.length);
+        console.log("[EQUIFAX-DEBUG] Raw response (first 2000 chars):", responseText.substring(0, 2000));
+        
         if (!response.ok) {
-          throw new Error(`Equifax API error: ${response.status} ${response.statusText}`);
+          console.error("[EQUIFAX-DEBUG] API returned error status:", response.status);
+          console.error("[EQUIFAX-DEBUG] Full error response:", responseText);
+          throw new Error(`Equifax API error: ${response.status} ${response.statusText} - ${responseText.substring(0, 500)}`);
         }
 
-        const rawResponse = await response.json();
-        console.log("Equifax response received");
+        try {
+          rawApiResponse = JSON.parse(responseText);
+          console.log("[EQUIFAX-DEBUG] Successfully parsed JSON response");
+          console.log("[EQUIFAX-DEBUG] Response structure keys:", Object.keys(rawApiResponse));
+        } catch (parseError: any) {
+          console.error("[EQUIFAX-DEBUG] Failed to parse JSON response:", parseError.message);
+          throw new Error(`Failed to parse Equifax response as JSON: ${parseError.message}`);
+        }
         
-        reportData = parseEquifaxResponse(rawResponse);
-        reportData.rawResponse = rawResponse; // Store raw response for debugging
+        reportData = parseEquifaxResponse(rawApiResponse);
+        reportData.rawResponse = rawApiResponse;
+        console.log("[EQUIFAX-DEBUG] Successfully parsed Equifax response");
+        console.log("[EQUIFAX-DEBUG] Credit Score:", reportData.creditScore);
+        console.log("[EQUIFAX-DEBUG] Hit Code:", reportData.hitCode, "-", reportData.hitDescription);
+        
       } catch (apiError: any) {
-        console.error("Equifax API call failed:", apiError.message);
+        console.error("[EQUIFAX-DEBUG] ========== API CALL FAILED ==========");
+        console.error("[EQUIFAX-DEBUG] Error type:", apiError.constructor.name);
+        console.error("[EQUIFAX-DEBUG] Error message:", apiError.message);
+        console.error("[EQUIFAX-DEBUG] Error stack:", apiError.stack);
+        
+        mockReason = `API call failed: ${apiError.message}`;
+        usedMockData = true;
+        
         // Fall back to mock data on API failure
-        console.log("Falling back to mock data");
+        console.log("[EQUIFAX-DEBUG] Falling back to mock data due to API error");
         reportData = generateMockResponse(applicantData);
         reportData.isMock = true;
         reportData.apiError = apiError.message;
       }
     }
+
+    // Build redacted request for storage (no passwords)
+    const redactedRequestForStorage = usedMockData ? null : {
+      RequestHeader: {
+        CustomerId: customerId,
+        UserId: userId,
+        Password: "***REDACTED***",
+        MemberNumber: memberNumber,
+        SecurityCode: "***REDACTED***",
+        CustRefField: applicationId,
+        ProductCode: ["PCS"],
+      },
+      RequestBody: {
+        InquiryPurpose: "05",
+        FirstName: applicantData.firstName,
+        MiddleName: applicantData.middleName || "",
+        LastName: applicantData.lastName || "",
+        InquiryAddresses: [{
+          seq: "1",
+          AddressType: ["H"],
+          AddressLine1: applicantData.address.line1,
+          State: getStateCode(applicantData.address.state),
+          Postal: applicantData.address.postal,
+        }],
+        InquiryPhones: [{
+          seq: "1",
+          Number: applicantData.mobile,
+          PhoneType: ["M"],
+        }],
+        IDDetails: applicantData.panNumber ? [{
+          seq: "1",
+          IDType: "T",
+          IDValue: applicantData.panNumber,
+          Source: "Inquiry",
+        }] : [],
+        DOB: formatDate(applicantData.dob),
+        Gender: applicantData.gender === "male" ? "1" : applicantData.gender === "female" ? "2" : "",
+      }
+    };
+
+    console.log("[EQUIFAX-DEBUG] ========== SAVING TO DATABASE ==========");
+    console.log("[EQUIFAX-DEBUG] Used mock data:", usedMockData);
+    console.log("[EQUIFAX-DEBUG] Mock reason:", mockReason || "N/A");
 
     // Save verification to database
     const verificationData = {
@@ -604,6 +718,18 @@ serve(async (req) => {
         bureau_type: "equifax",
         pan_number: applicantData.panNumber,
         request_timestamp: new Date().toISOString(),
+        full_request: redactedRequestForStorage,
+        api_url_used: apiUrl || "NOT SET",
+        debug_info: {
+          used_mock_data: usedMockData,
+          mock_reason: mockReason || null,
+          credentials_configured: {
+            hasCustomerId: !!customerId,
+            hasUserId: !!userId,
+            hasPassword: !!password,
+            hasApiUrl: !!apiUrl,
+          }
+        }
       },
       response_data: {
         bureau_type: "equifax",
@@ -625,12 +751,19 @@ serve(async (req) => {
         enquiry_count_90d: reportData.enquiries.total90Days,
         name_on_report: reportData.personalInfo.name,
         pan_on_report: reportData.personalInfo.pan,
-        is_live_fetch: true,
-        is_mock: reportData.isMock || false,
+        is_live_fetch: !usedMockData,
+        is_mock: usedMockData,
+        raw_api_response: rawApiResponse,
+        debug_info: {
+          response_timestamp: new Date().toISOString(),
+          api_error: reportData.apiError || null,
+        }
       },
-      remarks: reportData.hitCode === "01" 
-        ? `Credit score: ${reportData.creditScore} (${reportData.scoreType} ${reportData.scoreVersion})`
-        : `No records found: ${reportData.hitDescription}`,
+      remarks: usedMockData 
+        ? `[MOCK DATA] ${mockReason} - Credit score: ${reportData.creditScore}`
+        : reportData.hitCode === "01" 
+          ? `Credit score: ${reportData.creditScore} (${reportData.scoreType} ${reportData.scoreVersion})`
+          : `No records found: ${reportData.hitDescription}`,
       verified_at: new Date().toISOString(),
       org_id: orgId,
     };
