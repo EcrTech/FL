@@ -69,12 +69,18 @@ export default function CreditBureauDialog({
     `${applicant.first_name || ''} ${applicant.middle_name || ''} ${applicant.last_name || ''}`.trim() : 
     'Unknown';
   const applicantPAN = applicant?.pan_number || '';
-  const applicantDOB = applicant?.date_of_birth || '';
+  // Use 'dob' field (the actual column name) - fall back to date_of_birth for compatibility
+  const applicantDOB = applicant?.dob || applicant?.date_of_birth || '';
   const applicantMobile = applicant?.mobile || '';
-  const applicantAddress = applicant?.current_address || applicant?.address_line1 || '';
-  const applicantCity = applicant?.city || '';
-  const applicantState = applicant?.state || '';
-  const applicantPincode = applicant?.pincode || applicant?.postal_code || '';
+  
+  // Handle current_address as JSONB object with line1, city, state, pincode fields
+  const addressObj = applicant?.current_address;
+  const applicantAddress = typeof addressObj === 'object' && addressObj !== null
+    ? (addressObj as any).line1 || ''
+    : (addressObj || applicant?.address_line1 || '');
+  const applicantCity = (typeof addressObj === 'object' && addressObj !== null ? (addressObj as any).city : '') || applicant?.city || '';
+  const applicantState = (typeof addressObj === 'object' && addressObj !== null ? (addressObj as any).state : '') || applicant?.state || '';
+  const applicantPincode = (typeof addressObj === 'object' && addressObj !== null ? (addressObj as any).pincode : '') || applicant?.pincode || applicant?.postal_code || '';
 
   const handleFetchLiveReport = async () => {
     if (!consentChecked) {
