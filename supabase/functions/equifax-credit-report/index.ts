@@ -96,6 +96,325 @@ function formatDate(dateStr: string): string {
   return dateStr;
 }
 
+function escapeXml(str: string): string {
+  if (!str) return "";
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+/**
+ * Convert JSON request object to Equifax XML format
+ */
+function jsonToXml(request: any): string {
+  const header = request.RequestHeader;
+  const body = request.RequestBody;
+  
+  let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<ABOREQUESTINFO>
+  <RequestHeader>
+    <CustomerId>${escapeXml(header.CustomerId)}</CustomerId>
+    <UserId>${escapeXml(header.UserId)}</UserId>
+    <Password>${escapeXml(header.Password)}</Password>
+    <MemberNumber>${escapeXml(header.MemberNumber)}</MemberNumber>
+    <SecurityCode>${escapeXml(header.SecurityCode)}</SecurityCode>
+    <CustRefField>${escapeXml(header.CustRefField)}</CustRefField>
+    <ProductCode>${Array.isArray(header.ProductCode) ? header.ProductCode[0] : header.ProductCode}</ProductCode>
+  </RequestHeader>
+  <RequestBody>
+    <InquiryPurpose>${escapeXml(body.InquiryPurpose)}</InquiryPurpose>
+    <TransactionAmount>${escapeXml(body.TransactionAmount || "0")}</TransactionAmount>
+    <FirstName>${escapeXml(body.FirstName)}</FirstName>
+    <MiddleName>${escapeXml(body.MiddleName || "")}</MiddleName>
+    <LastName>${escapeXml(body.LastName || "")}</LastName>
+    <DOB>${escapeXml(body.DOB)}</DOB>
+    <Gender>${escapeXml(body.Gender)}</Gender>
+    <InquiryAddresses>`;
+  
+  // Add addresses
+  if (body.InquiryAddresses && body.InquiryAddresses.length > 0) {
+    body.InquiryAddresses.forEach((addr: any, index: number) => {
+      xml += `
+      <InquiryAddress seq="${addr.seq || index + 1}">
+        <AddressType>${Array.isArray(addr.AddressType) ? addr.AddressType[0] : addr.AddressType}</AddressType>
+        <AddressLine1>${escapeXml(addr.AddressLine1)}</AddressLine1>
+        <State>${escapeXml(addr.State)}</State>
+        <Postal>${escapeXml(addr.Postal)}</Postal>
+      </InquiryAddress>`;
+    });
+  }
+  
+  xml += `
+    </InquiryAddresses>
+    <InquiryPhones>`;
+  
+  // Add phones
+  if (body.InquiryPhones && body.InquiryPhones.length > 0) {
+    body.InquiryPhones.forEach((phone: any, index: number) => {
+      xml += `
+      <InquiryPhone seq="${phone.seq || index + 1}">
+        <Number>${escapeXml(phone.Number)}</Number>
+        <PhoneType>${Array.isArray(phone.PhoneType) ? phone.PhoneType[0] : phone.PhoneType}</PhoneType>
+      </InquiryPhone>`;
+    });
+  }
+  
+  xml += `
+    </InquiryPhones>
+    <IDDetails>`;
+  
+  // Add ID details
+  if (body.IDDetails && body.IDDetails.length > 0) {
+    body.IDDetails.forEach((id: any, index: number) => {
+      xml += `
+      <IDDetail seq="${id.seq || index + 1}">
+        <IDType>${escapeXml(id.IDType)}</IDType>
+        <IDValue>${escapeXml(id.IDValue)}</IDValue>
+        <Source>${escapeXml(id.Source)}</Source>
+      </IDDetail>`;
+    });
+  }
+  
+  xml += `
+    </IDDetails>
+    <Score>
+      <Type>${escapeXml(body.Score?.Type || "ERS")}</Type>
+      <Version>${escapeXml(body.Score?.Version || "4.0")}</Version>
+    </Score>
+  </RequestBody>
+</ABOREQUESTINFO>`;
+
+  return xml;
+}
+
+/**
+ * Extract value from XML tag using regex
+ */
+function extractXmlValue(xml: string, tagName: string): string {
+  const regex = new RegExp(`<${tagName}[^>]*>([^<]*)</${tagName}>`, "i");
+  const match = xml.match(regex);
+  return match ? match[1].trim() : "";
+}
+
+/**
+ * Extract all occurrences of a tag value
+ */
+function extractAllXmlValues(xml: string, tagName: string): string[] {
+  const regex = new RegExp(`<${tagName}[^>]*>([^<]*)</${tagName}>`, "gi");
+  const matches = [];
+  let match;
+  while ((match = regex.exec(xml)) !== null) {
+    matches.push(match[1].trim());
+  }
+  return matches;
+}
+
+/**
+ * Extract content between opening and closing tags (including nested content)
+ */
+function extractXmlBlock(xml: string, tagName: string): string {
+  const startTag = `<${tagName}`;
+  const endTag = `</${tagName}>`;
+  const startIndex = xml.indexOf(startTag);
+  if (startIndex === -1) return "";
+  
+  const endIndex = xml.indexOf(endTag, startIndex);
+  if (endIndex === -1) return "";
+  
+  return xml.substring(startIndex, endIndex + endTag.length);
+}
+
+/**
+ * Extract all blocks of a specific tag
+ */
+function extractAllXmlBlocks(xml: string, tagName: string): string[] {
+  const blocks: string[] = [];
+  let searchStart = 0;
+  const startTag = `<${tagName}`;
+  const endTag = `</${tagName}>`;
+  
+  while (true) {
+    const startIndex = xml.indexOf(startTag, searchStart);
+    if (startIndex === -1) break;
+    
+    const endIndex = xml.indexOf(endTag, startIndex);
+    if (endIndex === -1) break;
+    
+    blocks.push(xml.substring(startIndex, endIndex + endTag.length));
+    searchStart = endIndex + endTag.length;
+  }
+  
+  return blocks;
+}
+
+/**
+ * Parse XML response from Equifax into JSON structure
+ */
+function xmlToJson(xmlString: string): any {
+  console.log("[XML-PARSE] Starting XML to JSON conversion");
+  console.log("[XML-PARSE] XML length:", xmlString.length);
+  
+  try {
+    // Check if it's actually JSON (fallback)
+    if (xmlString.trim().startsWith("{")) {
+      console.log("[XML-PARSE] Response appears to be JSON, parsing directly");
+      return JSON.parse(xmlString);
+    }
+    
+    // Extract main sections
+    const cirReportDataBlock = extractXmlBlock(xmlString, "CIRReportData") || 
+                                extractXmlBlock(xmlString, "CIRReportDataLst");
+    
+    console.log("[XML-PARSE] CIRReportData block found:", !!cirReportDataBlock);
+    
+    // Parse Header
+    const headerBlock = extractXmlBlock(xmlString, "Header");
+    const header = {
+      ReportOrderNO: extractXmlValue(headerBlock, "ReportOrderNO"),
+      ReportDate: extractXmlValue(headerBlock, "ReportDate"),
+      HitCode: extractXmlValue(headerBlock, "HitCode"),
+      EnquiryControlNumber: extractXmlValue(headerBlock, "EnquiryControlNumber"),
+    };
+    console.log("[XML-PARSE] Header parsed:", header);
+    
+    // Parse Score Details
+    const scoreBlock = extractXmlBlock(xmlString, "ScoreDetails") || extractXmlBlock(xmlString, "Score");
+    const scoreDetails = {
+      Score: extractXmlValue(scoreBlock, "Score") || extractXmlValue(scoreBlock, "Value"),
+      Type: extractXmlValue(scoreBlock, "Type"),
+      Version: extractXmlValue(scoreBlock, "Version"),
+    };
+    console.log("[XML-PARSE] Score parsed:", scoreDetails);
+    
+    // Parse Retail Accounts Summary
+    const summaryBlock = extractXmlBlock(xmlString, "RetailAccountsSummary");
+    const retailAccountsSummary = {
+      TotalBalanceAmount: extractXmlValue(summaryBlock, "TotalBalanceAmount") || 
+                          extractXmlValue(summaryBlock, "CurrentBalance"),
+      TotalPastDue: extractXmlValue(summaryBlock, "TotalPastDue") || 
+                    extractXmlValue(summaryBlock, "AmountPastDue"),
+      TotalSanctionAmount: extractXmlValue(summaryBlock, "TotalSanctionAmount") || 
+                           extractXmlValue(summaryBlock, "SanctionAmount"),
+      OldestAccount: extractXmlValue(summaryBlock, "OldestAccount"),
+      RecentAccount: extractXmlValue(summaryBlock, "RecentAccount"),
+      TotalCreditLimit: extractXmlValue(summaryBlock, "TotalCreditLimit"),
+      TotalMonthlyPaymentAmount: extractXmlValue(summaryBlock, "TotalMonthlyPaymentAmount"),
+    };
+    
+    // Parse Retail Account Details
+    const accountBlocks = extractAllXmlBlocks(xmlString, "RetailAccountDetails") ||
+                          extractAllXmlBlocks(xmlString, "Account");
+    const retailAccountDetails = accountBlocks.map((accBlock: string) => ({
+      Institution: extractXmlValue(accBlock, "Institution") || extractXmlValue(accBlock, "ReportingMemberShortName"),
+      AccountType: extractXmlValue(accBlock, "AccountType"),
+      OwnershipType: extractXmlValue(accBlock, "OwnershipType") || extractXmlValue(accBlock, "Ownership"),
+      AccountNumber: extractXmlValue(accBlock, "AccountNumber"),
+      AccountStatus: extractXmlValue(accBlock, "AccountStatus") || extractXmlValue(accBlock, "Status"),
+      SanctionAmount: extractXmlValue(accBlock, "SanctionAmount") || extractXmlValue(accBlock, "HighCredit"),
+      CurrentBalance: extractXmlValue(accBlock, "CurrentBalance") || extractXmlValue(accBlock, "Balance"),
+      AmountPastDue: extractXmlValue(accBlock, "AmountPastDue") || extractXmlValue(accBlock, "PastDue"),
+      InstallmentAmount: extractXmlValue(accBlock, "InstallmentAmount") || extractXmlValue(accBlock, "EMI"),
+      DateOpened: extractXmlValue(accBlock, "DateOpened") || extractXmlValue(accBlock, "OpenDate"),
+      DateClosed: extractXmlValue(accBlock, "DateClosed") || extractXmlValue(accBlock, "CloseDate"),
+      DateReported: extractXmlValue(accBlock, "DateReported") || extractXmlValue(accBlock, "ReportDate"),
+      History48Months: extractXmlValue(accBlock, "History48Months") || extractXmlValue(accBlock, "PaymentHistory"),
+    }));
+    console.log("[XML-PARSE] Accounts parsed:", retailAccountDetails.length);
+    
+    // Parse Enquiry Summary
+    const enquirySummaryBlock = extractXmlBlock(xmlString, "EnquirySummary");
+    const enquirySummary = {
+      Last30Days: extractXmlValue(enquirySummaryBlock, "Last30Days") || 
+                  extractXmlValue(enquirySummaryBlock, "RecordLast30Days"),
+      Last90Days: extractXmlValue(enquirySummaryBlock, "Last90Days") || 
+                  extractXmlValue(enquirySummaryBlock, "RecordLast90Days"),
+      TotalEnquiries: extractXmlValue(enquirySummaryBlock, "TotalEnquiries") || 
+                      extractXmlValue(enquirySummaryBlock, "RecordTotal"),
+    };
+    
+    // Parse Enquiries
+    const enquiryBlocks = extractAllXmlBlocks(xmlString, "Enquiry") ||
+                          extractAllXmlBlocks(xmlString, "Enquiries");
+    const enquiries = enquiryBlocks.map((enqBlock: string) => ({
+      Date: extractXmlValue(enqBlock, "Date") || extractXmlValue(enqBlock, "EnquiryDate"),
+      Institution: extractXmlValue(enqBlock, "Institution") || extractXmlValue(enqBlock, "MemberName"),
+      Purpose: extractXmlValue(enqBlock, "Purpose") || extractXmlValue(enqBlock, "EnquiryPurpose"),
+      Amount: extractXmlValue(enqBlock, "Amount") || extractXmlValue(enqBlock, "EnquiryAmount"),
+    }));
+    
+    // Parse Personal Info
+    const personalInfoBlock = extractXmlBlock(xmlString, "PersonalInfo") || 
+                              extractXmlBlock(xmlString, "IDAndContactInfo");
+    const nameBlock = extractXmlBlock(personalInfoBlock, "Name");
+    const personalInfo = {
+      Name: {
+        FirstName: extractXmlValue(nameBlock, "FirstName"),
+        MiddleName: extractXmlValue(nameBlock, "MiddleName"),
+        LastName: extractXmlValue(nameBlock, "LastName"),
+      },
+      DateOfBirth: extractXmlValue(personalInfoBlock, "DateOfBirth") || extractXmlValue(personalInfoBlock, "DOB"),
+      Gender: extractXmlValue(personalInfoBlock, "Gender"),
+    };
+    
+    // Parse PAN
+    const panBlocks = extractAllXmlBlocks(xmlString, "PANId") || extractAllXmlBlocks(xmlString, "IDDetail");
+    const panIds = panBlocks
+      .filter((block: string) => block.includes("IDType>T<") || block.includes("PAN"))
+      .map((block: string) => ({
+        IdNumber: extractXmlValue(block, "IdNumber") || extractXmlValue(block, "IDValue"),
+      }));
+    
+    // Parse Address Info
+    const addressBlocks = extractAllXmlBlocks(xmlString, "AddressInfo") || 
+                          extractAllXmlBlocks(xmlString, "Address");
+    const addressInfo = addressBlocks.map((addrBlock: string) => ({
+      Address: extractXmlValue(addrBlock, "Address") || extractXmlValue(addrBlock, "AddressLine1"),
+      City: extractXmlValue(addrBlock, "City"),
+      State: extractXmlValue(addrBlock, "State"),
+      Postal: extractXmlValue(addrBlock, "Postal") || extractXmlValue(addrBlock, "PinCode"),
+    }));
+    
+    // Parse Phone Info
+    const phoneBlocks = extractAllXmlBlocks(xmlString, "PhoneInfo") || 
+                        extractAllXmlBlocks(xmlString, "Phone");
+    const phoneInfo = phoneBlocks.map((phoneBlock: string) => ({
+      Number: extractXmlValue(phoneBlock, "Number") || extractXmlValue(phoneBlock, "PhoneNumber"),
+    }));
+    
+    // Build the response in the expected format
+    const result = {
+      INProfileResponse: {
+        CIRReportDataLst: [{
+          CIRReportData: {
+            Header: header,
+            ScoreDetails: [scoreDetails],
+            RetailAccountsSummary: retailAccountsSummary,
+            RetailAccountDetails: retailAccountDetails,
+            EnquirySummary: enquirySummary,
+            Enquiries: enquiries,
+            IDAndContactInfo: {
+              PersonalInfo: personalInfo,
+              PANId: panIds,
+              AddressInfo: addressInfo,
+              PhoneInfo: phoneInfo,
+            },
+          },
+        }],
+      },
+    };
+    
+    console.log("[XML-PARSE] Conversion complete");
+    return result;
+    
+  } catch (error: any) {
+    console.error("[XML-PARSE] Error parsing XML:", error.message);
+    throw new Error(`Failed to parse XML response: ${error.message}`);
+  }
+}
+
 function parseDPDFromPaymentHistory(history: string): number {
   if (!history) return 0;
   
@@ -592,30 +911,30 @@ serve(async (req) => {
         },
       };
 
+      // Convert JSON request to XML
+      const xmlRequest = jsonToXml(equifaxRequest);
+      
       // Log redacted request payload for debugging
-      const redactedRequest = {
-        ...equifaxRequest,
-        RequestHeader: {
-          ...equifaxRequest.RequestHeader,
-          Password: "***REDACTED***",
-          SecurityCode: "***REDACTED***",
-        }
-      };
-      console.log("[EQUIFAX-DEBUG] ========== REQUEST PAYLOAD ==========");
-      console.log("[EQUIFAX-DEBUG] Request payload:", JSON.stringify(redactedRequest, null, 2));
+      const redactedXml = xmlRequest
+        .replace(/<Password>[^<]*<\/Password>/g, "<Password>***REDACTED***</Password>")
+        .replace(/<SecurityCode>[^<]*<\/SecurityCode>/g, "<SecurityCode>***REDACTED***</SecurityCode>");
+      
+      console.log("[EQUIFAX-DEBUG] ========== REQUEST PAYLOAD (XML) ==========");
+      console.log("[EQUIFAX-DEBUG] XML Request (redacted):", redactedXml);
       console.log("[EQUIFAX-DEBUG] API URL:", apiUrl);
 
       try {
-        console.log("[EQUIFAX-DEBUG] ========== CALLING EQUIFAX API ==========");
+        console.log("[EQUIFAX-DEBUG] ========== CALLING EQUIFAX API (XML FORMAT) ==========");
         console.log("[EQUIFAX-DEBUG] Starting API call at:", new Date().toISOString());
+        console.log("[EQUIFAX-DEBUG] Content-Type: application/xml");
         
         const response = await fetch(apiUrl, {
           method: "POST",
           headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
+            "Content-Type": "application/xml",
+            "Accept": "application/xml",
           },
-          body: JSON.stringify(equifaxRequest),
+          body: xmlRequest,
         });
 
         console.log("[EQUIFAX-DEBUG] API Response Status:", response.status, response.statusText);
@@ -633,12 +952,19 @@ serve(async (req) => {
         }
 
         try {
-          rawApiResponse = JSON.parse(responseText);
-          console.log("[EQUIFAX-DEBUG] Successfully parsed JSON response");
+          // Try to parse XML response to JSON
+          rawApiResponse = xmlToJson(responseText);
+          console.log("[EQUIFAX-DEBUG] Successfully parsed XML response to JSON");
           console.log("[EQUIFAX-DEBUG] Response structure keys:", Object.keys(rawApiResponse));
         } catch (parseError: any) {
-          console.error("[EQUIFAX-DEBUG] Failed to parse JSON response:", parseError.message);
-          throw new Error(`Failed to parse Equifax response as JSON: ${parseError.message}`);
+          console.error("[EQUIFAX-DEBUG] Failed to parse response:", parseError.message);
+          // Try JSON parsing as fallback
+          try {
+            rawApiResponse = JSON.parse(responseText);
+            console.log("[EQUIFAX-DEBUG] Fallback: Successfully parsed as JSON");
+          } catch {
+            throw new Error(`Failed to parse Equifax response: ${parseError.message}`);
+          }
         }
         
         reportData = parseEquifaxResponse(rawApiResponse);
@@ -720,6 +1046,7 @@ serve(async (req) => {
         request_timestamp: new Date().toISOString(),
         full_request: redactedRequestForStorage,
         api_url_used: apiUrl || "NOT SET",
+        request_format: "xml",
         debug_info: {
           used_mock_data: usedMockData,
           mock_reason: mockReason || null,
@@ -757,6 +1084,7 @@ serve(async (req) => {
         debug_info: {
           response_timestamp: new Date().toISOString(),
           api_error: reportData.apiError || null,
+          response_format: "xml",
         }
       },
       remarks: usedMockData 
