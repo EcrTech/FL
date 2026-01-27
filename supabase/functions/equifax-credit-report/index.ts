@@ -51,6 +51,80 @@ const STATE_CODES: Record<string, string> = {
   "pondicherry": "PY",
 };
 
+// Pincode prefix to state code mapping for fallback
+const PINCODE_STATE_MAP: Record<string, string> = {
+  "11": "DL", // Delhi
+  "12": "HR", // Haryana
+  "13": "PB", // Punjab
+  "14": "HP", // Himachal Pradesh
+  "15": "JK", // J&K
+  "16": "PB", // Punjab
+  "17": "HP", // Himachal
+  "18": "JK", // J&K
+  "19": "JK", // J&K
+  "20": "UP", // Uttar Pradesh
+  "21": "UP",
+  "22": "UP",
+  "23": "UP",
+  "24": "UP",
+  "25": "UP",
+  "26": "UP",
+  "27": "UP",
+  "28": "UP",
+  "30": "RJ", // Rajasthan
+  "31": "RJ",
+  "32": "RJ",
+  "33": "RJ",
+  "34": "RJ",
+  "36": "CG", // Chhattisgarh
+  "37": "AP", // Andhra Pradesh
+  "38": "GJ", // Gujarat
+  "39": "GJ",
+  "40": "MH", // Maharashtra
+  "41": "MH",
+  "42": "MH",
+  "43": "MH",
+  "44": "MH",
+  "45": "MP", // Madhya Pradesh
+  "46": "MP",
+  "47": "MP",
+  "48": "MP",
+  "49": "CG", // Chhattisgarh
+  "50": "TS", // Telangana
+  "51": "TS",
+  "52": "AP", // Andhra Pradesh
+  "53": "AP",
+  "56": "KA", // Karnataka
+  "57": "KA",
+  "58": "KA",
+  "59": "KA",
+  "60": "TN", // Tamil Nadu
+  "61": "TN",
+  "62": "TN",
+  "63": "TN",
+  "64": "TN",
+  "67": "KL", // Kerala
+  "68": "KL",
+  "69": "KL",
+  "70": "WB", // West Bengal
+  "71": "WB",
+  "72": "WB",
+  "73": "WB",
+  "74": "WB",
+  "75": "OD", // Odisha
+  "76": "OD",
+  "77": "OD",
+  "78": "AS", // Assam
+  "79": "AR", // Arunachal Pradesh
+  "80": "BR", // Bihar
+  "81": "BR",
+  "82": "BR",
+  "83": "BR",
+  "84": "BR",
+  "85": "JH", // Jharkhand
+  "86": "JH",
+};
+
 // Hit code descriptions
 const HIT_CODES: Record<string, string> = {
   "01": "Hit - Records found",
@@ -74,16 +148,41 @@ const PAYMENT_STATUS: Record<string, { label: string; severity: "current" | "dpd
   "WOF": { label: "Written Off", severity: "writeoff" },
 };
 
-function getStateCode(state: string): string {
-  if (!state) return "";
-  const normalized = state.toLowerCase().trim();
+// Get state code from pincode prefix
+function getStateFromPincode(pincode: string): string {
+  if (!pincode || pincode.length < 2) return "";
+  const prefix = pincode.substring(0, 2);
+  return PINCODE_STATE_MAP[prefix] || "";
+}
+
+// Get state code with pincode fallback
+function getStateCode(state: string, pincode?: string): string {
+  if (!state && !pincode) return "";
+  const normalized = state?.toLowerCase().trim() || "";
   
   // Check if already a 2-letter code
   if (normalized.length === 2) {
     return normalized.toUpperCase();
   }
   
-  return STATE_CODES[normalized] || state.substring(0, 2).toUpperCase();
+  // Try direct state name match
+  const directMatch = STATE_CODES[normalized];
+  if (directMatch) {
+    return directMatch;
+  }
+  
+  // Fallback: derive state from pincode (more reliable than guessing from city name)
+  if (pincode) {
+    const fromPincode = getStateFromPincode(pincode);
+    if (fromPincode) {
+      console.log(`[EQUIFAX-DEBUG] State "${state}" not found in mapping, inferred ${fromPincode} from pincode ${pincode}`);
+      return fromPincode;
+    }
+  }
+  
+  // Last resort: first 2 chars (may be wrong, but better than nothing)
+  console.log(`[EQUIFAX-DEBUG] Could not determine state code for "${state}" with pincode "${pincode}", using first 2 chars`);
+  return state ? state.substring(0, 2).toUpperCase() : "";
 }
 
 function formatDate(dateStr: string): string {
@@ -952,8 +1051,9 @@ serve(async (req) => {
       usedMockData = true;
       reportData = generateMockResponse(applicantData);
     } else {
-      // Build Equifax request
-      const stateCode = getStateCode(applicantData.address.state);
+      // Build Equifax request - pass pincode for state fallback
+      const stateCode = getStateCode(applicantData.address.state, applicantData.address.postal);
+      console.log("[EQUIFAX-DEBUG] Resolved state code:", stateCode, "from state:", applicantData.address.state, "pincode:", applicantData.address.postal);
       
       const equifaxRequest = {
         RequestHeader: {
