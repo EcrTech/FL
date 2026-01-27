@@ -869,23 +869,43 @@ serve(async (req) => {
       );
     }
 
-    // Prepare applicant data for API call
-    const applicantData = {
-      firstName: applicant.first_name || "",
-      middleName: applicant.middle_name || "",
-      lastName: applicant.last_name || "",
-      dob: applicant.date_of_birth || "",
-      panNumber: applicant.pan_number || "",
-      aadhaarNumber: applicant.aadhaar_number || "",
-      mobile: applicant.mobile || "",
-      gender: applicant.gender || "",
-      address: {
-        line1: applicant.address_line1 || applicant.current_address || "",
-        city: applicant.city || "",
-        state: applicant.state || "",
-        postal: applicant.pincode || applicant.postal_code || "",
-      },
-    };
+      // Parse current_address JSONB object
+      const currentAddress = applicant.current_address;
+      let addressLine1 = "";
+      let addressCity = "";
+      let addressState = "";
+      let addressPincode = "";
+
+      if (typeof currentAddress === 'object' && currentAddress !== null) {
+        addressLine1 = (currentAddress as any).line1 || "";
+        addressCity = (currentAddress as any).city || "";
+        addressState = (currentAddress as any).state || "";
+        addressPincode = (currentAddress as any).pincode || "";
+      } else if (typeof currentAddress === 'string') {
+        // Fallback: if stored as string, use it directly
+        addressLine1 = currentAddress;
+      }
+
+      // Prepare applicant data for API call
+      const applicantData = {
+        firstName: applicant.first_name || "",
+        middleName: applicant.middle_name || "",
+        lastName: applicant.last_name || "",
+        dob: applicant.dob || "",  // FIXED: use "dob" not "date_of_birth"
+        panNumber: applicant.pan_number || "",
+        aadhaarNumber: applicant.aadhaar_number || "",
+        mobile: applicant.mobile || "",
+        gender: applicant.gender || "",
+        address: {
+          line1: addressLine1,       // FIXED: extracted from JSONB
+          city: addressCity,         // FIXED: extracted from JSONB
+          state: addressState,       // FIXED: extracted from JSONB
+          postal: addressPincode,    // FIXED: extracted from JSONB (pincode)
+        },
+      };
+
+      // Log the extracted address for debugging
+      console.log("[EQUIFAX-DEBUG] Extracted address from applicant:", applicantData.address);
 
     // Get Equifax credentials
     const customerId = Deno.env.get("EQUIFAX_CUSTOMER_ID");
