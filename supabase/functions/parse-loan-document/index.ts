@@ -207,6 +207,19 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Fetch the document to get loan_application_id for syncing
+    const { data: docRecord, error: docFetchError } = await supabase
+      .from("loan_documents")
+      .select("loan_application_id")
+      .eq("id", documentId)
+      .single();
+
+    if (docFetchError) {
+      console.warn(`[ParseDocument] Could not fetch document record:`, docFetchError);
+    }
+    const loanApplicationId = docRecord?.loan_application_id;
+    console.log(`[ParseDocument] Loan Application ID: ${loanApplicationId}`);
+
     // Download the document from storage
     console.log(`[ParseDocument] Downloading file: ${filePath}`);
     const { data: fileData, error: downloadError } = await supabase.storage
@@ -358,6 +371,96 @@ serve(async (req) => {
     }
 
     console.log(`[ParseDocument] Successfully parsed and saved data for document ${documentId}`);
+
+    // === Sync OCR data to loan_applicants for Aadhaar/PAN ===
+    const isAadhaarOrPan = documentType === 'aadhaar_card' || documentType === 'aadhar_card' || documentType === 'pan_card';
+    
+    if (isAadhaarOrPan && !parsedData.parse_error && loanApplicationId) {
+      console.log(`[ParseDocument] Syncing OCR data to loan_applicants for ${documentType}`);
+      
+      // Find the primary applicant for this application
+      const { data: applicant, error: applicantFetchError } = await supabase
+        .from("loan_applicants")
+        .select("id, dob, current_address, gender")
+        .eq("loan_application_id", loanApplicationId)
+        .eq("applicant_type", "primary")
+        .maybeSingle();
+      
+      if (applicant && !applicantFetchError) {
+        const updateData: Record<string, unknown> = {};
+        
+        // Sync DOB if currently default placeholder
+        if (parsedData.dob && applicant.dob === '1990-01-01') {
+          // Validate and format DOB
+          const dobDate = new Date(parsedData.dob);
+          if (!isNaN(dobDate.getTime())) {
+            updateData.dob = parsedData.dob;
+          }
+        }
+        
+        // Sync gender from Aadhaar if not set
+        if (documentType === 'aadhaar_card' || documentType === 'aadhar_card') {
+          if (parsedData.gender && !applicant.gender) {
+            updateData.gender = parsedData.gender;
+          }
+          
+          // Sync address if not set (or is null)
+          if (parsedData.address && !applicant.current_address) {
+            const addressStr = parsedData.address;
+            
+            // Extract pincode (6 digits at end)
+            const pincodeMatch = addressStr.match(/(\d{6})\s*$/);
+            const pincode = pincodeMatch ? pincodeMatch[1] : '';
+            
+            // Extract state (common Indian states)
+            const statePatterns = [
+              'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
+              'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka',
+              'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram',
+              'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu',
+              'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+              'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Chandigarh', 'Puducherry'
+            ];
+            let state = '';
+            for (const s of statePatterns) {
+              if (addressStr.toLowerCase().includes(s.toLowerCase())) {
+                state = s;
+                break;
+              }
+            }
+            
+            // Build structured address
+            updateData.current_address = {
+              line1: addressStr, // Full address as line1
+              line2: '',
+              city: '',
+              state: state,
+              pincode: pincode
+            };
+            
+            console.log(`[ParseDocument] Extracted address - state: ${state}, pincode: ${pincode}`);
+          }
+        }
+        
+        // Perform update if we have changes
+        if (Object.keys(updateData).length > 0) {
+          const { error: syncError } = await supabase
+            .from("loan_applicants")
+            .update(updateData)
+            .eq("id", applicant.id);
+          
+          if (syncError) {
+            console.warn(`[ParseDocument] Failed to sync OCR to applicant:`, syncError);
+          } else {
+            console.log(`[ParseDocument] Synced OCR data to applicant:`, updateData);
+          }
+        } else {
+          console.log(`[ParseDocument] No updates needed for applicant (values already set)`);
+        }
+      } else {
+        console.log(`[ParseDocument] No primary applicant found for application ${loanApplicationId}`);
+      }
+    }
 
     return new Response(
       JSON.stringify({
