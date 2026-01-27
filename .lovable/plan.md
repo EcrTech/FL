@@ -1,112 +1,119 @@
 
-
-## Fix: Video KYC Upload Edge Function Errors
+## Fix: Auto-Populate DOB from Verified Sources
 
 ### Problem Summary
-The `referral-videokyc-upload` edge function is returning non-2xx errors due to two database schema mismatches:
+The applicant's Date of Birth displays "Jan 01, 1990" (a fallback default) because:
+1. The `create-draft-referral-application` function defaults to `1990-01-01` when `aadhaarData.dob` is not provided
+2. PAN and Aadhaar verification flows store the verified DOB in `loan_verifications.response_data` but never update `loan_applicants.dob`
+3. There is no mechanism to sync verified data back to the applicant record
 
-### Issue 1: `loan_verifications` Insert Failure
-**Error**: Attempting to insert `org_id` column that doesn't exist in the table
-
-```typescript
-// Current (BROKEN)
-.upsert({
-  loan_application_id: applicationId,
-  org_id: orgId,  // Column doesn't exist!
-  verification_type: "video_kyc",
-  ...
-})
-```
-
-**Fix**: Remove `org_id` from the insert and fix the upsert conflict handling.
+### Solution Overview
+Update both verification edge functions to automatically update `loan_applicants.dob` when a successful verification returns a valid DOB.
 
 ---
 
-### Issue 2: `videokyc_recordings` Insert Failure  
-**Error**: `applicant_name` is NOT NULL but not being provided
+### Files to Modify
 
-```typescript
-// Current (BROKEN)
-.insert({
-  org_id: orgId,
-  application_id: applicationId,
-  status: "completed",
-  recording_url: recordingUrl,
-  // Missing: applicant_name (required!)
-})
-```
-
-**Fix**: Fetch applicant name from the application and include it in the insert.
+| File | Purpose |
+|------|---------|
+| `supabase/functions/verifiedu-pan-verify/index.ts` | Update applicant DOB after successful PAN verification |
+| `supabase/functions/verifiedu-aadhaar-details/index.ts` | Update applicant DOB after successful Aadhaar verification |
 
 ---
 
-### Implementation Changes
+### Implementation Details
 
-**File**: `supabase/functions/referral-videokyc-upload/index.ts`
+#### 1. Update PAN Verification Function
 
-#### 1. Update application query to get applicant name
+**File:** `supabase/functions/verifiedu-pan-verify/index.ts`
+
+After successfully inserting the verification record, add logic to update the applicant's DOB:
 
 ```typescript
-// Line 51-55 - Update query to get applicant info via relation
-const { data: application, error: appError } = await supabase
-  .from("loan_applications")
-  .select("id, loan_applicants(first_name, last_name)")
-  .eq("id", applicationId)
-  .single();
+// After line 123 (after inserting loan_verifications)
+
+// Update applicant DOB if we have a valid date from PAN verification
+if (responseData.data?.dob && applicationId) {
+  const { error: applicantUpdateError } = await adminClient
+    .from("loan_applicants")
+    .update({ dob: responseData.data.dob })
+    .eq("loan_application_id", applicationId)
+    .eq("applicant_type", "primary");
+  
+  if (applicantUpdateError) {
+    console.warn("Failed to update applicant DOB from PAN:", applicantUpdateError);
+  } else {
+    console.log("Updated applicant DOB from PAN verification:", responseData.data.dob);
+  }
+}
 ```
 
-#### 2. Fix loan_verifications upsert (remove org_id)
+#### 2. Update Aadhaar Verification Function
+
+**File:** `supabase/functions/verifiedu-aadhaar-details/index.ts`
+
+After successfully updating/inserting the verification record, add logic to update the applicant's DOB and other verified fields:
 
 ```typescript
-// Lines 100-118 - Remove org_id, use INSERT instead of upsert
-const { error: verificationError } = await supabase
-  .from("loan_verifications")
-  .insert({
-    loan_application_id: applicationId,
-    verification_type: "video_kyc",
-    status: "success",
-    response_data: {
-      recording_url: recordingUrl,
-      uploaded_at: new Date().toISOString(),
-      source: "referral_application",
-    },
-    verified_at: new Date().toISOString(),
-  });
-```
+// After line 200 (after updating/inserting loan_verifications)
 
-#### 3. Fix videokyc_recordings insert (add applicant_name)
-
-```typescript
-// Lines 127-135 - Add applicant_name
-const applicantData = application.loan_applicants?.[0];
-const applicantName = applicantData 
-  ? `${applicantData.first_name || ''} ${applicantData.last_name || ''}`.trim() 
-  : 'Unknown Applicant';
-
-const { error: recordingError } = await supabase
-  .from("videokyc_recordings")
-  .insert({
-    org_id: orgId,
-    application_id: applicationId,
-    applicant_name: applicantName,  // Required field
-    status: "completed",
-    recording_url: recordingUrl,
-    completed_at: new Date().toISOString(),
-  });
+// Update applicant record with verified data from Aadhaar
+if (responseData.dob && resolvedApplicationId) {
+  const updateData: Record<string, string> = {
+    dob: responseData.dob,
+  };
+  
+  // Also update gender if available
+  if (responseData.gender) {
+    updateData.gender = responseData.gender;
+  }
+  
+  const { error: applicantUpdateError } = await adminClient
+    .from("loan_applicants")
+    .update(updateData)
+    .eq("loan_application_id", resolvedApplicationId)
+    .eq("applicant_type", "primary");
+  
+  if (applicantUpdateError) {
+    console.warn("Failed to update applicant from Aadhaar:", applicantUpdateError);
+  } else {
+    console.log("Updated applicant from Aadhaar verification:", updateData);
+  }
+}
 ```
 
 ---
 
-### Technical Details
+### Data Flow After Fix
 
-| Table | Issue | Fix |
-|-------|-------|-----|
-| `loan_verifications` | `org_id` column doesn't exist | Remove from insert |
-| `loan_verifications` | No unique constraint on `loan_application_id,verification_type` | Use `insert` instead of `upsert` |
-| `videokyc_recordings` | `applicant_name` is NOT NULL | Fetch and include applicant name |
+```text
+User completes PAN verification
+    │
+    ▼
+verifiedu-pan-verify edge function
+    │
+    ├─► Inserts record into loan_verifications
+    │
+    └─► NEW: Updates loan_applicants.dob with verified DOB
+    
+User completes Aadhaar verification
+    │
+    ▼
+verifiedu-aadhaar-details edge function
+    │
+    ├─► Updates loan_verifications with response
+    │
+    └─► NEW: Updates loan_applicants.dob (and gender) with verified data
+```
 
 ---
 
-### Expected Result
-After this fix, applicants will be able to successfully complete the Video KYC step without encountering the "Edge Function returned a non-2xx status code" error.
+### Technical Notes
 
+1. **Priority:** Aadhaar DOB will overwrite PAN DOB if both verifications occur (Aadhaar is typically completed after PAN in the referral flow)
+
+2. **Fallback Handling:** The existing fallback logic in `create-draft-referral-application` remains as a safety net for edge cases
+
+3. **Backward Compatibility:** Existing applications won't automatically get updated DOBs, but any new verification will sync the data
+
+4. **Admin Client Usage:** Both functions already have an admin client configured for database operations, so no additional setup is needed
