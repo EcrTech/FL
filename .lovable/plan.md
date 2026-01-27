@@ -1,82 +1,112 @@
 
 
-## Fix: Allow Single Verified Source for PAN Number Validation
+## Fix: Video KYC Upload Edge Function Errors
 
-### Problem
-The Document Data Verification table shows "Insufficient Data" for PAN Number even when the PAN Card OCR has extracted a valid PAN. The current logic requires **at least 2 sources** with data to display a status, but since PAN verification is mandatory, a single verified source should be sufficient.
+### Problem Summary
+The `referral-videokyc-upload` edge function is returning non-2xx errors due to two database schema mismatches:
 
-### Solution
-Update the match status logic to treat verified mandatory fields (like PAN) as valid with just one source. When only one source has data and it's from a verified document (PAN Card), display "Valid" status instead of "Insufficient Data".
+### Issue 1: `loan_verifications` Insert Failure
+**Error**: Attempting to insert `org_id` column that doesn't exist in the table
+
+```typescript
+// Current (BROKEN)
+.upsert({
+  loan_application_id: applicationId,
+  org_id: orgId,  // Column doesn't exist!
+  verification_type: "video_kyc",
+  ...
+})
+```
+
+**Fix**: Remove `org_id` from the insert and fix the upsert conflict handling.
 
 ---
 
-### File to Modify
+### Issue 2: `videokyc_recordings` Insert Failure  
+**Error**: `applicant_name` is NOT NULL but not being provided
 
-| File | Change |
-|------|--------|
-| `src/components/LOS/DocumentDataVerification.tsx` | Update match status logic to allow single verified source for PAN field |
+```typescript
+// Current (BROKEN)
+.insert({
+  org_id: orgId,
+  application_id: applicationId,
+  status: "completed",
+  recording_url: recordingUrl,
+  // Missing: applicant_name (required!)
+})
+```
+
+**Fix**: Fetch applicant name from the application and include it in the insert.
 
 ---
 
-### Code Changes
+### Implementation Changes
 
-**1. Add new match status type (line 23)**
+**File**: `supabase/functions/referral-videokyc-upload/index.ts`
 
-```typescript
-// Before
-matchStatus: "match" | "partial" | "mismatch" | "insufficient";
-
-// After
-matchStatus: "match" | "partial" | "mismatch" | "insufficient" | "valid";
-```
-
-**2. Update match calculation logic (lines 216-235)**
-
-Add special handling for mandatory verified fields:
+#### 1. Update application query to get applicant name
 
 ```typescript
-return fields.map((field) => {
-  const nonEmptyValues = field.values.filter((v) => v.value && v.value.trim() !== "");
-
-  // For PAN field: if only PAN Card source has value, it's valid (mandatory verified source)
-  if (field.field === "pan" && nonEmptyValues.length === 1) {
-    const singleSource = nonEmptyValues[0];
-    if (singleSource.source === "PAN Card" && singleSource.value) {
-      return { ...field, matchStatus: "valid" as const };
-    }
-  }
-
-  if (nonEmptyValues.length < 2) {
-    return { ...field, matchStatus: "insufficient" as const };
-  }
-
-  // ... rest of existing match logic
-});
+// Line 51-55 - Update query to get applicant info via relation
+const { data: application, error: appError } = await supabase
+  .from("loan_applications")
+  .select("id, loan_applicants(first_name, last_name)")
+  .eq("id", applicationId)
+  .single();
 ```
 
-**3. Add icon for "valid" status (line 248)**
+#### 2. Fix loan_verifications upsert (remove org_id)
 
 ```typescript
-case "valid":
-  return <CheckCircle className="h-4 w-4 text-green-500" />;
+// Lines 100-118 - Remove org_id, use INSERT instead of upsert
+const { error: verificationError } = await supabase
+  .from("loan_verifications")
+  .insert({
+    loan_application_id: applicationId,
+    verification_type: "video_kyc",
+    status: "success",
+    response_data: {
+      recording_url: recordingUrl,
+      uploaded_at: new Date().toISOString(),
+      source: "referral_application",
+    },
+    verified_at: new Date().toISOString(),
+  });
 ```
 
-**4. Add badge for "valid" status (line 260)**
+#### 3. Fix videokyc_recordings insert (add applicant_name)
 
 ```typescript
-case "valid":
-  return <Badge className="bg-green-500/10 text-green-600 border-green-500/20">Valid</Badge>;
+// Lines 127-135 - Add applicant_name
+const applicantData = application.loan_applicants?.[0];
+const applicantName = applicantData 
+  ? `${applicantData.first_name || ''} ${applicantData.last_name || ''}`.trim() 
+  : 'Unknown Applicant';
+
+const { error: recordingError } = await supabase
+  .from("videokyc_recordings")
+  .insert({
+    org_id: orgId,
+    application_id: applicationId,
+    applicant_name: applicantName,  // Required field
+    status: "completed",
+    recording_url: recordingUrl,
+    completed_at: new Date().toISOString(),
+  });
 ```
+
+---
+
+### Technical Details
+
+| Table | Issue | Fix |
+|-------|-------|-----|
+| `loan_verifications` | `org_id` column doesn't exist | Remove from insert |
+| `loan_verifications` | No unique constraint on `loan_application_id,verification_type` | Use `insert` instead of `upsert` |
+| `videokyc_recordings` | `applicant_name` is NOT NULL | Fetch and include applicant name |
 
 ---
 
 ### Expected Result
-
-| Source | Value | Status |
-|--------|-------|--------|
-| Application | - | |
-| PAN Card | PEKPK6738E | |
-| Form 16 | - | **Valid** ✅ |
-
-The PAN Number row will show "Valid" with a green checkmark when only the verified PAN Card source has data, since PAN verification is mandatory and the extracted value is from a trusted source.
+After this fix, applicants will be able to successfully complete the Video KYC step without encountering the "Edge Function returned a non-2xx status code" error.
 
