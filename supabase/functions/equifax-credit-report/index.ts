@@ -998,35 +998,62 @@ serve(async (req) => {
       };
 
       try {
-        // Try multiple request formats - SOAP first, then plain XML, then JSON
+        // Try multiple request formats - prioritizing Equifax India specific format
+        // Equifax India CIR 360 requires specific header combinations
         const formats = [
+          // Format 1: Equifax India standard - POST with application/xml and Accept: */*
+          { 
+            name: "XML with Accept All", 
+            contentType: "application/xml",
+            accept: "*/*",
+            body: jsonToXmlPlain(equifaxRequest),
+            soapAction: null,
+            extraHeaders: {}
+          },
+          // Format 2: POST with application/xml only
+          { 
+            name: "Plain application/xml", 
+            contentType: "application/xml",
+            accept: "application/xml",
+            body: jsonToXmlPlain(equifaxRequest),
+            soapAction: null,
+            extraHeaders: {}
+          },
+          // Format 3: POST with text/xml and empty SOAPAction
+          { 
+            name: "XML with empty SOAPAction", 
+            contentType: "text/xml; charset=utf-8",
+            accept: "*/*",
+            body: jsonToXmlPlain(equifaxRequest),
+            soapAction: "",
+            extraHeaders: {}
+          },
+          // Format 4: Full SOAP envelope
           { 
             name: "SOAP/XML", 
             contentType: "text/xml; charset=utf-8",
             accept: "text/xml",
             body: jsonToSoapXml(equifaxRequest),
-            soapAction: "getReport"
+            soapAction: "",
+            extraHeaders: {}
           },
+          // Format 5: SOAP with namespace-specific action
           { 
-            name: "Plain XML (text/xml)", 
-            contentType: "text/xml; charset=utf-8",
-            accept: "text/xml, application/xml",
-            body: jsonToXmlPlain(equifaxRequest),
-            soapAction: null
+            name: "SOAP with action", 
+            contentType: "application/soap+xml; charset=utf-8",
+            accept: "application/soap+xml, text/xml",
+            body: jsonToSoapXml(equifaxRequest),
+            soapAction: "http://cir360service.equifax.com/getReport",
+            extraHeaders: {}
           },
-          { 
-            name: "Plain XML (application/xml)", 
-            contentType: "application/xml; charset=utf-8",
-            accept: "application/xml, text/xml",
-            body: jsonToXmlPlain(equifaxRequest),
-            soapAction: null
-          },
+          // Format 6: JSON as last resort  
           { 
             name: "JSON", 
             contentType: "application/json",
             accept: "application/json",
             body: JSON.stringify(equifaxRequest),
-            soapAction: null
+            soapAction: null,
+            extraHeaders: {}
           },
         ];
 
