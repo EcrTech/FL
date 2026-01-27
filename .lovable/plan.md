@@ -1,143 +1,111 @@
 
-# Fix Equifax 406 Error - Convert to XML Format
+# Fix DOB and Address Sync from Aadhaar Verification
 
-## Problem
-The Equifax Production API (`ists.equifax.co.in`) is returning a **406 Not Acceptable** error because it requires XML format for requests and responses, but the current edge function sends JSON.
+## Problem Summary
+1. **Verified data not syncing** - The application shows default DOB (`Jan 01, 1990`) and no address despite Aadhaar verification being available
+2. **Address sync is missing** - The `verifiedu-aadhaar-details` edge function currently only syncs DOB and gender, but NOT the verified address
+3. **State and Pincode required** - The Aadhaar response contains `state` and `pc` (pincode) fields that must be extracted and stored
 
-## Solution Overview
-Update the `equifax-credit-report` edge function to:
-1. Convert the JSON request body to XML format
-2. Send requests with `Content-Type: application/xml` headers
-3. Parse XML responses back to JSON for the frontend
+## Solution
 
-## Implementation Steps
+### Update Aadhaar Verification Edge Function
 
-### Step 1: Add XML Conversion Utility
-Create a function to convert the JSON request object to Equifax's expected XML format:
+**File:** `supabase/functions/verifiedu-aadhaar-details/index.ts`
+
+Modify the applicant update logic (lines 202-224) to include address sync with proper field mapping:
 
 ```text
-┌─────────────────────────────────────────────────────────────────┐
-│  Current JSON Request                                            │
-│  ─────────────────────                                           │
-│  {                                                               │
-│    "RequestHeader": { "CustomerId": "6065", ... },              │
-│    "RequestBody": { "FirstName": "John", ... }                   │
-│  }                                                               │
-├─────────────────────────────────────────────────────────────────┤
-│                          ▼                                       │
-│                   XML Conversion                                 │
-│                          ▼                                       │
-├─────────────────────────────────────────────────────────────────┤
-│  Required XML Format                                             │
-│  ───────────────────                                             │
-│  <?xml version="1.0" encoding="UTF-8"?>                         │
-│  <ABOREQUESTINFO>                                                │
-│    <RequestHeader>                                               │
-│      <CustomerId>6065</CustomerId>                              │
-│      <UserId>...</UserId>                                        │
-│    </RequestHeader>                                              │
-│    <RequestBody>                                                 │
-│      <InquiryPurpose>05</InquiryPurpose>                        │
-│      ...                                                         │
-│    </RequestBody>                                                │
-│  </ABOREQUESTINFO>                                               │
-└─────────────────────────────────────────────────────────────────┘
+Aadhaar Response Fields → loan_applicants.current_address Structure
+─────────────────────────────────────────────────────────────────────
+addresses[0].house      ─┐
+addresses[0].street      │──→ line1 (combined)
+addresses[0].landmark   ─┘
+addresses[0].locality   ─┐
+addresses[0].vtc         │──→ line2 (combined)
+addresses[0].subdist    ─┘
+addresses[0].dist       ───→ city
+addresses[0].state      ───→ state (MANDATORY)
+addresses[0].pc         ───→ pincode (MANDATORY)
 ```
 
-### Step 2: Add XML Response Parser
-Create a function to parse the XML response from Equifax back into a JSON object that the existing `parseEquifaxResponse` function can process.
+### Code Changes
 
-### Step 3: Update API Call Headers
-Change the fetch call from:
-```javascript
-headers: {
-  "Content-Type": "application/json",
-  Accept: "application/json",
+Replace lines 202-224 with:
+
+```typescript
+// Update applicant record with verified DOB, gender, and ADDRESS from Aadhaar
+if (responseData.dob || responseData.gender || responseData.addresses?.length) {
+  const updateData: Record<string, unknown> = {};
+  
+  if (responseData.dob) {
+    updateData.dob = responseData.dob;
+  }
+  if (responseData.gender) {
+    updateData.gender = responseData.gender;
+  }
+  
+  // NEW: Sync verified address to current_address JSONB field
+  if (responseData.addresses?.length > 0) {
+    const addr = responseData.addresses[0];
+    
+    // Build line1: house + street + landmark
+    const line1Parts = [addr.house, addr.street, addr.landmark].filter(Boolean);
+    const line1 = line1Parts.join(', ') || '';
+    
+    // Build line2: locality + vtc + subdist
+    const line2Parts = [addr.locality, addr.vtc, addr.subdist].filter(Boolean);
+    const line2 = line2Parts.join(', ') || '';
+    
+    // Extract city (dist), state, and pincode (pc) - MANDATORY fields
+    const city = addr.dist || '';
+    const state = addr.state || '';          // MANDATORY
+    const pincode = addr.pc || '';            // MANDATORY
+    
+    updateData.current_address = {
+      line1: line1,
+      line2: line2,
+      city: city,
+      state: state,       // ← Extracted from Aadhaar
+      pincode: pincode    // ← Extracted from Aadhaar
+    };
+    
+    console.log("Extracted address from Aadhaar:", {
+      line1, line2, city, state, pincode
+    });
+  }
+  
+  const { error: applicantUpdateError } = await adminClient
+    .from("loan_applicants")
+    .update(updateData)
+    .eq("loan_application_id", resolvedApplicationId)
+    .eq("applicant_type", "primary");
+  
+  if (applicantUpdateError) {
+    console.warn("Failed to update applicant from Aadhaar:", applicantUpdateError);
+  } else {
+    console.log("Updated applicant from Aadhaar verification:", updateData);
+  }
 }
 ```
-To:
-```javascript
-headers: {
-  "Content-Type": "application/xml",
-  Accept: "application/xml",
-}
-```
 
-### Step 4: Wire Up the Conversion Functions
-1. Convert request object to XML before sending
-2. Parse XML response to JSON after receiving
-3. Keep existing JSON parsing as fallback for testing
+### Address Field Mapping Details
 
-## Technical Details
+| Aadhaar API Field | Maps To | Required |
+|-------------------|---------|----------|
+| `house`, `street`, `landmark` | `line1` | Optional (combined) |
+| `locality`, `vtc`, `subdist` | `line2` | Optional (combined) |
+| `dist` | `city` | Optional |
+| `state` | `state` | **MANDATORY** |
+| `pc` | `pincode` | **MANDATORY** |
 
-### File to Modify
-- `supabase/functions/equifax-credit-report/index.ts`
+## Files to Modify
+- `supabase/functions/verifiedu-aadhaar-details/index.ts` - Add complete address sync logic
 
-### New Functions to Add
-
-1. **`jsonToXml()`** - Converts the request object to XML string with proper Equifax structure
-2. **`xmlToJson()`** - Parses XML response using regex (Deno doesn't have built-in XML parser)
-
-### XML Request Structure (Equifax CIR 360)
-The Equifax API expects this XML envelope:
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<ABOREQUESTINFO>
-  <RequestHeader>
-    <CustomerId>...</CustomerId>
-    <UserId>...</UserId>
-    <Password>...</Password>
-    <MemberNumber>...</MemberNumber>
-    <SecurityCode>...</SecurityCode>
-    <CustRefField>...</CustRefField>
-    <ProductCode>PCS</ProductCode>
-  </RequestHeader>
-  <RequestBody>
-    <InquiryPurpose>05</InquiryPurpose>
-    <TransactionAmount>0</TransactionAmount>
-    <FirstName>...</FirstName>
-    <MiddleName>...</MiddleName>
-    <LastName>...</LastName>
-    <DOB>DD-MM-YYYY</DOB>
-    <Gender>1 or 2</Gender>
-    <InquiryAddresses>
-      <InquiryAddress seq="1">
-        <AddressType>H</AddressType>
-        <AddressLine1>...</AddressLine1>
-        <State>XX</State>
-        <Postal>XXXXXX</Postal>
-      </InquiryAddress>
-    </InquiryAddresses>
-    <InquiryPhones>
-      <InquiryPhone seq="1">
-        <Number>...</Number>
-        <PhoneType>M</PhoneType>
-      </InquiryPhone>
-    </InquiryPhones>
-    <IDDetails>
-      <IDDetail seq="1">
-        <IDType>T</IDType>
-        <IDValue>PANXXXXXXXX</IDValue>
-        <Source>Inquiry</Source>
-      </IDDetail>
-    </IDDetails>
-    <Score>
-      <Type>ERS</Type>
-      <Version>4.0</Version>
-    </Score>
-  </RequestBody>
-</ABOREQUESTINFO>
-```
-
-### Error Handling
-- If XML conversion fails, log error and fall back to mock data
-- If XML response parsing fails, try JSON parsing as fallback
-- Add detailed logging for debugging XML issues
-
-## Verification
+## Verification Steps
 After deployment:
-1. Open a loan application with valid PAN number
-2. Click "Fetch Credit Report"
-3. Check edge function logs for successful XML request/response
-4. Confirm real credit data appears (not mock data)
-5. Verify the "simulated data" banner is gone
+1. Complete a new Aadhaar DigiLocker verification for any application
+2. Check the Application Detail page → Applicant Details section
+3. Verify that DOB, address, state, and pincode are all populated correctly
+
+## Note for Existing Application
+For application `6a68a59b-28e9-4648-b27f-2c376dbf799f`, the Aadhaar verification must be triggered again after this fix is deployed for the data to sync properly.
