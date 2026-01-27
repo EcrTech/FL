@@ -121,6 +121,21 @@ serve(async (req) => {
         response_data: responseData.data,
         verified_at: new Date().toISOString(),
       });
+
+      // Update applicant DOB if we have a valid date from PAN verification
+      if (responseData.data?.dob) {
+        const { error: applicantUpdateError } = await adminClient
+          .from("loan_applicants")
+          .update({ dob: responseData.data.dob })
+          .eq("loan_application_id", applicationId)
+          .eq("applicant_type", "primary");
+        
+        if (applicantUpdateError) {
+          console.warn("Failed to update applicant DOB from PAN:", applicantUpdateError);
+        } else {
+          console.log("Updated applicant DOB from PAN verification:", responseData.data.dob);
+        }
+      }
     }
 
     return new Response(JSON.stringify({
