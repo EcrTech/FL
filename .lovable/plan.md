@@ -1,111 +1,195 @@
 
-# Fix DOB and Address Sync from Aadhaar Verification
+# Fix: Auto-Sync OCR Data to Existing Applicant Records
 
-## Problem Summary
-1. **Verified data not syncing** - The application shows default DOB (`Jan 01, 1990`) and no address despite Aadhaar verification being available
-2. **Address sync is missing** - The `verifiedu-aadhaar-details` edge function currently only syncs DOB and gender, but NOT the verified address
-3. **State and Pincode required** - The Aadhaar response contains `state` and `pc` (pincode) fields that must be extracted and stored
+## Problem Analysis
 
-## Solution
+The "Verified Document Data" section shows AI-parsed address from the Aadhaar card (`S/O: Ranjit Kumar Jaiswal, ward no 3, Mahua SINGH ray, Mahua, Vaishali, Bihar, 844122`), but the "Applicant Details" section shows `Current Address: N/A`.
 
-### Update Aadhaar Verification Edge Function
+**Root Cause**: The system has **TWO separate data sources** that are NOT synchronized:
 
-**File:** `supabase/functions/verifiedu-aadhaar-details/index.ts`
+1. **OCR Data** (AI-parsed) → Stored in `loan_documents.ocr_data` 
+2. **Applicant Profile** → Stored in `loan_applicants.current_address`
 
-Modify the applicant update logic (lines 202-224) to include address sync with proper field mapping:
+The `parse-loan-document` edge function saves OCR data but does NOT update the existing `loan_applicants` record. The recently updated `verifiedu-aadhaar-details` function only syncs data from **live API verification** (DigiLocker), not from AI-parsed documents.
+
+**Database Evidence** (5 affected applications found):
+| Application | First Name | DOB (Applicant) | Current Address | OCR Address Available |
+|-------------|------------|-----------------|-----------------|----------------------|
+| 48e426cb... | Kusum | 1990-01-01 | null | Yes (Bihar address) |
+| 2a3cbc09... | sonu | 1990-01-01 | email (wrong) | Yes |
+| 3bf41430... | Sonu | 1990-01-01 | null | Yes |
+| 06216b35... | SAMAN | 1990-01-01 | null | Yes |
+
+## Solution: Auto-Sync OCR to Applicant on Document Parse
+
+Update the `parse-loan-document` edge function to automatically sync key fields (DOB, gender, address) from Aadhaar/PAN OCR data to the `loan_applicants` table when parsing completes.
 
 ```text
-Aadhaar Response Fields → loan_applicants.current_address Structure
-─────────────────────────────────────────────────────────────────────
-addresses[0].house      ─┐
-addresses[0].street      │──→ line1 (combined)
-addresses[0].landmark   ─┘
-addresses[0].locality   ─┐
-addresses[0].vtc         │──→ line2 (combined)
-addresses[0].subdist    ─┘
-addresses[0].dist       ───→ city
-addresses[0].state      ───→ state (MANDATORY)
-addresses[0].pc         ───→ pincode (MANDATORY)
+Current Flow:
+┌──────────────────┐    ┌────────────────────────┐
+│ Upload Document  │ →  │ parse-loan-document    │ → loan_documents.ocr_data ✓
+└──────────────────┘    │ (AI parsing)           │
+                        └────────────────────────┘
+                                   ↓ (MISSING)
+                        loan_applicants NOT updated ✗
+
+Proposed Flow:
+┌──────────────────┐    ┌────────────────────────┐
+│ Upload Document  │ →  │ parse-loan-document    │ → loan_documents.ocr_data ✓
+└──────────────────┘    │ (AI parsing)           │         │
+                        └────────────────────────┘         │
+                                   ↓ (NEW)                 ↓
+                        ┌────────────────────────────────────┐
+                        │ Sync DOB, Gender, Address to       │
+                        │ loan_applicants (if Aadhaar/PAN)   │
+                        └────────────────────────────────────┘
 ```
 
-### Code Changes
+## Implementation
 
-Replace lines 202-224 with:
+### File: `supabase/functions/parse-loan-document/index.ts`
+
+Add sync logic after successful OCR data storage (after line 360):
 
 ```typescript
-// Update applicant record with verified DOB, gender, and ADDRESS from Aadhaar
-if (responseData.dob || responseData.gender || responseData.addresses?.length) {
-  const updateData: Record<string, unknown> = {};
+// === NEW: Sync OCR data to loan_applicants for Aadhaar/PAN ===
+if (
+  (documentType === 'aadhaar_card' || documentType === 'aadhar_card' || documentType === 'pan_card') && 
+  !parsedData.parse_error &&
+  loanApplicationId
+) {
+  console.log(`[ParseDocument] Syncing OCR data to loan_applicants for ${documentType}`);
   
-  if (responseData.dob) {
-    updateData.dob = responseData.dob;
-  }
-  if (responseData.gender) {
-    updateData.gender = responseData.gender;
-  }
-  
-  // NEW: Sync verified address to current_address JSONB field
-  if (responseData.addresses?.length > 0) {
-    const addr = responseData.addresses[0];
-    
-    // Build line1: house + street + landmark
-    const line1Parts = [addr.house, addr.street, addr.landmark].filter(Boolean);
-    const line1 = line1Parts.join(', ') || '';
-    
-    // Build line2: locality + vtc + subdist
-    const line2Parts = [addr.locality, addr.vtc, addr.subdist].filter(Boolean);
-    const line2 = line2Parts.join(', ') || '';
-    
-    // Extract city (dist), state, and pincode (pc) - MANDATORY fields
-    const city = addr.dist || '';
-    const state = addr.state || '';          // MANDATORY
-    const pincode = addr.pc || '';            // MANDATORY
-    
-    updateData.current_address = {
-      line1: line1,
-      line2: line2,
-      city: city,
-      state: state,       // ← Extracted from Aadhaar
-      pincode: pincode    // ← Extracted from Aadhaar
-    };
-    
-    console.log("Extracted address from Aadhaar:", {
-      line1, line2, city, state, pincode
-    });
-  }
-  
-  const { error: applicantUpdateError } = await adminClient
+  // Find the primary applicant for this application
+  const { data: applicant, error: applicantFetchError } = await supabase
     .from("loan_applicants")
-    .update(updateData)
-    .eq("loan_application_id", resolvedApplicationId)
-    .eq("applicant_type", "primary");
+    .select("id, dob, current_address, gender")
+    .eq("loan_application_id", loanApplicationId)
+    .eq("applicant_type", "primary")
+    .maybeSingle();
   
-  if (applicantUpdateError) {
-    console.warn("Failed to update applicant from Aadhaar:", applicantUpdateError);
-  } else {
-    console.log("Updated applicant from Aadhaar verification:", updateData);
+  if (applicant && !applicantFetchError) {
+    const updateData: Record<string, unknown> = {};
+    
+    // Sync DOB if currently default placeholder
+    if (parsedData.dob && applicant.dob === '1990-01-01') {
+      // Validate and format DOB
+      const dobDate = new Date(parsedData.dob);
+      if (!isNaN(dobDate.getTime())) {
+        updateData.dob = parsedData.dob;
+      }
+    }
+    
+    // Sync gender from Aadhaar if not set
+    if (documentType === 'aadhaar_card' || documentType === 'aadhar_card') {
+      if (parsedData.gender && !applicant.gender) {
+        updateData.gender = parsedData.gender;
+      }
+      
+      // Sync address if not set (or is null)
+      if (parsedData.address && !applicant.current_address) {
+        // Parse address into structured format
+        // Address format: "S/O: Ranjit Kumar Jaiswal, ward no 3, Mahua, Vaishali, Bihar, 844122"
+        const addressStr = parsedData.address;
+        
+        // Extract pincode (6 digits at end)
+        const pincodeMatch = addressStr.match(/(\d{6})\s*$/);
+        const pincode = pincodeMatch ? pincodeMatch[1] : '';
+        
+        // Extract state (common Indian states before pincode)
+        const statePatterns = [
+          'Bihar', 'Jharkhand', 'West Bengal', 'Uttar Pradesh', 'Maharashtra', 
+          'Karnataka', 'Tamil Nadu', 'Delhi', 'Gujarat', 'Rajasthan', 
+          'Madhya Pradesh', 'Andhra Pradesh', 'Telangana', 'Kerala', 
+          'Punjab', 'Haryana', 'Odisha', 'Chhattisgarh', 'Assam'
+        ];
+        let state = '';
+        for (const s of statePatterns) {
+          if (addressStr.toLowerCase().includes(s.toLowerCase())) {
+            state = s;
+            break;
+          }
+        }
+        
+        // Build structured address
+        updateData.current_address = {
+          line1: addressStr, // Full address as line1
+          line2: '',
+          city: '',
+          state: state,
+          pincode: pincode
+        };
+      }
+    }
+    
+    // Perform update if we have changes
+    if (Object.keys(updateData).length > 0) {
+      const { error: updateError } = await supabase
+        .from("loan_applicants")
+        .update(updateData)
+        .eq("id", applicant.id);
+      
+      if (updateError) {
+        console.warn(`[ParseDocument] Failed to sync OCR to applicant:`, updateError);
+      } else {
+        console.log(`[ParseDocument] Synced OCR data to applicant:`, updateData);
+      }
+    }
   }
 }
 ```
 
-### Address Field Mapping Details
+### Additional Requirement: Get `loan_application_id`
 
-| Aadhaar API Field | Maps To | Required |
-|-------------------|---------|----------|
-| `house`, `street`, `landmark` | `line1` | Optional (combined) |
-| `locality`, `vtc`, `subdist` | `line2` | Optional (combined) |
-| `dist` | `city` | Optional |
-| `state` | `state` | **MANDATORY** |
-| `pc` | `pincode` | **MANDATORY** |
+The edge function currently receives `documentId` but needs the `loan_application_id` to find the applicant. Modify the document fetch query (around line 200) to also fetch the application ID:
+
+```typescript
+// Fetch document with application ID
+const { data: document, error: docError } = await supabase
+  .from("loan_documents")
+  .select("id, document_type, file_url, loan_application_id")  // Add loan_application_id
+  .eq("id", documentId)
+  .single();
+
+// Store for later use
+const loanApplicationId = document.loan_application_id;
+```
 
 ## Files to Modify
-- `supabase/functions/verifiedu-aadhaar-details/index.ts` - Add complete address sync logic
 
-## Verification Steps
-After deployment:
-1. Complete a new Aadhaar DigiLocker verification for any application
-2. Check the Application Detail page → Applicant Details section
-3. Verify that DOB, address, state, and pincode are all populated correctly
+| File | Change |
+|------|--------|
+| `supabase/functions/parse-loan-document/index.ts` | Add OCR-to-applicant sync logic after document parsing |
 
-## Note for Existing Application
-For application `6a68a59b-28e9-4648-b27f-2c376dbf799f`, the Aadhaar verification must be triggered again after this fix is deployed for the data to sync properly.
+## Address Parsing Logic
+
+The OCR address string `S/O: Ranjit Kumar Jaiswal, ward no 3, Mahua SINGH ray, Mahua, Vaishali, Bihar, 844122` will be parsed as:
+
+| Field | Extracted Value |
+|-------|-----------------|
+| `line1` | Full address string |
+| `state` | "Bihar" (pattern matched) |
+| `pincode` | "844122" (6-digit regex) |
+
+## Sync Rules (Preventing Data Corruption)
+
+- **DOB**: Only sync if current value is the placeholder `1990-01-01`
+- **Gender**: Only sync from Aadhaar if currently null/empty
+- **Address**: Only sync if `current_address` is null
+- **Priority**: Live API verification (DigiLocker) always takes precedence when triggered later
+
+## Testing After Deployment
+
+1. Upload a new Aadhaar card to any application
+2. Wait for AI parsing to complete
+3. Verify the Applicant Details section auto-populates:
+   - Date of Birth (from OCR)
+   - Gender (from Aadhaar)
+   - Current Address with state and pincode
+
+## Backfill for Existing Applications
+
+After the fix is deployed, existing applications with parsed OCR data but missing applicant fields can be fixed by:
+1. Re-uploading the Aadhaar document, OR
+2. Triggering the DigiLocker verification flow, OR
+3. Running a one-time SQL backfill script (can provide separately if needed)
