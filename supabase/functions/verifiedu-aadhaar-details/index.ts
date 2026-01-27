@@ -199,15 +199,45 @@ serve(async (req) => {
         });
       }
 
-      // Update applicant record with verified DOB and gender from Aadhaar
-      if (responseData.dob || responseData.gender) {
-        const updateData: Record<string, string> = {};
+      // Update applicant record with verified DOB, gender, and ADDRESS from Aadhaar
+      if (responseData.dob || responseData.gender || responseData.addresses?.length) {
+        const updateData: Record<string, unknown> = {};
         
         if (responseData.dob) {
           updateData.dob = responseData.dob;
         }
         if (responseData.gender) {
           updateData.gender = responseData.gender;
+        }
+        
+        // Sync verified address to current_address JSONB field
+        if (responseData.addresses?.length > 0) {
+          const addr = responseData.addresses[0];
+          
+          // Build line1: house + street + landmark
+          const line1Parts = [addr.house, addr.street, addr.landmark].filter(Boolean);
+          const line1 = line1Parts.join(', ') || '';
+          
+          // Build line2: locality + vtc + subdist
+          const line2Parts = [addr.locality, addr.vtc, addr.subdist].filter(Boolean);
+          const line2 = line2Parts.join(', ') || '';
+          
+          // Extract city (dist), state, and pincode (pc) - MANDATORY fields
+          const city = addr.dist || '';
+          const state = addr.state || '';          // MANDATORY
+          const pincode = addr.pc || '';           // MANDATORY
+          
+          updateData.current_address = {
+            line1: line1,
+            line2: line2,
+            city: city,
+            state: state,
+            pincode: pincode
+          };
+          
+          console.log("Extracted address from Aadhaar:", {
+            line1, line2, city, state, pincode
+          });
         }
         
         const { error: applicantUpdateError } = await adminClient
