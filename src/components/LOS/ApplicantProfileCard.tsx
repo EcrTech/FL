@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -239,7 +240,6 @@ export function ApplicantProfileCard({
   gender,
 }: ApplicantProfileCardProps) {
   const [documents, setDocuments] = useState<Document[]>([]);
-  const [verifications, setVerifications] = useState<Verification[]>([]);
   const [loading, setLoading] = useState(true);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [viewerOpen, setViewerOpen] = useState(false);
@@ -252,8 +252,26 @@ export function ApplicantProfileCard({
   const [whatsappDialogOpen, setWhatsappDialogOpen] = useState(false);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
 
+  // Fetch verifications using React Query for proper cache invalidation
+  const { data: verifications = [], isLoading: verificationsLoading } = useQuery({
+    queryKey: ["loan-verifications", applicationId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('loan_verifications')
+        .select('id, verification_type, status, verified_at, response_data, created_at')
+        .eq('loan_application_id', applicationId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return (data || []) as Verification[];
+    },
+    enabled: !!applicationId,
+    staleTime: 0, // Always fetch fresh data
+    refetchOnWindowFocus: true, // Refetch when user returns to the tab
+  });
+
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchDocuments = async () => {
       // Fetch documents
       const { data: docData, error: docError } = await supabase
         .from('loan_documents')
@@ -280,21 +298,10 @@ export function ApplicantProfileCard({
         }
       }
 
-      // Fetch verifications - ordered by created_at DESC to get newest first
-      const { data: verData, error: verError } = await supabase
-        .from('loan_verifications')
-        .select('id, verification_type, status, verified_at, response_data, created_at')
-        .eq('loan_application_id', applicationId)
-        .order('created_at', { ascending: false });
-
-      if (!verError && verData) {
-        setVerifications(verData);
-      }
-
       setLoading(false);
     };
 
-    fetchData();
+    fetchDocuments();
   }, [applicationId]);
 
   const handleViewDocument = (url: string, name: string, isPdf: boolean = false) => {
