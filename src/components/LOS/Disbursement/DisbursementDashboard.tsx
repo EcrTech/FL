@@ -17,6 +17,7 @@ import SanctionLetterDocument from "../Sanction/templates/SanctionLetterDocument
 import LoanAgreementDocument from "../Sanction/templates/LoanAgreementDocument";
 import DailyRepaymentScheduleDocument from "../Sanction/templates/DailyRepaymentScheduleDocument";
 import UploadSignedDocumentDialog from "../Sanction/UploadSignedDocumentDialog";
+import ESignDocumentButton from "../Sanction/ESignDocumentButton";
 
 
 interface DisbursementDashboardProps {
@@ -552,15 +553,35 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
                       >
                         <Download className="h-4 w-4" />
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="w-full"
-                        disabled={!isGenerated}
-                        title="Send"
-                      >
-                        <Send className="h-4 w-4" />
-                      </Button>
+                      {/* E-Sign Button */}
+                      {isGenerated && !isSigned && docRecord && (
+                        <ESignDocumentButton
+                          orgId={application!.org_id}
+                          applicationId={applicationId}
+                          documentId={docRecord.id}
+                          documentType={doc.key}
+                          documentLabel={doc.label}
+                          signerName={borrowerName || ""}
+                          signerEmail={applicant?.email || ""}
+                          signerMobile={applicant?.mobile || ""}
+                          disabled={!isGenerated}
+                          environment="uat"
+                          onSuccess={() => refetchDocs()}
+                        />
+                      )}
+                      
+                      {!isGenerated && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full"
+                          disabled
+                          title="Generate document first"
+                        >
+                          <Send className="h-4 w-4 mr-2" />
+                          E-Sign
+                        </Button>
+                      )}
                     </div>
                     
                     {/* Upload signed button */}

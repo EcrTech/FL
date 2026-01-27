@@ -1816,9 +1816,13 @@ export type Database = {
           created_by: string | null
           document_id: string | null
           document_type: string
+          esign_response: Json | null
           id: string
           notification_channel: string | null
           notification_sent_at: string | null
+          nupay_docket_id: string | null
+          nupay_document_id: string | null
+          nupay_ref_no: string | null
           org_id: string
           signed_at: string | null
           signed_document_path: string | null
@@ -1827,6 +1831,8 @@ export type Database = {
           signer_email: string | null
           signer_name: string
           signer_phone: string | null
+          signer_sequence: number | null
+          signer_url: string | null
           status: string
           token_expires_at: string
           updated_at: string | null
@@ -1841,9 +1847,13 @@ export type Database = {
           created_by?: string | null
           document_id?: string | null
           document_type: string
+          esign_response?: Json | null
           id?: string
           notification_channel?: string | null
           notification_sent_at?: string | null
+          nupay_docket_id?: string | null
+          nupay_document_id?: string | null
+          nupay_ref_no?: string | null
           org_id: string
           signed_at?: string | null
           signed_document_path?: string | null
@@ -1852,6 +1862,8 @@ export type Database = {
           signer_email?: string | null
           signer_name: string
           signer_phone?: string | null
+          signer_sequence?: number | null
+          signer_url?: string | null
           status?: string
           token_expires_at: string
           updated_at?: string | null
@@ -1866,9 +1878,13 @@ export type Database = {
           created_by?: string | null
           document_id?: string | null
           document_type?: string
+          esign_response?: Json | null
           id?: string
           notification_channel?: string | null
           notification_sent_at?: string | null
+          nupay_docket_id?: string | null
+          nupay_document_id?: string | null
+          nupay_ref_no?: string | null
           org_id?: string
           signed_at?: string | null
           signed_document_path?: string | null
@@ -1877,6 +1893,8 @@ export type Database = {
           signer_email?: string | null
           signer_name?: string
           signer_phone?: string | null
+          signer_sequence?: number | null
+          signer_url?: string | null
           status?: string
           token_expires_at?: string
           updated_at?: string | null
