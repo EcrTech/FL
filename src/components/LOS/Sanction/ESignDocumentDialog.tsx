@@ -1,0 +1,265 @@
+import { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Loader2, Send, FileSignature, Copy, ExternalLink } from "lucide-react";
+import { useESignRequest } from "@/hooks/useESignDocument";
+import { toast } from "sonner";
+
+interface ESignDocumentDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  orgId: string;
+  applicationId: string;
+  documentId: string;
+  documentType: "sanction_letter" | "loan_agreement" | "daily_schedule";
+  documentLabel: string;
+  defaultSignerName?: string;
+  defaultSignerEmail?: string;
+  defaultSignerMobile?: string;
+  environment?: "uat" | "production";
+  onSuccess?: () => void;
+}
+
+type AppearancePosition = "bottom-left" | "bottom-right" | "top-left" | "top-right";
+
+export default function ESignDocumentDialog({
+  open,
+  onOpenChange,
+  orgId,
+  applicationId,
+  documentId,
+  documentType,
+  documentLabel,
+  defaultSignerName = "",
+  defaultSignerEmail = "",
+  defaultSignerMobile = "",
+  environment = "uat",
+  onSuccess,
+}: ESignDocumentDialogProps) {
+  const [signerName, setSignerName] = useState(defaultSignerName);
+  const [signerEmail, setSignerEmail] = useState(defaultSignerEmail);
+  const [signerMobile, setSignerMobile] = useState(defaultSignerMobile);
+  const [appearance, setAppearance] = useState<AppearancePosition>("bottom-right");
+  const [signerUrl, setSignerUrl] = useState<string | null>(null);
+
+  const esignMutation = useESignRequest();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!signerName || !signerMobile) {
+      toast.error("Signer name and mobile are required");
+      return;
+    }
+
+    // Validate mobile number
+    const cleanMobile = signerMobile.replace(/\D/g, "");
+    if (cleanMobile.length < 10) {
+      toast.error("Please enter a valid 10-digit mobile number");
+      return;
+    }
+
+    try {
+      const result = await esignMutation.mutateAsync({
+        orgId,
+        applicationId,
+        documentId,
+        documentType,
+        signerName,
+        signerEmail: signerEmail || undefined,
+        signerMobile: cleanMobile,
+        appearance,
+        environment,
+      });
+
+      if (result.signer_url) {
+        setSignerUrl(result.signer_url);
+      }
+
+      onSuccess?.();
+    } catch (error) {
+      // Error is handled by the mutation
+    }
+  };
+
+  const handleCopyUrl = () => {
+    if (signerUrl) {
+      navigator.clipboard.writeText(signerUrl);
+      toast.success("Signing URL copied to clipboard");
+    }
+  };
+
+  const handleOpenUrl = () => {
+    if (signerUrl) {
+      window.open(signerUrl, "_blank");
+    }
+  };
+
+  const handleClose = () => {
+    setSignerUrl(null);
+    onOpenChange(false);
+  };
+
+  // Update form when defaults change
+  useState(() => {
+    setSignerName(defaultSignerName);
+    setSignerEmail(defaultSignerEmail);
+    setSignerMobile(defaultSignerMobile);
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileSignature className="h-5 w-5" />
+            Send for E-Sign
+          </DialogTitle>
+          <DialogDescription>
+            Send <strong>{documentLabel}</strong> for Aadhaar-based digital signature.
+          </DialogDescription>
+        </DialogHeader>
+
+        {!signerUrl ? (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="signerName">Signer Name *</Label>
+              <Input
+                id="signerName"
+                value={signerName}
+                onChange={(e) => setSignerName(e.target.value)}
+                placeholder="Enter signer's full name"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="signerMobile">Mobile Number *</Label>
+              <Input
+                id="signerMobile"
+                value={signerMobile}
+                onChange={(e) => setSignerMobile(e.target.value)}
+                placeholder="10-digit mobile number"
+                type="tel"
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                OTP will be sent to this number for Aadhaar verification
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="signerEmail">Email (Optional)</Label>
+              <Input
+                id="signerEmail"
+                value={signerEmail}
+                onChange={(e) => setSignerEmail(e.target.value)}
+                placeholder="signer@email.com"
+                type="email"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="appearance">Signature Position</Label>
+              <Select value={appearance} onValueChange={(v) => setAppearance(v as AppearancePosition)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select position" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bottom-right">Bottom Right</SelectItem>
+                  <SelectItem value="bottom-left">Bottom Left</SelectItem>
+                  <SelectItem value="top-right">Top Right</SelectItem>
+                  <SelectItem value="top-left">Top Left</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={handleClose}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={esignMutation.isPending}>
+                {esignMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Send className="mr-2 h-4 w-4" />
+                    Send for E-Sign
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        ) : (
+          <div className="space-y-4">
+            <div className="rounded-lg border bg-green-50 p-4">
+              <p className="text-sm font-medium text-green-800">
+                E-Sign request sent successfully!
+              </p>
+              <p className="mt-1 text-xs text-green-700">
+                The signing link has been generated. Share it with the borrower.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Signing URL</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={signerUrl}
+                  readOnly
+                  className="text-xs"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={handleCopyUrl}
+                  title="Copy URL"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={handleOpenUrl}
+                  title="Open URL"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Share this link with the borrower. They will need to verify their Aadhaar via OTP to sign.
+              </p>
+            </div>
+
+            <DialogFooter>
+              <Button onClick={handleClose}>
+                Done
+              </Button>
+            </DialogFooter>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
