@@ -1253,6 +1253,21 @@ serve(async (req) => {
           }
         }
         
+        // CHECK FOR API ERROR RESPONSE FIRST
+        // Equifax returns errors in format: { Error: { ErrorCode: "E0413", ErrorDesc: "..." } }
+        if (rawApiResponse?.Error?.ErrorCode) {
+          const errorCode = rawApiResponse.Error.ErrorCode;
+          const errorDesc = rawApiResponse.Error.ErrorDesc || "Unknown error";
+          console.error("[EQUIFAX-DEBUG] ========== API RETURNED ERROR ==========");
+          console.error("[EQUIFAX-DEBUG] Error Code:", errorCode);
+          console.error("[EQUIFAX-DEBUG] Error Description:", errorDesc);
+          console.error("[EQUIFAX-DEBUG] Full error response:", JSON.stringify(rawApiResponse));
+          
+          // Return error response - do NOT fall back to mock data
+          // This gives the user actual feedback about what went wrong
+          throw new Error(`Equifax API Error ${errorCode}: ${errorDesc}`);
+        }
+        
         reportData = parseEquifaxResponse(rawApiResponse);
         reportData.rawResponse = rawApiResponse;
         reportData.requestFormat = successFormat;
