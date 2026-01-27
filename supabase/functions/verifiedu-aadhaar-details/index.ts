@@ -198,6 +198,30 @@ serve(async (req) => {
           ...verificationData,
         });
       }
+
+      // Update applicant record with verified DOB and gender from Aadhaar
+      if (responseData.dob || responseData.gender) {
+        const updateData: Record<string, string> = {};
+        
+        if (responseData.dob) {
+          updateData.dob = responseData.dob;
+        }
+        if (responseData.gender) {
+          updateData.gender = responseData.gender;
+        }
+        
+        const { error: applicantUpdateError } = await adminClient
+          .from("loan_applicants")
+          .update(updateData)
+          .eq("loan_application_id", resolvedApplicationId)
+          .eq("applicant_type", "primary");
+        
+        if (applicantUpdateError) {
+          console.warn("Failed to update applicant from Aadhaar:", applicantUpdateError);
+        } else {
+          console.log("Updated applicant from Aadhaar verification:", updateData);
+        }
+      }
     }
 
     return new Response(JSON.stringify({
