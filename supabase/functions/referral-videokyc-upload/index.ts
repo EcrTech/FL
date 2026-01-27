@@ -47,10 +47,10 @@ serve(async (req) => {
 
     console.log(`Processing video upload for application: ${applicationId}`);
 
-    // Verify application exists
+    // Verify application exists and get applicant info
     const { data: application, error: appError } = await supabase
       .from("loan_applications")
-      .select("id, applicant_name")
+      .select("id, loan_applicants(first_name, last_name)")
       .eq("id", applicationId)
       .single();
 
@@ -96,26 +96,20 @@ serve(async (req) => {
     const recordingUrl = urlData.publicUrl;
     console.log("Recording URL:", recordingUrl);
 
-    // Create or update loan_verifications record
+    // Create loan_verifications record
     const { error: verificationError } = await supabase
       .from("loan_verifications")
-      .upsert(
-        {
-          loan_application_id: applicationId,
-          org_id: orgId,
-          verification_type: "video_kyc",
-          status: "success",
-          response_data: {
-            recording_url: recordingUrl,
-            uploaded_at: new Date().toISOString(),
-            source: "referral_application",
-          },
-          verified_at: new Date().toISOString(),
+      .insert({
+        loan_application_id: applicationId,
+        verification_type: "video_kyc",
+        status: "success",
+        response_data: {
+          recording_url: recordingUrl,
+          uploaded_at: new Date().toISOString(),
+          source: "referral_application",
         },
-        {
-          onConflict: "loan_application_id,verification_type",
-        }
-      );
+        verified_at: new Date().toISOString(),
+      });
 
     if (verificationError) {
       console.error("Verification record error:", verificationError);
@@ -123,12 +117,19 @@ serve(async (req) => {
       console.warn("Video uploaded but verification record failed to update");
     }
 
+    // Build applicant name from linked loan_applicants
+    const applicantData = (application as { loan_applicants?: { first_name?: string; last_name?: string }[] }).loan_applicants?.[0];
+    const applicantName = applicantData 
+      ? `${applicantData.first_name || ''} ${applicantData.last_name || ''}`.trim() 
+      : 'Unknown Applicant';
+
     // Also create a videokyc_recordings record for tracking
     const { error: recordingError } = await supabase
       .from("videokyc_recordings")
       .insert({
         org_id: orgId,
         application_id: applicationId,
+        applicant_name: applicantName,
         status: "completed",
         recording_url: recordingUrl,
         completed_at: new Date().toISOString(),
