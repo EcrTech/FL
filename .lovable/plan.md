@@ -1,95 +1,100 @@
 
 
-# Update Equifax API Request Format
+# Fix Equifax Address Extraction - Parse State and Pincode from Line1
 
-## Overview
+## Problem Identified
 
-Update the Equifax credit report edge function to exactly match the user-provided JSON format for API requests.
+The `current_address` JSONB only contains `line1` with the entire address concatenated:
+```json
+{
+  "line1": "S/O Ramagya Pathak, HOUSE NO-323 BLOCK-L FIRST, GALI NO-6, NEAR SATNAM PUBLIC SCHOOL, SANGAM VIHAR, SANGAM VIHAR, South Dahl, Delhi-110062, Delhi, 110062"
+}
+```
 
-## Key Changes Required
+The `state`, `city`, and `pincode` fields are **missing**, causing Equifax API to reject with error E0048.
 
-| Field | Current Value | New Value |
-|-------|--------------|-----------|
-| `InquiryPurpose` | `"05"` | `"00"` |
-| `Gender` | `"1"` (male) / `"2"` (female) | `"M"` / `"F"` |
-| `Score` location | Inside `RequestBody` | At **root level** (sibling of RequestHeader/RequestBody) |
-| `EmailAddress` | Present (empty) | Remove |
-| `GSTStateCode` | Present | Remove |
+## Solution
 
-## Technical Changes
+Add intelligent parsing in the edge function to extract pincode and state from the `line1` string when structured fields are missing.
+
+---
+
+## Technical Implementation
 
 ### File: `supabase/functions/equifax-credit-report/index.ts`
 
-**Lines 1055-1115 - Update request structure:**
+**Add helper functions to extract pincode and state from address string:**
 
 ```typescript
-const equifaxRequest = {
-  RequestHeader: {
-    CustomerId: customerId,
-    UserId: userId,
-    Password: password,
-    MemberNumber: memberNumber,
-    SecurityCode: securityCode,
-    CustRefField: applicationId,  // Keep for tracking
-    ProductCode: ["PCS"],
-  },
-  RequestBody: {
-    InquiryPurpose: "00",  // Changed from "05"
-    TransactionAmount: "0",
-    FirstName: applicantData.firstName,
-    MiddleName: applicantData.middleName || "",
-    LastName: applicantData.lastName || "",
-    InquiryAddresses: [
-      {
-        seq: "1",
-        AddressLine1: applicantData.address.line1,
-        State: stateCode,
-        AddressType: ["H"],
-        Postal: applicantData.address.postal,
-      },
-    ],
-    InquiryPhones: [
-      {
-        seq: "1",
-        Number: applicantData.mobile,
-        PhoneType: ["M"],
-      },
-    ],
-    IDDetails: applicantData.panNumber
-      ? [
-          {
-            seq: "1",
-            IDValue: applicantData.panNumber,
-            IDType: "T",
-            Source: "Inquiry",
-          },
-        ]
-      : [],
-    DOB: formatDate(applicantData.dob),
-    Gender: applicantData.gender === "male" ? "M" : applicantData.gender === "female" ? "F" : "",  // Changed from 1/2
-  },
-  Score: [  // Moved to root level as array
-    {
-      Type: "ERS",
-      Version: "4.0",
-    },
-  ],
-};
+// Extract 6-digit pincode from address string
+function extractPincodeFromAddress(address: string): string {
+  const pincodeMatch = address.match(/\b(\d{6})\b/);
+  return pincodeMatch ? pincodeMatch[1] : "";
+}
+
+// Extract state from address string (common patterns)
+function extractStateFromAddress(address: string, pincode: string): string {
+  // First try to get state code from pincode
+  if (pincode) {
+    const stateFromPincode = getStateFromPincode(pincode);
+    if (stateFromPincode) return stateFromPincode;
+  }
+  
+  // Try to match common state patterns in address
+  const statePatterns = [
+    /Delhi/i,
+    /Maharashtra/i,
+    /Karnataka/i,
+    /Rajasthan/i,
+    // ... etc
+  ];
+  
+  // Map matched state names to codes
+  if (/Delhi/i.test(address)) return "DL";
+  if (/Maharashtra/i.test(address)) return "MH";
+  // ... etc
+  
+  return "";
+}
 ```
 
-## Changes Summary
+**Update address extraction logic (lines ~975-1000):**
 
-| Section | Before | After |
-|---------|--------|-------|
-| InquiryPurpose | `"05"` (Credit Application) | `"00"` |
-| Gender format | `"1"/"2"` | `"M"/"F"` |
-| Score placement | Nested in RequestBody | Root level array |
-| EmailAddress | Included (empty) | Removed |
-| GSTStateCode | Included | Removed |
+```typescript
+// After extracting from JSONB, try to parse from line1 if fields are missing
+if (!addressState && addressLine1) {
+  const extractedPincode = extractPincodeFromAddress(addressLine1);
+  if (extractedPincode) {
+    addressPincode = extractedPincode;
+  }
+  addressState = extractStateFromAddress(addressLine1, addressPincode);
+}
+
+if (!addressPincode && addressLine1) {
+  addressPincode = extractPincodeFromAddress(addressLine1);
+}
+```
+
+---
+
+## Expected Result
+
+For the address string:
+```
+"S/O Ramagya Pathak, HOUSE NO-323 BLOCK-L FIRST, ..., Delhi-110062, Delhi, 110062"
+```
+
+After parsing:
+| Field | Value |
+|-------|-------|
+| State | `DL` |
+| Postal | `110062` |
+
+---
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `supabase/functions/equifax-credit-report/index.ts` | Update request structure to match exact format |
+| `supabase/functions/equifax-credit-report/index.ts` | Add pincode/state extraction functions and fallback logic |
 
