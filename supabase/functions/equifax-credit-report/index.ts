@@ -669,19 +669,34 @@ function parseEquifaxResponse(response: any): any {
 
     // Parse accounts
     const accounts = retailAccountDetails.map((acc: any) => {
-      const history48Months = acc.History48Months || "";
-      const paymentHistory = [];
+      const history48MonthsRaw = acc.History48Months;
+      const paymentHistory: any[] = [];
       
-      // Parse payment history - each 3 characters represents a month
-      for (let i = 0; i < history48Months.length && i < 144; i += 3) {
-        const status = history48Months.substring(i, i + 3);
-        const monthIndex = Math.floor(i / 3);
-        paymentHistory.push({
-          month: monthIndex + 1,
-          status: status,
-          label: PAYMENT_STATUS[status]?.label || status,
-          severity: PAYMENT_STATUS[status]?.severity || "current",
+      // Handle both formats: array of objects (CIR 360 JSON) or string (legacy)
+      if (Array.isArray(history48MonthsRaw)) {
+        // CIR 360 JSON format - array of objects like:
+        // [{"key":"01-26","PaymentStatus":"000","SuitFiledStatus":"*","AssetClassificationStatus":"*"}, ...]
+        history48MonthsRaw.forEach((item: any) => {
+          const status = item.PaymentStatus || "*";
+          paymentHistory.push({
+            month: item.key || "",
+            status: status,
+            label: PAYMENT_STATUS[status]?.label || status,
+            severity: PAYMENT_STATUS[status]?.severity || "current",
+          });
         });
+      } else if (typeof history48MonthsRaw === "string" && history48MonthsRaw.length > 0) {
+        // Legacy string format - each 3 characters represents a month
+        for (let i = 0; i < history48MonthsRaw.length && i < 144; i += 3) {
+          const status = history48MonthsRaw.substring(i, i + 3);
+          const monthIndex = Math.floor(i / 3);
+          paymentHistory.push({
+            month: monthIndex + 1,
+            status: status,
+            label: PAYMENT_STATUS[status]?.label || status,
+            severity: PAYMENT_STATUS[status]?.severity || "current",
+          });
+        }
       }
 
       return {
@@ -691,14 +706,16 @@ function parseEquifaxResponse(response: any): any {
         accountNumber: acc.AccountNumber || "",
         status: acc.AccountStatus || "Unknown",
         sanctionAmount: parseFloat(acc.SanctionAmount) || 0,
-        currentBalance: parseFloat(acc.CurrentBalance) || 0,
-        pastDueAmount: parseFloat(acc.AmountPastDue) || 0,
+        currentBalance: parseFloat(acc.Balance || acc.CurrentBalance) || 0,
+        pastDueAmount: parseFloat(acc.PastDueAmount || acc.AmountPastDue) || 0,
         emiAmount: parseFloat(acc.InstallmentAmount) || 0,
         dateOpened: acc.DateOpened || "",
         dateClosed: acc.DateClosed || "",
         dateReported: acc.DateReported || "",
         paymentHistory: paymentHistory,
-        rawHistory: history48Months,
+        rawHistory: Array.isArray(history48MonthsRaw) 
+          ? JSON.stringify(history48MonthsRaw) 
+          : (history48MonthsRaw || ""),
       };
     });
 
