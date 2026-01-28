@@ -1,56 +1,53 @@
 
-# Remove Mock Data Fallback - Show Error on API Failure
 
-## Current Behavior
+# Change DOB Format to YYYY-MM-DD for Equifax API
 
-When the Equifax API call fails, the edge function:
-1. Catches the error
-2. Falls back to mock/simulated data
-3. Returns `success: true` with mock data
-4. Frontend shows the mock data as if it were real
+## Problem
 
-## Desired Behavior
+The current `formatDate` function converts DOB from `YYYY-MM-DD` to `DD-MM-YYYY`. Equifax API requires the DOB in `YYYY-MM-DD` format.
 
-When the Equifax API call fails:
-1. Return `success: false` with error message
-2. Frontend catches the error and shows toast: "Failed to fetch credit report"
-3. No mock data is used at all
+## Solution
+
+Modify the `formatDate` function to return the date as-is (since it's already stored in `YYYY-MM-DD` format in the database).
 
 ## Technical Changes
 
 ### File: `supabase/functions/equifax-credit-report/index.ts`
 
-**Lines 1278-1292 - Replace mock fallback with error re-throw:**
+**Lines 188-196 - Update formatDate function:**
 
+Current code:
 ```typescript
-} catch (apiError: any) {
-  console.error("[EQUIFAX-DEBUG] ========== API CALL FAILED ==========");
-  console.error("[EQUIFAX-DEBUG] Error type:", apiError.constructor.name);
-  console.error("[EQUIFAX-DEBUG] Error message:", apiError.message);
-  console.error("[EQUIFAX-DEBUG] Error stack:", apiError.stack);
-  
-  // Re-throw the error - no fallback to mock data
-  // This will be caught by the outer catch block and return success: false
-  throw new Error(`Failed to fetch credit report: ${apiError.message}`);
+function formatDate(dateStr: string): string {
+  if (!dateStr) return "";
+  // Convert YYYY-MM-DD to DD-MM-YYYY
+  const parts = dateStr.split("-");
+  if (parts.length === 3) {
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  return dateStr;
 }
 ```
 
-This change:
-- Removes `mockReason`, `usedMockData = true`, and `generateMockResponse()` call
-- Re-throws the error so it propagates to the outer catch block (lines 1427-1432)
-- Outer catch already returns `{ success: false, error: error.message }`
-- Frontend already handles `success: false` by showing "Failed to fetch credit report" toast
+New code:
+```typescript
+function formatDate(dateStr: string): string {
+  if (!dateStr) return "";
+  // Return date as YYYY-MM-DD (already in correct format from database)
+  // Equifax API requires YYYY-MM-DD format
+  return dateStr;
+}
+```
 
 ## Result
 
-| Scenario | Before | After |
-|----------|--------|-------|
-| API returns error | Shows simulated data | Shows error toast: "Failed to fetch credit report" |
-| Network failure | Shows simulated data | Shows error toast: "Failed to fetch credit report" |
-| Credentials missing | Shows simulated data | Shows error toast: "Failed to fetch credit report" |
+| Before | After |
+|--------|-------|
+| DOB sent as `02-08-2006` | DOB sent as `2006-08-02` |
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `supabase/functions/equifax-credit-report/index.ts` | Remove mock fallback, re-throw API errors |
+| `supabase/functions/equifax-credit-report/index.ts` | Update `formatDate` to keep YYYY-MM-DD format |
+
