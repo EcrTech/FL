@@ -667,16 +667,19 @@ function parseEquifaxResponse(response: any): any {
       .filter(Boolean)
       .join(" ");
 
-    // Parse accounts
-    const accounts = retailAccountDetails.map((acc: any) => {
+    // Parse accounts - LIMIT to first 15 accounts to prevent timeout
+    const maxAccounts = 15;
+    const accountsToProcess = retailAccountDetails.slice(0, maxAccounts);
+    const accounts = accountsToProcess.map((acc: any) => {
       const history48MonthsRaw = acc.History48Months;
       const paymentHistory: any[] = [];
       
       // Handle both formats: array of objects (CIR 360 JSON) or string (legacy)
+      // LIMIT to 24 months to prevent timeout
       if (Array.isArray(history48MonthsRaw)) {
-        // CIR 360 JSON format - array of objects like:
-        // [{"key":"01-26","PaymentStatus":"000","SuitFiledStatus":"*","AssetClassificationStatus":"*"}, ...]
-        history48MonthsRaw.forEach((item: any) => {
+        // CIR 360 JSON format - array of objects
+        const recentHistory = history48MonthsRaw.slice(0, 24);
+        recentHistory.forEach((item: any) => {
           const status = item.PaymentStatus || "*";
           paymentHistory.push({
             month: item.key || "",
@@ -686,8 +689,9 @@ function parseEquifaxResponse(response: any): any {
           });
         });
       } else if (typeof history48MonthsRaw === "string" && history48MonthsRaw.length > 0) {
-        // Legacy string format - each 3 characters represents a month
-        for (let i = 0; i < history48MonthsRaw.length && i < 144; i += 3) {
+        // Legacy string format - each 3 characters represents a month (limit to 24 months = 72 chars)
+        const maxChars = Math.min(history48MonthsRaw.length, 72);
+        for (let i = 0; i < maxChars; i += 3) {
           const status = history48MonthsRaw.substring(i, i + 3);
           const monthIndex = Math.floor(i / 3);
           paymentHistory.push({
@@ -713,8 +717,9 @@ function parseEquifaxResponse(response: any): any {
         dateClosed: acc.DateClosed || "",
         dateReported: acc.DateReported || "",
         paymentHistory: paymentHistory,
+        // Don't stringify large arrays - just store summary
         rawHistory: Array.isArray(history48MonthsRaw) 
-          ? JSON.stringify(history48MonthsRaw) 
+          ? `array:${history48MonthsRaw.length} months` 
           : (history48MonthsRaw || ""),
       };
     });
@@ -760,9 +765,7 @@ function parseEquifaxResponse(response: any): any {
     const scoreFromScores = parseInt(cirReportData.Scores?.[0]?.Value) || 0;
     const creditScore = scoreFromDetails || scoreFromScoreCard || scoreFromScores;
     
-    console.log("[EQUIFAX-PARSE] Score extraction - scoreDetails:", JSON.stringify(scoreDetails));
-    console.log("[EQUIFAX-PARSE] Score extraction - ScoreCard:", JSON.stringify(cirReportData.ScoreCard));
-    console.log("[EQUIFAX-PARSE] Score extraction - Scores:", JSON.stringify(cirReportData.Scores));
+    // Reduced logging to prevent performance overhead
     console.log("[EQUIFAX-PARSE] Final credit score:", creditScore);
     
     return {
@@ -1236,20 +1239,34 @@ serve(async (req) => {
         console.log(`[EQUIFAX-DEBUG] Content-Type: application/json`);
         console.log(`[EQUIFAX-DEBUG] Request body (redacted):`, redactedBody);
         
-        const response = await fetch(apiUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Accept": "text/plain",
-          },
-          body: JSON.stringify(equifaxRequest),
-        });
+        // Add 25-second timeout to prevent hanging on slow API
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 25000);
+        
+        let response: Response;
+        try {
+          response = await fetch(apiUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "text/plain",
+            },
+            body: JSON.stringify(equifaxRequest),
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+        } catch (fetchError: any) {
+          clearTimeout(timeoutId);
+          if (fetchError.name === 'AbortError') {
+            throw new Error("Equifax API request timed out after 25 seconds");
+          }
+          throw fetchError;
+        }
 
         console.log(`[EQUIFAX-DEBUG] Response Status:`, response.status, response.statusText);
         
         const responseText = await response.text();
         console.log(`[EQUIFAX-DEBUG] Response length:`, responseText.length);
-        console.log(`[EQUIFAX-DEBUG] Response (first 2000 chars):`, responseText.substring(0, 2000));
         
         if (!response.ok) {
           throw new Error(`API returned ${response.status}: ${responseText.substring(0, 500)}`);
@@ -1393,7 +1410,14 @@ serve(async (req) => {
         pan_on_report: reportData.personalInfo.pan,
         is_live_fetch: !usedMockData,
         is_mock: usedMockData,
-        raw_api_response: rawApiResponse,
+        // Truncate raw response to prevent slow DB insert
+        raw_api_response: rawApiResponse 
+          ? { 
+              summary: "Full response parsed into structured data above",
+              hitCode: reportData?.hitCode,
+              accountCount: reportData?.accounts?.length || 0,
+            }
+          : null,
         debug_info: {
           response_timestamp: new Date().toISOString(),
           api_error: reportData.apiError || null,
