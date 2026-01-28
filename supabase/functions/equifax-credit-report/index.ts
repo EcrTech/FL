@@ -688,7 +688,19 @@ function parseEquifaxResponse(response: any): any {
     // Parse accounts - LIMIT to first 15 accounts to prevent timeout
     const maxAccounts = 15;
     const accountsToProcess = retailAccountDetails.slice(0, maxAccounts);
-    const accounts = accountsToProcess.map((acc: any) => {
+    const accounts = accountsToProcess.map((acc: any, accIndex: number) => {
+      // Debug: Log first account's keys to identify correct field names
+      if (accIndex === 0) {
+        console.log("[EQUIFAX-PARSE] First account keys:", Object.keys(acc).join(", "));
+        console.log("[EQUIFAX-PARSE] Potential institution fields:", {
+          SubscriberName: acc.SubscriberName,
+          InstitutionName: acc.InstitutionName,
+          Institution: acc.Institution,
+          ReportingMemberShortName: acc.ReportingMemberShortName,
+          MemberShortName: acc.MemberShortName,
+        });
+      }
+
       const history48MonthsRaw = acc.History48Months;
       const paymentHistory: any[] = [];
       
@@ -721,8 +733,16 @@ function parseEquifaxResponse(response: any): any {
         }
       }
 
+      // Check multiple possible field names for bank/institution name (CIR 360 uses SubscriberName)
+      const institutionName = acc.SubscriberName 
+        || acc.InstitutionName 
+        || acc.ReportingMemberShortName 
+        || acc.MemberShortName 
+        || acc.Institution 
+        || "Unknown";
+
       return {
-        institution: acc.Institution || "Unknown",
+        institution: institutionName,
         accountType: acc.AccountType || "Unknown",
         ownershipType: acc.OwnershipType || "Individual",
         accountNumber: acc.AccountNumber || "",
