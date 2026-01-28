@@ -982,6 +982,47 @@ serve(async (req) => {
         addressLine1 = currentAddress;
       }
 
+      // FALLBACK: Extract pincode and state from line1 if structured fields are missing
+      // This handles cases where the entire address is concatenated in line1
+      if (addressLine1 && (!addressPincode || !addressState)) {
+        console.log("[EQUIFAX-DEBUG] Attempting to extract pincode/state from line1:", addressLine1);
+        
+        // Extract 6-digit pincode from address string
+        if (!addressPincode) {
+          const pincodeMatch = addressLine1.match(/\b(\d{6})\b/);
+          if (pincodeMatch) {
+            addressPincode = pincodeMatch[1];
+            console.log("[EQUIFAX-DEBUG] Extracted pincode from line1:", addressPincode);
+          }
+        }
+        
+        // Extract state from address string if still missing
+        if (!addressState) {
+          // First try to derive from pincode
+          if (addressPincode) {
+            const stateFromPincode = getStateFromPincode(addressPincode);
+            if (stateFromPincode) {
+              addressState = stateFromPincode;
+              console.log("[EQUIFAX-DEBUG] Derived state from pincode:", addressState);
+            }
+          }
+          
+          // If still no state, try to match state names in the address string
+          if (!addressState) {
+            const addressLower = addressLine1.toLowerCase();
+            for (const [stateName, stateCode] of Object.entries(STATE_CODES)) {
+              if (addressLower.includes(stateName)) {
+                addressState = stateCode;
+                console.log("[EQUIFAX-DEBUG] Matched state name in address:", stateName, "->", stateCode);
+                break;
+              }
+            }
+          }
+        }
+        
+        console.log("[EQUIFAX-DEBUG] After extraction - pincode:", addressPincode, "state:", addressState);
+      }
+
       // Prepare applicant data for API call
       const applicantData = {
         firstName: applicant.first_name || "",
