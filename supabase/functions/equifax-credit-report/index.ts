@@ -629,13 +629,19 @@ function parseEquifaxResponse(response: any): any {
       // CIR 360 JSON format
       console.log("[EQUIFAX-PARSE] Using CCRResponse path (CIR 360 JSON format)");
       inquiryResponse = ccrResponse.CIRReportDataLst[0];
-      header = inquiryResponse.InquiryResponseHeader || {};
+      header = inquiryResponse.InquiryResponseHeader || response.InquiryResponseHeader || {};
       
-      // In CCR format, score is at root level of CIRReportDataLst item
-      const scoreArray = inquiryResponse.Score || response.Score || [];
+      // Score can be at multiple locations - check all possibilities
+      // 1. Root level response.Score (most common for CIR 360)
+      // 2. Inside CIRReportDataLst item
+      // 3. Inside CIRReportData
+      const rootScore = response.Score;
+      const itemScore = inquiryResponse.Score;
+      const scoreArray = rootScore || itemScore || [];
       scoreDetails = scoreArray[0] || {};
       
-      console.log("[EQUIFAX-PARSE] Header:", JSON.stringify(header).substring(0, 200));
+      console.log("[EQUIFAX-PARSE] Root Score array:", JSON.stringify(rootScore)?.substring(0, 300));
+      console.log("[EQUIFAX-PARSE] Extracted scoreDetails:", JSON.stringify(scoreDetails));
       console.log("[EQUIFAX-PARSE] HitCode from header:", header.HitCode);
     } else if (inProfileResponse?.CIRReportDataLst?.[0]) {
       // Legacy XML format
@@ -758,14 +764,15 @@ function parseEquifaxResponse(response: any): any {
       return date >= ninetyDaysAgo;
     }).length;
 
-    // Extract credit score - check multiple locations
-    // CIR 360 format may have score in ScoreDetails array within CIRReportData
-    const scoreFromDetails = parseInt(scoreDetails.Score) || 0;
+    // Extract credit score - check multiple locations and field names
+    // CIR 360 format may use "Value" or "Score" for the numeric score
+    const scoreFromDetailsScore = parseInt(scoreDetails.Score) || 0;
+    const scoreFromDetailsValue = parseInt(scoreDetails.Value) || 0;
     const scoreFromScoreCard = parseInt(cirReportData.ScoreCard?.Score) || 0;
     const scoreFromScores = parseInt(cirReportData.Scores?.[0]?.Value) || 0;
-    const creditScore = scoreFromDetails || scoreFromScoreCard || scoreFromScores;
+    const creditScore = scoreFromDetailsScore || scoreFromDetailsValue || scoreFromScoreCard || scoreFromScores;
     
-    // Reduced logging to prevent performance overhead
+    console.log("[EQUIFAX-PARSE] Score sources - Details.Score:", scoreFromDetailsScore, "Details.Value:", scoreFromDetailsValue);
     console.log("[EQUIFAX-PARSE] Final credit score:", creditScore);
     
     return {
