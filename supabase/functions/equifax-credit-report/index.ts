@@ -1063,7 +1063,7 @@ serve(async (req) => {
           ProductCode: ["PCS"],
         },
         RequestBody: {
-          InquiryPurpose: "05", // Credit Application
+          InquiryPurpose: "00",
           TransactionAmount: "0",
           FirstName: applicantData.firstName,
           MiddleName: applicantData.middleName || "",
@@ -1071,9 +1071,9 @@ serve(async (req) => {
           InquiryAddresses: [
             {
               seq: "1",
-              AddressType: ["H"], // Home
               AddressLine1: applicantData.address.line1,
               State: stateCode,
+              AddressType: ["H"],
               Postal: applicantData.address.postal,
             },
           ],
@@ -1081,15 +1081,15 @@ serve(async (req) => {
             {
               seq: "1",
               Number: applicantData.mobile,
-              PhoneType: ["M"], // Mobile
+              PhoneType: ["M"],
             },
           ],
           IDDetails: applicantData.panNumber
             ? [
                 {
                   seq: "1",
-                  IDType: "T", // PAN
                   IDValue: applicantData.panNumber,
+                  IDType: "T",
                   Source: "Inquiry",
                 },
               ]
@@ -1097,21 +1097,21 @@ serve(async (req) => {
             ? [
                 {
                   seq: "1",
-                  IDType: "M", // Aadhaar
                   IDValue: applicantData.aadhaarNumber.replace(/\s/g, ""),
+                  IDType: "M",
                   Source: "Inquiry",
                 },
               ]
             : [],
           DOB: formatDate(applicantData.dob),
-          Gender: applicantData.gender === "male" ? "1" : applicantData.gender === "female" ? "2" : "",
-          EmailAddress: "",
-          GSTStateCode: stateCode,
-          Score: {
+          Gender: applicantData.gender === "male" ? "M" : applicantData.gender === "female" ? "F" : "",
+        },
+        Score: [
+          {
             Type: "ERS",
             Version: "4.0",
           },
-        },
+        ],
       };
 
       try {
