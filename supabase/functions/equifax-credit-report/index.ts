@@ -1421,9 +1421,10 @@ serve(async (req) => {
     );
   } catch (error: any) {
     console.error("Error in equifax-credit-report:", error);
+    // Return 200 with success: false so frontend can handle the error message properly
     return new Response(
       JSON.stringify({ success: false, error: error.message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
