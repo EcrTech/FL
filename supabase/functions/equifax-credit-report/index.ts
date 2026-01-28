@@ -1130,7 +1130,7 @@ serve(async (req) => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Accept": "application/json",
+            "Accept": "text/plain",
           },
           body: JSON.stringify(equifaxRequest),
         });
