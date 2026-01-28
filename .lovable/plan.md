@@ -1,21 +1,30 @@
 
 
-# Fix Equifax Address Extraction - Parse State and Pincode from Line1
+# Fix History48Months Array Parsing - Missing Implementation
 
 ## Problem Identified
 
-The `current_address` JSONB only contains `line1` with the entire address concatenated:
-```json
-{
-  "line1": "S/O Ramagya Pathak, HOUSE NO-323 BLOCK-L FIRST, GALI NO-6, NEAR SATNAM PUBLIC SCHOOL, SANGAM VIHAR, SANGAM VIHAR, South Dahl, Delhi-110062, Delhi, 110062"
+The logs clearly show the error:
+```
+TypeError: history48Months.substring is not a function
+```
+
+The fix for handling the CIR 360 JSON format (where `History48Months` is an **array of objects**) was not applied to the file. The current code at lines 672-685 still treats it as a string:
+
+```typescript
+// Current broken code:
+const history48Months = acc.History48Months || "";
+for (let i = 0; i < history48Months.length && i < 144; i += 3) {
+  const status = history48Months.substring(i, i + 3);  // ← CRASHES HERE
+  ...
 }
 ```
 
-The `state`, `city`, and `pincode` fields are **missing**, causing Equifax API to reject with error E0048.
+---
 
 ## Solution
 
-Add intelligent parsing in the edge function to extract pincode and state from the `line1` string when structured fields are missing.
+Update the account parsing logic to detect whether `History48Months` is an array or string, and handle both formats appropriately.
 
 ---
 
@@ -23,72 +32,72 @@ Add intelligent parsing in the edge function to extract pincode and state from t
 
 ### File: `supabase/functions/equifax-credit-report/index.ts`
 
-**Add helper functions to extract pincode and state from address string:**
+**Replace lines 670-703** with:
 
 ```typescript
-// Extract 6-digit pincode from address string
-function extractPincodeFromAddress(address: string): string {
-  const pincodeMatch = address.match(/\b(\d{6})\b/);
-  return pincodeMatch ? pincodeMatch[1] : "";
-}
-
-// Extract state from address string (common patterns)
-function extractStateFromAddress(address: string, pincode: string): string {
-  // First try to get state code from pincode
-  if (pincode) {
-    const stateFromPincode = getStateFromPincode(pincode);
-    if (stateFromPincode) return stateFromPincode;
+// Parse accounts
+const accounts = retailAccountDetails.map((acc: any) => {
+  const history48MonthsRaw = acc.History48Months;
+  const paymentHistory: any[] = [];
+  
+  // Handle both formats: array of objects (CIR 360 JSON) or string (legacy)
+  if (Array.isArray(history48MonthsRaw)) {
+    // CIR 360 JSON format - array of objects like:
+    // [{"key":"01-26","PaymentStatus":"000","SuitFiledStatus":"*","AssetClassificationStatus":"*"}, ...]
+    history48MonthsRaw.forEach((item: any) => {
+      const status = item.PaymentStatus || "*";
+      paymentHistory.push({
+        month: item.key || "",
+        status: status,
+        label: PAYMENT_STATUS[status]?.label || status,
+        severity: PAYMENT_STATUS[status]?.severity || "current",
+      });
+    });
+  } else if (typeof history48MonthsRaw === "string" && history48MonthsRaw.length > 0) {
+    // Legacy string format - each 3 characters represents a month
+    for (let i = 0; i < history48MonthsRaw.length && i < 144; i += 3) {
+      const status = history48MonthsRaw.substring(i, i + 3);
+      const monthIndex = Math.floor(i / 3);
+      paymentHistory.push({
+        month: monthIndex + 1,
+        status: status,
+        label: PAYMENT_STATUS[status]?.label || status,
+        severity: PAYMENT_STATUS[status]?.severity || "current",
+      });
+    }
   }
-  
-  // Try to match common state patterns in address
-  const statePatterns = [
-    /Delhi/i,
-    /Maharashtra/i,
-    /Karnataka/i,
-    /Rajasthan/i,
-    // ... etc
-  ];
-  
-  // Map matched state names to codes
-  if (/Delhi/i.test(address)) return "DL";
-  if (/Maharashtra/i.test(address)) return "MH";
-  // ... etc
-  
-  return "";
-}
+
+  return {
+    institution: acc.Institution || "Unknown",
+    accountType: acc.AccountType || "Unknown",
+    ownershipType: acc.OwnershipType || "Individual",
+    accountNumber: acc.AccountNumber || "",
+    status: acc.AccountStatus || "Unknown",
+    sanctionAmount: parseFloat(acc.SanctionAmount) || 0,
+    currentBalance: parseFloat(acc.Balance || acc.CurrentBalance) || 0,
+    pastDueAmount: parseFloat(acc.PastDueAmount || acc.AmountPastDue) || 0,
+    emiAmount: parseFloat(acc.InstallmentAmount) || 0,
+    dateOpened: acc.DateOpened || "",
+    dateClosed: acc.DateClosed || "",
+    dateReported: acc.DateReported || "",
+    paymentHistory: paymentHistory,
+    rawHistory: Array.isArray(history48MonthsRaw) 
+      ? JSON.stringify(history48MonthsRaw) 
+      : (history48MonthsRaw || ""),
+  };
+});
 ```
 
-**Update address extraction logic (lines ~975-1000):**
-
-```typescript
-// After extracting from JSONB, try to parse from line1 if fields are missing
-if (!addressState && addressLine1) {
-  const extractedPincode = extractPincodeFromAddress(addressLine1);
-  if (extractedPincode) {
-    addressPincode = extractedPincode;
-  }
-  addressState = extractStateFromAddress(addressLine1, addressPincode);
-}
-
-if (!addressPincode && addressLine1) {
-  addressPincode = extractPincodeFromAddress(addressLine1);
-}
-```
+**Additional fix:** The response also uses `Balance` and `PastDueAmount` (not `CurrentBalance`/`AmountPastDue`), so we need to check both field names.
 
 ---
 
 ## Expected Result
 
-For the address string:
-```
-"S/O Ramagya Pathak, HOUSE NO-323 BLOCK-L FIRST, ..., Delhi-110062, Delhi, 110062"
-```
-
-After parsing:
-| Field | Value |
-|-------|-------|
-| State | `DL` |
-| Postal | `110062` |
+| Input Format | Before | After |
+|--------------|--------|-------|
+| `[{key:"01-26", PaymentStatus:"000"}, ...]` | Crash: `substring is not a function` | Properly parsed |
+| `"000000030..."` (legacy string) | Works | Still works |
 
 ---
 
@@ -96,5 +105,5 @@ After parsing:
 
 | File | Change |
 |------|--------|
-| `supabase/functions/equifax-credit-report/index.ts` | Add pincode/state extraction functions and fallback logic |
+| `supabase/functions/equifax-credit-report/index.ts` | Fix `History48Months` parsing at lines 670-703 to handle array format |
 
