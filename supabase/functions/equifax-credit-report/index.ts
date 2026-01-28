@@ -187,11 +187,8 @@ function getStateCode(state: string, pincode?: string): string {
 
 function formatDate(dateStr: string): string {
   if (!dateStr) return "";
-  // Convert YYYY-MM-DD to DD-MM-YYYY
-  const parts = dateStr.split("-");
-  if (parts.length === 3) {
-    return `${parts[2]}-${parts[1]}-${parts[0]}`;
-  }
+  // Return date as YYYY-MM-DD (already in correct format from database)
+  // Equifax API requires YYYY-MM-DD format
   return dateStr;
 }
 
