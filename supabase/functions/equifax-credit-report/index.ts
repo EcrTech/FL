@@ -125,14 +125,17 @@ const PINCODE_STATE_MAP: Record<string, string> = {
   "86": "JH",
 };
 
-// Hit code descriptions
+// Hit code descriptions - Equifax CIR 360 hit codes
 const HIT_CODES: Record<string, string> = {
-  "01": "Hit - Records found",
-  "02": "No Hit - No records found",
-  "03": "ACGI - Age Criteria Not Met",
-  "04": "ID Scrub Failed",
-  "05": "File Frozen",
-  "06": "System Error",
+  "10": "Hit - Records found",
+  "11": "No Hit - No records found", 
+  "12": "ACGI - Age Criteria Not Met",
+  "13": "ID Scrub Failed",
+  "14": "File Frozen",
+  "15": "System Error",
+  // Legacy codes
+  "01": "Hit - Records found (legacy)",
+  "02": "No Hit - No records found (legacy)",
 };
 
 // Payment status codes interpretation
@@ -611,10 +614,46 @@ function parseDPDFromPaymentHistory(history: string): number {
 
 function parseEquifaxResponse(response: any): any {
   try {
-    const inquiryResponse = response?.INProfileResponse?.CIRReportDataLst?.[0] || {};
+    console.log("[EQUIFAX-PARSE] Parsing response structure...");
+    console.log("[EQUIFAX-PARSE] Top-level keys:", Object.keys(response));
+    
+    // Try CCRResponse path first (CIR 360 JSON format), then INProfileResponse (legacy XML format)
+    const ccrResponse = response?.CCRResponse;
+    const inProfileResponse = response?.INProfileResponse;
+    
+    let inquiryResponse: any = {};
+    let header: any = {};
+    let scoreDetails: any = {};
+    
+    if (ccrResponse?.CIRReportDataLst?.[0]) {
+      // CIR 360 JSON format
+      console.log("[EQUIFAX-PARSE] Using CCRResponse path (CIR 360 JSON format)");
+      inquiryResponse = ccrResponse.CIRReportDataLst[0];
+      header = inquiryResponse.InquiryResponseHeader || {};
+      
+      // In CCR format, score is at root level of CIRReportDataLst item
+      const scoreArray = inquiryResponse.Score || response.Score || [];
+      scoreDetails = scoreArray[0] || {};
+      
+      console.log("[EQUIFAX-PARSE] Header:", JSON.stringify(header).substring(0, 200));
+      console.log("[EQUIFAX-PARSE] HitCode from header:", header.HitCode);
+    } else if (inProfileResponse?.CIRReportDataLst?.[0]) {
+      // Legacy XML format
+      console.log("[EQUIFAX-PARSE] Using INProfileResponse path (legacy format)");
+      inquiryResponse = inProfileResponse.CIRReportDataLst[0];
+      header = inquiryResponse.CIRReportData?.Header || {};
+      scoreDetails = inquiryResponse.CIRReportData?.ScoreDetails?.[0] || {};
+    } else {
+      console.error("[EQUIFAX-PARSE] Could not find CIRReportDataLst in response");
+      console.error("[EQUIFAX-PARSE] CCRResponse:", JSON.stringify(ccrResponse).substring(0, 500));
+      throw new Error("Invalid response structure - CIRReportDataLst not found");
+    }
+    
     const cirReportData = inquiryResponse.CIRReportData || {};
-    const header = cirReportData.Header || {};
-    const scoreDetails = cirReportData.ScoreDetails?.[0] || {};
+    // Use already-extracted scoreDetails if available, otherwise get from cirReportData
+    if (!scoreDetails?.Type && !scoreDetails?.Score) {
+      scoreDetails = cirReportData.ScoreDetails?.[0] || {};
+    }
     const retailAccountsSummary = cirReportData.RetailAccountsSummary || {};
     const retailAccountDetails = cirReportData.RetailAccountDetails || [];
     const enquirySummary = cirReportData.EnquirySummary || {};
@@ -697,13 +736,25 @@ function parseEquifaxResponse(response: any): any {
       return date >= ninetyDaysAgo;
     }).length;
 
+    // Extract credit score - check multiple locations
+    // CIR 360 format may have score in ScoreDetails array within CIRReportData
+    const scoreFromDetails = parseInt(scoreDetails.Score) || 0;
+    const scoreFromScoreCard = parseInt(cirReportData.ScoreCard?.Score) || 0;
+    const scoreFromScores = parseInt(cirReportData.Scores?.[0]?.Value) || 0;
+    const creditScore = scoreFromDetails || scoreFromScoreCard || scoreFromScores;
+    
+    console.log("[EQUIFAX-PARSE] Score extraction - scoreDetails:", JSON.stringify(scoreDetails));
+    console.log("[EQUIFAX-PARSE] Score extraction - ScoreCard:", JSON.stringify(cirReportData.ScoreCard));
+    console.log("[EQUIFAX-PARSE] Score extraction - Scores:", JSON.stringify(cirReportData.Scores));
+    console.log("[EQUIFAX-PARSE] Final credit score:", creditScore);
+    
     return {
       reportOrderNo: header.ReportOrderNO || "",
-      reportDate: header.ReportDate || new Date().toISOString(),
-      creditScore: parseInt(scoreDetails.Score) || 0,
+      reportDate: header.Date || header.ReportDate || new Date().toISOString(),
+      creditScore: creditScore,
       scoreType: scoreDetails.Type || "ERS",
       scoreVersion: scoreDetails.Version || "4.0",
-      hitCode: header.HitCode || "01",
+      hitCode: header.HitCode || "10",
       hitDescription: HIT_CODES[header.HitCode] || "Unknown",
       summary: {
         totalAccounts: accounts.length,
@@ -729,9 +780,10 @@ function parseEquifaxResponse(response: any): any {
         list: parsedEnquiries,
       },
       personalInfo: {
-        name: fullName,
+        name: fullName.trim(),
         dob: personalInfo.DateOfBirth || "",
-        pan: idAndContactInfo.PANId?.[0]?.IdNumber || "",
+        pan: idAndContactInfo.IdentityInfo?.PANId?.[0]?.IdNumber || 
+             idAndContactInfo.PANId?.[0]?.IdNumber || "",
         gender: personalInfo.Gender || "",
         addresses: (idAndContactInfo.AddressInfo || []).map((addr: any) => 
           [addr.Address, addr.City, addr.State, addr.Postal].filter(Boolean).join(", ")
@@ -1283,7 +1335,7 @@ serve(async (req) => {
       applicant_id: applicantId,
       verification_type: "credit_bureau",
       verification_source: "equifax",
-      status: reportData.hitCode === "01" ? "success" : "failed",
+      status: (reportData.hitCode === "10" || reportData.hitCode === "01") ? "success" : "failed",
       request_data: {
         bureau_type: "equifax",
         pan_number: applicantData.panNumber,
