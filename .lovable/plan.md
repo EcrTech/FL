@@ -1,112 +1,95 @@
 
 
-# Send Equifax API Request as JSON (Not XML)
+# Update Equifax API Request Format
 
-## Problem
+## Overview
 
-The Equifax credit report edge function currently tries multiple XML formats first, and only uses JSON as a last resort. The user wants to send the request in JSON format directly.
+Update the Equifax credit report edge function to exactly match the user-provided JSON format for API requests.
 
-## Solution
+## Key Changes Required
 
-Modify the request strategy to send JSON as the primary (and only) format, removing the XML-first approach.
+| Field | Current Value | New Value |
+|-------|--------------|-----------|
+| `InquiryPurpose` | `"05"` | `"00"` |
+| `Gender` | `"1"` (male) / `"2"` (female) | `"M"` / `"F"` |
+| `Score` location | Inside `RequestBody` | At **root level** (sibling of RequestHeader/RequestBody) |
+| `EmailAddress` | Present (empty) | Remove |
+| `GSTStateCode` | Present | Remove |
 
 ## Technical Changes
 
 ### File: `supabase/functions/equifax-credit-report/index.ts`
 
-**Lines 1117-1175 - Replace multi-format strategy with JSON-only:**
-
-Current code tries formats in this order:
-1. XML with Accept All
-2. Plain application/xml
-3. XML with empty SOAPAction
-4. SOAP/XML
-5. SOAP with action
-6. JSON (last resort)
-
-New code will:
-- Send request as JSON directly
-- Use `application/json` content type
-- Remove all XML format attempts
-
-**Changes:**
-
-| Section | Current | New |
-|---------|---------|-----|
-| Format attempts | 6 formats (5 XML + 1 JSON) | 1 format (JSON only) |
-| Content-Type | `application/xml` first | `application/json` |
-| Accept header | Various XML types | `application/json` |
-| Request body | XML string | JSON string |
-| Storage metadata | `request_format: "xml"` | `request_format: "json"` |
-
-**Code Changes (Lines 1117-1228):**
-
-Replace the multi-format loop with a single JSON request:
+**Lines 1055-1115 - Update request structure:**
 
 ```typescript
-try {
-  // Send request as JSON
-  console.log(`[EQUIFAX-DEBUG] ========== SENDING JSON REQUEST ==========`);
-  
-  // Log redacted request
-  const redactedBody = JSON.stringify(equifaxRequest)
-    .replace(/"Password":"[^"]*"/g, '"Password":"***REDACTED***"')
-    .replace(/"SecurityCode":"[^"]*"/g, '"SecurityCode":"***REDACTED***"');
-  
-  console.log(`[EQUIFAX-DEBUG] Content-Type: application/json`);
-  console.log(`[EQUIFAX-DEBUG] Request body (redacted):`, redactedBody);
-  
-  const response = await fetch(apiUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Accept": "application/json",
+const equifaxRequest = {
+  RequestHeader: {
+    CustomerId: customerId,
+    UserId: userId,
+    Password: password,
+    MemberNumber: memberNumber,
+    SecurityCode: securityCode,
+    CustRefField: applicationId,  // Keep for tracking
+    ProductCode: ["PCS"],
+  },
+  RequestBody: {
+    InquiryPurpose: "00",  // Changed from "05"
+    TransactionAmount: "0",
+    FirstName: applicantData.firstName,
+    MiddleName: applicantData.middleName || "",
+    LastName: applicantData.lastName || "",
+    InquiryAddresses: [
+      {
+        seq: "1",
+        AddressLine1: applicantData.address.line1,
+        State: stateCode,
+        AddressType: ["H"],
+        Postal: applicantData.address.postal,
+      },
+    ],
+    InquiryPhones: [
+      {
+        seq: "1",
+        Number: applicantData.mobile,
+        PhoneType: ["M"],
+      },
+    ],
+    IDDetails: applicantData.panNumber
+      ? [
+          {
+            seq: "1",
+            IDValue: applicantData.panNumber,
+            IDType: "T",
+            Source: "Inquiry",
+          },
+        ]
+      : [],
+    DOB: formatDate(applicantData.dob),
+    Gender: applicantData.gender === "male" ? "M" : applicantData.gender === "female" ? "F" : "",  // Changed from 1/2
+  },
+  Score: [  // Moved to root level as array
+    {
+      Type: "ERS",
+      Version: "4.0",
     },
-    body: JSON.stringify(equifaxRequest),
-  });
-
-  console.log(`[EQUIFAX-DEBUG] Response Status:`, response.status, response.statusText);
-  
-  const responseText = await response.text();
-  console.log(`[EQUIFAX-DEBUG] Response length:`, responseText.length);
-  console.log(`[EQUIFAX-DEBUG] Response (first 2000 chars):`, responseText.substring(0, 2000));
-  
-  if (!response.ok) {
-    throw new Error(`API returned ${response.status}: ${responseText.substring(0, 500)}`);
-  }
-  
-  // Parse JSON response
-  rawApiResponse = JSON.parse(responseText);
-  // ... rest of response handling
-}
+  ],
+};
 ```
 
-**Line 1343 - Update request format metadata:**
+## Changes Summary
 
-```typescript
-request_format: "json",  // Changed from "xml"
-```
+| Section | Before | After |
+|---------|--------|-------|
+| InquiryPurpose | `"05"` (Credit Application) | `"00"` |
+| Gender format | `"1"/"2"` | `"M"/"F"` |
+| Score placement | Nested in RequestBody | Root level array |
+| EmailAddress | Included (empty) | Removed |
+| GSTStateCode | Included | Removed |
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `supabase/functions/equifax-credit-report/index.ts` | Replace XML format strategy with JSON-only request |
-
-## Expected Result
-
-| Before | After |
-|--------|-------|
-| Request sent as XML | Request sent as JSON |
-| Content-Type: `application/xml` | Content-Type: `application/json` |
-| Tries 6 different formats | Single JSON request |
-
-## Additional Cleanup
-
-The following XML helper functions will become unused and can be removed:
-- `jsonToXmlPlain()` (lines 208-287)
-- `jsonToSoapXml()` (lines 292-373)
-- `escapeXml()` (lines 195-203)
-- `xmlToJson()` (lines 438-597) - Keep for parsing XML responses if Equifax returns XML
-- Various XML extraction functions (keep as fallback)
+| `supabase/functions/equifax-credit-report/index.ts` | Update request structure to match exact format |
 
