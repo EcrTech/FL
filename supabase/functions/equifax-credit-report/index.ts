@@ -1115,136 +1115,47 @@ serve(async (req) => {
       };
 
       try {
-        // Try multiple request formats - prioritizing Equifax India specific format
-        // Equifax India CIR 360 requires specific header combinations
-        const formats = [
-          // Format 1: Equifax India standard - POST with application/xml and Accept: */*
-          { 
-            name: "XML with Accept All", 
-            contentType: "application/xml",
-            accept: "*/*",
-            body: jsonToXmlPlain(equifaxRequest),
-            soapAction: null,
-            extraHeaders: {}
+        // Send request as JSON
+        console.log(`[EQUIFAX-DEBUG] ========== SENDING JSON REQUEST ==========`);
+        
+        // Log redacted request
+        const redactedBody = JSON.stringify(equifaxRequest)
+          .replace(/"Password":"[^"]*"/g, '"Password":"***REDACTED***"')
+          .replace(/"SecurityCode":"[^"]*"/g, '"SecurityCode":"***REDACTED***"');
+        
+        console.log(`[EQUIFAX-DEBUG] Content-Type: application/json`);
+        console.log(`[EQUIFAX-DEBUG] Request body (redacted):`, redactedBody);
+        
+        const response = await fetch(apiUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
           },
-          // Format 2: POST with application/xml only
-          { 
-            name: "Plain application/xml", 
-            contentType: "application/xml",
-            accept: "application/xml",
-            body: jsonToXmlPlain(equifaxRequest),
-            soapAction: null,
-            extraHeaders: {}
-          },
-          // Format 3: POST with text/xml and empty SOAPAction
-          { 
-            name: "XML with empty SOAPAction", 
-            contentType: "text/xml; charset=utf-8",
-            accept: "*/*",
-            body: jsonToXmlPlain(equifaxRequest),
-            soapAction: "",
-            extraHeaders: {}
-          },
-          // Format 4: Full SOAP envelope
-          { 
-            name: "SOAP/XML", 
-            contentType: "text/xml; charset=utf-8",
-            accept: "text/xml",
-            body: jsonToSoapXml(equifaxRequest),
-            soapAction: "",
-            extraHeaders: {}
-          },
-          // Format 5: SOAP with namespace-specific action
-          { 
-            name: "SOAP with action", 
-            contentType: "application/soap+xml; charset=utf-8",
-            accept: "application/soap+xml, text/xml",
-            body: jsonToSoapXml(equifaxRequest),
-            soapAction: "http://cir360service.equifax.com/getReport",
-            extraHeaders: {}
-          },
-          // Format 6: JSON as last resort  
-          { 
-            name: "JSON", 
-            contentType: "application/json",
-            accept: "application/json",
-            body: JSON.stringify(equifaxRequest),
-            soapAction: null,
-            extraHeaders: {}
-          },
-        ];
+          body: JSON.stringify(equifaxRequest),
+        });
 
-        let lastError: string | null = null;
-        let successResponse: string | null = null;
-        let successFormat: string | null = null;
-
-        for (const format of formats) {
-          console.log(`[EQUIFAX-DEBUG] ========== TRYING ${format.name} FORMAT ==========`);
-          
-          // Log redacted request
-          const redactedBody = format.body
-            .replace(/<Password>[^<]*<\/Password>/g, "<Password>***REDACTED***</Password>")
-            .replace(/<SecurityCode>[^<]*<\/SecurityCode>/g, "<SecurityCode>***REDACTED***</SecurityCode>")
-            .replace(/"Password":"[^"]*"/g, '"Password":"***REDACTED***"')
-            .replace(/"SecurityCode":"[^"]*"/g, '"SecurityCode":"***REDACTED***"');
-          
-          console.log(`[EQUIFAX-DEBUG] Content-Type: ${format.contentType}`);
-          console.log(`[EQUIFAX-DEBUG] Request body (redacted, first 1500 chars):`, redactedBody.substring(0, 1500));
-          
-          try {
-            const headers: Record<string, string> = {
-              "Content-Type": format.contentType,
-              "Accept": format.accept,
-            };
-            
-            if (format.soapAction) {
-              headers["SOAPAction"] = format.soapAction;
-            }
-            
-            const response = await fetch(apiUrl, {
-              method: "POST",
-              headers,
-              body: format.body,
-            });
-
-            console.log(`[EQUIFAX-DEBUG] ${format.name} Response Status:`, response.status, response.statusText);
-            
-            if (response.ok) {
-              const responseText = await response.text();
-              console.log(`[EQUIFAX-DEBUG] SUCCESS with ${format.name}! Response length:`, responseText.length);
-              console.log(`[EQUIFAX-DEBUG] Response (first 2000 chars):`, responseText.substring(0, 2000));
-              successResponse = responseText;
-              successFormat = format.name;
-              break;
-            } else {
-              const errorText = await response.text();
-              console.log(`[EQUIFAX-DEBUG] ${format.name} failed with ${response.status}:`, errorText.substring(0, 500));
-              lastError = `${format.name}: ${response.status} ${response.statusText}`;
-            }
-          } catch (formatError: any) {
-            console.error(`[EQUIFAX-DEBUG] ${format.name} threw error:`, formatError.message);
-            lastError = `${format.name}: ${formatError.message}`;
-          }
+        console.log(`[EQUIFAX-DEBUG] Response Status:`, response.status, response.statusText);
+        
+        const responseText = await response.text();
+        console.log(`[EQUIFAX-DEBUG] Response length:`, responseText.length);
+        console.log(`[EQUIFAX-DEBUG] Response (first 2000 chars):`, responseText.substring(0, 2000));
+        
+        if (!response.ok) {
+          throw new Error(`API returned ${response.status}: ${responseText.substring(0, 500)}`);
         }
-
-        // Process response or throw error
-        if (!successResponse) {
-          throw new Error(`All request formats failed. Last error: ${lastError}`);
-        }
-
-        console.log(`[EQUIFAX-DEBUG] ========== PROCESSING ${successFormat} RESPONSE ==========`);
-
+        
+        // Parse JSON response
         try {
-          // Try to parse XML response to JSON
-          rawApiResponse = xmlToJson(successResponse);
-          console.log("[EQUIFAX-DEBUG] Successfully parsed response to JSON");
+          rawApiResponse = JSON.parse(responseText);
+          console.log("[EQUIFAX-DEBUG] Successfully parsed JSON response");
           console.log("[EQUIFAX-DEBUG] Response structure keys:", Object.keys(rawApiResponse));
         } catch (parseError: any) {
-          console.error("[EQUIFAX-DEBUG] Failed to parse response:", parseError.message);
-          // Try JSON parsing as fallback
+          // If JSON fails, try XML parsing as fallback (in case API returns XML despite Accept header)
+          console.log("[EQUIFAX-DEBUG] JSON parse failed, trying XML fallback...");
           try {
-            rawApiResponse = JSON.parse(successResponse);
-            console.log("[EQUIFAX-DEBUG] Fallback: Successfully parsed as JSON");
+            rawApiResponse = xmlToJson(responseText);
+            console.log("[EQUIFAX-DEBUG] Successfully parsed as XML");
           } catch {
             throw new Error(`Failed to parse Equifax response: ${parseError.message}`);
           }
@@ -1261,13 +1172,12 @@ serve(async (req) => {
           console.error("[EQUIFAX-DEBUG] Full error response:", JSON.stringify(rawApiResponse));
           
           // Return error response - do NOT fall back to mock data
-          // This gives the user actual feedback about what went wrong
           throw new Error(`Equifax API Error ${errorCode}: ${errorDesc}`);
         }
         
         reportData = parseEquifaxResponse(rawApiResponse);
         reportData.rawResponse = rawApiResponse;
-        reportData.requestFormat = successFormat;
+        reportData.requestFormat = "json";
         console.log("[EQUIFAX-DEBUG] Successfully parsed Equifax response");
         console.log("[EQUIFAX-DEBUG] Credit Score:", reportData.creditScore);
         console.log("[EQUIFAX-DEBUG] Hit Code:", reportData.hitCode, "-", reportData.hitDescription);
@@ -1279,7 +1189,6 @@ serve(async (req) => {
         console.error("[EQUIFAX-DEBUG] Error stack:", apiError.stack);
         
         // Re-throw the error - no fallback to mock data
-        // This will be caught by the outer catch block and return success: false
         throw new Error(`Failed to fetch credit report: ${apiError.message}`);
       }
     }
@@ -1340,7 +1249,7 @@ serve(async (req) => {
         request_timestamp: new Date().toISOString(),
         full_request: redactedRequestForStorage,
         api_url_used: apiUrl || "NOT SET",
-        request_format: "xml",
+        request_format: "json",
         debug_info: {
           used_mock_data: usedMockData,
           mock_reason: mockReason || null,
@@ -1378,7 +1287,7 @@ serve(async (req) => {
         debug_info: {
           response_timestamp: new Date().toISOString(),
           api_error: reportData.apiError || null,
-          response_format: "xml",
+          response_format: "json",
         }
       },
       remarks: usedMockData 
