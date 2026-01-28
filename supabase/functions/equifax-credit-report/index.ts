@@ -1281,14 +1281,9 @@ serve(async (req) => {
         console.error("[EQUIFAX-DEBUG] Error message:", apiError.message);
         console.error("[EQUIFAX-DEBUG] Error stack:", apiError.stack);
         
-        mockReason = `API call failed: ${apiError.message}`;
-        usedMockData = true;
-        
-        // Fall back to mock data on API failure
-        console.log("[EQUIFAX-DEBUG] Falling back to mock data due to API error");
-        reportData = generateMockResponse(applicantData);
-        reportData.isMock = true;
-        reportData.apiError = apiError.message;
+        // Re-throw the error - no fallback to mock data
+        // This will be caught by the outer catch block and return success: false
+        throw new Error(`Failed to fetch credit report: ${apiError.message}`);
       }
     }
 
