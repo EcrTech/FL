@@ -675,10 +675,10 @@ function parseEquifaxResponse(response: any): any {
       const paymentHistory: any[] = [];
       
       // Handle both formats: array of objects (CIR 360 JSON) or string (legacy)
-      // LIMIT to 24 months to prevent timeout
+      // LIMIT to 12 months to prevent timeout
       if (Array.isArray(history48MonthsRaw)) {
         // CIR 360 JSON format - array of objects
-        const recentHistory = history48MonthsRaw.slice(0, 24);
+        const recentHistory = history48MonthsRaw.slice(0, 12);
         recentHistory.forEach((item: any) => {
           const status = item.PaymentStatus || "*";
           paymentHistory.push({
@@ -689,8 +689,8 @@ function parseEquifaxResponse(response: any): any {
           });
         });
       } else if (typeof history48MonthsRaw === "string" && history48MonthsRaw.length > 0) {
-        // Legacy string format - each 3 characters represents a month (limit to 24 months = 72 chars)
-        const maxChars = Math.min(history48MonthsRaw.length, 72);
+        // Legacy string format - each 3 characters represents a month (limit to 12 months = 36 chars)
+        const maxChars = Math.min(history48MonthsRaw.length, 36);
         for (let i = 0; i < maxChars; i += 3) {
           const status = history48MonthsRaw.substring(i, i + 3);
           const monthIndex = Math.floor(i / 3);
