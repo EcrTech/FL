@@ -656,10 +656,22 @@ function parseEquifaxResponse(response: any): any {
     }
     
     const cirReportData = inquiryResponse.CIRReportData || {};
-    // Use already-extracted scoreDetails if available, otherwise get from cirReportData
-    if (!scoreDetails?.Type && !scoreDetails?.Score) {
-      scoreDetails = cirReportData.ScoreDetails?.[0] || {};
+    
+    // Debug: Log all possible score locations
+    console.log("[EQUIFAX-PARSE] Looking for score in multiple locations...");
+    console.log("[EQUIFAX-PARSE] cirReportData.ScoreDetails:", JSON.stringify(cirReportData.ScoreDetails)?.substring(0, 300));
+    console.log("[EQUIFAX-PARSE] cirReportData.Score:", JSON.stringify(cirReportData.Score)?.substring(0, 300));
+    console.log("[EQUIFAX-PARSE] inquiryResponse.ScoreDetails:", JSON.stringify(inquiryResponse.ScoreDetails)?.substring(0, 300));
+    
+    // Check for score in CIRReportData.ScoreDetails (common location)
+    if (!scoreDetails?.Score && !scoreDetails?.Value) {
+      const cirScoreDetails = cirReportData.ScoreDetails?.[0] || cirReportData.ScoreDetails || {};
+      if (cirScoreDetails.Score || cirScoreDetails.Value) {
+        scoreDetails = cirScoreDetails;
+        console.log("[EQUIFAX-PARSE] Found score in CIRReportData.ScoreDetails:", JSON.stringify(scoreDetails));
+      }
     }
+    
     const retailAccountsSummary = cirReportData.RetailAccountsSummary || {};
     const retailAccountDetails = cirReportData.RetailAccountDetails || [];
     const enquirySummary = cirReportData.EnquirySummary || {};
