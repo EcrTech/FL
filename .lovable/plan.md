@@ -1,75 +1,72 @@
 
-# Fix Bank Name Display in Credit Report
+# Fix E-Sign PDF Generation - Rupee Symbol Encoding Error
 
 ## Problem Identified
 
-The credit report is showing **"BANK"** instead of the actual bank name (like "HDFC Bank", "ICICI Bank", etc.) because the edge function is looking for the wrong field in the Equifax CIR 360 JSON response.
+The E-Sign functionality is failing because the PDF generation library (`pdf-lib`) cannot encode the Indian Rupee symbol (₹) when using standard fonts.
 
-### Current Code
-```typescript
-institution: acc.Institution || "Unknown",
+### Error from Edge Function Logs
+```
+Error: WinAnsi cannot encode "₹" (0x20b9)
+    at r.encodeUnicodeCodePoint (standard-fonts.mjs)
+    at createPdfFromDocument (index.ts:108)
 ```
 
 ### Root Cause
-The Equifax CIR 360 JSON response uses `SubscriberName` (not `Institution`) for the bank/lender name. The field `Institution` likely contains a generic account type code like "BANK".
+Standard PDF fonts (Helvetica, Times-Roman, Courier) only support **WinAnsi encoding**, which is limited to ASCII and Western European characters. The Rupee symbol (₹) is a Unicode character (U+20B9) that is not included in this encoding.
+
+The problematic line is:
+```typescript
+`Loan Amount: ₹${sanction?.sanctioned_amount?.toLocaleString("en-IN") || "N/A"}`,
+```
 
 ---
 
 ## Solution
 
-Update the account parsing logic to check multiple possible field names for the institution/subscriber name:
-
-### Field Names to Check (in priority order)
-1. `SubscriberName` - Primary field in CIR 360 JSON
-2. `InstitutionName` - Alternative field name  
-3. `ReportingMemberShortName` - Used in some formats
-4. `MemberShortName` - Alternate member name
-5. `Institution` - Fallback (current)
+Replace the Rupee symbol (₹) with a compatible alternative like `Rs.` or `INR` in the PDF text content.
 
 ---
 
 ## Technical Implementation
 
-### File: `supabase/functions/equifax-credit-report/index.ts`
+### File: `supabase/functions/nupay-esign-request/index.ts`
 
-**Change in account parsing (around line 691-725):**
+**Change in createPdfFromDocument function (lines 143-161):**
+
+Replace all instances of the ₹ symbol with `Rs.`:
 
 ```typescript
-const accounts = accountsToProcess.map((acc: any) => {
-  // Debug: Log first account's keys to identify correct field name
-  if (accountsToProcess.indexOf(acc) === 0) {
-    console.log("[EQUIFAX-PARSE] First account keys:", Object.keys(acc).join(", "));
-    console.log("[EQUIFAX-PARSE] Potential institution fields:", {
-      SubscriberName: acc.SubscriberName,
-      InstitutionName: acc.InstitutionName,
-      Institution: acc.Institution,
-      ReportingMemberShortName: acc.ReportingMemberShortName,
-      MemberShortName: acc.MemberShortName,
-    });
-  }
-  
-  // ... payment history parsing ...
-  
-  return {
-    // Check multiple possible field names for bank/institution name
-    institution: acc.SubscriberName 
-      || acc.InstitutionName 
-      || acc.ReportingMemberShortName 
-      || acc.MemberShortName 
-      || acc.Institution 
-      || "Unknown",
-    // ... rest of fields ...
-  };
-});
+const lines = [
+  `Application Number: ${appData.application_number || "N/A"}`,
+  `Date: ${new Date().toLocaleDateString("en-IN")}`,
+  "",
+  `Loan Amount: Rs. ${sanction?.sanctioned_amount?.toLocaleString("en-IN") || "N/A"}`,
+  `Interest Rate: ${sanction?.interest_rate || "N/A"}% p.a.`,
+  `Tenure: ${sanction?.tenure_months || "N/A"} months`,
+  "",
+  "This document is digitally generated and requires Aadhaar-based e-signature",
+  "for legal validity.",
+  "",
+  "",
+  "",
+  "Signature: ___________________________",
+  "",
+  "",
+  "(This space is reserved for digital signature)",
+];
 ```
 
 ---
 
-## Expected Result
+## Alternative: Embed Custom Font (More Complex)
 
-| Before | After |
-|--------|-------|
-| "BANK" displayed for all accounts | Actual bank name (e.g., "HDFC Bank", "ICICI Bank") |
+For proper ₹ symbol support, we would need to:
+1. Embed a custom font (like Noto Sans) that includes the Rupee character
+2. Load the font bytes in the edge function
+3. Use `pdfDoc.embedFont(fontBytes)` instead of `StandardFonts.Helvetica`
+
+This approach is more complex and increases function size/latency, so using `Rs.` is the recommended quick fix.
 
 ---
 
@@ -77,12 +74,17 @@ const accounts = accountsToProcess.map((acc: any) => {
 
 | File | Change |
 |------|--------|
-| `supabase/functions/equifax-credit-report/index.ts` | Add fallback chain for institution name field, add debug logging |
+| `supabase/functions/nupay-esign-request/index.ts` | Replace ₹ with Rs. in PDF text content |
 
 ---
 
-## Benefits
+## Expected Result
 
-1. **Correct display** - Users will see actual bank names
-2. **Debug logging** - First account's keys will be logged to help identify correct field names
-3. **Robust fallback** - Multiple field names checked to handle different response formats
+After this fix:
+- PDF generation will succeed
+- E-Sign request will be sent to Nupay API
+- Signer URL will be returned to the user
+
+| Before | After |
+|--------|-------|
+| ₹12,500 (fails) | Rs. 12,500 (works) |
