@@ -145,7 +145,7 @@ async function createPdfFromDocument(
     `Application Number: ${appData.application_number || "N/A"}`,
     `Date: ${new Date().toLocaleDateString("en-IN")}`,
     "",
-    `Loan Amount: ₹${sanction?.sanctioned_amount?.toLocaleString("en-IN") || "N/A"}`,
+    `Loan Amount: Rs. ${sanction?.sanctioned_amount?.toLocaleString("en-IN") || "N/A"}`,
     `Interest Rate: ${sanction?.interest_rate || "N/A"}% p.a.`,
     `Tenure: ${sanction?.tenure_months || "N/A"} months`,
     "",
