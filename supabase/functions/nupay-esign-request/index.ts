@@ -370,8 +370,8 @@ serve(async (req) => {
     console.log("[E-Sign] Generating PDF document...");
     const pdfBytes = await createPdfFromDocument(supabase, document_id, document_type, application_id);
 
-    // Generate reference number
-    const refNo = `ESIGN-${application_id.substring(0, 8).toUpperCase()}-${Date.now()}`;
+    // Generate reference number (max 20 chars for Nupay)
+    const refNo = `ES${Date.now().toString(36).toUpperCase()}`;
     const documentTitle = document_type === "sanction_letter" ? "Sanction Letter" :
       document_type === "loan_agreement" ? "Loan Agreement" : "Daily Repayment Schedule";
 
