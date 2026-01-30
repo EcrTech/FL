@@ -280,12 +280,17 @@ async function processForSign(
   }
 
   // Extract signer URL from response - check multiple possible locations
-  const signerUrl = processData.signer_url || 
+  // Nupay uses PascalCase "Data" and field is "url" not "signer_url"
+  const signerUrl = processData.Data?.signer_info?.[0]?.url ||
+                    processData.data?.signer_info?.[0]?.url ||
+                    processData.Data?.signer_info?.[0]?.signer_url ||
+                    processData.data?.signer_info?.[0]?.signer_url ||
+                    processData.signer_url || 
                     processData.data?.signer_url ||
                     processData.SignerUrl ||
                     processData.data?.SignerUrl ||
-                    processData.data?.signer_info?.[0]?.signer_url ||
-                    processData.signer_info?.[0]?.signer_url;
+                    processData.signer_info?.[0]?.signer_url ||
+                    processData.signer_info?.[0]?.url;
 
   if (!signerUrl) {
     console.error("[E-Sign] No signer_url in process response:", processData);
