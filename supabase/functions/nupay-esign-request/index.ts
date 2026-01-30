@@ -441,6 +441,54 @@ serve(async (req) => {
     }
 
     console.log(`[E-Sign] Request created successfully: ${esignRecord.id}`);
+
+    // Send notifications (WhatsApp and Email)
+    const channels: string[] = ["whatsapp"];
+    if (signer_email) {
+      channels.push("email");
+    }
+
+    console.log(`[E-Sign] Sending notifications via: ${channels.join(", ")}`);
+    
+    try {
+      const notifyResponse = await fetch(`${supabaseUrl}/functions/v1/send-esign-notifications`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${supabaseServiceKey}`,
+        },
+        body: JSON.stringify({
+          org_id,
+          signer_name,
+          signer_email,
+          signer_mobile,
+          signer_url: signerUrl,
+          document_type,
+          application_id,
+          channels,
+        }),
+      });
+
+      const notifyResult = await notifyResponse.json();
+      console.log(`[E-Sign] Notification results:`, JSON.stringify(notifyResult, null, 2));
+
+      // Update the record with notification channel
+      const sentChannels = notifyResult.results
+        ?.filter((r: { success: boolean }) => r.success)
+        .map((r: { channel: string }) => r.channel)
+        .join(",") || null;
+
+      if (sentChannels) {
+        await supabase
+          .from("document_esign_requests")
+          .update({ notification_channel: sentChannels })
+          .eq("id", esignRecord.id);
+      }
+    } catch (notifyError) {
+      console.error("[E-Sign] Notification error (non-fatal):", notifyError);
+      // Don't fail the whole request if notifications fail
+    }
+
     console.log(`[E-Sign] ========== E-SIGN REQUEST SUCCESS ==========`);
 
     return new Response(
