@@ -286,13 +286,49 @@ serve(async (req) => {
       );
     }
 
+    // Send automated notifications if registration URL is available
+    let notificationResults = null;
+    if (registrationUrl) {
+      try {
+        console.log("[Nupay-CreateMandate] Triggering automated notifications...");
+        const notifyResponse = await fetch(`${supabaseUrl}/functions/v1/send-emandate-notifications`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify({
+            org_id: requestData.org_id,
+            signer_name: requestData.account_holder_name,
+            signer_email: requestData.email,
+            signer_mobile: requestData.mobile_no,
+            registration_url: registrationUrl,
+            loan_no: requestData.loan_no,
+            collection_amount: requestData.collection_amount,
+            channels: ["whatsapp", "email"],
+          }),
+        });
+
+        if (notifyResponse.ok) {
+          notificationResults = await notifyResponse.json();
+          console.log("[Nupay-CreateMandate] Notification results:", JSON.stringify(notificationResults));
+        } else {
+          const errorText = await notifyResponse.text();
+          console.warn("[Nupay-CreateMandate] Notification request failed:", errorText);
+        }
+      } catch (notifyError) {
+        console.warn("[Nupay-CreateMandate] Notification send failed:", notifyError);
+      }
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true,
         mandate_id: mandate.id,
         nupay_id: nupayId,
         registration_url: registrationUrl,
-        status: "submitted"
+        status: "submitted",
+        notifications: notificationResults
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
