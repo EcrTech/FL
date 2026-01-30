@@ -16,7 +16,7 @@ import CreditBureauDialog from "@/components/LOS/Verification/CreditBureauDialog
 import { VideoKYCRetryButton } from "@/components/LOS/Verification/VideoKYCRetryButton";
 import { VideoKYCViewDialog } from "@/components/LOS/Verification/VideoKYCViewDialog";
 import { WhatsAppChatDialog } from "@/components/LOS/Relationships/WhatsAppChatDialog";
-import { SendEmailDialog } from "@/components/Contact/SendEmailDialog";
+import { EmailChatDialog } from "@/components/LOS/Relationships/EmailChatDialog";
 interface Document {
   id: string;
   document_type: string;
@@ -551,14 +551,16 @@ export function ApplicantProfileCard({
         />
       )}
 
-      {/* Email Dialog */}
-      <SendEmailDialog
-        open={emailDialogOpen}
-        onOpenChange={setEmailDialogOpen}
-        contactId={applicationId}
-        contactName={applicantName}
-        initialEmail={applicant.email}
-      />
+      {/* Email Chat Dialog */}
+      {applicant.email && (
+        <EmailChatDialog
+          open={emailDialogOpen}
+          onOpenChange={setEmailDialogOpen}
+          contactId={applicationId}
+          contactName={applicantName}
+          email={applicant.email}
+        />
+      )}
     </>
   );
 }
