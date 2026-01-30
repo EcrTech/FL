@@ -142,10 +142,16 @@ serve(async (req) => {
     console.log(`[Nupay-Banks] Full API response:`, JSON.stringify(banksData));
     
     // Handle various Nupay response structures
+    // Actual response: {"StatusCode":"NP000","data":{"banks":[...]}}
     let banks: any[] = [];
     
     if (Array.isArray(banksData)) {
       banks = banksData;
+    } else if (banksData.data?.banks && Array.isArray(banksData.data.banks)) {
+      // Primary format: data.banks (confirmed from logs)
+      banks = banksData.data.banks;
+    } else if (banksData.data?.Banks && Array.isArray(banksData.data.Banks)) {
+      banks = banksData.data.Banks;
     } else if (banksData.data && Array.isArray(banksData.data)) {
       banks = banksData.data;
     } else if (banksData.banks && Array.isArray(banksData.banks)) {
@@ -154,10 +160,6 @@ serve(async (req) => {
       banks = banksData.Banks;
     } else if (banksData.result && Array.isArray(banksData.result)) {
       banks = banksData.result;
-    } else if (banksData.bankList && Array.isArray(banksData.bankList)) {
-      banks = banksData.bankList;
-    } else if (banksData.BankList && Array.isArray(banksData.BankList)) {
-      banks = banksData.BankList;
     }
 
     console.log(`[Nupay-Banks] Parsed ${banks.length} banks from response`);
