@@ -193,8 +193,11 @@ async function uploadDocumentToNupay(
 
   // Create FormData for multipart upload
   const formData = new FormData();
-  formData.append("document_title", documentTitle);
-  formData.append("remarks", `E-Sign request for ${documentTitle}`);
+  // Sanitize text fields - Nupay only accepts alphanumeric and spaces
+  const sanitize = (text: string) => text.replace(/[^a-zA-Z0-9 ]/g, "").trim();
+  
+  formData.append("document_title", sanitize(documentTitle));
+  formData.append("remarks", sanitize(`ESign request for ${documentTitle}`));
   formData.append("ref_no", refNo);
   
   // Create blob from PDF bytes - convert to ArrayBuffer first
