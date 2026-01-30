@@ -555,6 +555,7 @@ export type Database = {
           activity_id: string | null
           agent_id: string | null
           answered_at: string | null
+          applicant_id: string | null
           call_duration: number | null
           call_type: string
           contact_id: string | null
@@ -568,6 +569,7 @@ export type Database = {
           exotel_raw_data: Json | null
           from_number: string
           id: string
+          loan_application_id: string | null
           notes: string | null
           org_id: string
           recording_duration: number | null
@@ -582,6 +584,7 @@ export type Database = {
           activity_id?: string | null
           agent_id?: string | null
           answered_at?: string | null
+          applicant_id?: string | null
           call_duration?: number | null
           call_type: string
           contact_id?: string | null
@@ -595,6 +598,7 @@ export type Database = {
           exotel_raw_data?: Json | null
           from_number: string
           id?: string
+          loan_application_id?: string | null
           notes?: string | null
           org_id: string
           recording_duration?: number | null
@@ -609,6 +613,7 @@ export type Database = {
           activity_id?: string | null
           agent_id?: string | null
           answered_at?: string | null
+          applicant_id?: string | null
           call_duration?: number | null
           call_type?: string
           contact_id?: string | null
@@ -622,6 +627,7 @@ export type Database = {
           exotel_raw_data?: Json | null
           from_number?: string
           id?: string
+          loan_application_id?: string | null
           notes?: string | null
           org_id?: string
           recording_duration?: number | null
@@ -648,6 +654,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "call_logs_applicant_id_fkey"
+            columns: ["applicant_id"]
+            isOneToOne: false
+            referencedRelation: "loan_applicants"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "call_logs_contact_id_fkey"
             columns: ["contact_id"]
             isOneToOne: false
@@ -666,6 +679,13 @@ export type Database = {
             columns: ["disposition_id"]
             isOneToOne: false
             referencedRelation: "call_dispositions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_logs_loan_application_id_fkey"
+            columns: ["loan_application_id"]
+            isOneToOne: false
+            referencedRelation: "loan_applications"
             referencedColumns: ["id"]
           },
           {

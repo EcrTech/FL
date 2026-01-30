@@ -45,9 +45,9 @@ serve(async (req) => {
     }
 
     const requestBody = await req.json();
-    const { contactId, agentPhoneNumber, customerPhoneNumber } = requestBody;
+    const { contactId, agentPhoneNumber, customerPhoneNumber, loanApplicationId, applicantId } = requestBody;
 
-    console.log('Make call request:', { contactId, agentPhoneNumber, customerPhoneNumber: customerPhoneNumber ? '***' : 'missing' });
+    console.log('Make call request:', { contactId, agentPhoneNumber, customerPhoneNumber: customerPhoneNumber ? '***' : 'missing', loanApplicationId, applicantId });
 
     let customerPhone = customerPhoneNumber;
     let customerName = null;
@@ -160,7 +160,9 @@ serve(async (req) => {
         direction: 'outgoing-api',
         status: 'initiated',
         exotel_raw_data: exotelData,
-        started_at: new Date().toISOString(), // Use current time in UTC
+        started_at: new Date().toISOString(),
+        loan_application_id: loanApplicationId || null,
+        applicant_id: applicantId || null,
       })
       .select()
       .single();

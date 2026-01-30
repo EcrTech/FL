@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, User, FileText, Calculator, FileCheck, XCircle, CreditCard, CheckCircle, MapPin, Edit2, Save, X, RefreshCw, Loader2, Sparkles, Plus, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, User, FileText, Calculator, FileCheck, XCircle, CreditCard, CheckCircle, MapPin, Edit2, Save, X, RefreshCw, Loader2, Sparkles, Plus, Pencil, Trash2, History } from "lucide-react";
 import { toast } from "sonner";
 import { LoadingState } from "@/components/common/LoadingState";
 import { format } from "date-fns";
@@ -27,6 +27,7 @@ import { BankDetailsSection } from "@/components/LOS/BankDetailsSection";
 import { ReferralDialog } from "@/components/LOS/ReferralDialog";
 import { ApplicationSummary } from "@/components/LOS/ApplicationSummary";
 import { AssignmentDialog } from "@/components/LOS/AssignmentDialog";
+import { CaseHistoryDialog } from "@/components/LOS/CaseHistoryDialog";
 
 const STAGE_LABELS: Record<string, string> = {
   application_login: "Application Login",
@@ -397,6 +398,7 @@ export default function ApplicationDetail() {
   const { orgId, isLoading: isOrgLoading } = useOrgContext();
   const [approvalAction, setApprovalAction] = useState<"approve" | "reject" | null>(null);
   const [isAssignmentDialogOpen, setIsAssignmentDialogOpen] = useState(false);
+  const [isCaseHistoryOpen, setIsCaseHistoryOpen] = useState(false);
   const [isEditingReferrals, setIsEditingReferrals] = useState(false);
   const [isEditingApplicant, setIsEditingApplicant] = useState(false);
   const [applicantData, setApplicantData] = useState({
@@ -850,12 +852,25 @@ export default function ApplicationDetail() {
               <div className="text-xs text-muted-foreground">Not captured</div>
             )}
           </Card>
+          <Card 
+            className="p-3 cursor-pointer hover:bg-muted/50 transition-colors group"
+            onClick={() => setIsCaseHistoryOpen(true)}
+          >
+            <div className="text-xs text-muted-foreground flex items-center gap-1">
+              <History className="h-3 w-3" />
+              Case History
+            </div>
+            <div className="text-sm font-medium text-primary">
+              View Timeline
+            </div>
+          </Card>
         </div>
 
         {/* Applicant Profile with Documents */}
         {primaryApplicant && (
           <ApplicantProfileCard
             applicationId={id!}
+            applicantId={primaryApplicant.id as string}
             orgId={orgId!}
             applicant={primaryApplicant}
             applicantName={`${primaryApplicant.first_name} ${primaryApplicant.middle_name || ''} ${primaryApplicant.last_name || ''}`.trim()}
@@ -1339,6 +1354,19 @@ export default function ApplicationDetail() {
         }
         orgId={orgId!}
       />
+
+      {/* Case History Dialog */}
+      {primaryApplicant && (
+        <CaseHistoryDialog
+          open={isCaseHistoryOpen}
+          onOpenChange={setIsCaseHistoryOpen}
+          applicationId={id!}
+          orgId={orgId!}
+          applicantName={`${primaryApplicant.first_name} ${primaryApplicant.middle_name || ''} ${primaryApplicant.last_name || ''}`.trim()}
+          applicantPhone={primaryApplicant.mobile as string}
+          applicantEmail={primaryApplicant.email as string}
+        />
+      )}
     </DashboardLayout>
   );
 }
