@@ -10,6 +10,7 @@ interface SendMessageRequest {
   contactId: string;
   phoneNumber: string;
   templateId?: string;
+  templateName?: string; // For hardcoded templates like "conversation"
   templateVariables?: Record<string, string>;
   message?: string;
 }
@@ -82,7 +83,7 @@ Deno.serve(async (req) => {
     console.log('✓ User authenticated:', user.email);
 
     const body: SendMessageRequest = await req.json();
-    const { contactId, phoneNumber, templateId, templateVariables, message } = body;
+    const { contactId, phoneNumber, templateId, templateName, templateVariables, message } = body;
 
     // Fetch user profile and org_id
     console.log('Fetching user profile and org_id...');
@@ -135,9 +136,16 @@ Deno.serve(async (req) => {
 
     let messageContent = message || '';
     let templateData = null;
+    let useTemplateApi = false;
 
-    // If using a template, fetch it and prepare message
-    if (templateId) {
+    // If using templateName (hardcoded template like "conversation"), use Exotel template API
+    if (templateName) {
+      useTemplateApi = true;
+      // For hardcoded templates, message content is passed in the request
+      messageContent = message || '';
+    }
+    // If using a template from database, fetch it
+    else if (templateId) {
       const { data: template } = await supabaseClient
         .from('communication_templates')
         .select('*')
@@ -175,17 +183,45 @@ Deno.serve(async (req) => {
 
     // Build Exotel API URL
     const exotelSubdomain = whatsappSettings.exotel_subdomain || 'api.exotel.com';
-    const exotelUrl = `https://${exotelSubdomain}/v2/accounts/${whatsappSettings.exotel_sid}/messages`;
+    let exotelUrl: string;
+    let exotelPayload: any;
 
-    // Prepare Exotel payload
-    const exotelPayload = {
-      to: formattedPhone,
-      body: messageContent,
-      from: whatsappSettings.whatsapp_source_number,
-      channel: 'whatsapp',
-    };
+    if (useTemplateApi) {
+      // Use WhatsApp template API for hardcoded templates
+      exotelUrl = `https://${exotelSubdomain}/v2/accounts/${whatsappSettings.exotel_sid}/whatsapp/messages`;
+      exotelPayload = {
+        whatsapp: {
+          messages: [{
+            from: whatsappSettings.whatsapp_source_number,
+            to: formattedPhone,
+            content: {
+              type: "template",
+              template: {
+                name: templateName,
+                language: { code: "en" },
+                components: [] // No variables for "conversation" template
+              }
+            }
+          }]
+        }
+      };
+    } else {
+      // Use standard messaging API for plain messages or database templates
+      exotelUrl = `https://${exotelSubdomain}/v2/accounts/${whatsappSettings.exotel_sid}/messages`;
+      exotelPayload = {
+        to: formattedPhone,
+        body: messageContent,
+        from: whatsappSettings.whatsapp_source_number,
+        channel: 'whatsapp',
+      };
+    }
 
-    console.log('Sending WhatsApp message via Exotel:', { to: formattedPhone, bodyLength: messageContent.length });
+    console.log('Sending WhatsApp message via Exotel:', { 
+      to: formattedPhone, 
+      useTemplateApi, 
+      templateName: templateName || 'N/A',
+      bodyLength: messageContent?.length || 0 
+    });
 
     // Send via Exotel API
     const exotelResponse = await fetch(exotelUrl, {
