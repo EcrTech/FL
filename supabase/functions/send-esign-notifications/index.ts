@@ -240,18 +240,19 @@ serve(async (req) => {
         .eq("is_active", true)
         .single();
 
-      if (emailSettings?.sending_domain) {
-        const emailResult = await sendEmailNotification(
-          signer_email,
-          signer_name,
-          signer_url,
-          document_type,
-          emailSettings
-        );
-        results.push({ channel: "email", ...emailResult });
-      } else {
-        results.push({ channel: "email", success: false, error: "Email settings not configured" });
-      }
+      // Use org's verified domain if available, otherwise use global verified domain
+      const effectiveEmailSettings = emailSettings?.sending_domain 
+        ? emailSettings 
+        : { sending_domain: "in-sync.co.in", from_name: "E-Sign" };
+
+      const emailResult = await sendEmailNotification(
+        signer_email,
+        signer_name,
+        signer_url,
+        document_type,
+        effectiveEmailSettings
+      );
+      results.push({ channel: "email", ...emailResult });
     }
 
     // Send WhatsApp notification
