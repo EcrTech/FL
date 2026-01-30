@@ -9,7 +9,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
-import { User, FileText, CheckCircle, Eye, Loader2, Video, CreditCard, MessageSquare, Mail } from "lucide-react";
+import { User, FileText, CheckCircle, Eye, Loader2, Video, CreditCard, MessageSquare, Mail, Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 import CreditBureauDialog from "@/components/LOS/Verification/CreditBureauDialog";
@@ -17,6 +17,7 @@ import { VideoKYCRetryButton } from "@/components/LOS/Verification/VideoKYCRetry
 import { VideoKYCViewDialog } from "@/components/LOS/Verification/VideoKYCViewDialog";
 import { WhatsAppChatDialog } from "@/components/LOS/Relationships/WhatsAppChatDialog";
 import { EmailChatDialog } from "@/components/LOS/Relationships/EmailChatDialog";
+import { CallChatDialog } from "@/components/LOS/Relationships/CallChatDialog";
 interface Document {
   id: string;
   document_type: string;
@@ -46,6 +47,7 @@ interface Applicant {
 
 interface ApplicantProfileCardProps {
   applicationId: string;
+  applicantId?: string;
   orgId: string;
   applicant: Applicant;
   applicantName: string;
@@ -230,6 +232,7 @@ const VerificationCard = ({
 
 export function ApplicantProfileCard({
   applicationId,
+  applicantId,
   orgId,
   applicant,
   applicantName,
@@ -251,6 +254,7 @@ export function ApplicantProfileCard({
   const [videoKYCRecordingUrl, setVideoKYCRecordingUrl] = useState<string | null>(null);
   const [whatsappDialogOpen, setWhatsappDialogOpen] = useState(false);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [callDialogOpen, setCallDialogOpen] = useState(false);
 
   // Fetch verifications using React Query for proper cache invalidation
   const { data: verifications = [], isLoading: verificationsLoading } = useQuery({
@@ -418,6 +422,23 @@ export function ApplicantProfileCard({
                     {applicant.email ? "Send Email" : "No email available"}
                   </TooltipContent>
                 </Tooltip>
+                
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="default" 
+                      size="icon" 
+                      className="h-9 w-9 bg-emerald-600 hover:bg-emerald-700 shadow-md"
+                      onClick={() => setCallDialogOpen(true)}
+                      disabled={!mobile}
+                    >
+                      <Phone className="h-5 w-5 text-white" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {mobile ? "Make a Call" : "No phone number available"}
+                  </TooltipContent>
+                </Tooltip>
               </div>
             </div>
 
@@ -559,6 +580,18 @@ export function ApplicantProfileCard({
           contactId={applicationId}
           contactName={applicantName}
           email={applicant.email}
+        />
+      )}
+
+      {/* Call Chat Dialog */}
+      {mobile && (
+        <CallChatDialog
+          open={callDialogOpen}
+          onOpenChange={setCallDialogOpen}
+          applicantId={applicantId || applicationId}
+          applicationId={applicationId}
+          applicantName={applicantName}
+          phoneNumber={mobile}
         />
       )}
     </>
