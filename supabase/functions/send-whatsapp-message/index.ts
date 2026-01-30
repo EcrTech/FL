@@ -176,7 +176,13 @@ Deno.serve(async (req) => {
     }
 
     // Format phone number - remove non-digits for Exotel API call
-    const phoneDigits = phoneNumber.replace(/[^\d]/g, '');
+    let phoneDigits = phoneNumber.replace(/[^\d]/g, '');
+    
+    // If phone is 10 digits (Indian local number), prepend country code 91
+    if (phoneDigits.length === 10) {
+      phoneDigits = '91' + phoneDigits;
+    }
+    
     // Store with + prefix for consistency with UI queries
     const phoneForStorage = '+' + phoneDigits;
 

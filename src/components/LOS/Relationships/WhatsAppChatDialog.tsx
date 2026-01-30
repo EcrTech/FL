@@ -66,10 +66,17 @@ export function WhatsAppChatDialog({
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  // Format phone number for queries
-  const formattedPhone = phoneNumber.replace(/[^\d]/g, '').startsWith('+') 
-    ? phoneNumber.replace(/[^\d+]/g, '')
-    : '+' + phoneNumber.replace(/[^\d]/g, '');
+  // Format phone number for queries - ensure country code is present
+  const formatPhoneForQuery = (phone: string) => {
+    let digits = phone.replace(/[^\d]/g, '');
+    // If 10 digits (Indian local), prepend 91
+    if (digits.length === 10) {
+      digits = '91' + digits;
+    }
+    return '+' + digits;
+  };
+  
+  const formattedPhone = formatPhoneForQuery(phoneNumber);
 
   // Scroll to bottom when messages change
   const scrollToBottom = useCallback(() => {
