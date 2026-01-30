@@ -1,90 +1,135 @@
 
-# Fix E-Sign PDF Generation - Rupee Symbol Encoding Error
+# Fix Nupay API Authentication - Add Missing `api-key` Header
 
-## Problem Identified
+## Problem Summary
 
-The E-Sign functionality is failing because the PDF generation library (`pdf-lib`) cannot encode the Indian Rupee symbol (₹) when using standard fonts.
+The Nupay eMandate and E-Sign API calls are failing with **"Invalid API key"** (403 status). The error occurs because:
 
-### Error from Edge Function Logs
+1. **Authentication works correctly**: The `nupay-authenticate` function gets a valid JWT token using the `api-key` header
+2. **Subsequent API calls fail**: All other Nupay functions (`get-banks`, `create-mandate`, `get-status`, `esign-request`, `esign-status`) only send the `Bearer token` but are **missing the `api-key` header**
+
+### Error from Logs
 ```
-Error: WinAnsi cannot encode "₹" (0x20b9)
-    at r.encodeUnicodeCodePoint (standard-fonts.mjs)
-    at createPdfFromDocument (index.ts:108)
+[Nupay-Banks] Failed to fetch banks: {"status":false,"error":"Invalid API key "}
 ```
 
 ### Root Cause
-Standard PDF fonts (Helvetica, Times-Roman, Courier) only support **WinAnsi encoding**, which is limited to ASCII and Western European characters. The Rupee symbol (₹) is a Unicode character (U+20B9) that is not included in this encoding.
 
-The problematic line is:
-```typescript
-`Loan Amount: ₹${sanction?.sanctioned_amount?.toLocaleString("en-IN") || "N/A"}`,
-```
+The Nupay API requires **BOTH** headers for all requests:
+- `Authorization: Bearer <token>` ✓ (currently sent)
+- `api-key: <api_key>` ✗ (missing from all functions except authenticate)
 
 ---
 
 ## Solution
 
-Replace the Rupee symbol (₹) with a compatible alternative like `Rs.` or `INR` in the PDF text content.
+Add the `api-key` header to all Nupay edge functions that make API calls. This requires:
+
+1. Fetching the `api_key` from `nupay_config` table (currently only fetching `api_endpoint`)
+2. Including `api-key` header in all `fetch()` calls to Nupay API endpoints
 
 ---
 
 ## Technical Implementation
 
-### File: `supabase/functions/nupay-esign-request/index.ts`
+### Files to Modify
 
-**Change in createPdfFromDocument function (lines 143-161):**
+| File | Current Issue | Fix |
+|------|---------------|-----|
+| `supabase/functions/nupay-get-banks/index.ts` | Only sends Bearer token | Add `api-key` header, fetch `api_key` from config |
+| `supabase/functions/nupay-create-mandate/index.ts` | Only sends Bearer token | Add `api-key` header (config already fetched with `*`) |
+| `supabase/functions/nupay-get-status/index.ts` | Only sends Bearer token | Add `api-key` header, fetch `api_key` from config |
+| `supabase/functions/nupay-esign-request/index.ts` | Only sends Bearer token | Add `api-key` header, fetch `api_key` from config |
+| `supabase/functions/nupay-esign-status/index.ts` | Only sends Bearer token | Add `api-key` header, fetch `api_key` from config |
 
-Replace all instances of the ₹ symbol with `Rs.`:
+---
 
+### Change Pattern (Example: nupay-get-banks)
+
+**Before:**
 ```typescript
-const lines = [
-  `Application Number: ${appData.application_number || "N/A"}`,
-  `Date: ${new Date().toLocaleDateString("en-IN")}`,
-  "",
-  `Loan Amount: Rs. ${sanction?.sanctioned_amount?.toLocaleString("en-IN") || "N/A"}`,
-  `Interest Rate: ${sanction?.interest_rate || "N/A"}% p.a.`,
-  `Tenure: ${sanction?.tenure_months || "N/A"} months`,
-  "",
-  "This document is digitally generated and requires Aadhaar-based e-signature",
-  "for legal validity.",
-  "",
-  "",
-  "",
-  "Signature: ___________________________",
-  "",
-  "",
-  "(This space is reserved for digital signature)",
-];
+// Line 96-102: Only fetching api_endpoint
+const { data: config } = await supabase
+  .from("nupay_config")
+  .select("api_endpoint")
+  .eq("org_id", org_id)
+  ...
+
+// Line 115-121: Only sending Bearer token
+const banksResponse = await fetch(banksEndpoint, {
+  method: "GET",
+  headers: {
+    "Authorization": `Bearer ${token}`,
+    "Content-Type": "application/json",
+  },
+});
+```
+
+**After:**
+```typescript
+// Fetch both api_endpoint AND api_key
+const { data: config } = await supabase
+  .from("nupay_config")
+  .select("api_endpoint, api_key")
+  .eq("org_id", org_id)
+  ...
+
+// Send BOTH Bearer token AND api-key header
+const banksResponse = await fetch(banksEndpoint, {
+  method: "GET",
+  headers: {
+    "Authorization": `Bearer ${token}`,
+    "api-key": config.api_key,
+    "Content-Type": "application/json",
+  },
+});
 ```
 
 ---
 
-## Alternative: Embed Custom Font (More Complex)
+## Detailed Changes Per File
 
-For proper ₹ symbol support, we would need to:
-1. Embed a custom font (like Noto Sans) that includes the Rupee character
-2. Load the font bytes in the edge function
-3. Use `pdfDoc.embedFont(fontBytes)` instead of `StandardFonts.Helvetica`
+### 1. `nupay-get-banks/index.ts`
+- Line 98: Change `.select("api_endpoint")` to `.select("api_endpoint, api_key")`
+- Line 117-120: Add `"api-key": config.api_key` to headers
 
-This approach is more complex and increases function size/latency, so using `Rs.` is the recommended quick fix.
+### 2. `nupay-create-mandate/index.ts`
+- Line 129: Already using `.select("*")` so `api_key` is available
+- Line 197-200: Add `"api-key": config.api_key` to headers
+
+### 3. `nupay-get-status/index.ts`
+- Line 107: Change `.select("api_endpoint")` to `.select("api_endpoint, api_key")`
+- Line 126-129: Add `"api-key": config.api_key` to headers
+
+### 4. `nupay-esign-request/index.ts`
+- Line 219: Change `.select("api_endpoint")` to `.select("api_endpoint, api_key")`
+- Line 260-263: Add `"api-key": config.api_key` to headers
+
+### 5. `nupay-esign-status/index.ts`
+- Check current implementation and apply same pattern
 
 ---
 
-## Files to Modify
+## Verification Steps
 
-| File | Change |
-|------|--------|
-| `supabase/functions/nupay-esign-request/index.ts` | Replace ₹ with Rs. in PDF text content |
+After deployment:
+
+1. Go to `/los/settings/nupay` → Banks tab
+2. Click "Refresh Bank List"
+3. Expected: Banks load successfully instead of "Invalid API key" error
 
 ---
 
-## Expected Result
+## Additional Recommendation: Enhanced Logging
 
-After this fix:
-- PDF generation will succeed
-- E-Sign request will be sent to Nupay API
-- Signer URL will be returned to the user
+Add diagnostic logging to help debug future issues:
 
-| Before | After |
-|--------|-------|
-| ₹12,500 (fails) | Rs. 12,500 (works) |
+```typescript
+console.log(`[Nupay-Banks] Config loaded:`, {
+  api_endpoint: config.api_endpoint,
+  api_key_length: config.api_key?.length || 0,
+  api_key_prefix: config.api_key?.substring(0, 8) + "...",
+});
+```
+
+This will help verify the `api_key` is being loaded correctly without exposing the full key in logs.
