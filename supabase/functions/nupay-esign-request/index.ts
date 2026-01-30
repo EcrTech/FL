@@ -19,32 +19,15 @@ interface ESignRequest {
   environment: "uat" | "production";
 }
 
-// Helper function to get fresh Nupay auth token (no caching to avoid stale tokens)
-// deno-lint-ignore no-explicit-any
-async function getNupayToken(supabase: SupabaseClient<any, any, any>, orgId: string, environment: string): Promise<{ token: string; apiKey: string; apiEndpoint: string }> {
-  // Get config for API details
-  const { data: config, error: configError } = await supabase
-    .from("nupay_config")
-    .select("*")
-    .eq("org_id", orgId)
-    .eq("environment", environment)
-    .eq("is_active", true)
-    .single();
-
-  if (configError || !config) {
-    throw new Error("Nupay configuration not found or inactive");
-  }
-
-  const configData = config as { api_endpoint: string; api_key: string };
-
-  // Always get fresh token - do not use cache to avoid stale token issues
-  const authEndpoint = `${configData.api_endpoint}/Auth/token`;
+// Helper function to get a fresh token directly from Nupay API
+async function getNewToken(apiEndpoint: string, apiKey: string): Promise<string> {
+  const authEndpoint = `${apiEndpoint}/Auth/token`;
   console.log(`[E-Sign] Requesting fresh token from ${authEndpoint}`);
 
   const authResponse = await fetch(authEndpoint, {
     method: "GET",
     headers: {
-      "api-key": configData.api_key,
+      "api-key": apiKey,
     },
   });
 
@@ -70,12 +53,7 @@ async function getNupayToken(supabase: SupabaseClient<any, any, any>, orgId: str
   }
 
   console.log(`[E-Sign] Got fresh token: ${token.substring(0, 20)}...`);
-
-  return {
-    token,
-    apiKey: configData.api_key,
-    apiEndpoint: configData.api_endpoint,
-  };
+  return token;
 }
 
 // Helper to create a simple PDF from document data
@@ -358,8 +336,22 @@ serve(async (req) => {
     console.log(`[E-Sign] Signer: ${signer_name}, Mobile: ${signer_mobile}`);
     console.log(`[E-Sign] Environment: ${environment}`);
 
-    // Get fresh Nupay token
-    const { token, apiKey, apiEndpoint } = await getNupayToken(supabase, org_id, environment);
+    // Get Nupay config (will get fresh tokens for each step)
+    const { data: config, error: configError } = await supabase
+      .from("nupay_config")
+      .select("*")
+      .eq("org_id", org_id)
+      .eq("environment", environment)
+      .eq("is_active", true)
+      .single();
+
+    if (configError || !config) {
+      throw new Error("Nupay configuration not found or inactive");
+    }
+
+    const configData = config as { api_endpoint: string; api_key: string };
+    const apiEndpoint = configData.api_endpoint;
+    const apiKey = configData.api_key;
 
     // Generate PDF
     console.log("[E-Sign] Generating PDF document...");
@@ -373,21 +365,29 @@ serve(async (req) => {
 
     console.log(`[E-Sign] Generated ref_no: ${refNo}`);
 
+    // Step 1: Get fresh token for upload
+    console.log("[E-Sign] Getting fresh token for Step 1 (Upload)...");
+    const token1 = await getNewToken(apiEndpoint, apiKey);
+
     // Step 1: Upload document to Nupay
     const { nupayRefNo } = await uploadDocumentToNupay(
       apiEndpoint,
       apiKey,
-      token,
+      token1,
       pdfBytes,
       documentTitle,
       refNo
     );
 
-    // Step 2: Process for signing (add signers) - use SAME token
+    // Step 2: Get FRESH token for processForSign (critical - tokens may be single-use)
+    console.log("[E-Sign] Getting fresh token for Step 2 (Process)...");
+    const token2 = await getNewToken(apiEndpoint, apiKey);
+
+    // Step 2: Process for signing (add signers) - use FRESH token
     const { signerUrl, docketId, documentId: nupayDocumentId } = await processForSign(
       apiEndpoint,
       apiKey,
-      token,
+      token2,
       refNo,
       nupayRefNo,
       signer_name,
