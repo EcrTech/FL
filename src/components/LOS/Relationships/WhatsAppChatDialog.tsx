@@ -49,6 +49,9 @@ const CONVERSATION_TEMPLATE = {
 I have a few clarifications to seek about your application. Are you available now?
 
 team PaisaaSaarthi`,
+  buttons: [
+    { type: "quick_reply", text: "Yes, I am available" }
+  ]
 };
 
 export function WhatsAppChatDialog({
@@ -345,30 +348,53 @@ export function WhatsAppChatDialog({
                 Starting conversation...
               </div>
             ) : (
-              messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}
-                >
+              messages.map((msg) => {
+                // Check if this message matches the conversation template
+                const isConversationTemplate = msg.message_content?.includes(CONVERSATION_TEMPLATE.content.substring(0, 50));
+                
+                return (
                   <div
-                    className={`max-w-[80%] rounded-lg px-3 py-2 shadow-sm ${
-                      msg.direction === 'outbound'
-                        ? 'bg-[#dcf8c6] dark:bg-green-700 text-foreground'
-                        : 'bg-white dark:bg-slate-700 text-foreground'
-                    }`}
+                    key={msg.id}
+                    className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}
                   >
-                    <p className="text-sm whitespace-pre-wrap">{msg.message_content}</p>
-                    <div className="flex items-center justify-end gap-1 mt-1">
-                      <span className="text-[10px] text-muted-foreground">
-                        {msg.sent_at || msg.created_at
-                          ? format(new Date(msg.sent_at || msg.created_at!), "HH:mm")
-                          : ""}
-                      </span>
-                      {msg.direction === 'outbound' && getStatusIcon(msg.status)}
+                    <div className="max-w-[80%]">
+                      <div
+                        className={`rounded-lg px-3 py-2 shadow-sm ${
+                          msg.direction === 'outbound'
+                            ? 'bg-[#dcf8c6] dark:bg-green-700 text-foreground'
+                            : 'bg-white dark:bg-slate-700 text-foreground'
+                        }`}
+                      >
+                        <p className="text-sm whitespace-pre-wrap">{msg.message_content}</p>
+                        <div className="flex items-center justify-end gap-1 mt-1">
+                          <span className="text-[10px] text-muted-foreground">
+                            {msg.sent_at || msg.created_at
+                              ? format(new Date(msg.sent_at || msg.created_at!), "HH:mm")
+                              : ""}
+                          </span>
+                          {msg.direction === 'outbound' && getStatusIcon(msg.status)}
+                        </div>
+                      </div>
+                      
+                      {/* Show buttons for template messages */}
+                      {isConversationTemplate && msg.direction === 'outbound' && (
+                        <div className="mt-1 space-y-1">
+                          {CONVERSATION_TEMPLATE.buttons.map((btn, idx) => (
+                            <div
+                              key={idx}
+                              className="bg-white dark:bg-slate-600 text-center py-2 px-3 rounded-lg shadow-sm border border-gray-200 dark:border-slate-500"
+                            >
+                              <span className="text-sm text-blue-600 dark:text-blue-400">
+                                {btn.text}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
             
             {/* Sending indicator */}
