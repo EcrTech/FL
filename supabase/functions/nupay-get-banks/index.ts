@@ -95,11 +95,17 @@ serve(async (req) => {
     // Fetch Nupay config to get endpoint
     const { data: config } = await supabase
       .from("nupay_config")
-      .select("api_endpoint")
+      .select("api_endpoint, api_key")
       .eq("org_id", org_id)
       .eq("environment", environment)
       .eq("is_active", true)
       .single();
+
+    console.log(`[Nupay-Banks] Config loaded:`, {
+      api_endpoint: config?.api_endpoint,
+      api_key_length: config?.api_key?.length || 0,
+      api_key_prefix: config?.api_key?.substring(0, 8) + "...",
+    });
 
     if (!config) {
       return new Response(
@@ -116,6 +122,7 @@ serve(async (req) => {
       method: "GET",
       headers: {
         "Authorization": `Bearer ${token}`,
+        "api-key": config.api_key,
         "Content-Type": "application/json",
       },
     });

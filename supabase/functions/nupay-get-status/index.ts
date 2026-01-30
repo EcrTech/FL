@@ -104,7 +104,7 @@ serve(async (req) => {
     // Fetch Nupay config
     const { data: config } = await supabase
       .from("nupay_config")
-      .select("api_endpoint")
+      .select("api_endpoint, api_key")
       .eq("org_id", org_id)
       .eq("environment", environment)
       .eq("is_active", true)
@@ -125,6 +125,7 @@ serve(async (req) => {
       method: "GET",
       headers: {
         "Authorization": `Bearer ${token}`,
+        "api-key": config.api_key,
         "Content-Type": "application/json",
       },
     });

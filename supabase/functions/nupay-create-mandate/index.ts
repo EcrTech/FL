@@ -196,6 +196,7 @@ serve(async (req) => {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${token}`,
+        "api-key": config.api_key,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(nupayPayload),
