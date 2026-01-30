@@ -291,7 +291,7 @@ Deno.serve(async (req) => {
     }
 
     // Log successful message
-    const { data: messageRecord } = await supabaseClient
+    const { data: messageRecord, error: insertError } = await supabaseClient
       .from('whatsapp_messages')
       .insert({
         org_id: profile.org_id,
@@ -303,9 +303,18 @@ Deno.serve(async (req) => {
         template_variables: templateVariables || null,
         exotel_message_id: exotelResult.sid || exotelResult.id,
         status: 'sent',
+        direction: 'outbound',
+        sent_at: new Date().toISOString(),
       })
       .select()
       .single();
+
+    if (insertError) {
+      console.error('Failed to insert message record:', insertError);
+      // Still return success since message was sent, but log the error
+    }
+
+    console.log('Message record inserted:', messageRecord?.id || 'FAILED');
 
     // Use shared service role client for wallet deduction
     const supabaseServiceClient = getSupabaseClient();
