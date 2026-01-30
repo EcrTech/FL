@@ -158,7 +158,7 @@ async function sendWhatsAppNotification(
           template: {
             name: "emandate_request",
             language: {
-              code: "en"
+              code: "en_US"
             },
             components: [
               {
