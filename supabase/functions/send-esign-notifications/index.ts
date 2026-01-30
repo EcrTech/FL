@@ -43,29 +43,31 @@ async function sendEmailNotification(
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>E-Sign Request</title>
+  <title>Congratulations! Sign Your ${documentLabel}</title>
 </head>
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
-    <h1 style="color: #fff; margin: 0; font-size: 24px;">E-Sign Request</h1>
+  <div style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+    <h1 style="color: #fff; margin: 0; font-size: 24px;">🎉 Congratulations!</h1>
   </div>
   
   <div style="background: #fff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
     <p style="font-size: 16px;">Dear <strong>${signerName}</strong>,</p>
     
-    <p style="font-size: 16px;">You have received a document for electronic signature:</p>
+    <p style="font-size: 16px;"><strong>Congratulations on your loan approval!</strong></p>
     
-    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center;">
-      <p style="font-size: 18px; font-weight: bold; color: #333; margin: 0 0 10px 0;">${documentLabel}</p>
-      <p style="color: #666; margin: 0;">Please review and sign the document</p>
+    <p style="font-size: 16px;">Here is the link for your electronic signature. Please click the button below to review and sign your document.</p>
+    
+    <div style="background: #f0fdf4; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: center; border: 1px solid #bbf7d0;">
+      <p style="font-size: 18px; font-weight: bold; color: #166534; margin: 0 0 10px 0;">${documentLabel}</p>
+      <p style="color: #15803d; margin: 0;">Ready for your signature</p>
     </div>
     
     <div style="text-align: center; margin: 30px 0;">
-      <a href="${signerUrl}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: bold; display: inline-block;">Sign Document</a>
+      <a href="${signerUrl}" style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: #fff; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: bold; display: inline-block;">Sign Document</a>
     </div>
     
     <p style="font-size: 14px; color: #666;">If the button doesn't work, copy and paste this link in your browser:</p>
-    <p style="font-size: 12px; word-break: break-all; color: #667eea;">${signerUrl}</p>
+    <p style="font-size: 12px; word-break: break-all; color: #16a34a;">${signerUrl}</p>
     
     <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 30px 0;">
     
@@ -87,7 +89,7 @@ async function sendEmailNotification(
       body: JSON.stringify({
         from: `${fromName} <${fromEmail}>`,
         to: [to],
-        subject: `E-Sign Request: ${documentLabel}`,
+        subject: `Congratulations! Please Sign Your ${documentLabel}`,
         html: htmlContent,
       }),
     });
