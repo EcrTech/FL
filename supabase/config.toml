@@ -77,3 +77,6 @@ verify_jwt = true
 
 [functions.nupay-webhook-handler]
 verify_jwt = false
+
+[functions.send-emandate-notifications]
+verify_jwt = false
