@@ -160,8 +160,10 @@ async function uploadDocumentToNupay(
 
   // Create FormData for multipart upload
   const formData = new FormData();
-  formData.append("document_title", sanitize(documentTitle));
-  formData.append("remarks", sanitize(`ESign request for ${documentTitle}`));
+  formData.append("document_title", sanitize(documentTitle).substring(0, 50));
+  // Nupay limits remarks to 35 characters
+  const shortRemarks = sanitize(`ESign ${documentTitle}`).substring(0, 35);
+  formData.append("remarks", shortRemarks);
   formData.append("ref_no", refNo);
   
   // Create blob from PDF bytes
