@@ -18,6 +18,7 @@ import LoanAgreementDocument from "../Sanction/templates/LoanAgreementDocument";
 import DailyRepaymentScheduleDocument from "../Sanction/templates/DailyRepaymentScheduleDocument";
 import UploadSignedDocumentDialog from "../Sanction/UploadSignedDocumentDialog";
 import ESignDocumentButton from "../Sanction/ESignDocumentButton";
+import EMandateSection from "./EMandateSection";
 
 
 interface DisbursementDashboardProps {
@@ -627,6 +628,19 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
           </div>
         </CardContent>
       </Card>
+
+      {/* eMandate Registration Section */}
+      <EMandateSection
+        applicationId={applicationId}
+        orgId={application.org_id}
+        borrowerName={borrowerName}
+        borrowerPhone={borrowerPhone}
+        borrowerEmail={applicant?.email}
+        dailyEMI={dailyEMI}
+        loanAmount={loanAmount}
+        tenureDays={tenureDays}
+        loanNo={application.application_number || `LOAN-${applicationId.slice(0, 8)}`}
+      />
 
       {/* Hidden document templates for printing */}
       <div className="hidden">
