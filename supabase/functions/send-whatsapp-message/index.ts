@@ -233,8 +233,28 @@ Deno.serve(async (req) => {
       body: JSON.stringify(exotelPayload),
     });
 
-    const exotelResult = await exotelResponse.json();
-    console.log('Exotel response:', exotelResult);
+    // Read response as text first, then try to parse as JSON
+    const responseText = await exotelResponse.text();
+    console.log('Exotel raw response:', responseText);
+    
+    let exotelResult: any;
+    try {
+      exotelResult = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('Failed to parse Exotel response as JSON:', parseError);
+      // Try to extract JSON from the response if it's mixed content
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          exotelResult = JSON.parse(jsonMatch[0]);
+        } catch {
+          exotelResult = { raw: responseText, error: 'Invalid JSON response' };
+        }
+      } else {
+        exotelResult = { raw: responseText, error: 'Non-JSON response' };
+      }
+    }
+    console.log('Exotel parsed response:', exotelResult);
 
     if (!exotelResponse.ok) {
       // Log failed message
