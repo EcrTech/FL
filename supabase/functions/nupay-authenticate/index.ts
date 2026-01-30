@@ -67,9 +67,9 @@ serve(async (req) => {
       );
     }
 
-    // Call Nupay Auth endpoint
+    // Call Nupay Auth endpoint - only api-key header needed
     const authEndpoint = `${config.api_endpoint}/Auth/token`;
-    console.log(`[Nupay-Auth] Requesting token from ${authEndpoint}`);
+    console.log(`[Nupay-Auth] Requesting token from ${authEndpoint} with api-key: ${config.api_key.substring(0, 8)}...`);
 
     const authResponse = await fetch(authEndpoint, {
       method: "GET",

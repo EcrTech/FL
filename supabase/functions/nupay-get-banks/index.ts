@@ -71,28 +71,7 @@ serve(async (req) => {
       }
     }
 
-    // Get auth token
-    const authFunctionUrl = `${supabaseUrl}/functions/v1/nupay-authenticate`;
-    const tokenResponse = await fetch(authFunctionUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${supabaseServiceKey}`,
-      },
-      body: JSON.stringify({ org_id, environment }),
-    });
-
-    if (!tokenResponse.ok) {
-      const errorData = await tokenResponse.json();
-      return new Response(
-        JSON.stringify({ error: "Failed to authenticate", details: errorData }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const { token } = await tokenResponse.json();
-
-    // Fetch Nupay config to get endpoint
+    // Fetch Nupay config to get endpoint - NO TOKEN NEEDED for getBankList per API spec
     const { data: config } = await supabase
       .from("nupay_config")
       .select("api_endpoint, api_key")
@@ -114,16 +93,14 @@ serve(async (req) => {
       );
     }
 
-    // Fetch bank list from Nupay
+    // Fetch bank list from Nupay - ONLY api-key header needed (per API spec)
     const banksEndpoint = `${config.api_endpoint}/api/EMandate/getBankList`;
-    console.log(`[Nupay-Banks] Fetching bank list from ${banksEndpoint}`);
+    console.log(`[Nupay-Banks] Fetching bank list from ${banksEndpoint} (api-key only, no Token)`);
 
     const banksResponse = await fetch(banksEndpoint, {
       method: "GET",
       headers: {
-        "Authorization": `Bearer ${token}`,
         "api-key": config.api_key,
-        "Content-Type": "application/json",
       },
     });
 

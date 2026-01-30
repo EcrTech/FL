@@ -139,12 +139,19 @@ serve(async (req) => {
       );
     }
 
-    // Build Nupay API payload (field mapping as per API doc)
+    // Build Nupay API payload (field mapping as per API doc - EXACT field names)
+    // Map account_type to Nupay format
+    const accountTypeMap: Record<string, string> = {
+      "Savings": "SB",
+      "Current": "CC",
+      "OTHER": "OTHER"
+    };
+    
     const nupayPayload: Record<string, any> = {
       loan_no: requestData.loan_no,
       seq_tp: requestData.seq_type,
       frqcy: requestData.frequency,
-      category_id: requestData.category_id || 7, // Default: Loan instalment
+      category_id: requestData.category_id || 13, // Default category as per sample
       colltn_amt: requestData.collection_amount,
       debit_type: requestData.debit_type || false,
       frst_colltn_dt: requestData.first_collection_date,
@@ -153,23 +160,27 @@ serve(async (req) => {
       bank_account_no: requestData.bank_account_no,
       bank_account_no_confirmation: requestData.bank_account_no_confirmation,
       bank_id: requestData.bank_id,
-      acc_tp: requestData.account_type,
+      account_type: accountTypeMap[requestData.account_type] || "SB", // Use exact field name
       mobile_no: requestData.mobile_no,
+      tel_no: "", // Required field per API
+      addnl2: "",
+      addnl3: "",
+      addnl4: "",
+      addnl5: "",
     };
 
-    // Optional fields
+    // Optional fields - use EXACT field names per API spec
     if (requestData.final_collection_date) {
       nupayPayload.fnl_colltn_dt = requestData.final_collection_date;
     }
     if (requestData.ifsc_code) {
-      nupayPayload.ifsc = requestData.ifsc_code;
+      nupayPayload.ifsc_code = requestData.ifsc_code; // Exact field name per spec
     }
     if (requestData.email) {
       nupayPayload.email = requestData.email;
     }
-    if (requestData.auth_type) {
-      nupayPayload.auth_type = requestData.auth_type;
-    }
+    // auth_type should be empty string if not specified per API sample
+    nupayPayload.auth_type = requestData.auth_type || "";
 
     // Additional data fields (addnl2-5)
     if (requestData.additional_data) {
@@ -192,11 +203,12 @@ serve(async (req) => {
     console.log(`[Nupay-CreateMandate] Creating mandate at ${mandateEndpoint}`);
     console.log(`[Nupay-CreateMandate] Payload:`, JSON.stringify(nupayPayload));
 
+    // Use correct headers per API spec: "Token" header (not "Authorization: Bearer")
     const mandateResponse = await fetch(mandateEndpoint, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${token}`,
         "api-key": config.api_key,
+        "Token": token, // Correct header per API spec
         "Content-Type": "application/json",
       },
       body: JSON.stringify(nupayPayload),
