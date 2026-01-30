@@ -121,12 +121,12 @@ serve(async (req) => {
     const statusEndpoint = `${config.api_endpoint}/api/EMandate/getStatus/${mandate.nupay_id}`;
     console.log(`[Nupay-Status] Checking status at ${statusEndpoint}`);
 
+    // Use correct headers per API spec: "Token" header (not "Authorization: Bearer")
     const statusResponse = await fetch(statusEndpoint, {
       method: "GET",
       headers: {
-        "Authorization": `Bearer ${token}`,
         "api-key": config.api_key,
-        "Content-Type": "application/json",
+        "Token": token, // Correct header per API spec
       },
     });
 
