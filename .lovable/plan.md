@@ -1,92 +1,58 @@
 
-# Update Email Template and E-Sign Status Flow Overview
+# Fix E-Sign Email Notifications
 
-## Summary
-Update the email template to match your approved WhatsApp template's congratulatory tone, then test the complete E-Sign notification flow.
+## Problem
+The E-Sign email notification is failing because the function requires an entry in the `email_settings` table with a `sending_domain`. The table is currently empty.
 
-## 1. Email Template Update
+The OTP email functions work because they have a fallback to `noreply@in-sync.co.in` when org-specific email settings aren't configured.
 
-### Current Email Content (lines 40-78 in `send-esign-notifications/index.ts`)
-```
-Subject: E-Sign Request: {Document Label}
-Body: "Dear {Name}, You have received a document for electronic signature..."
-```
-
-### New Email Content (matching WhatsApp tone)
-```
-Subject: Congratulations! Please Sign Your {Document Label}
-Body: "Dear {Name}, Congratulations on your loan approval! Here is the link 
-       for your electronic signature. Please click the button below to review 
-       and sign the document. This link is valid for 72 hours."
-```
-
-### File to Modify
-`supabase/functions/send-esign-notifications/index.ts` (lines 40-92)
+## Solution
+Update the `send-esign-notifications` Edge Function to use the same fallback pattern as the working OTP functions.
 
 ---
 
-## 2. E-Sign Response Flow (Current Implementation)
+## Changes Required
 
-### How Signed Status is Received
+### File: `supabase/functions/send-esign-notifications/index.ts`
 
-**Two mechanisms exist:**
+**Current behavior (lines 243-254):**
+```typescript
+if (emailSettings?.sending_domain) {
+  // send email
+} else {
+  results.push({ channel: "email", success: false, error: "Email settings not configured" });
+}
+```
 
-1. **Webhook (Automatic)** - `nupay-esign-webhook` Edge Function
-   - Nupay sends a POST request when signing is complete
-   - Payload includes: `document_id`, `status`, `signer_info`, optionally `signed_document` (base64 PDF)
+**New behavior with fallback:**
+```typescript
+// Use org's verified domain if available, otherwise use global verified domain
+const effectiveEmailSettings = emailSettings?.sending_domain 
+  ? emailSettings 
+  : { sending_domain: "in-sync.co.in", from_name: "E-Sign" };
 
-2. **Manual Status Check (Polling)** - `nupay-esign-status` Edge Function
-   - Triggered via the refresh button in the UI
-   - Calls Nupay's `/api/SignDocument/documentStatus` endpoint
-   - Polls every 30 seconds while status is pending/sent/viewed
+const emailResult = await sendEmailNotification(
+  signer_email,
+  signer_name,
+  signer_url,
+  document_type,
+  effectiveEmailSettings
+);
+results.push({ channel: "email", ...emailResult });
+```
 
-### Where Signed Status is Stored
-
-**`document_esign_requests` table** stores:
-| Field | Description |
-|-------|-------------|
-| `status` | pending → sent → viewed → signed |
-| `signed_at` | Timestamp when signed |
-| `signed_document_path` | Storage path if Nupay returns PDF |
-| `audit_log` | JSON array of status changes |
-| `esign_response` | Raw Nupay webhook payload |
-
-**`loan_generated_documents` table** is also updated:
-| Field | Description |
-|-------|-------------|
-| `customer_signed` | Set to `true` |
-| `signed_at` | Timestamp |
-| `status` | Set to `signed` |
-
-### How Status is Displayed in UI
-
-**Component: `ESignDocumentButton.tsx`**
-- Uses `useESignRequests(applicationId)` hook to fetch all e-sign requests
-- Finds the latest request for each document type
-- Renders `ESignStatusBadge` showing: Pending, Sent, Viewed, or Signed
-- Shows refresh button to manually trigger status check
-
-**Component: `ESignStatusBadge.tsx`**
-- Color-coded badges: Yellow (pending), Blue (sent), Purple (viewed), Green (signed)
-- Tooltip shows sent/viewed/signed timestamps
-
-**Locations in UI:**
-- Disbursement Dashboard (`DisbursementDashboard.tsx` line 559)
-- Displayed next to each document (Sanction Letter, Loan Agreement, Daily Schedule)
+This will:
+1. Try to use org-specific email settings from `email_settings` table
+2. Fall back to `noreply@in-sync.co.in` (same verified domain used by OTP emails) if not configured
 
 ---
 
-## 3. Testing the Complete Flow
+## Technical Details
 
-After deploying the email template update, test by:
+| Aspect | Before | After |
+|--------|--------|-------|
+| Missing email_settings | Fails with error | Falls back to in-sync.co.in |
+| From address | Only org-specific | Org-specific OR noreply@in-sync.co.in |
+| Behavior matches | N/A | send-otp, send-public-otp |
 
-1. Go to a sanctioned loan application
-2. Navigate to Disbursement tab
-3. Click "E-Sign" on Sanction Letter or Loan Agreement
-4. Fill in signer details and submit
-5. Check:
-   - WhatsApp message arrives with "Congratulations on your loan approval..."
-   - Email arrives with matching congratulatory content
-6. Click the signing link and complete e-sign
-7. Return to the app and click the refresh icon
-8. Verify status badge changes to "Signed" (green)
+No database changes required - this is purely an Edge Function update.
