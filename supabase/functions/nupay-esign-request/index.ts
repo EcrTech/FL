@@ -329,10 +329,10 @@ serve(async (req) => {
       environment,
     } = body;
 
-    // Validate required fields
-    if (!org_id || !application_id || !document_type || !signer_name || !signer_mobile || !environment) {
+    // Validate required fields - email is required by Nupay
+    if (!org_id || !application_id || !document_type || !signer_name || !signer_mobile || !signer_email || !environment) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields" }),
+        JSON.stringify({ error: "Missing required fields. Name, mobile, and email are required." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

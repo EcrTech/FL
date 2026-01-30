@@ -63,8 +63,8 @@ export default function ESignDocumentDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!signerName || !signerMobile) {
-      toast.error("Signer name and mobile are required");
+    if (!signerName || !signerMobile || !signerEmail) {
+      toast.error("Signer name, mobile, and email are required");
       return;
     }
 
@@ -165,13 +165,14 @@ export default function ESignDocumentDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="signerEmail">Email (Optional)</Label>
+              <Label htmlFor="signerEmail">Email *</Label>
               <Input
                 id="signerEmail"
                 value={signerEmail}
                 onChange={(e) => setSignerEmail(e.target.value)}
                 placeholder="signer@email.com"
                 type="email"
+                required
               />
             </div>
 
