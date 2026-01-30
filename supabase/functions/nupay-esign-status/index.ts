@@ -140,7 +140,7 @@ serve(async (req) => {
 
     const { data: config } = await supabase
       .from("nupay_config")
-      .select("api_endpoint")
+      .select("api_endpoint, api_key")
       .eq("org_id", org_id)
       .eq("environment", environment)
       .single();
@@ -157,6 +157,7 @@ serve(async (req) => {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${token}`,
+        "api-key": config.api_key,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
