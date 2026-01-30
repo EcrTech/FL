@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,8 +12,10 @@ import {
   FileText,
   Banknote,
   ArrowRight,
+  MessageSquare,
 } from "lucide-react";
 import { ApplicationListItem } from "@/hooks/useApplicationsList";
+import { WhatsAppChatDialog } from "./WhatsAppChatDialog";
 
 interface ApplicationCardProps {
   application: ApplicationListItem;
@@ -34,6 +37,8 @@ const stageConfig: Record<string, { label: string; color: string; order: number 
 const stages = ["application", "documents", "verification", "assessment", "approval", "sanctioned", "disbursed"];
 
 export function ApplicationCard({ application, onViewDetails }: ApplicationCardProps) {
+  const [showWhatsAppChat, setShowWhatsAppChat] = useState(false);
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
@@ -144,15 +149,25 @@ export function ApplicationCard({ application, onViewDetails }: ApplicationCardP
               </div>
             )}
 
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onViewDetails(application)}
-              className="mt-2"
-            >
-              <Eye className="h-4 w-4 mr-1" />
-              View
-            </Button>
+            <div className="flex gap-1 mt-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowWhatsAppChat(true)}
+                title="WhatsApp Chat"
+                className="text-green-600 hover:text-green-700 hover:bg-green-50"
+              >
+                <MessageSquare className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onViewDetails(application)}
+              >
+                <Eye className="h-4 w-4 mr-1" />
+                View
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -189,6 +204,15 @@ export function ApplicationCard({ application, onViewDetails }: ApplicationCardP
           </span>
         </div>
       </CardContent>
+
+      {/* WhatsApp Chat Dialog */}
+      <WhatsAppChatDialog
+        open={showWhatsAppChat}
+        onOpenChange={setShowWhatsAppChat}
+        contactId={application.id}
+        contactName={application.applicantName}
+        phoneNumber={application.mobile}
+      />
     </Card>
   );
 }

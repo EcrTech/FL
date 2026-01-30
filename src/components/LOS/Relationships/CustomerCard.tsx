@@ -18,10 +18,12 @@ import {
   Image,
   Shield,
   Building,
+  MessageSquare,
 } from "lucide-react";
 import { CustomerRelationship, CustomerDocument } from "@/hooks/useCustomerRelationships";
 import { supabase } from "@/integrations/supabase/client";
 import { useState, useEffect } from "react";
+import { WhatsAppChatDialog } from "./WhatsAppChatDialog";
 
 interface CustomerCardProps {
   customer: CustomerRelationship;
@@ -138,6 +140,7 @@ function DocumentThumbnail({ document }: { document: CustomerDocument }) {
 
 export function CustomerCard({ customer, onViewDetails, onShareReferralLink }: CustomerCardProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [showWhatsAppChat, setShowWhatsAppChat] = useState(false);
 
   useEffect(() => {
     const loadAvatar = async () => {
@@ -264,6 +267,15 @@ export function CustomerCard({ customer, onViewDetails, onShareReferralLink }: C
             <Button
               variant="ghost"
               size="icon"
+              onClick={() => setShowWhatsAppChat(true)}
+              title="WhatsApp Chat"
+              className="text-green-600 hover:text-green-700 hover:bg-green-50"
+            >
+              <MessageSquare className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={onShareReferralLink}
               title="Share Referral Link"
             >
@@ -283,6 +295,15 @@ export function CustomerCard({ customer, onViewDetails, onShareReferralLink }: C
           </span>
         </div>
       </CardContent>
+
+      {/* WhatsApp Chat Dialog */}
+      <WhatsAppChatDialog
+        open={showWhatsAppChat}
+        onOpenChange={setShowWhatsAppChat}
+        contactId={customer.customerId}
+        contactName={customer.name}
+        phoneNumber={customer.mobile}
+      />
     </Card>
   );
 }
