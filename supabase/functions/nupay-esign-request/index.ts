@@ -19,16 +19,9 @@ interface ESignRequest {
   environment: "uat" | "production";
 }
 
-interface NupaySignerInfo {
-  name: string;
-  email?: string;
-  mobile: string;
-  appearance: string;
-}
-
 // Helper function to get Nupay auth token
 // deno-lint-ignore no-explicit-any
-async function getNupayToken(supabase: SupabaseClient<any, any, any>, orgId: string, environment: string): Promise<string> {
+async function getNupayToken(supabase: SupabaseClient<any, any, any>, orgId: string, environment: string): Promise<{ token: string; apiKey: string; apiEndpoint: string }> {
   // Check for cached valid token
   const { data: cachedToken } = await supabase
     .from("nupay_auth_tokens")
@@ -38,12 +31,7 @@ async function getNupayToken(supabase: SupabaseClient<any, any, any>, orgId: str
     .gt("expires_at", new Date().toISOString())
     .single();
 
-  if (cachedToken) {
-    console.log("[E-Sign] Using cached Nupay token");
-    return (cachedToken as { token: string }).token;
-  }
-
-  // Get fresh token
+  // Get config for API details
   const { data: config, error: configError } = await supabase
     .from("nupay_config")
     .select("*")
@@ -57,6 +45,17 @@ async function getNupayToken(supabase: SupabaseClient<any, any, any>, orgId: str
   }
 
   const configData = config as { api_endpoint: string; api_key: string };
+
+  if (cachedToken) {
+    console.log("[E-Sign] Using cached Nupay token");
+    return {
+      token: (cachedToken as { token: string }).token,
+      apiKey: configData.api_key,
+      apiEndpoint: configData.api_endpoint,
+    };
+  }
+
+  // Get fresh token
   const authEndpoint = `${configData.api_endpoint}/Auth/token`;
   console.log(`[E-Sign] Requesting token from ${authEndpoint}`);
 
@@ -64,7 +63,6 @@ async function getNupayToken(supabase: SupabaseClient<any, any, any>, orgId: str
     method: "GET",
     headers: {
       "api-key": configData.api_key,
-      "Content-Type": "application/json",
     },
   });
 
@@ -91,7 +89,11 @@ async function getNupayToken(supabase: SupabaseClient<any, any, any>, orgId: str
     expires_at: expiresAt.toISOString(),
   } as Record<string, unknown>, { onConflict: "org_id,environment" });
 
-  return token;
+  return {
+    token,
+    apiKey: configData.api_key,
+    apiEndpoint: configData.api_endpoint,
+  };
 }
 
 // Helper to create a simple PDF from document data
@@ -177,6 +179,154 @@ async function createPdfFromDocument(
   return await pdfDoc.save();
 }
 
+// Step 1: Upload document to Nupay
+async function uploadDocumentToNupay(
+  apiEndpoint: string,
+  apiKey: string,
+  token: string,
+  pdfBytes: Uint8Array,
+  documentTitle: string,
+  refNo: string
+): Promise<{ nupayRefNo: string }> {
+  const uploadEndpoint = `${apiEndpoint}/api/SignDocument/addRequestFile`;
+  console.log(`[E-Sign] Step 1: Uploading document to ${uploadEndpoint}`);
+
+  // Create FormData for multipart upload
+  const formData = new FormData();
+  formData.append("document_title", documentTitle);
+  formData.append("remarks", `E-Sign request for ${documentTitle}`);
+  formData.append("ref_no", refNo);
+  
+  // Create blob from PDF bytes - convert to ArrayBuffer first
+  const pdfBlob = new Blob([new Uint8Array(pdfBytes).buffer], { type: "application/pdf" });
+  formData.append("document", pdfBlob, `${refNo}.pdf`);
+
+  const uploadResponse = await fetch(uploadEndpoint, {
+    method: "POST",
+    headers: {
+      "api-key": apiKey,
+      "Token": token,
+    },
+    body: formData,
+  });
+
+  const responseText = await uploadResponse.text();
+  console.log(`[E-Sign] Upload response status: ${uploadResponse.status}`);
+  console.log(`[E-Sign] Upload response: ${responseText}`);
+
+  let uploadData;
+  try {
+    uploadData = JSON.parse(responseText);
+  } catch {
+    console.error("[E-Sign] Failed to parse upload response:", responseText);
+    throw new Error(`Invalid upload response from Nupay: ${responseText}`);
+  }
+
+  // Check for success - Nupay uses StatusCode or code
+  const statusCode = uploadData.StatusCode || uploadData.code || uploadData.status_code;
+  if (!uploadResponse.ok || (statusCode && statusCode !== "NP000" && statusCode !== "200")) {
+    console.error("[E-Sign] Upload error:", uploadData);
+    throw new Error(uploadData.message || uploadData.Message || "Document upload failed");
+  }
+
+  // Extract nupay_ref_no from response
+  const nupayRefNo = uploadData.data?.nupay_ref_no || 
+                     uploadData.nupay_ref_no || 
+                     uploadData.data?.NupayRefNo ||
+                     uploadData.NupayRefNo ||
+                     uploadData.data?.reference_no;
+
+  if (!nupayRefNo) {
+    console.error("[E-Sign] No nupay_ref_no in upload response:", uploadData);
+    throw new Error("No reference number received from Nupay after upload");
+  }
+
+  console.log(`[E-Sign] Document uploaded successfully. Nupay Ref: ${nupayRefNo}`);
+  return { nupayRefNo };
+}
+
+// Step 2: Process document for signing (add signers)
+async function processForSign(
+  apiEndpoint: string,
+  apiKey: string,
+  token: string,
+  refNo: string,
+  nupayRefNo: string,
+  signerName: string,
+  signerMobile: string,
+  signerEmail: string | undefined,
+  appearance: string
+): Promise<{ signerUrl: string; docketId?: string; documentId?: string }> {
+  const processEndpoint = `${apiEndpoint}/api/SignDocument/processForSign`;
+  console.log(`[E-Sign] Step 2: Processing for sign at ${processEndpoint}`);
+
+  const signerInfo = {
+    appearance: appearance,
+    signer_name: signerName,
+    signer_mobile: signerMobile,
+    ...(signerEmail && { signer_email: signerEmail }),
+  };
+
+  const payload = {
+    esign_verification: {
+      ref_no: refNo,
+      nupay_ref_no: nupayRefNo,
+      no_of_signer: 1,
+      signer_info: [signerInfo],
+    },
+  };
+
+  console.log(`[E-Sign] Process payload:`, JSON.stringify(payload, null, 2));
+
+  const processResponse = await fetch(processEndpoint, {
+    method: "POST",
+    headers: {
+      "api-key": apiKey,
+      "Token": token,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const responseText = await processResponse.text();
+  console.log(`[E-Sign] Process response status: ${processResponse.status}`);
+  console.log(`[E-Sign] Process response: ${responseText}`);
+
+  let processData;
+  try {
+    processData = JSON.parse(responseText);
+  } catch {
+    console.error("[E-Sign] Failed to parse process response:", responseText);
+    throw new Error(`Invalid process response from Nupay: ${responseText}`);
+  }
+
+  // Check for success
+  const statusCode = processData.StatusCode || processData.code || processData.status_code;
+  if (!processResponse.ok || (statusCode && statusCode !== "NP000" && statusCode !== "200")) {
+    console.error("[E-Sign] Process error:", processData);
+    throw new Error(processData.message || processData.Message || "E-Sign process failed");
+  }
+
+  // Extract signer URL from response
+  const signerUrl = processData.data?.signer_url || 
+                    processData.signer_url ||
+                    processData.data?.SignerUrl ||
+                    processData.SignerUrl ||
+                    // Check in signer_info array
+                    processData.data?.signer_info?.[0]?.signer_url;
+
+  if (!signerUrl) {
+    console.error("[E-Sign] No signer_url in process response:", processData);
+    throw new Error("No signer URL received from Nupay");
+  }
+
+  const docketId = processData.data?.docket_id || processData.docket_id;
+  const documentId = processData.data?.document_id || processData.document_id;
+
+  console.log(`[E-Sign] Process completed. Signer URL obtained.`);
+  return { signerUrl, docketId, documentId };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -210,92 +360,40 @@ serve(async (req) => {
 
     console.log(`[E-Sign] Initiating e-sign for application ${application_id}, document type: ${document_type}`);
 
-    // Get Nupay token
-    const token = await getNupayToken(supabase, org_id, environment);
-
-    // Get Nupay config for API endpoint
-    const { data: config } = await supabase
-      .from("nupay_config")
-      .select("api_endpoint, api_key")
-      .eq("org_id", org_id)
-      .eq("environment", environment)
-      .single();
-
-    if (!config) {
-      throw new Error("Nupay config not found");
-    }
+    // Get Nupay token and config
+    const { token, apiKey, apiEndpoint } = await getNupayToken(supabase, org_id, environment);
 
     // Generate PDF
     console.log("[E-Sign] Generating PDF document...");
     const pdfBytes = await createPdfFromDocument(supabase, document_id, document_type, application_id);
-    const pdfBase64 = btoa(String.fromCharCode(...pdfBytes));
 
     // Generate reference number
-    const nupayRefNo = `ESIGN-${application_id.substring(0, 8).toUpperCase()}-${Date.now()}`;
+    const refNo = `ESIGN-${application_id.substring(0, 8).toUpperCase()}-${Date.now()}`;
+    const documentTitle = document_type === "sanction_letter" ? "Sanction Letter" :
+      document_type === "loan_agreement" ? "Loan Agreement" : "Daily Repayment Schedule";
 
-    // Prepare signer info
-    const signerInfo: NupaySignerInfo[] = [{
-      name: signer_name,
-      mobile: signer_mobile,
-      appearance: appearance,
-    }];
+    // Step 1: Upload document to Nupay
+    const { nupayRefNo } = await uploadDocumentToNupay(
+      apiEndpoint,
+      apiKey,
+      token,
+      pdfBytes,
+      documentTitle,
+      refNo
+    );
 
-    if (signer_email) {
-      signerInfo[0].email = signer_email;
-    }
-
-    // Call Nupay E-Sign API
-    const esignEndpoint = `${config.api_endpoint}/api/SignDocument/signRequest`;
-    console.log(`[E-Sign] Calling Nupay API: ${esignEndpoint}`);
-
-    const esignPayload = {
-      document: pdfBase64,
-      no_of_signer: 1,
-      signer_info: signerInfo,
-      ref_no: nupayRefNo,
-    };
-
-    const esignResponse = await fetch(esignEndpoint, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "api-key": config.api_key,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(esignPayload),
-    });
-
-    const responseText = await esignResponse.text();
-    console.log(`[E-Sign] Nupay response status: ${esignResponse.status}`);
-
-    let esignData;
-    try {
-      esignData = JSON.parse(responseText);
-    } catch {
-      console.error("[E-Sign] Failed to parse response:", responseText);
-      throw new Error(`Invalid response from Nupay: ${responseText}`);
-    }
-
-    if (!esignResponse.ok || esignData.code !== "NP000") {
-      console.error("[E-Sign] Nupay error:", esignData);
-      return new Response(
-        JSON.stringify({ 
-          error: esignData.message || "E-Sign request failed",
-          code: esignData.code,
-          details: esignData 
-        }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Extract response data
-    const docketId = esignData.data?.docket_id || esignData.docket_id;
-    const nupayDocumentId = esignData.data?.document_id || esignData.document_id;
-    const signerUrl = esignData.data?.signer_url || esignData.signer_url;
-
-    if (!signerUrl) {
-      throw new Error("No signer URL in response");
-    }
+    // Step 2: Process for signing (add signers)
+    const { signerUrl, docketId, documentId: nupayDocumentId } = await processForSign(
+      apiEndpoint,
+      apiKey,
+      token,
+      refNo,
+      nupayRefNo,
+      signer_name,
+      signer_mobile,
+      signer_email,
+      appearance
+    );
 
     // Generate access token for our record
     const accessToken = crypto.randomUUID();
@@ -320,12 +418,12 @@ serve(async (req) => {
         nupay_document_id: nupayDocumentId,
         nupay_ref_no: nupayRefNo,
         signer_url: signerUrl,
-        esign_response: esignData,
+        esign_response: { nupayRefNo, docketId, documentId: nupayDocumentId },
         notification_sent_at: new Date().toISOString(),
         audit_log: [{
           action: "esign_initiated",
           timestamp: new Date().toISOString(),
-          details: { environment, appearance },
+          details: { environment, appearance, refNo, nupayRefNo },
         }],
       })
       .select()
@@ -344,7 +442,8 @@ serve(async (req) => {
         esign_request_id: esignRecord.id,
         signer_url: signerUrl,
         nupay_document_id: nupayDocumentId,
-        ref_no: nupayRefNo,
+        nupay_ref_no: nupayRefNo,
+        ref_no: refNo,
         expires_at: tokenExpiresAt.toISOString(),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

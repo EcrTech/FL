@@ -75,7 +75,6 @@ serve(async (req) => {
       method: "GET",
       headers: {
         "api-key": config.api_key,
-        "Content-Type": "application/json",
       },
     });
 
