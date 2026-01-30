@@ -143,31 +143,32 @@ async function sendWhatsAppNotification(
 
   // Use the approved 2-variable esign_request template (UTILITY category):
   // {{1}} = Signer Name, {{2}} = Signing URL
-  // Exotel requires 'components' format, not 'body_values'
+  // Exotel requires 'whatsapp: { messages: [...] }' wrapper format
   const payload = {
-    custom_data: crypto.randomUUID(),
-    status_callback: null,
-    messages: [{
-      channel: "whatsapp",
-      to: formattedPhone,
-      from: whatsapp_source_number,
-      content: {
-        type: "template",
-        template: {
-          name: "esign_request",
-          language: "en",
-          components: [
-            {
-              type: "body",
-              parameters: [
-                { type: "text", text: signerName },
-                { type: "text", text: signerUrl }
-              ]
-            }
-          ]
-        },
-      },
-    }],
+    whatsapp: {
+      messages: [{
+        from: whatsapp_source_number,
+        to: formattedPhone,
+        content: {
+          type: "template",
+          template: {
+            name: "esign_request",
+            language: {
+              code: "en"
+            },
+            components: [
+              {
+                type: "body",
+                parameters: [
+                  { type: "text", text: signerName },
+                  { type: "text", text: signerUrl }
+                ]
+              }
+            ]
+          }
+        }
+      }]
+    }
   };
 
   console.log("[E-Sign Notify] Sending WhatsApp to:", formattedPhone);
