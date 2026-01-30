@@ -1,146 +1,293 @@
 
 
-# Automated eMandate Notification Flow
+## WhatsApp Chat Feature - Auto-Send "conversation" Template
 
-## Overview
-Create an automated notification system that sends the eMandate registration link to customers via WhatsApp and Email immediately after successful mandate registration - matching the existing E-Sign notification pattern.
+This plan implements a WhatsApp chat feature where clicking the WhatsApp button on Customer/Application cards automatically sends the "conversation" template message and opens a real-time chat window to view replies.
 
 ---
 
-## Architecture
+### Template Details
+
+The "conversation" template will be sent automatically when the WhatsApp button is clicked:
+
+**Template Name:** `conversation`
+**Language:** English (`en`)
+**Body:** 
+```
+Hello
+
+I have a few clarifications to seek about your application. Are you available now?
+
+team PaisaaSaarthi
+```
+
+This template has no variables (static content), making the auto-send straightforward.
+
+---
+
+### Implementation Overview
 
 ```text
-┌─────────────────────────┐
-│  CreateMandateDialog    │
-│  (Frontend)             │
-└───────────┬─────────────┘
-            │ 1. Create mandate
-            ▼
-┌─────────────────────────┐
-│  nupay-create-mandate   │
-│  (Edge Function)        │
-└───────────┬─────────────┘
-            │ 2. On success, call notification function
-            ▼
-┌─────────────────────────────────┐
-│  send-emandate-notifications    │◄── NEW Edge Function
-│  (Edge Function)                │
-└───────────┬─────────────────────┘
-            │
-    ┌───────┴───────┐
-    ▼               ▼
-┌────────┐     ┌──────────┐
-│ Email  │     │ WhatsApp │
-│(Resend)│     │ (Exotel) │
-└────────┘     └──────────┘
++---------------------------+
+|  User clicks WhatsApp     |
+|  button on Customer or    |
+|  Application Card         |
++------------+--------------+
+             |
+             v
++---------------------------+
+|  WhatsAppChatDialog       |
+|  opens                    |
++------------+--------------+
+             |
+             v
++---------------------------+
+|  Checks for existing      |
+|  conversation history     |
++------------+--------------+
+             |
+    +--------+--------+
+    |                 |
+    v                 v
+No messages        Has messages
+    |                 |
+    v                 v
+Auto-send         Show history
+"conversation"    (skip auto-send)
+template              
+    |                 |
+    +--------+--------+
+             |
+             v
++---------------------------+
+|  Real-time subscription   |
+|  for incoming replies     |
++---------------------------+
 ```
 
 ---
 
-## Changes Required
+### Component Architecture
 
-### 1. New Edge Function: `send-emandate-notifications`
+**New Files:**
 
-**File:** `supabase/functions/send-emandate-notifications/index.ts`
+| File | Purpose |
+|------|---------|
+| `src/components/LOS/Relationships/WhatsAppChatDialog.tsx` | Chat dialog with auto-send and real-time updates |
 
-Creates a new edge function (modeled after `send-esign-notifications`) that:
-- Accepts: `org_id`, `signer_name`, `signer_email`, `signer_mobile`, `registration_url`, `loan_no`, `collection_amount`, `channels`
-- Sends Email via Resend with a professional template (green-themed like E-Sign)
-- Sends WhatsApp via Exotel using an approved template
-- Uses the same email domain fallback pattern (`in-sync.co.in`)
+**Modified Files:**
 
-**Email Template Design:**
-- Subject: "Complete Your eMandate Registration"
-- Green gradient header with checkmark icon
-- Clear call-to-action button
-- Loan reference and EMI amount displayed
-- Instructions for authentication
+| File | Changes |
+|------|---------|
+| `src/components/LOS/Relationships/CustomerCard.tsx` | Add WhatsApp button that triggers chat dialog |
+| `src/components/LOS/Relationships/ApplicationCard.tsx` | Add WhatsApp button that triggers chat dialog |
+| `supabase/functions/send-whatsapp-message/index.ts` | Add support for hardcoded template names (like "conversation") |
 
-**WhatsApp Template:**
-- Uses `emandate_request` template (2-variable UTILITY template)
-- Variables: `{{1}}` = Customer Name, `{{2}}` = Registration URL
-- Note: This template must be pre-approved in Exotel/WhatsApp Business
+---
 
-### 2. Update Edge Function: `nupay-create-mandate`
+### Database Changes
 
-**File:** `supabase/functions/nupay-create-mandate/index.ts`
+Enable real-time for the `whatsapp_messages` table so the chat dialog receives instant updates when applicants reply:
 
-After successful mandate creation (when `registration_url` is returned):
-1. Call `send-emandate-notifications` with customer details
-2. Log notification results in the response
-3. Continue existing flow (return registration URL to frontend)
+```sql
+ALTER PUBLICATION supabase_realtime ADD TABLE public.whatsapp_messages;
+```
 
-**Key Addition (~20 lines):**
+---
+
+### WhatsAppChatDialog Component
+
+The dialog will:
+
+1. **On Open:**
+   - Fetch existing messages for the phone number from `whatsapp_messages`
+   - If no previous messages exist, automatically trigger the "conversation" template
+   - Subscribe to real-time updates
+
+2. **UI Elements:**
+   - Header showing applicant name and phone number
+   - Scrollable message history with WhatsApp-style bubbles (green for sent, gray for received)
+   - Status indicators (sent, delivered, read, failed)
+   - Input area for sending follow-up messages (enabled after receiving a reply - within 24-hour session window)
+
+3. **Auto-Send Logic:**
+   ```typescript
+   // On dialog open
+   const existingMessages = await fetchMessages(phoneNumber);
+   if (existingMessages.length === 0) {
+     await sendConversationTemplate();
+   }
+   ```
+
+---
+
+### Edge Function Updates
+
+Update `send-whatsapp-message` to support template-based sending with Exotel's format:
+
 ```typescript
-// After successful mandate creation and before returning response:
-if (registrationUrl) {
-  try {
-    const notifyResponse = await fetch(`${supabaseUrl}/functions/v1/send-emandate-notifications`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${supabaseServiceKey}`,
-      },
-      body: JSON.stringify({
-        org_id: requestData.org_id,
-        signer_name: requestData.account_holder_name,
-        signer_email: requestData.email,
-        signer_mobile: requestData.mobile_no,
-        registration_url: registrationUrl,
-        loan_no: requestData.loan_no,
-        collection_amount: requestData.collection_amount,
-        channels: ["whatsapp", "email"],
-      }),
-    });
-    // Log result but don't fail mandate creation if notification fails
-  } catch (notifyError) {
-    console.warn("[Nupay-CreateMandate] Notification send failed:", notifyError);
+// New payload structure for "conversation" template
+const payload = {
+  whatsapp: {
+    messages: [{
+      from: whatsapp_source_number,
+      to: formattedPhone,
+      content: {
+        type: "template",
+        template: {
+          name: "conversation",
+          language: { code: "en" },
+          components: [] // No variables needed
+        }
+      }
+    }]
   }
+};
+```
+
+A new optional parameter `templateName` will be added to support hardcoded template names directly (vs template IDs from the database).
+
+---
+
+### CustomerCard Changes
+
+Add WhatsApp button to the actions column:
+
+```typescript
+// New state
+const [showWhatsAppChat, setShowWhatsAppChat] = useState(false);
+
+// Button added to actions
+<Button
+  variant="ghost"
+  size="icon"
+  onClick={() => setShowWhatsAppChat(true)}
+  title="WhatsApp Chat"
+>
+  <MessageSquare className="h-4 w-4 text-green-600" />
+</Button>
+
+// Dialog component
+<WhatsAppChatDialog
+  open={showWhatsAppChat}
+  onOpenChange={setShowWhatsAppChat}
+  contactId={customer.contactId}
+  contactName={customer.name}
+  phoneNumber={customer.mobile}
+/>
+```
+
+---
+
+### ApplicationCard Changes
+
+Similar WhatsApp button added to the view actions area, using the applicant's phone number and name from the application data.
+
+---
+
+### Real-time Subscription
+
+The chat dialog will subscribe to changes using phone number as the conversation identifier:
+
+```typescript
+const channel = supabase
+  .channel(`whatsapp-chat-${phoneNumber}`)
+  .on(
+    'postgres_changes',
+    {
+      event: '*',
+      schema: 'public',
+      table: 'whatsapp_messages',
+      filter: `phone_number=eq.${formattedPhone}`,
+    },
+    (payload) => {
+      if (payload.eventType === 'INSERT') {
+        setMessages(prev => [...prev, payload.new]);
+      } else if (payload.eventType === 'UPDATE') {
+        setMessages(prev => 
+          prev.map(m => m.id === payload.new.id ? payload.new : m)
+        );
+      }
+    }
+  )
+  .subscribe();
+```
+
+---
+
+### Message Flow
+
+**Outbound (Auto-send on open):**
+1. Dialog opens and checks message history
+2. If empty, calls edge function with `templateName: "conversation"`
+3. Edge function sends via Exotel and logs to `whatsapp_messages`
+4. Message appears in chat with "sending" status
+5. Webhook updates status to "delivered"/"read"
+
+**Inbound (Applicant replies):**
+1. Exotel sends webhook to `whatsapp-webhook` function
+2. Function stores message in `whatsapp_messages` with `direction: "inbound"`
+3. Real-time subscription triggers UI update
+4. New message appears in chat dialog
+
+---
+
+### Technical Details
+
+**Edge Function Request Interface:**
+```typescript
+interface SendMessageRequest {
+  contactId: string;
+  phoneNumber: string;
+  templateId?: string;           // Existing: from database
+  templateName?: string;         // New: hardcoded name like "conversation"
+  templateVariables?: Record<string, string>;
+  message?: string;
 }
 ```
 
-### 3. Update Config: `supabase/config.toml`
-
-Add configuration for the new function:
-```toml
-[functions.send-emandate-notifications]
-verify_jwt = false
+**Chat Message Interface:**
+```typescript
+interface ChatMessage {
+  id: string;
+  direction: 'inbound' | 'outbound';
+  message_content: string;
+  sent_at: string;
+  status: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
+  sender_name?: string;
+}
 ```
 
 ---
 
-## Database Changes
-None required. The `nupay_mandates` table already has `mobile_no` and `email` fields.
+### Dependencies
+
+Uses existing installed packages:
+- `@supabase/supabase-js` for real-time subscriptions
+- `lucide-react` for icons (MessageSquare)
+- `date-fns` for timestamp formatting
 
 ---
 
-## WhatsApp Template Requirement
+### Edge Cases Handled
 
-A new WhatsApp template `emandate_request` needs to be registered with Exotel:
-- Category: UTILITY
-- Language: en
-- Variables: 2 (Name, URL)
-- Example body: "Dear {{1}}, please complete your eMandate registration by clicking: {{2}}"
-
-Note: If this template doesn't exist yet, you'll need to create and get it approved in your Exotel/WhatsApp Business dashboard before WhatsApp notifications will work.
-
----
-
-## Technical Summary
-
-| Component | Action | Description |
-|-----------|--------|-------------|
-| `send-emandate-notifications/index.ts` | CREATE | New edge function for Email + WhatsApp delivery |
-| `nupay-create-mandate/index.ts` | UPDATE | Call notification function after success |
-| `supabase/config.toml` | UPDATE | Add function config |
+| Scenario | Behavior |
+|----------|----------|
+| No prior conversation | Auto-send template immediately |
+| Existing messages | Show history, no auto-send |
+| Send failure | Show error toast, allow retry |
+| User not logged in | Disable WhatsApp button or show auth prompt |
+| Invalid phone number | Validation before sending |
+| Webhook delay | Optimistic UI with status indicators |
 
 ---
 
-## Flow After Implementation
+### Summary of Changes
 
-1. User submits eMandate registration in `CreateMandateDialog`
-2. `nupay-create-mandate` calls Nupay API and receives `registration_url`
-3. Automatically triggers `send-emandate-notifications`
-4. Customer receives WhatsApp message + Email with the link
-5. Frontend still shows QR code and manual sharing options as backup
+1. **Database Migration:** Enable realtime on `whatsapp_messages`
+2. **New Component:** `WhatsAppChatDialog.tsx` (approx. 250 lines)
+3. **Modified Components:**
+   - `CustomerCard.tsx` - Add button + dialog
+   - `ApplicationCard.tsx` - Add button + dialog
+4. **Edge Function Update:** `send-whatsapp-message` - Add templateName support for Exotel format
 
