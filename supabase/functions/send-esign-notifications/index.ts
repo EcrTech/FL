@@ -112,7 +112,6 @@ async function sendWhatsAppNotification(
   phoneNumber: string,
   signerName: string,
   signerUrl: string,
-  documentType: string,
   whatsappSettings: {
     exotel_sid: string;
     exotel_api_key: string;
@@ -136,14 +135,12 @@ async function sendWhatsAppNotification(
     formattedPhone = `91${formattedPhone}`;
   }
 
-  const documentLabel = documentType === "sanction_letter" ? "Sanction Letter" :
-    documentType === "loan_agreement" ? "Loan Agreement" : "Daily Repayment Schedule";
-
   const subdomain = exotel_subdomain || "api.exotel.com";
   const exotelUrl = `https://${subdomain}/v2/accounts/${exotel_sid}/messages`;
   const authHeader = `Basic ${btoa(`${exotel_api_key}:${exotel_api_token}`)}`;
 
-  // Use the esign_request template
+  // Use the approved 2-variable esign_request template:
+  // {{1}} = Signer Name, {{2}} = Signing URL
   const payload = {
     custom_data: crypto.randomUUID(),
     status_callback: null,
@@ -154,9 +151,9 @@ async function sendWhatsAppNotification(
       content: {
         type: "template",
         template: {
-          name: "esign_request", // Template name to be created
+          name: "esign_request",
           language: "en",
-          body_values: [signerName, documentLabel, signerUrl],
+          body_values: [signerName, signerUrl],
         },
       },
     }],
@@ -261,7 +258,6 @@ serve(async (req) => {
           signer_mobile,
           signer_name,
           signer_url,
-          document_type,
           whatsappSettings
         );
         results.push({ channel: "whatsapp", ...whatsappResult });
