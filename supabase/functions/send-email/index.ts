@@ -173,49 +173,57 @@ serve(async (req) => {
 
     console.log('✓ Organization verified:', profile.org_id);
 
-    // Get email settings and verify domain
+    // Get email settings and verify domain - with fallback for orgs without custom domain
     const { data: emailSettings, error: settingsError } = await supabaseClient
       .from("email_settings")
       .select("sending_domain, verification_status, is_active, resend_domain_id")
       .eq("org_id", profile.org_id)
       .maybeSingle();
 
-    if (!emailSettings || !emailSettings.is_active) {
-      throw new Error("Email sending is not configured. Please set up your sending domain in Email Settings.");
-    }
+    let sendingDomain: string;
+    let skipDomainVerification = false;
 
-    if (emailSettings.verification_status !== "verified") {
-      throw new Error("Email domain verification pending. Please go to Email Settings and click 'Verify Domain' to complete verification.");
-    }
-
-    // Double-check domain status with Resend API to avoid stale data issues
-    console.log('Checking domain status with Resend API...');
-    const domainCheckResponse = await fetch(
-      `https://api.resend.com/domains/${emailSettings.resend_domain_id}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${RESEND_API_KEY}`,
-        },
-      }
-    );
-
-    if (domainCheckResponse.ok) {
-      const domainStatus = await domainCheckResponse.json();
-      console.log('Current Resend domain status:', domainStatus.status);
+    if (emailSettings?.is_active && emailSettings.verification_status === 'verified') {
+      // Use organization's verified domain
+      sendingDomain = emailSettings.sending_domain;
       
-      if (domainStatus.status !== 'verified') {
-        // Update database with actual status
-        await supabaseClient
-          .from('email_settings')
-          .update({ verification_status: 'pending' })
-          .eq('org_id', profile.org_id);
+      // Double-check domain status with Resend API to avoid stale data issues
+      console.log('Checking domain status with Resend API...');
+      const domainCheckResponse = await fetch(
+        `https://api.resend.com/domains/${emailSettings.resend_domain_id}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${RESEND_API_KEY}`,
+          },
+        }
+      );
+
+      if (domainCheckResponse.ok) {
+        const domainStatus = await domainCheckResponse.json();
+        console.log('Current Resend domain status:', domainStatus.status);
         
-        throw new Error(`Domain verification incomplete. Status: ${domainStatus.status}. Please verify all DNS records in Email Settings.`);
+        if (domainStatus.status !== 'verified') {
+          // Update database with actual status
+          await supabaseClient
+            .from('email_settings')
+            .update({ verification_status: 'pending' })
+            .eq('org_id', profile.org_id);
+          
+          // Fall back to default domain instead of failing
+          console.log('Domain verification incomplete, falling back to default domain');
+          sendingDomain = 'in-sync.co.in';
+          skipDomainVerification = true;
+        }
       }
+    } else {
+      // Fallback: Use verified platform domain (same pattern as E-Sign notifications)
+      console.log('No custom email settings found, using platform default domain: in-sync.co.in');
+      sendingDomain = 'in-sync.co.in';
+      skipDomainVerification = true;
     }
 
     // Use verified domain as sender, user's email as reply-to
-    const fromEmail = `noreply@${emailSettings.sending_domain}`;
+    const fromEmail = `noreply@${sendingDomain}`;
     const replyToEmail = user.email || fromEmail;
     const fromName = profile.first_name 
       ? `${profile.first_name} ${profile.last_name || ''}`.trim()
