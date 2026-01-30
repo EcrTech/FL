@@ -275,26 +275,45 @@ serve(async (req) => {
 
     // Log email to email_conversations table
     console.log('[send-email] Logging email to database...');
+    
+    // Build insert object - only include contact_id if provided and valid
+    const emailLogData: Record<string, any> = {
+      org_id: profile.org_id,
+      conversation_id: conversationId || emailData?.id || crypto.randomUUID(),
+      from_email: fromEmail,
+      from_name: fromName,
+      to_email: to,
+      reply_to_email: replyToEmail,
+      subject: subject,
+      email_content: emailHtml,
+      html_content: emailHtml,
+      direction: "outbound",
+      sent_by: user.id,
+      status: "sent",
+      sent_at: new Date().toISOString(),
+      tracking_pixel_id: trackingPixelId,
+      unsubscribe_token: unsubToken,
+    };
+    
+    // Only add contact_id if provided - it may be an applicant ID not a contact ID
+    if (contactId) {
+      // Verify contactId exists in contacts table before adding
+      const { data: contactExists } = await supabaseClient
+        .from('contacts')
+        .select('id')
+        .eq('id', contactId)
+        .maybeSingle();
+      
+      if (contactExists) {
+        emailLogData.contact_id = contactId;
+      } else {
+        console.log('[send-email] contact_id not found in contacts table, skipping foreign key');
+      }
+    }
+    
     const { error: logError } = await supabaseClient
       .from("email_conversations")
-      .insert({
-        org_id: profile.org_id,
-        contact_id: contactId,
-        conversation_id: conversationId || emailData?.id || crypto.randomUUID(),
-        from_email: fromEmail,
-        from_name: fromName,
-        to_email: to,
-        reply_to_email: replyToEmail,
-        subject: subject,
-        email_content: emailHtml,
-        html_content: emailHtml,
-        direction: "outbound",
-        sent_by: user.id,
-        status: "sent",
-        sent_at: new Date().toISOString(),
-        tracking_pixel_id: trackingPixelId,
-        unsubscribe_token: unsubToken,
-      });
+      .insert(emailLogData);
 
     if (logError) {
       console.error('[send-email] Error logging email to email_conversations:', logError);
