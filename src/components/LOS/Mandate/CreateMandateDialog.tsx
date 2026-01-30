@@ -201,10 +201,12 @@ export default function CreateMandateDialog({
   };
 
   const canProceedFromBank = selectedBankId !== null && authType !== "";
+  const isIfscValid = ifscCode === "" || ifscCode.length === 11;
   const canProceedFromAccount = 
     accountHolderName.trim() !== "" &&
     bankAccountNo.length >= 8 &&
-    bankAccountNo === bankAccountNoConfirm;
+    bankAccountNo === bankAccountNoConfirm &&
+    isIfscValid;
   const canProceedFromMandate = 
     collectionAmount > 0 &&
     firstCollectionDate !== "" &&
@@ -311,10 +313,13 @@ export default function CreateMandateDialog({
               <Input
                 id="ifsc"
                 value={ifscCode}
-                onChange={(e) => setIfscCode(e.target.value.toUpperCase())}
+                onChange={(e) => setIfscCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
                 placeholder="e.g., HDFC0001234"
                 maxLength={11}
               />
+              {ifscCode && ifscCode.length !== 11 && (
+                <p className="text-xs text-destructive mt-1">IFSC code must be exactly 11 characters</p>
+              )}
             </div>
             <div>
               <Label>Account Type</Label>
