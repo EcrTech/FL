@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import CreditBureauDialog from "@/components/LOS/Verification/CreditBureauDialog";
 import { VideoKYCRetryButton } from "@/components/LOS/Verification/VideoKYCRetryButton";
 import { VideoKYCViewDialog } from "@/components/LOS/Verification/VideoKYCViewDialog";
-import { SendWhatsAppDialog } from "@/components/Contact/SendWhatsAppDialog";
+import { WhatsAppChatDialog } from "@/components/LOS/Relationships/WhatsAppChatDialog";
 import { SendEmailDialog } from "@/components/Contact/SendEmailDialog";
 interface Document {
   id: string;
@@ -540,9 +540,9 @@ export function ApplicantProfileCard({
         existingVerification={verifications.find(v => v.verification_type === 'credit_bureau')}
       />
 
-      {/* WhatsApp Dialog */}
+      {/* WhatsApp Chat Dialog */}
       {mobile && (
-        <SendWhatsAppDialog
+        <WhatsAppChatDialog
           open={whatsappDialogOpen}
           onOpenChange={setWhatsappDialogOpen}
           contactId={applicationId}
