@@ -175,8 +175,10 @@ Deno.serve(async (req) => {
       };
     }
 
-    // Format phone number - remove non-digits and leading + for Exotel
-    const formattedPhone = phoneNumber.replace(/[^\d]/g, '');
+    // Format phone number - remove non-digits for Exotel API call
+    const phoneDigits = phoneNumber.replace(/[^\d]/g, '');
+    // Store with + prefix for consistency with UI queries
+    const phoneForStorage = '+' + phoneDigits;
 
     // Build Exotel API URL - ALWAYS use /messages endpoint for WhatsApp templates
     const exotelSubdomain = whatsappSettings.exotel_subdomain || 'api.exotel.com';
@@ -189,7 +191,7 @@ Deno.serve(async (req) => {
         whatsapp: {
           messages: [{
             from: whatsappSettings.whatsapp_source_number,
-            to: formattedPhone,
+            to: phoneDigits,
             content: {
               type: "template",
               template: {
@@ -207,7 +209,7 @@ Deno.serve(async (req) => {
         whatsapp: {
           messages: [{
             from: whatsappSettings.whatsapp_source_number,
-            to: formattedPhone,
+            to: phoneDigits,
             content: {
               type: "text",
               text: messageContent
@@ -219,7 +221,7 @@ Deno.serve(async (req) => {
 
     console.log('Sending WhatsApp message via Exotel:', { 
       url: exotelUrl,
-      to: formattedPhone, 
+      to: phoneDigits, 
       useTemplateApi, 
       templateName: templateName || 'N/A',
       bodyLength: messageContent?.length || 0,
@@ -266,7 +268,7 @@ Deno.serve(async (req) => {
         contact_id: contactId,
         template_id: templateId || null,
         sent_by: user.id,
-        phone_number: formattedPhone,
+        phone_number: phoneForStorage,
         message_content: messageContent,
         template_variables: templateVariables || null,
         status: 'failed',
@@ -290,7 +292,7 @@ Deno.serve(async (req) => {
         contact_id: contactId,
         template_id: templateId || null,
         sent_by: user.id,
-        phone_number: formattedPhone,
+        phone_number: phoneForStorage,
         message_content: messageContent,
         template_variables: templateVariables || null,
         exotel_message_id: exotelResult.sid || exotelResult.id,
