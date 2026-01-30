@@ -186,16 +186,77 @@ serve(async (req) => {
     }
 
     // Parse status from response
-    const signerStatus = statusData.data?.signer_info?.[0]?.status || 
-                         statusData.signer_info?.[0]?.status ||
-                         statusData.status;
+    const signerInfo = statusData.data?.signer_info?.[0] || statusData.signer_info?.[0];
+    const signerStatus = signerInfo?.status || statusData.status;
 
     let newStatus = esignRecord.status;
     let signedAt = null;
+    let signedDocumentPath: string | null = null;
 
     if (signerStatus === "signed" || signerStatus === "completed") {
       newStatus = "signed";
       signedAt = new Date().toISOString();
+
+      // Try to download signed document from Nupay
+      // Nupay may provide signed_document as base64 or a download URL
+      const signedDocBase64 = statusData.data?.signed_document || 
+                               statusData.signed_document ||
+                               signerInfo?.signed_document;
+      
+      const signedDocUrl = statusData.data?.signed_document_url || 
+                           statusData.signed_document_url ||
+                           signerInfo?.signed_document_url ||
+                           signerInfo?.download_url;
+
+      if (signedDocBase64 || signedDocUrl) {
+        try {
+          let pdfBuffer: Uint8Array;
+
+          if (signedDocBase64) {
+            // Decode base64 to binary
+            console.log("[E-Sign-Status] Decoding signed document from base64");
+            const binaryString = atob(signedDocBase64);
+            pdfBuffer = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+              pdfBuffer[i] = binaryString.charCodeAt(i);
+            }
+          } else if (signedDocUrl) {
+            // Download from URL
+            console.log("[E-Sign-Status] Downloading signed document from:", signedDocUrl);
+            const downloadResponse = await fetch(signedDocUrl);
+            if (downloadResponse.ok) {
+              const arrayBuffer = await downloadResponse.arrayBuffer();
+              pdfBuffer = new Uint8Array(arrayBuffer);
+            } else {
+              throw new Error(`Download failed: ${downloadResponse.status}`);
+            }
+          } else {
+            throw new Error("No signed document data available");
+          }
+
+          // Upload to Supabase Storage
+          const fileName = `signed/${esignRecord.application_id}/${esignRecord.document_type}_signed_${Date.now()}.pdf`;
+          console.log("[E-Sign-Status] Uploading signed PDF to storage:", fileName);
+
+          const { error: uploadError } = await supabase.storage
+            .from("loan-documents")
+            .upload(fileName, pdfBuffer, {
+              contentType: "application/pdf",
+              upsert: true,
+            });
+
+          if (uploadError) {
+            console.error("[E-Sign-Status] Storage upload failed:", uploadError);
+          } else {
+            signedDocumentPath = fileName;
+            console.log("[E-Sign-Status] Signed document stored at:", signedDocumentPath);
+          }
+        } catch (docError) {
+          console.error("[E-Sign-Status] Failed to fetch/store signed document:", docError);
+        }
+      } else {
+        console.log("[E-Sign-Status] No signed document data in Nupay response");
+      }
     } else if (signerStatus === "expired") {
       newStatus = "expired";
     } else if (signerStatus === "failed" || signerStatus === "rejected") {
@@ -211,6 +272,7 @@ serve(async (req) => {
       timestamp: new Date().toISOString(),
       nupay_status: signerStatus,
       new_status: newStatus,
+      signed_document_stored: !!signedDocumentPath,
     });
 
     // Update our record
@@ -218,10 +280,15 @@ serve(async (req) => {
       status: newStatus,
       audit_log: auditLog,
       updated_at: new Date().toISOString(),
+      esign_response: statusData,
     };
 
     if (signedAt) {
       updateData.signed_at = signedAt;
+    }
+
+    if (signedDocumentPath) {
+      updateData.signed_document_path = signedDocumentPath;
     }
 
     if (signerStatus === "viewed" && !esignRecord.viewed_at) {
@@ -239,13 +306,19 @@ serve(async (req) => {
 
     // If signed, also update loan_generated_documents
     if (newStatus === "signed" && esignRecord.document_id) {
+      const docUpdateData: Record<string, unknown> = {
+        customer_signed: true,
+        signed_at: signedAt,
+        status: "signed",
+      };
+
+      if (signedDocumentPath) {
+        docUpdateData.signed_document_path = signedDocumentPath;
+      }
+
       await supabase
         .from("loan_generated_documents")
-        .update({
-          customer_signed: true,
-          signed_at: signedAt,
-          status: "signed",
-        })
+        .update(docUpdateData)
         .eq("id", esignRecord.document_id);
     }
 
