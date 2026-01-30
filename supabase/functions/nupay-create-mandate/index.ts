@@ -140,13 +140,7 @@ serve(async (req) => {
     }
 
     // Build Nupay API payload (field mapping as per API doc - EXACT field names)
-    // Map account_type to Nupay format
-    const accountTypeMap: Record<string, string> = {
-      "Savings": "SB",
-      "Current": "CC",
-      "OTHER": "OTHER"
-    };
-    
+    // Nupay expects full word: "Savings", "Current", "CC", "OTHER"
     const nupayPayload: Record<string, any> = {
       loan_no: requestData.loan_no,
       seq_tp: requestData.seq_type,
@@ -160,7 +154,7 @@ serve(async (req) => {
       bank_account_no: requestData.bank_account_no,
       bank_account_no_confirmation: requestData.bank_account_no_confirmation,
       bank_id: requestData.bank_id,
-      account_type: accountTypeMap[requestData.account_type] || "SB", // Use exact field name
+      account_type: requestData.account_type, // Use full word: Savings, Current, CC, OTHER
       mobile_no: requestData.mobile_no,
       tel_no: "", // Required field per API
       addnl2: "",
