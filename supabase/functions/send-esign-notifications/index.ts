@@ -141,8 +141,9 @@ async function sendWhatsAppNotification(
   const exotelUrl = `https://${subdomain}/v2/accounts/${exotel_sid}/messages`;
   const authHeader = `Basic ${btoa(`${exotel_api_key}:${exotel_api_token}`)}`;
 
-  // Use the approved 2-variable esign_request template:
+  // Use the approved 2-variable esign_request template (UTILITY category):
   // {{1}} = Signer Name, {{2}} = Signing URL
+  // Exotel requires 'components' format, not 'body_values'
   const payload = {
     custom_data: crypto.randomUUID(),
     status_callback: null,
@@ -155,7 +156,15 @@ async function sendWhatsAppNotification(
         template: {
           name: "esign_request",
           language: "en",
-          body_values: [signerName, signerUrl],
+          components: [
+            {
+              type: "body",
+              parameters: [
+                { type: "text", text: signerName },
+                { type: "text", text: signerUrl }
+              ]
+            }
+          ]
         },
       },
     }],
