@@ -137,9 +137,44 @@ serve(async (req) => {
     }
 
     const banksData = await banksResponse.json();
-    const banks = banksData.banks || banksData.Banks || banksData || [];
+    
+    // Log full response structure for debugging
+    console.log(`[Nupay-Banks] Full API response:`, JSON.stringify(banksData));
+    
+    // Handle various Nupay response structures
+    let banks: any[] = [];
+    
+    if (Array.isArray(banksData)) {
+      banks = banksData;
+    } else if (banksData.data && Array.isArray(banksData.data)) {
+      banks = banksData.data;
+    } else if (banksData.banks && Array.isArray(banksData.banks)) {
+      banks = banksData.banks;
+    } else if (banksData.Banks && Array.isArray(banksData.Banks)) {
+      banks = banksData.Banks;
+    } else if (banksData.result && Array.isArray(banksData.result)) {
+      banks = banksData.result;
+    } else if (banksData.bankList && Array.isArray(banksData.bankList)) {
+      banks = banksData.bankList;
+    } else if (banksData.BankList && Array.isArray(banksData.BankList)) {
+      banks = banksData.BankList;
+    }
 
-    console.log(`[Nupay-Banks] Received ${banks.length} banks from Nupay`);
+    console.log(`[Nupay-Banks] Parsed ${banks.length} banks from response`);
+
+    if (banks.length === 0) {
+      console.warn("[Nupay-Banks] No banks found in response, returning empty array");
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          banks: [],
+          cached: false,
+          count: 0,
+          raw_response: banksData 
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Clear old cache for this org
     await supabase
@@ -147,13 +182,13 @@ serve(async (req) => {
       .delete()
       .eq("org_id", org_id);
 
-    // Insert new bank data
+    // Insert new bank data - handle various field name formats
     const banksToInsert = banks.map((bank: any) => ({
       org_id,
-      bank_id: bank.id || bank.Id,
-      name: bank.name || bank.Name,
-      bank_code: bank.bank_code || bank.BankCode || bank.bankCode || "",
-      mode: bank.mode || bank.Mode || "netbanking",
+      bank_id: bank.id || bank.Id || bank.bank_id || bank.BankId || String(bank.bankId || ""),
+      name: bank.name || bank.Name || bank.bankName || bank.BankName || "Unknown",
+      bank_code: bank.bank_code || bank.BankCode || bank.bankCode || bank.code || "",
+      mode: bank.mode || bank.Mode || bank.authMode || "netbanking",
       is_active: true,
       cached_at: new Date().toISOString(),
     }));
