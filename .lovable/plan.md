@@ -1,58 +1,146 @@
 
-# Fix E-Sign Email Notifications
 
-## Problem
-The E-Sign email notification is failing because the function requires an entry in the `email_settings` table with a `sending_domain`. The table is currently empty.
+# Automated eMandate Notification Flow
 
-The OTP email functions work because they have a fallback to `noreply@in-sync.co.in` when org-specific email settings aren't configured.
+## Overview
+Create an automated notification system that sends the eMandate registration link to customers via WhatsApp and Email immediately after successful mandate registration - matching the existing E-Sign notification pattern.
 
-## Solution
-Update the `send-esign-notifications` Edge Function to use the same fallback pattern as the working OTP functions.
+---
+
+## Architecture
+
+```text
+┌─────────────────────────┐
+│  CreateMandateDialog    │
+│  (Frontend)             │
+└───────────┬─────────────┘
+            │ 1. Create mandate
+            ▼
+┌─────────────────────────┐
+│  nupay-create-mandate   │
+│  (Edge Function)        │
+└───────────┬─────────────┘
+            │ 2. On success, call notification function
+            ▼
+┌─────────────────────────────────┐
+│  send-emandate-notifications    │◄── NEW Edge Function
+│  (Edge Function)                │
+└───────────┬─────────────────────┘
+            │
+    ┌───────┴───────┐
+    ▼               ▼
+┌────────┐     ┌──────────┐
+│ Email  │     │ WhatsApp │
+│(Resend)│     │ (Exotel) │
+└────────┘     └──────────┘
+```
 
 ---
 
 ## Changes Required
 
-### File: `supabase/functions/send-esign-notifications/index.ts`
+### 1. New Edge Function: `send-emandate-notifications`
 
-**Current behavior (lines 243-254):**
+**File:** `supabase/functions/send-emandate-notifications/index.ts`
+
+Creates a new edge function (modeled after `send-esign-notifications`) that:
+- Accepts: `org_id`, `signer_name`, `signer_email`, `signer_mobile`, `registration_url`, `loan_no`, `collection_amount`, `channels`
+- Sends Email via Resend with a professional template (green-themed like E-Sign)
+- Sends WhatsApp via Exotel using an approved template
+- Uses the same email domain fallback pattern (`in-sync.co.in`)
+
+**Email Template Design:**
+- Subject: "Complete Your eMandate Registration"
+- Green gradient header with checkmark icon
+- Clear call-to-action button
+- Loan reference and EMI amount displayed
+- Instructions for authentication
+
+**WhatsApp Template:**
+- Uses `emandate_request` template (2-variable UTILITY template)
+- Variables: `{{1}}` = Customer Name, `{{2}}` = Registration URL
+- Note: This template must be pre-approved in Exotel/WhatsApp Business
+
+### 2. Update Edge Function: `nupay-create-mandate`
+
+**File:** `supabase/functions/nupay-create-mandate/index.ts`
+
+After successful mandate creation (when `registration_url` is returned):
+1. Call `send-emandate-notifications` with customer details
+2. Log notification results in the response
+3. Continue existing flow (return registration URL to frontend)
+
+**Key Addition (~20 lines):**
 ```typescript
-if (emailSettings?.sending_domain) {
-  // send email
-} else {
-  results.push({ channel: "email", success: false, error: "Email settings not configured" });
+// After successful mandate creation and before returning response:
+if (registrationUrl) {
+  try {
+    const notifyResponse = await fetch(`${supabaseUrl}/functions/v1/send-emandate-notifications`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${supabaseServiceKey}`,
+      },
+      body: JSON.stringify({
+        org_id: requestData.org_id,
+        signer_name: requestData.account_holder_name,
+        signer_email: requestData.email,
+        signer_mobile: requestData.mobile_no,
+        registration_url: registrationUrl,
+        loan_no: requestData.loan_no,
+        collection_amount: requestData.collection_amount,
+        channels: ["whatsapp", "email"],
+      }),
+    });
+    // Log result but don't fail mandate creation if notification fails
+  } catch (notifyError) {
+    console.warn("[Nupay-CreateMandate] Notification send failed:", notifyError);
+  }
 }
 ```
 
-**New behavior with fallback:**
-```typescript
-// Use org's verified domain if available, otherwise use global verified domain
-const effectiveEmailSettings = emailSettings?.sending_domain 
-  ? emailSettings 
-  : { sending_domain: "in-sync.co.in", from_name: "E-Sign" };
+### 3. Update Config: `supabase/config.toml`
 
-const emailResult = await sendEmailNotification(
-  signer_email,
-  signer_name,
-  signer_url,
-  document_type,
-  effectiveEmailSettings
-);
-results.push({ channel: "email", ...emailResult });
+Add configuration for the new function:
+```toml
+[functions.send-emandate-notifications]
+verify_jwt = false
 ```
-
-This will:
-1. Try to use org-specific email settings from `email_settings` table
-2. Fall back to `noreply@in-sync.co.in` (same verified domain used by OTP emails) if not configured
 
 ---
 
-## Technical Details
+## Database Changes
+None required. The `nupay_mandates` table already has `mobile_no` and `email` fields.
 
-| Aspect | Before | After |
-|--------|--------|-------|
-| Missing email_settings | Fails with error | Falls back to in-sync.co.in |
-| From address | Only org-specific | Org-specific OR noreply@in-sync.co.in |
-| Behavior matches | N/A | send-otp, send-public-otp |
+---
 
-No database changes required - this is purely an Edge Function update.
+## WhatsApp Template Requirement
+
+A new WhatsApp template `emandate_request` needs to be registered with Exotel:
+- Category: UTILITY
+- Language: en
+- Variables: 2 (Name, URL)
+- Example body: "Dear {{1}}, please complete your eMandate registration by clicking: {{2}}"
+
+Note: If this template doesn't exist yet, you'll need to create and get it approved in your Exotel/WhatsApp Business dashboard before WhatsApp notifications will work.
+
+---
+
+## Technical Summary
+
+| Component | Action | Description |
+|-----------|--------|-------------|
+| `send-emandate-notifications/index.ts` | CREATE | New edge function for Email + WhatsApp delivery |
+| `nupay-create-mandate/index.ts` | UPDATE | Call notification function after success |
+| `supabase/config.toml` | UPDATE | Add function config |
+
+---
+
+## Flow After Implementation
+
+1. User submits eMandate registration in `CreateMandateDialog`
+2. `nupay-create-mandate` calls Nupay API and receives `registration_url`
+3. Automatically triggers `send-emandate-notifications`
+4. Customer receives WhatsApp message + Email with the link
+5. Frontend still shows QR code and manual sharing options as backup
+
