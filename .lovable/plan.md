@@ -1,60 +1,49 @@
 
-# Fix E-Sign Signer URL Extraction
+# Update WhatsApp Template for E-Sign Notifications
 
-## Issue Identified
-The `nupay-esign-request` Edge Function fails to extract the signer URL from Nupay's `processForSign` response due to incorrect field path mapping.
+## Summary
+Update the `send-esign-notifications` edge function to use your approved 2-variable WhatsApp template instead of the current 3-variable structure.
 
-**Current Code (lines 282-288):**
-```typescript
-const signerUrl = processData.signer_url || 
-                  processData.data?.signer_url ||
-                  processData.SignerUrl ||
-                  processData.data?.SignerUrl ||
-                  processData.data?.signer_info?.[0]?.signer_url ||
-                  processData.signer_info?.[0]?.signer_url;
+## Your Approved Template
+```
+Hello {{1}},
+
+Congratulations for your loan approval. Here is the link of the loan agreement for your electronic signature.
+
+Please click the link below to review and sign the document:
+
+{{2}}
+
+This link is valid for 72 hours.
 ```
 
-**Problem:**
-- Nupay returns `Data` (capital D), not `data`
-- The field is `url`, not `signer_url`
-- Correct path: `processData.Data.signer_info[0].url`
+**Variable Mapping:**
+- `{{1}}` = Signer Name (e.g., "SAMAN KHAN")
+- `{{2}}` = Signing URL (e.g., "https://nachuat.nupaybiz.com/EsignWidget?signer_id=...")
 
-## Solution
-Update the signer URL extraction chain in `processForSign` function to include the correct Nupay response structure.
+## Changes Required
 
-**File:** `supabase/functions/nupay-esign-request/index.ts`
+### File: `supabase/functions/send-esign-notifications/index.ts`
 
-**Change (lines 282-288):**
+**1. Update the `sendWhatsAppNotification` function signature (lines 111-122)**
+- Remove the `documentType` parameter since it's no longer used in the template
+
+**2. Update the WhatsApp payload (lines 147-163)**
 ```typescript
-const signerUrl = processData.Data?.signer_info?.[0]?.url ||
-                  processData.data?.signer_info?.[0]?.url ||
-                  processData.Data?.signer_info?.[0]?.signer_url ||
-                  processData.data?.signer_info?.[0]?.signer_url ||
-                  processData.signer_url || 
-                  processData.data?.signer_url ||
-                  processData.SignerUrl ||
-                  processData.data?.SignerUrl ||
-                  processData.signer_info?.[0]?.signer_url ||
-                  processData.signer_info?.[0]?.url;
+// Current (3 variables):
+body_values: [signerName, documentLabel, signerUrl],
+
+// New (2 variables):
+body_values: [signerName, signerUrl],
 ```
 
-This prioritizes the correct Nupay path (`Data.signer_info[0].url`) while maintaining backward compatibility with other possible response formats.
+**3. Remove unused `documentLabel` variable (line 139-140)**
+- Since the template no longer references document type, remove this logic
 
----
+**4. Update the function call (lines 260-266)**
+- Remove `document_type` from the function call parameters
 
-## Technical Details
-
-### Root Cause Analysis
-The Nupay API response structure uses:
-- **PascalCase** for top-level keys (e.g., `Data`, `StatusCode`)
-- **snake_case** for nested keys (e.g., `signer_info`, `url`)
-
-### Why This Matters
-When `processForSign` API returns success (`NP000`) but the URL extraction returns `undefined`, the function throws "No signer URL received from Nupay" even though the data is present in the response.
-
-### Testing
-After deployment, test the E-Sign flow on a sanctioned loan application:
-1. Navigate to a loan in "Sanctioned" status
-2. Click "E-Sign" on Sanction Letter
-3. Fill in signer details and submit
-4. Verify that the signer URL is returned and stored
+## After Deployment
+Test by initiating an E-Sign request on a sanctioned loan application. The signer should receive:
+- **WhatsApp message** with their name and the signing link
+- **Email** with the full HTML template (unchanged)
