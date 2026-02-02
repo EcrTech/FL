@@ -1,225 +1,336 @@
 
-# Referral Application Form Restructuring
+# Fix: Capture Real Aadhaar/PAN Data in Referral Applications
 
-## Overview
-Restructure the 2-screen referral loan application to consolidate key fields onto Screen 1, making Screen 2 lighter with only contact details.
+## Problem Summary
+For referral (unauthenticated) loan applications, verified data from PAN and Aadhaar is not being stored in the `loan_applicants` table. The current flow stores **placeholder strings** instead of actual verification data.
 
----
+## Root Causes
 
-## Current Layout
+| # | Issue | File | Problem |
+|---|-------|------|---------|
+| 1 | Placeholder data stored | `DigilockerSuccess.tsx` | Stores "DOB verified" instead of real DOB |
+| 2 | No public Aadhaar endpoint | Edge functions | `verifiedu-aadhaar-details` requires authentication |
+| 3 | PAN missing DOB | `verifiedu-public-pan-verify` | Doesn't return DOB from API response |
+| 4 | Draft function ignores placeholders | `create-draft-referral-application` | Falls back to default DOB (1990-01-01) |
+| 5 | Submit missing fields | `submit-loan-application` | Doesn't include DOB, gender, or address in insert |
 
-| Screen 1 (What do you need?) | Screen 2 (How do we reach you?) |
-|------------------------------|----------------------------------|
-| Loan Amount                  | Mobile Number (with OTP)         |
-| Tenure (Days)                | Email Address (with OTP)         |
-| Full Name                    | Office Email (optional)          |
-|                              | **Consents (3 checkboxes)**      |
+## Solution Architecture
 
-## New Layout
+```text
+CURRENT (BROKEN):
+DigiLocker → Callback → Store placeholders → Form → Submit placeholders → DB gets defaults
 
-| Screen 1 (What do you need?) | Screen 2 (How do we reach you?) |
-|------------------------------|----------------------------------|
-| Loan Amount                  | Tenure (Days)                    |
-| **Mobile Number (with OTP)** | Email Address (with OTP)         |
-| Full Name                    | Office Email (optional)          |
-| **Consents (3 checkboxes)**  |                                  |
+FIXED:
+DigiLocker → Callback → Fetch REAL data (public API) → Store structured data → Form → Submit real data → DB synced
+```
 
----
+## Implementation Steps
 
-## File Changes
+### Step 1: Create Public Aadhaar Details Endpoint
 
-### 1. LoanRequirementsScreen.tsx
+Create `supabase/functions/verifiedu-public-aadhaar-details/index.ts`
 
-**Remove:**
-- Tenure input field, slider, and validation (`tenureDays`)
+A new **unauthenticated** endpoint to fetch Aadhaar details after DigiLocker verification.
 
-**Add:**
-- Mobile number field with +91 prefix (from ContactConsentScreen)
-- OTP verification UI (input + verify button)
-- Auto-send OTP logic (500ms debounce on 10-digit detection)
-- Verification status handling and timer
-- All 3 consent checkboxes:
-  - Household income > ₹3 Lakh/year
-  - Terms, Privacy Policy & Gradation of Risk
-  - CKYC verification & communications consent
+Key features:
+- No authentication required (public access)
+- Accepts `uniqueRequestNumber` from callback
+- Calls VerifiedU `GetAadhaarDetailsById` API
+- Returns structured data: `aadhaar_uid`, `name`, `gender`, `dob`, and structured address
+- Mock mode support when credentials not configured
 
-**Props Interface Update:**
-```typescript
-interface LoanRequirementsScreenProps {
-  formData: {
-    name: string;
-    requestedAmount: number;
-    phone: string;  // Added
-  };
-  onUpdate: (data: Partial<{ name: string; requestedAmount: number; phone: string }>) => void;
-  consents: {  // Added
-    householdIncome: boolean;
-    termsAndConditions: boolean;
-    aadhaarConsent: boolean;
-  };
-  onConsentChange: (consent: 'householdIncome' | 'termsAndConditions' | 'aadhaarConsent', value: boolean) => void;  // Added
-  verificationStatus: { phoneVerified: boolean };  // Added
-  onVerificationComplete: (type: 'phone') => void;  // Added
-  onContinue: () => void;
+Response structure:
+```json
+{
+  "success": true,
+  "data": {
+    "aadhaar_uid": "XXXX-XXXX-1234",
+    "name": "APPLICANT NAME",
+    "gender": "Male",
+    "dob": "1995-06-15",
+    "addresses": [{
+      "combined": "Full address string",
+      "house": "123",
+      "street": "Main Street",
+      "locality": "Sector 5",
+      "dist": "City Name",
+      "state": "State Name",
+      "pc": "123456"
+    }]
+  }
 }
 ```
 
-**Validation Update:**
-```
-canContinue = isValidAmount && isValidPhone && phoneVerified && isValidName && allConsentsChecked
-```
+### Step 2: Update PAN Verification to Return DOB
 
----
+Modify `supabase/functions/verifiedu-public-pan-verify/index.ts`
 
-### 2. ContactConsentScreen.tsx
-
-**Remove:**
-- Mobile number field and all phone OTP logic
-- All 3 consent checkboxes and related state
-- `consents` and `onConsentChange` from props
-
-**Add:**
-- Tenure input field with slider (1-90 days range)
-
-**Props Interface Update:**
+Add DOB to the response:
 ```typescript
-interface ContactConsentScreenProps {
-  formData: {
-    email: string;
-    officeEmail: string;
-    tenureDays: number;  // Added
-  };
-  onUpdate: (data: Partial<{ email: string; officeEmail: string; tenureDays: number }>) => void;
-  verificationStatus: {
-    emailVerified: boolean;
-    officeEmailVerified: boolean;
-    // phoneVerified removed
-  };
-  onVerificationComplete: (type: 'email' | 'officeEmail') => void;
-  onContinue: () => void;
+return new Response(JSON.stringify({
+  success: true,
+  data: { 
+    name: responseData.data?.name, 
+    is_valid: responseData.data?.is_valid,
+    dob: responseData.data?.dob  // ADD THIS
+  },
+}), ...);
+```
+
+Also update mock response to include mock DOB.
+
+### Step 3: Fix DigilockerSuccess for Referral Callbacks
+
+Modify `src/pages/DigilockerSuccess.tsx`
+
+For referral callbacks:
+1. Call the new public `verifiedu-public-aadhaar-details` endpoint
+2. Wait for response before redirecting
+3. Store REAL verified data in localStorage:
+
+```typescript
+const verifiedInfo = {
+  name: data.name,
+  dob: data.dob,
+  gender: data.gender,
+  address: data.addresses?.[0]?.combined || '',
+  aadhaarNumber: data.aadhaar_uid,
+  addressData: {
+    line1: buildLine1(data.addresses[0]),
+    line2: buildLine2(data.addresses[0]),
+    city: data.addresses[0]?.dist,
+    state: data.addresses[0]?.state,
+    pincode: data.addresses[0]?.pc
+  }
+};
+localStorage.setItem("referral_aadhaar_verified", JSON.stringify(verifiedInfo));
+```
+
+### Step 4: Update AadhaarVerificationStep to Parse Structured Data
+
+Modify `src/components/ReferralApplication/AadhaarVerificationStep.tsx`
+
+Update `onVerified` callback interface to include structured address:
+```typescript
+interface AadhaarVerificationStepProps {
+  onVerified: (data: { 
+    name: string; 
+    address: string; 
+    dob: string; 
+    aadhaarNumber?: string;
+    gender?: string;
+    addressData?: {
+      line1: string;
+      line2: string;
+      city: string;
+      state: string;
+      pincode: string;
+    };
+  }) => void;
+  // ...
 }
 ```
 
-**Validation Update:**
+Pass the complete verified data from localStorage to parent.
+
+### Step 5: Update PANVerificationStep to Capture DOB
+
+Modify `src/components/ReferralApplication/PANVerificationStep.tsx`
+
+Update `onVerified` callback to include DOB:
+```typescript
+onVerified({
+  name: verifyData.data?.name || 'Name retrieved',
+  status: 'Verified',
+  dob: verifyData.data?.dob,  // ADD THIS
+});
 ```
-canContinue = isValidTenure && isValidEmail && emailVerified && officeEmailValid
+
+### Step 6: Update Parent Component State
+
+Modify `src/pages/ReferralLoanApplication.tsx`
+
+Update interfaces and state to track verified data:
+```typescript
+interface AadhaarVerifiedData {
+  name: string;
+  address: string;
+  dob: string;
+  gender?: string;
+  aadhaarNumber?: string;
+  addressData?: {
+    line1: string;
+    line2: string;
+    city: string;
+    state: string;
+    pincode: string;
+  };
+}
+
+interface PanVerifiedData {
+  name: string;
+  status: string;
+  dob?: string;
+}
 ```
 
-**Title Update:**
-- Keep "How do we reach you?" as header
-- Add tenure as first field (before email)
+### Step 7: Update Draft Application Edge Function
 
----
+Modify `supabase/functions/create-draft-referral-application/index.ts`
 
-### 3. ReferralLoanApplication.tsx (Parent Component)
+Accept and store structured address and DOB:
+```typescript
+const { referralCode, basicInfo, panNumber, aadhaarNumber, aadhaarData, panData } = body;
 
-**Update screen data passing:**
+// Extract DOB (prefer Aadhaar, fallback to PAN, then default)
+const dob = aadhaarData?.dob && aadhaarData.dob !== 'DOB verified' 
+  ? aadhaarData.dob 
+  : panData?.dob || '1990-01-01';
 
-**Screen 1 (LoanRequirementsScreen):**
-- Pass: `name`, `requestedAmount`, `phone`
-- Pass: `consents`, `onConsentChange`
-- Pass: `verificationStatus.phoneVerified`, `onVerificationComplete('phone')`
+// Extract gender
+const gender = aadhaarData?.gender || null;
 
-**Screen 2 (ContactConsentScreen):**
-- Pass: `email`, `officeEmail`, `tenureDays`
-- Pass: `verificationStatus.emailVerified`, `verificationStatus.officeEmailVerified`
-- Remove: `phone`, `phoneVerified`, `consents`
+// Build address JSONB
+const currentAddress = aadhaarData?.addressData ? {
+  line1: aadhaarData.addressData.line1 || '',
+  line2: aadhaarData.addressData.line2 || '',
+  city: aadhaarData.addressData.city || '',
+  state: aadhaarData.addressData.state || '',
+  pincode: aadhaarData.addressData.pincode || ''
+} : null;
 
----
+// Insert with complete data
+.insert({
+  // ...existing fields
+  dob: dob,
+  gender: gender,
+  current_address: currentAddress,
+});
+```
 
-## UI Layout for Screen 1 (New)
+### Step 8: Update Submit Application Edge Function
+
+Modify `supabase/functions/submit-loan-application/index.ts`
+
+In the referral application section, add the missing fields:
+```typescript
+.insert({
+  loan_application_id: application.id,
+  applicant_type: 'primary',
+  first_name: firstName,
+  last_name: lastName,
+  // ...existing fields...
+  dob: applicant.dob || applicant.aadhaarDob || '1990-01-01',
+  gender: applicant.gender || null,
+  current_address: applicant.addressData || null,
+});
+```
+
+## Files to Create/Modify
+
+| File | Action | Priority |
+|------|--------|----------|
+| `supabase/functions/verifiedu-public-aadhaar-details/index.ts` | CREATE | High |
+| `supabase/functions/verifiedu-public-pan-verify/index.ts` | MODIFY | High |
+| `src/pages/DigilockerSuccess.tsx` | MODIFY | High |
+| `src/components/ReferralApplication/PANVerificationStep.tsx` | MODIFY | Medium |
+| `src/components/ReferralApplication/AadhaarVerificationStep.tsx` | MODIFY | Medium |
+| `src/pages/ReferralLoanApplication.tsx` | MODIFY | Medium |
+| `supabase/functions/create-draft-referral-application/index.ts` | MODIFY | High |
+| `supabase/functions/submit-loan-application/index.ts` | MODIFY | High |
+
+## Data Flow After Fix
 
 ```text
-┌─────────────────────────────────┐
-│ 💰 What do you need?            │
-│ Tell us about your loan requirement │
-├─────────────────────────────────┤
-│ ₹ LOAN AMOUNT *                 │
-│ ┌─────────────────────────────┐ │
-│ │ ₹ 25,000                    │ │
-│ └─────────────────────────────┘ │
-│ ──●────────────────────────── │
-│ ₹5,000                ₹1,00,000 │
-├─────────────────────────────────┤
-│ 📱 MOBILE NUMBER *              │
-│ ┌────┬────────────────────────┐ │
-│ │+91 │ Enter 10-digit mobile  │ │
-│ └────┴────────────────────────┘ │
-│ [OTP verification area if sent] │
-├─────────────────────────────────┤
-│ 👤 FULL NAME (AS PER PAN) *     │
-│ ┌─────────────────────────────┐ │
-│ │ Enter your full name        │ │
-│ └─────────────────────────────┘ │
-├─────────────────────────────────┤
-│ DECLARATIONS                    │
-│ ☑ Household income > ₹3 Lakh   │
-│ ☑ I agree to Terms, Privacy... │
-│ ☑ I consent to CKYC verification│
-├─────────────────────────────────┤
-│ ┌─────────────────────────────┐ │
-│ │      Continue →             │ │
-│ └─────────────────────────────┘ │
-│ 🔒 Your data is 256-bit secure  │
-└─────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          FIXED DATA FLOW                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  PAN VERIFICATION                                                           │
+│  ┌──────────┐     ┌─────────────────────────┐     ┌──────────────────────┐ │
+│  │Enter PAN │────▶│verifiedu-public-pan     │────▶│Returns: name, DOB,   │ │
+│  │          │     │         -verify         │     │is_valid              │ │
+│  └──────────┘     └─────────────────────────┘     └──────────────────────┘ │
+│                                                             │               │
+│                                                             ▼               │
+│                                              Store DOB in panData state     │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  AADHAAR VERIFICATION                                                       │
+│  ┌──────────┐     ┌─────────────────────────┐     ┌──────────────────────┐ │
+│  │DigiLocker│────▶│digilocker-callback      │────▶│DigilockerSuccess.tsx │ │
+│  │  Flow    │     │    (redirect)           │     │                      │ │
+│  └──────────┘     └─────────────────────────┘     └──────────┬───────────┘ │
+│                                                              │              │
+│                   ┌─────────────────────────┐                │              │
+│                   │verifiedu-public-aadhaar │◀───────────────┘              │
+│                   │       -details (NEW)    │                               │
+│                   └──────────────┬──────────┘                               │
+│                                  │                                          │
+│                                  ▼                                          │
+│                   ┌──────────────────────────────────────────────────────┐  │
+│                   │ Returns: name, DOB, gender, aadhaar_uid,             │  │
+│                   │          addresses (house, street, locality,         │  │
+│                   │                      dist, state, pincode)           │  │
+│                   └──────────────────────────────────────────────────────┘  │
+│                                  │                                          │
+│                                  ▼                                          │
+│                   Store in localStorage with structured addressData         │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  FORM SUBMISSION                                                            │
+│  ┌──────────────────┐     ┌─────────────────────────┐                       │
+│  │ Referral Form    │────▶│ submit-loan-application │                       │
+│  │ (with real data) │     │   OR create-draft-...   │                       │
+│  └──────────────────┘     └───────────┬─────────────┘                       │
+│                                       │                                     │
+│                                       ▼                                     │
+│                           ┌─────────────────────────────────────────┐       │
+│                           │        loan_applicants table            │       │
+│                           │  - dob: "1995-06-15"                    │       │
+│                           │  - gender: "Male"                       │       │
+│                           │  - current_address: {                   │       │
+│                           │      line1: "123 Main St",              │       │
+│                           │      line2: "Sector 5",                 │       │
+│                           │      city: "City Name",                 │       │
+│                           │      state: "State Name",               │       │
+│                           │      pincode: "123456"                  │       │
+│                           │    }                                    │       │
+│                           └─────────────────────────────────────────┘       │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
----
+## Technical Notes
 
-## UI Layout for Screen 2 (New)
+### DOB Priority Logic
+When storing DOB, use this priority:
+1. Aadhaar verified DOB (most authoritative)
+2. PAN verified DOB (secondary)
+3. Default `1990-01-01` (last resort for schema compliance)
 
-```text
-┌─────────────────────────────────┐
-│ 📞 How do we reach you?         │
-│ We'll send updates on these     │
-├─────────────────────────────────┤
-│ 📅 TENURE (DAYS) *              │
-│ ┌─────────────────────────────┐ │
-│ │ 30                          │ │
-│ └─────────────────────────────┘ │
-│ ──●────────────────────────── │
-│ 1 day                    90 days│
-├─────────────────────────────────┤
-│ 📧 EMAIL ADDRESS *              │
-│ ┌─────────────────────────────┐ │
-│ │ Enter your email            │ │
-│ └─────────────────────────────┘ │
-│ [OTP verification area if sent] │
-├─────────────────────────────────┤
-│ 🏢 OFFICE EMAIL (Optional)      │
-│ ┌─────────────────────────────┐ │
-│ │ Enter work email            │ │
-│ └─────────────────────────────┘ │
-│ [OTP verification area if sent] │
-├─────────────────────────────────┤
-│ ┌─────────────────────────────┐ │
-│ │ Continue to PAN Verification│ │
-│ └─────────────────────────────┘ │
-│ 🔒 Secure · RBI Registered      │
-└─────────────────────────────────┘
+### Placeholder Detection
+Before storing DOB, check it's not a placeholder:
+```typescript
+const isValidDob = dob && dob !== 'DOB verified' && /^\d{4}-\d{2}-\d{2}$/.test(dob);
 ```
 
----
+### Address Structure
+The `current_address` JSONB column expects:
+```json
+{
+  "line1": "House/Building/Street",
+  "line2": "Locality/Landmark",
+  "city": "District name",
+  "state": "State name",
+  "pincode": "6-digit PIN"
+}
+```
 
-## Technical Implementation Notes
-
-### OTP Logic Migration
-The complete phone OTP verification logic moves from `ContactConsentScreen` to `LoanRequirementsScreen`:
-- State variables: `phoneOtpSent`, `phoneOtp`, `phoneSessionId`, `sendingPhoneOtp`, `verifyingPhone`, `phoneTimer`, `phoneTestOtp`
-- Auto-send effect (500ms debounce on 10-digit input)
-- `sendOtp('phone')` and `verifyOtp('phone')` functions
-- Timer management with `startTimer` and `formatTimer` utilities
-
-### Consent Checkbox Styling
-Preserve the exact styling from ContactConsentScreen:
-- 22x22px checkbox with rounded-md and border-2
-- 13px text with muted-foreground color
-- Links styled with text-primary and underline
-
-### Mobile Considerations
-Screen 1 will now have more content, but remains scrollable with the `overflow-y-auto` container. The 52px input heights and 14px border-radius design system are maintained.
-
----
-
-## Dependencies
-No new dependencies - this is a restructuring of existing components using current UI patterns and OTP infrastructure.
+### Mock Mode
+The new public Aadhaar details endpoint will support mock mode:
+- Returns mock data when VerifiedU credentials not configured
+- Includes `is_mock: true` flag in response
+- Mock DOB: "1990-01-15", Mock Gender: "Male"
