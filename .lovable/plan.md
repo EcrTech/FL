@@ -1,245 +1,225 @@
 
-# Call Integration and Case History for Loan Application Detail Page
+# Referral Application Form Restructuring
 
 ## Overview
-This plan implements a calling feature using the existing Exotel infrastructure and adds a comprehensive case history page that consolidates all contact interactions (calls, emails, WhatsApp messages) for a loan application.
+Restructure the 2-screen referral loan application to consolidate key fields onto Screen 1, making Screen 2 lighter with only contact details.
 
 ---
 
-## Current Infrastructure Analysis
+## Current Layout
 
-**What's Already Configured:**
-- Exotel Edge Functions: `exotel-make-call`, `exotel-webhook`, `exotel-get-recording`
-- `call_logs` table with recording support
-- `CallRecordingPlayer` component for playback
-- `ClickToCall` component with disposition tracking
-- `exotel_settings` table (needs org configuration)
-- User profile has `calling_enabled` and `phone` fields
+| Screen 1 (What do you need?) | Screen 2 (How do we reach you?) |
+|------------------------------|----------------------------------|
+| Loan Amount                  | Mobile Number (with OTP)         |
+| Tenure (Days)                | Email Address (with OTP)         |
+| Full Name                    | Office Email (optional)          |
+|                              | **Consents (3 checkboxes)**      |
 
-**What's Missing:**
-- Call icon on the loan application detail page
-- Linking call logs to loan applications (`loan_application_id` column needs to be added to `call_logs`)
-- Case history page consolidating all communications
+## New Layout
+
+| Screen 1 (What do you need?) | Screen 2 (How do we reach you?) |
+|------------------------------|----------------------------------|
+| Loan Amount                  | Tenure (Days)                    |
+| **Mobile Number (with OTP)** | Email Address (with OTP)         |
+| Full Name                    | Office Email (optional)          |
+| **Consents (3 checkboxes)**  |                                  |
 
 ---
 
-## Implementation Plan
+## File Changes
 
-### Phase 1: Database Schema Update
-Add `loan_application_id` column to `call_logs` table to track calls associated with loan applications.
+### 1. LoanRequirementsScreen.tsx
 
-```text
-+-------------+            +---------------+
-| call_logs   |            | loan_applications |
-+-------------+            +---------------+
-| id          |<-----------| id            |
-| ...         |  (new FK)  | ...           |
-| loan_application_id (new)|               |
-+-------------+            +---------------+
+**Remove:**
+- Tenure input field, slider, and validation (`tenureDays`)
+
+**Add:**
+- Mobile number field with +91 prefix (from ContactConsentScreen)
+- OTP verification UI (input + verify button)
+- Auto-send OTP logic (500ms debounce on 10-digit detection)
+- Verification status handling and timer
+- All 3 consent checkboxes:
+  - Household income > ₹3 Lakh/year
+  - Terms, Privacy Policy & Gradation of Risk
+  - CKYC verification & communications consent
+
+**Props Interface Update:**
+```typescript
+interface LoanRequirementsScreenProps {
+  formData: {
+    name: string;
+    requestedAmount: number;
+    phone: string;  // Added
+  };
+  onUpdate: (data: Partial<{ name: string; requestedAmount: number; phone: string }>) => void;
+  consents: {  // Added
+    householdIncome: boolean;
+    termsAndConditions: boolean;
+    aadhaarConsent: boolean;
+  };
+  onConsentChange: (consent: 'householdIncome' | 'termsAndConditions' | 'aadhaarConsent', value: boolean) => void;  // Added
+  verificationStatus: { phoneVerified: boolean };  // Added
+  onVerificationComplete: (type: 'phone') => void;  // Added
+  onContinue: () => void;
+}
 ```
 
-**SQL Migration:**
-- Add `loan_application_id` (UUID, nullable, foreign key) to `call_logs`
-- Update RLS policies for proper access control
-
----
-
-### Phase 2: Call Button on Applicant Profile Card
-
-**Location:** `src/components/LOS/ApplicantProfileCard.tsx`
-
-Add a third communication button (phone icon) alongside the existing WhatsApp and Email buttons.
-
-**Component Changes:**
-1. Import `Phone` icon from lucide-react
-2. Create a new `CallChatDialog` component (similar to WhatsApp/Email dialogs)
-3. Add Phone button with green styling matching the WhatsApp button
-4. On click, opens call dialog showing:
-   - Active call status with real-time updates
-   - Call history for this applicant
-   - Disposition form after call ends
-
-**Call Flow:**
-```text
-User clicks Phone icon
-        |
-        v
-+-------------------+
-| CallChatDialog    |
-| - Check user has  |
-|   phone in profile|
-| - Check Exotel    |
-|   configured      |
-+-------------------+
-        |
-        v
-Invoke exotel-make-call (with loan_application_id)
-        |
-        v
-Real-time status updates via agent_call_sessions
-        |
-        v
-Call ends -> Disposition form
-        |
-        v
-Save disposition to call_logs
+**Validation Update:**
+```
+canContinue = isValidAmount && isValidPhone && phoneVerified && isValidName && allConsentsChecked
 ```
 
 ---
 
-### Phase 3: New Edge Function Update
+### 2. ContactConsentScreen.tsx
 
-**Modify:** `supabase/functions/exotel-make-call/index.ts`
+**Remove:**
+- Mobile number field and all phone OTP logic
+- All 3 consent checkboxes and related state
+- `consents` and `onConsentChange` from props
 
-Add support for `loanApplicationId` parameter:
-- Accept optional `loanApplicationId` in request body
-- Include in call_logs insert when creating the call record
-- This links the call to the specific loan application
+**Add:**
+- Tenure input field with slider (1-90 days range)
 
----
+**Props Interface Update:**
+```typescript
+interface ContactConsentScreenProps {
+  formData: {
+    email: string;
+    officeEmail: string;
+    tenureDays: number;  // Added
+  };
+  onUpdate: (data: Partial<{ email: string; officeEmail: string; tenureDays: number }>) => void;
+  verificationStatus: {
+    emailVerified: boolean;
+    officeEmailVerified: boolean;
+    // phoneVerified removed
+  };
+  onVerificationComplete: (type: 'email' | 'officeEmail') => void;
+  onContinue: () => void;
+}
+```
 
-### Phase 4: Call Chat Dialog Component
+**Validation Update:**
+```
+canContinue = isValidTenure && isValidEmail && emailVerified && officeEmailValid
+```
 
-**Create:** `src/components/LOS/Relationships/CallChatDialog.tsx`
-
-Features:
-1. **Header:** Applicant name, phone number, call status badge
-2. **Call History Section:**
-   - List of previous calls for this phone number / loan application
-   - Each call shows: date/time, duration, status, disposition
-   - Call recording player for completed calls with recordings
-3. **Active Call Panel:**
-   - Real-time status (initiating, ringing, connected)
-   - Duration timer
-   - End call button
-4. **Make Call Button:**
-   - Only enabled if Exotel is configured
-   - Only enabled if user has phone number in profile
-   - Shows loading state during call initiation
-5. **Disposition Form:**
-   - Appears after call ends
-   - Disposition and sub-disposition dropdowns
-   - Notes textarea
-   - Callback date/time picker for follow-ups
-   - Save button
-
----
-
-### Phase 5: Case History Page
-
-**Create:** `src/components/LOS/CaseHistoryDialog.tsx`
-
-A comprehensive timeline view consolidating:
-
-1. **Call History:**
-   - Fetched from `call_logs` where `loan_application_id` matches OR `to_number`/`from_number` matches applicant mobile
-   - Shows: date, time, duration, status, agent, disposition, recording
-
-2. **Email History:**
-   - Fetched from `email_conversations` where `to_email` OR `from_email` matches applicant email
-   - Shows: date, subject, status (sent/delivered/opened), direction
-
-3. **WhatsApp History:**
-   - Fetched from `whatsapp_messages` where `phone_number` matches applicant mobile
-   - Shows: date, message preview, status, direction
-
-4. **Stage History:**
-   - Already exists in `loan_stage_history`
-   - Shows: stage transitions with who moved it and when
-
-5. **Activity Notes:**
-   - From `contact_activities` linked to calls
-   - Any manual notes added
-
-**UI Design:**
-- Tabbed interface: All | Calls | Emails | WhatsApp | Notes
-- Timeline view with color-coded entries
-- Filter by date range
-- Export option
-
-**Access from Application Detail:**
-- Add "Case History" button in the header area
-- Opens the dialog overlay
+**Title Update:**
+- Keep "How do we reach you?" as header
+- Add tenure as first field (before email)
 
 ---
 
-### Phase 6: Application Detail Page Updates
+### 3. ReferralLoanApplication.tsx (Parent Component)
 
-**Modify:** `src/pages/LOS/ApplicationDetail.tsx`
+**Update screen data passing:**
 
-1. Add "Case History" button in the header section
-2. Import and render `CaseHistoryDialog`
-3. Pass applicationId and applicant details
+**Screen 1 (LoanRequirementsScreen):**
+- Pass: `name`, `requestedAmount`, `phone`
+- Pass: `consents`, `onConsentChange`
+- Pass: `verificationStatus.phoneVerified`, `onVerificationComplete('phone')`
 
----
-
-## File Changes Summary
-
-| File | Action | Description |
-|------|--------|-------------|
-| `call_logs` table | Migrate | Add `loan_application_id` column |
-| `supabase/functions/exotel-make-call/index.ts` | Modify | Accept `loanApplicationId` parameter |
-| `src/components/LOS/ApplicantProfileCard.tsx` | Modify | Add Phone call button |
-| `src/components/LOS/Relationships/CallChatDialog.tsx` | Create | Call dialog with history and dialer |
-| `src/components/LOS/CaseHistoryDialog.tsx` | Create | Comprehensive communication timeline |
-| `src/pages/LOS/ApplicationDetail.tsx` | Modify | Add Case History button |
+**Screen 2 (ContactConsentScreen):**
+- Pass: `email`, `officeEmail`, `tenureDays`
+- Pass: `verificationStatus.emailVerified`, `verificationStatus.officeEmailVerified`
+- Remove: `phone`, `phoneVerified`, `consents`
 
 ---
 
-## Technical Details
-
-### Call Recording Access
-The existing `exotel-get-recording` edge function:
-- Authenticates user
-- Verifies org access
-- Fetches recording from Exotel using stored credentials
-- Returns audio stream
-
-### Real-time Updates
-Subscribe to `agent_call_sessions` table for live call status:
-- `initiating` - Call being placed
-- `ringing` - Recipient phone ringing
-- `connected` - Call in progress
-- `ended` - Call completed
-
-### User Requirements
-For calling to work, users need:
-1. `calling_enabled = true` on their profile
-2. `phone` field set in their profile
-3. Organization has Exotel configured and active
-
----
-
-## UX Flow
+## UI Layout for Screen 1 (New)
 
 ```text
-Loan Application Detail Page
-         |
-         +-- Applicant Profile Card
-         |        |
-         |        +-- [WhatsApp] [Email] [Phone] buttons
-         |        |
-         |        +-- Click Phone -> CallChatDialog
-         |             |
-         |             +-- View call history
-         |             +-- Make new call
-         |             +-- Listen to recordings
-         |             +-- Add dispositions
-         |
-         +-- [Case History] button in header
-                  |
-                  +-- CaseHistoryDialog
-                       |
-                       +-- Timeline of all interactions
-                       +-- Calls with recordings
-                       +-- Emails with open tracking
-                       +-- WhatsApp messages
-                       +-- Stage changes
+┌─────────────────────────────────┐
+│ 💰 What do you need?            │
+│ Tell us about your loan requirement │
+├─────────────────────────────────┤
+│ ₹ LOAN AMOUNT *                 │
+│ ┌─────────────────────────────┐ │
+│ │ ₹ 25,000                    │ │
+│ └─────────────────────────────┘ │
+│ ──●────────────────────────── │
+│ ₹5,000                ₹1,00,000 │
+├─────────────────────────────────┤
+│ 📱 MOBILE NUMBER *              │
+│ ┌────┬────────────────────────┐ │
+│ │+91 │ Enter 10-digit mobile  │ │
+│ └────┴────────────────────────┘ │
+│ [OTP verification area if sent] │
+├─────────────────────────────────┤
+│ 👤 FULL NAME (AS PER PAN) *     │
+│ ┌─────────────────────────────┐ │
+│ │ Enter your full name        │ │
+│ └─────────────────────────────┘ │
+├─────────────────────────────────┤
+│ DECLARATIONS                    │
+│ ☑ Household income > ₹3 Lakh   │
+│ ☑ I agree to Terms, Privacy... │
+│ ☑ I consent to CKYC verification│
+├─────────────────────────────────┤
+│ ┌─────────────────────────────┐ │
+│ │      Continue →             │ │
+│ └─────────────────────────────┘ │
+│ 🔒 Your data is 256-bit secure  │
+└─────────────────────────────────┘
 ```
+
+---
+
+## UI Layout for Screen 2 (New)
+
+```text
+┌─────────────────────────────────┐
+│ 📞 How do we reach you?         │
+│ We'll send updates on these     │
+├─────────────────────────────────┤
+│ 📅 TENURE (DAYS) *              │
+│ ┌─────────────────────────────┐ │
+│ │ 30                          │ │
+│ └─────────────────────────────┘ │
+│ ──●────────────────────────── │
+│ 1 day                    90 days│
+├─────────────────────────────────┤
+│ 📧 EMAIL ADDRESS *              │
+│ ┌─────────────────────────────┐ │
+│ │ Enter your email            │ │
+│ └─────────────────────────────┘ │
+│ [OTP verification area if sent] │
+├─────────────────────────────────┤
+│ 🏢 OFFICE EMAIL (Optional)      │
+│ ┌─────────────────────────────┐ │
+│ │ Enter work email            │ │
+│ └─────────────────────────────┘ │
+│ [OTP verification area if sent] │
+├─────────────────────────────────┤
+│ ┌─────────────────────────────┐ │
+│ │ Continue to PAN Verification│ │
+│ └─────────────────────────────┘ │
+│ 🔒 Secure · RBI Registered      │
+└─────────────────────────────────┘
+```
+
+---
+
+## Technical Implementation Notes
+
+### OTP Logic Migration
+The complete phone OTP verification logic moves from `ContactConsentScreen` to `LoanRequirementsScreen`:
+- State variables: `phoneOtpSent`, `phoneOtp`, `phoneSessionId`, `sendingPhoneOtp`, `verifyingPhone`, `phoneTimer`, `phoneTestOtp`
+- Auto-send effect (500ms debounce on 10-digit input)
+- `sendOtp('phone')` and `verifyOtp('phone')` functions
+- Timer management with `startTimer` and `formatTimer` utilities
+
+### Consent Checkbox Styling
+Preserve the exact styling from ContactConsentScreen:
+- 22x22px checkbox with rounded-md and border-2
+- 13px text with muted-foreground color
+- Links styled with text-primary and underline
+
+### Mobile Considerations
+Screen 1 will now have more content, but remains scrollable with the `overflow-y-auto` container. The 52px input heights and 14px border-radius design system are maintained.
 
 ---
 
 ## Dependencies
-- Exotel settings must be configured by the organization
-- User must have calling enabled on their profile
-- User must have their phone number saved in profile
+No new dependencies - this is a restructuring of existing components using current UI patterns and OTP infrastructure.
