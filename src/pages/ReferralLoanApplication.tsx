@@ -49,10 +49,23 @@ interface StoredFormState {
   };
   panNumber: string;
   panVerified: boolean;
-  panData?: { name: string; status: string };
+  panData?: { name: string; status: string; dob?: string };
   aadhaarNumber: string;
   aadhaarVerified: boolean;
-  aadhaarData?: { name: string; address: string; dob: string };
+  aadhaarData?: { 
+    name: string; 
+    address: string; 
+    dob: string;
+    gender?: string;
+    aadhaarNumber?: string;
+    addressData?: {
+      line1: string;
+      line2: string;
+      city: string;
+      state: string;
+      pincode: string;
+    };
+  };
   geolocation?: { latitude: number; longitude: number; accuracy: number };
   referralCode?: string;
 }
@@ -153,11 +166,24 @@ export default function ReferralLoanApplication() {
 
   const [panNumber, setPanNumber] = useState("");
   const [panVerified, setPanVerified] = useState(false);
-  const [panData, setPanData] = useState<{ name: string; status: string } | undefined>();
+  const [panData, setPanData] = useState<{ name: string; status: string; dob?: string } | undefined>();
 
   const [aadhaarNumber, setAadhaarNumber] = useState("");
   const [aadhaarVerified, setAadhaarVerified] = useState(false);
-  const [aadhaarData, setAadhaarData] = useState<{ name: string; address: string; dob: string; aadhaarNumber?: string } | undefined>();
+  const [aadhaarData, setAadhaarData] = useState<{ 
+    name: string; 
+    address: string; 
+    dob: string; 
+    aadhaarNumber?: string;
+    gender?: string;
+    addressData?: {
+      line1: string;
+      line2: string;
+      city: string;
+      state: string;
+      pincode: string;
+    };
+  } | undefined>();
 
   const [videoKycCompleted, setVideoKycCompleted] = useState(false);
 
@@ -297,12 +323,25 @@ export default function ReferralLoanApplication() {
     setConsents((prev) => ({ ...prev, [consent]: value }));
   };
 
-  const handlePanVerified = (data: { name: string; status: string }) => {
+  const handlePanVerified = (data: { name: string; status: string; dob?: string }) => {
     setPanData(data);
     setPanVerified(true);
   };
 
-  const handleAadhaarVerified = (data: { name: string; address: string; dob: string; aadhaarNumber?: string }) => {
+  const handleAadhaarVerified = (data: { 
+    name: string; 
+    address: string; 
+    dob: string; 
+    aadhaarNumber?: string;
+    gender?: string;
+    addressData?: {
+      line1: string;
+      line2: string;
+      city: string;
+      state: string;
+      pincode: string;
+    };
+  }) => {
     setAadhaarData(data);
     setAadhaarVerified(true);
     // Store aadhaar number if provided from DigiLocker
@@ -333,6 +372,7 @@ export default function ReferralLoanApplication() {
           panNumber,
           aadhaarNumber,
           aadhaarData,
+          panData,
         }
       });
 
@@ -394,11 +434,14 @@ export default function ReferralLoanApplication() {
         pan: panNumber,
         panVerified,
         panName: panData?.name,
+        panDob: panData?.dob,
         aadhaar: aadhaarNumber,
         aadhaarVerified,
         aadhaarName: aadhaarData?.name,
         aadhaarAddress: aadhaarData?.address,
         aadhaarDob: aadhaarData?.dob,
+        aadhaarGender: aadhaarData?.gender,
+        addressData: aadhaarData?.addressData,
         videoKycCompleted: true,
       },
         consents,

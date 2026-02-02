@@ -297,6 +297,36 @@ Deno.serve(async (req) => {
           .eq('id', application.id);
       }
 
+      // Helper function to check if DOB is a valid date (not placeholder)
+      const isValidDob = (dob: string | undefined) => {
+        return dob && dob !== 'DOB verified' && /^\d{4}-\d{2}-\d{2}$/.test(dob);
+      };
+
+      // Extract DOB - prioritize Aadhaar DOB, then PAN DOB, then default
+      let dob = '1990-01-01';
+      if (isValidDob(applicant.aadhaarDob)) {
+        dob = applicant.aadhaarDob;
+      } else if (isValidDob(applicant.panDob)) {
+        dob = applicant.panDob;
+      }
+
+      // Extract gender from Aadhaar data
+      const gender = applicant.aadhaarGender || null;
+
+      // Build current_address JSONB from structured Aadhaar address data
+      let currentAddress = null;
+      if (applicant.addressData) {
+        currentAddress = {
+          line1: applicant.addressData.line1 || '',
+          line2: applicant.addressData.line2 || '',
+          city: applicant.addressData.city || '',
+          state: applicant.addressData.state || '',
+          pincode: applicant.addressData.pincode || '',
+        };
+      }
+
+      console.log('[submit-loan-application] Extracted data - DOB:', dob, 'Gender:', gender, 'Has Address:', !!currentAddress);
+
       // Create applicant record
       const { error: applicantError } = await supabase
         .from('loan_applicants')
@@ -313,7 +343,10 @@ Deno.serve(async (req) => {
           email: applicant.email || null,
           office_email: applicant.officeEmail || null,
           office_email_verified: applicant.officeEmailVerified || false,
-          video_kyc_completed: applicant.videoKycCompleted || false
+          video_kyc_completed: applicant.videoKycCompleted || false,
+          dob: dob,
+          gender: gender,
+          current_address: currentAddress,
         });
 
       if (applicantError) {

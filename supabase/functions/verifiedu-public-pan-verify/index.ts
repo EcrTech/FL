@@ -36,7 +36,7 @@ serve(async (req) => {
       // Mock response for testing
       return new Response(JSON.stringify({
         success: true,
-        data: { name: "MOCK USER NAME", is_valid: true },
+        data: { name: "MOCK USER NAME", is_valid: true, dob: "1990-01-15" },
         is_mock: true,
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -58,7 +58,11 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      data: { name: responseData.data?.name, is_valid: responseData.data?.is_valid },
+      data: { 
+        name: responseData.data?.name, 
+        is_valid: responseData.data?.is_valid,
+        dob: responseData.data?.dob,
+      },
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (error) {

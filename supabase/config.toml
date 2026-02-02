@@ -57,6 +57,9 @@ verify_jwt = false
 [functions.verifiedu-public-aadhaar-initiate]
 verify_jwt = false
 
+[functions.verifiedu-public-aadhaar-details]
+verify_jwt = false
+
 [functions.digilocker-callback]
 verify_jwt = false
 

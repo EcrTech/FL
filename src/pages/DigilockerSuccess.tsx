@@ -78,27 +78,103 @@ export default function DigilockerSuccess() {
     },
   });
 
-  // Handle referral callback - redirect back immediately with success/failure
-  const handleReferralCallback = (success: boolean) => {
+  // Handle referral callback - fetch real data and redirect
+  const handleReferralCallback = async (success: boolean) => {
     if (!effectiveReturnUrl) {
       setErrorMessage("Missing return URL for referral callback");
       setStatus("error");
       return;
     }
 
-    // Clean up localStorage
-    localStorage.removeItem("referral_aadhaar_pending");
+    if (!success) {
+      // Clean up localStorage
+      localStorage.removeItem("referral_aadhaar_pending");
+      redirectToReferralForm(false);
+      return;
+    }
 
-    if (success) {
-      // Store verified info for the form to consume
+    // Fetch real Aadhaar data using public endpoint
+    try {
+      console.log("[DigilockerSuccess] Fetching Aadhaar details for referral...");
+      setStatus("loading");
+
+      const { data, error } = await supabase.functions.invoke("verifiedu-public-aadhaar-details", {
+        body: {
+          uniqueRequestNumber: id,
+        },
+      });
+
+      if (error || !data?.success) {
+        console.error("[DigilockerSuccess] Error fetching Aadhaar details:", error || data?.error);
+        // Still redirect with success since DigiLocker verified, but with placeholder data
+        storeVerifiedInfoAndRedirect({
+          name: "DigiLocker Verified",
+          address: "Address verified via DigiLocker",
+          dob: "DOB verified",
+        });
+        return;
+      }
+
+      // Build structured address from response
+      const addr = data.data?.addresses?.[0];
+      let addressData = null;
+      let combinedAddress = "Address verified via DigiLocker";
+
+      if (addr) {
+        // Build line1: house + street + landmark
+        const line1Parts = [addr.house, addr.street, addr.landmark].filter(Boolean);
+        const line1 = line1Parts.join(', ') || '';
+        
+        // Build line2: locality + vtc + subdist
+        const line2Parts = [addr.locality, addr.vtc, addr.subdist].filter(Boolean);
+        const line2 = line2Parts.join(', ') || '';
+        
+        addressData = {
+          line1: line1,
+          line2: line2,
+          city: addr.dist || '',
+          state: addr.state || '',
+          pincode: addr.pc || '',
+        };
+        
+        combinedAddress = addr.combined || `${line1}, ${line2}, ${addr.dist}, ${addr.state} - ${addr.pc}`;
+      }
+
+      // Store real verified info
       const verifiedInfo = {
+        name: data.data?.name || "DigiLocker Verified",
+        address: combinedAddress,
+        dob: data.data?.dob || "DOB verified",
+        gender: data.data?.gender || undefined,
+        aadhaarNumber: data.data?.aadhaar_uid || undefined,
+        addressData: addressData,
+      };
+
+      console.log("[DigilockerSuccess] Storing verified info:", verifiedInfo);
+      storeVerifiedInfoAndRedirect(verifiedInfo);
+
+    } catch (err) {
+      console.error("[DigilockerSuccess] Exception fetching Aadhaar details:", err);
+      // Redirect with placeholder data
+      storeVerifiedInfoAndRedirect({
         name: "DigiLocker Verified",
         address: "Address verified via DigiLocker",
         dob: "DOB verified",
-      };
-      localStorage.setItem("referral_aadhaar_verified", JSON.stringify(verifiedInfo));
+      });
     }
+  };
 
+  const storeVerifiedInfoAndRedirect = (verifiedInfo: any) => {
+    // Clean up localStorage
+    localStorage.removeItem("referral_aadhaar_pending");
+
+    // Store verified info for the form to consume
+    localStorage.setItem("referral_aadhaar_verified", JSON.stringify(verifiedInfo));
+
+    redirectToReferralForm(true);
+  };
+
+  const redirectToReferralForm = (success: boolean) => {
     // Build redirect URL
     try {
       const returnUrl = new URL(effectiveReturnUrl);
