@@ -17,10 +17,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Phone, IndianRupee, Search, Eye, Filter } from "lucide-react";
+import { IndianRupee, Search, Eye, Filter, Smartphone } from "lucide-react";
 import { CollectionRecord } from "@/hooks/useCollections";
 import { useNavigate } from "react-router-dom";
 import { ClickToCall } from "@/components/Contact/ClickToCall";
+import { UPICollectionDialog } from "./UPICollectionDialog";
+import { useUPICollection } from "@/hooks/useUPICollection";
 
 interface CollectionsTableProps {
   collections: CollectionRecord[];
@@ -32,6 +34,9 @@ export function CollectionsTable({ collections, onRecordPayment }: CollectionsTa
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [upiDialogOpen, setUpiDialogOpen] = useState(false);
+  const [selectedUpiRecord, setSelectedUpiRecord] = useState<CollectionRecord | null>(null);
+  const { isCollectionEnabled } = useUPICollection();
   const pageSize = 25;
 
   const formatCurrency = (amount: number) => {
@@ -224,15 +229,31 @@ export function CollectionsTable({ collections, onRecordPayment }: CollectionsTa
                     <TableCell className="py-2">
                       <div className="flex items-center justify-center gap-1">
                         {record.status !== "paid" && (
-                          <Button
-                            size="sm"
-                            variant="default"
-                            className="h-7 text-xs px-2"
-                            onClick={() => onRecordPayment(record)}
-                          >
-                            <IndianRupee className="h-3 w-3 mr-1" />
-                            Pay
-                          </Button>
+                          <>
+                            <Button
+                              size="sm"
+                              variant="default"
+                              className="h-7 text-xs px-2"
+                              onClick={() => onRecordPayment(record)}
+                            >
+                              <IndianRupee className="h-3 w-3 mr-1" />
+                              Pay
+                            </Button>
+                            {isCollectionEnabled && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs px-2"
+                                onClick={() => {
+                                  setSelectedUpiRecord(record);
+                                  setUpiDialogOpen(true);
+                                }}
+                              >
+                                <Smartphone className="h-3 w-3 mr-1" />
+                                UPI
+                              </Button>
+                            )}
+                          </>
                         )}
                         <Button
                           size="sm"
@@ -303,6 +324,13 @@ export function CollectionsTable({ collections, onRecordPayment }: CollectionsTa
           </div>
         </div>
       )}
+
+      {/* UPI Collection Dialog */}
+      <UPICollectionDialog
+        open={upiDialogOpen}
+        onOpenChange={setUpiDialogOpen}
+        record={selectedUpiRecord}
+      />
     </div>
   );
 }

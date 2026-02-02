@@ -83,3 +83,15 @@ verify_jwt = false
 
 [functions.send-emandate-notifications]
 verify_jwt = false
+
+[functions.nupay-collection-authenticate]
+verify_jwt = true
+
+[functions.nupay-create-upi-collection]
+verify_jwt = true
+
+[functions.nupay-collection-status]
+verify_jwt = false
+
+[functions.nupay-collection-webhook]
+verify_jwt = false
