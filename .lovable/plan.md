@@ -1,336 +1,332 @@
 
-# Fix: Capture Real Aadhaar/PAN Data in Referral Applications
+# UPI Collection Integration with Nupay Collection 360
 
-## Problem Summary
-For referral (unauthenticated) loan applications, verified data from PAN and Aadhaar is not being stored in the `loan_applicants` table. The current flow stores **placeholder strings** instead of actual verification data.
+## Overview
+Integrate Nupay's Collection 360 API to enable UPI-based EMI collections in the Collections module. This will allow generating payment QR codes/links for pending EMIs and auto-reconciling payments via webhooks.
 
-## Root Causes
+---
 
-| # | Issue | File | Problem |
-|---|-------|------|---------|
-| 1 | Placeholder data stored | `DigilockerSuccess.tsx` | Stores "DOB verified" instead of real DOB |
-| 2 | No public Aadhaar endpoint | Edge functions | `verifiedu-aadhaar-details` requires authentication |
-| 3 | PAN missing DOB | `verifiedu-public-pan-verify` | Doesn't return DOB from API response |
-| 4 | Draft function ignores placeholders | `create-draft-referral-application` | Falls back to default DOB (1990-01-01) |
-| 5 | Submit missing fields | `submit-loan-application` | Doesn't include DOB, gender, or address in insert |
+## API Summary from Documentation
 
-## Solution Architecture
+| API | Endpoint | Purpose |
+|-----|----------|---------|
+| Get Access Token | POST `/onboarding/v1/users/accesstoken` | Generate JWT (30 min expiry) using `access_key` + `access_secret` |
+| Create Collect Request | POST `/collect360/v1/initiate_transaction` | Generate Dynamic QR, UPI Intent URL, or VPA Collect |
+| Get Transaction Status | GET `/collect360/v1/transactionEnquiry/:client_reference_id` | Check payment status |
+| Get Transaction Statement | GET `/collect360/v1/transactionStatement` | Fetch transaction history |
+
+**Key Differences from eMandate API:**
+- Uses `access_key` + `access_secret` (not just `api_key`)
+- Different endpoint base: `https://api-uat.nupaybiz.com` (UAT) / `https://api.nupaybiz.com` (Prod)
+- Requires `NP-Request-ID`, `x-api-key`, and `Authorization` headers
+- Token expires in 30 minutes (vs 30 days for eMandate)
+
+---
+
+## Database Schema Changes
+
+### 1. Extend `nupay_config` table
+
+Add Collection 360-specific credentials:
+```sql
+ALTER TABLE nupay_config ADD COLUMN IF NOT EXISTS access_key text;
+ALTER TABLE nupay_config ADD COLUMN IF NOT EXISTS access_secret text;
+ALTER TABLE nupay_config ADD COLUMN IF NOT EXISTS collection_api_endpoint text;
+ALTER TABLE nupay_config ADD COLUMN IF NOT EXISTS provider_id text;
+ALTER TABLE nupay_config ADD COLUMN IF NOT EXISTS collection_enabled boolean DEFAULT false;
+```
+
+### 2. Create `nupay_upi_transactions` table
+
+Track UPI collection requests and their status:
+```sql
+CREATE TABLE nupay_upi_transactions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id uuid NOT NULL REFERENCES organizations(id),
+  loan_application_id uuid NOT NULL REFERENCES loan_applications(id),
+  schedule_id uuid REFERENCES loan_repayment_schedule(id),
+  
+  -- Nupay identifiers
+  client_reference_id text NOT NULL UNIQUE,
+  transaction_id text,
+  customer_unique_id text,
+  nupay_reference_id text,
+  
+  -- Transaction details
+  request_amount numeric NOT NULL,
+  transaction_amount numeric,
+  convenience_fee numeric,
+  gst_amount numeric,
+  
+  -- Payment info
+  payment_link text,
+  payee_vpa text,
+  payer_vpa text,
+  payer_name text,
+  payer_mobile text,
+  payer_email text,
+  
+  -- Status
+  status text NOT NULL DEFAULT 'pending',
+  status_description text,
+  utr text,
+  npci_transaction_id text,
+  
+  -- Timestamps
+  expires_at timestamptz,
+  transaction_timestamp timestamptz,
+  
+  -- Metadata
+  request_payload jsonb,
+  response_payload jsonb,
+  webhook_payload jsonb,
+  
+  created_by uuid REFERENCES auth.users(id),
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+-- RLS policies
+ALTER TABLE nupay_upi_transactions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own org transactions" ON nupay_upi_transactions
+  FOR SELECT USING (org_id IN (SELECT org_id FROM profiles WHERE id = auth.uid()));
+
+CREATE POLICY "Users can insert own org transactions" ON nupay_upi_transactions
+  FOR INSERT WITH CHECK (org_id IN (SELECT org_id FROM profiles WHERE id = auth.uid()));
+```
+
+### 3. Create `nupay_upi_auth_tokens` table
+
+Cache short-lived tokens (30 min expiry):
+```sql
+CREATE TABLE nupay_upi_auth_tokens (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id uuid NOT NULL REFERENCES organizations(id),
+  environment text NOT NULL,
+  token text NOT NULL,
+  expires_at timestamptz NOT NULL,
+  created_at timestamptz DEFAULT now(),
+  UNIQUE(org_id, environment)
+);
+```
+
+---
+
+## Edge Functions to Create
+
+### 1. `nupay-collection-authenticate`
+
+Generate JWT token for Collection 360 API.
 
 ```text
-CURRENT (BROKEN):
-DigiLocker → Callback → Store placeholders → Form → Submit placeholders → DB gets defaults
-
-FIXED:
-DigiLocker → Callback → Fetch REAL data (public API) → Store structured data → Form → Submit real data → DB synced
+POST /nupay-collection-authenticate
+Body: { org_id, environment }
+Response: { success, token, expires_at }
 ```
 
-## Implementation Steps
+Key logic:
+- Check `nupay_upi_auth_tokens` for valid cached token
+- If expired, call `/onboarding/v1/users/accesstoken` with `access_key` + `access_secret`
+- Cache new token (set expiry to 25 min to be safe)
+- Return token
 
-### Step 1: Create Public Aadhaar Details Endpoint
+### 2. `nupay-create-upi-collection`
 
-Create `supabase/functions/verifiedu-public-aadhaar-details/index.ts`
-
-A new **unauthenticated** endpoint to fetch Aadhaar details after DigiLocker verification.
-
-Key features:
-- No authentication required (public access)
-- Accepts `uniqueRequestNumber` from callback
-- Calls VerifiedU `GetAadhaarDetailsById` API
-- Returns structured data: `aadhaar_uid`, `name`, `gender`, `dob`, and structured address
-- Mock mode support when credentials not configured
-
-Response structure:
-```json
-{
-  "success": true,
-  "data": {
-    "aadhaar_uid": "XXXX-XXXX-1234",
-    "name": "APPLICANT NAME",
-    "gender": "Male",
-    "dob": "1995-06-15",
-    "addresses": [{
-      "combined": "Full address string",
-      "house": "123",
-      "street": "Main Street",
-      "locality": "Sector 5",
-      "dist": "City Name",
-      "state": "State Name",
-      "pc": "123456"
-    }]
-  }
-}
-```
-
-### Step 2: Update PAN Verification to Return DOB
-
-Modify `supabase/functions/verifiedu-public-pan-verify/index.ts`
-
-Add DOB to the response:
-```typescript
-return new Response(JSON.stringify({
-  success: true,
-  data: { 
-    name: responseData.data?.name, 
-    is_valid: responseData.data?.is_valid,
-    dob: responseData.data?.dob  // ADD THIS
-  },
-}), ...);
-```
-
-Also update mock response to include mock DOB.
-
-### Step 3: Fix DigilockerSuccess for Referral Callbacks
-
-Modify `src/pages/DigilockerSuccess.tsx`
-
-For referral callbacks:
-1. Call the new public `verifiedu-public-aadhaar-details` endpoint
-2. Wait for response before redirecting
-3. Store REAL verified data in localStorage:
-
-```typescript
-const verifiedInfo = {
-  name: data.name,
-  dob: data.dob,
-  gender: data.gender,
-  address: data.addresses?.[0]?.combined || '',
-  aadhaarNumber: data.aadhaar_uid,
-  addressData: {
-    line1: buildLine1(data.addresses[0]),
-    line2: buildLine2(data.addresses[0]),
-    city: data.addresses[0]?.dist,
-    state: data.addresses[0]?.state,
-    pincode: data.addresses[0]?.pc
-  }
-};
-localStorage.setItem("referral_aadhaar_verified", JSON.stringify(verifiedInfo));
-```
-
-### Step 4: Update AadhaarVerificationStep to Parse Structured Data
-
-Modify `src/components/ReferralApplication/AadhaarVerificationStep.tsx`
-
-Update `onVerified` callback interface to include structured address:
-```typescript
-interface AadhaarVerificationStepProps {
-  onVerified: (data: { 
-    name: string; 
-    address: string; 
-    dob: string; 
-    aadhaarNumber?: string;
-    gender?: string;
-    addressData?: {
-      line1: string;
-      line2: string;
-      city: string;
-      state: string;
-      pincode: string;
-    };
-  }) => void;
-  // ...
-}
-```
-
-Pass the complete verified data from localStorage to parent.
-
-### Step 5: Update PANVerificationStep to Capture DOB
-
-Modify `src/components/ReferralApplication/PANVerificationStep.tsx`
-
-Update `onVerified` callback to include DOB:
-```typescript
-onVerified({
-  name: verifyData.data?.name || 'Name retrieved',
-  status: 'Verified',
-  dob: verifyData.data?.dob,  // ADD THIS
-});
-```
-
-### Step 6: Update Parent Component State
-
-Modify `src/pages/ReferralLoanApplication.tsx`
-
-Update interfaces and state to track verified data:
-```typescript
-interface AadhaarVerifiedData {
-  name: string;
-  address: string;
-  dob: string;
-  gender?: string;
-  aadhaarNumber?: string;
-  addressData?: {
-    line1: string;
-    line2: string;
-    city: string;
-    state: string;
-    pincode: string;
-  };
-}
-
-interface PanVerifiedData {
-  name: string;
-  status: string;
-  dob?: string;
-}
-```
-
-### Step 7: Update Draft Application Edge Function
-
-Modify `supabase/functions/create-draft-referral-application/index.ts`
-
-Accept and store structured address and DOB:
-```typescript
-const { referralCode, basicInfo, panNumber, aadhaarNumber, aadhaarData, panData } = body;
-
-// Extract DOB (prefer Aadhaar, fallback to PAN, then default)
-const dob = aadhaarData?.dob && aadhaarData.dob !== 'DOB verified' 
-  ? aadhaarData.dob 
-  : panData?.dob || '1990-01-01';
-
-// Extract gender
-const gender = aadhaarData?.gender || null;
-
-// Build address JSONB
-const currentAddress = aadhaarData?.addressData ? {
-  line1: aadhaarData.addressData.line1 || '',
-  line2: aadhaarData.addressData.line2 || '',
-  city: aadhaarData.addressData.city || '',
-  state: aadhaarData.addressData.state || '',
-  pincode: aadhaarData.addressData.pincode || ''
-} : null;
-
-// Insert with complete data
-.insert({
-  // ...existing fields
-  dob: dob,
-  gender: gender,
-  current_address: currentAddress,
-});
-```
-
-### Step 8: Update Submit Application Edge Function
-
-Modify `supabase/functions/submit-loan-application/index.ts`
-
-In the referral application section, add the missing fields:
-```typescript
-.insert({
-  loan_application_id: application.id,
-  applicant_type: 'primary',
-  first_name: firstName,
-  last_name: lastName,
-  // ...existing fields...
-  dob: applicant.dob || applicant.aadhaarDob || '1990-01-01',
-  gender: applicant.gender || null,
-  current_address: applicant.addressData || null,
-});
-```
-
-## Files to Create/Modify
-
-| File | Action | Priority |
-|------|--------|----------|
-| `supabase/functions/verifiedu-public-aadhaar-details/index.ts` | CREATE | High |
-| `supabase/functions/verifiedu-public-pan-verify/index.ts` | MODIFY | High |
-| `src/pages/DigilockerSuccess.tsx` | MODIFY | High |
-| `src/components/ReferralApplication/PANVerificationStep.tsx` | MODIFY | Medium |
-| `src/components/ReferralApplication/AadhaarVerificationStep.tsx` | MODIFY | Medium |
-| `src/pages/ReferralLoanApplication.tsx` | MODIFY | Medium |
-| `supabase/functions/create-draft-referral-application/index.ts` | MODIFY | High |
-| `supabase/functions/submit-loan-application/index.ts` | MODIFY | High |
-
-## Data Flow After Fix
+Initiate a UPI collection request for an EMI.
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                          FIXED DATA FLOW                                    │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  PAN VERIFICATION                                                           │
-│  ┌──────────┐     ┌─────────────────────────┐     ┌──────────────────────┐ │
-│  │Enter PAN │────▶│verifiedu-public-pan     │────▶│Returns: name, DOB,   │ │
-│  │          │     │         -verify         │     │is_valid              │ │
-│  └──────────┘     └─────────────────────────┘     └──────────────────────┘ │
-│                                                             │               │
-│                                                             ▼               │
-│                                              Store DOB in panData state     │
-│                                                                             │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  AADHAAR VERIFICATION                                                       │
-│  ┌──────────┐     ┌─────────────────────────┐     ┌──────────────────────┐ │
-│  │DigiLocker│────▶│digilocker-callback      │────▶│DigilockerSuccess.tsx │ │
-│  │  Flow    │     │    (redirect)           │     │                      │ │
-│  └──────────┘     └─────────────────────────┘     └──────────┬───────────┘ │
-│                                                              │              │
-│                   ┌─────────────────────────┐                │              │
-│                   │verifiedu-public-aadhaar │◀───────────────┘              │
-│                   │       -details (NEW)    │                               │
-│                   └──────────────┬──────────┘                               │
-│                                  │                                          │
-│                                  ▼                                          │
-│                   ┌──────────────────────────────────────────────────────┐  │
-│                   │ Returns: name, DOB, gender, aadhaar_uid,             │  │
-│                   │          addresses (house, street, locality,         │  │
-│                   │                      dist, state, pincode)           │  │
-│                   └──────────────────────────────────────────────────────┘  │
-│                                  │                                          │
-│                                  ▼                                          │
-│                   Store in localStorage with structured addressData         │
-│                                                                             │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  FORM SUBMISSION                                                            │
-│  ┌──────────────────┐     ┌─────────────────────────┐                       │
-│  │ Referral Form    │────▶│ submit-loan-application │                       │
-│  │ (with real data) │     │   OR create-draft-...   │                       │
-│  └──────────────────┘     └───────────┬─────────────┘                       │
-│                                       │                                     │
-│                                       ▼                                     │
-│                           ┌─────────────────────────────────────────┐       │
-│                           │        loan_applicants table            │       │
-│                           │  - dob: "1995-06-15"                    │       │
-│                           │  - gender: "Male"                       │       │
-│                           │  - current_address: {                   │       │
-│                           │      line1: "123 Main St",              │       │
-│                           │      line2: "Sector 5",                 │       │
-│                           │      city: "City Name",                 │       │
-│                           │      state: "State Name",               │       │
-│                           │      pincode: "123456"                  │       │
-│                           │    }                                    │       │
-│                           └─────────────────────────────────────────┘       │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
+POST /nupay-create-upi-collection
+Body: {
+  org_id,
+  environment,
+  schedule_id,
+  loan_application_id,
+  loan_id,
+  emi_number,
+  amount,
+  payer_name,
+  payer_mobile,
+  payer_email (optional)
+}
+Response: {
+  success,
+  transaction_id,
+  payment_link,
+  payee_vpa,
+  expires_at,
+  qr_data
+}
 ```
+
+Key logic:
+- Generate unique `client_reference_id` (format: `EMI_{schedule_id}_{timestamp}`)
+- Get auth token via `nupay-collection-authenticate`
+- Call `/collect360/v1/initiate_transaction`
+- Store in `nupay_upi_transactions`
+- Return payment link and QR data
+
+### 3. `nupay-collection-status`
+
+Check transaction status.
+
+```text
+GET /nupay-collection-status?client_reference_id=XXX
+Response: { status, utr, amount, payer_vpa, ... }
+```
+
+### 4. `nupay-collection-webhook`
+
+Handle incoming webhooks from Nupay.
+
+```text
+POST /nupay-collection-webhook
+Body: { client_reference_id, transaction_status, utr, ... }
+```
+
+Key logic:
+- Parse webhook payload
+- Update `nupay_upi_transactions` status
+- If `SUCCESS`: Auto-record payment in `loan_payments` and update `loan_repayment_schedule`
+- If `FAILED` or `REJECTED`: Update status only
+
+---
+
+## Frontend Changes
+
+### 1. Update `NupaySettings.tsx`
+
+Add Collection 360 configuration section:
+- Access Key input
+- Access Secret input
+- Collection API Endpoint
+- Provider ID
+- Enable/Disable Collection toggle
+- Test Connection button
+
+### 2. Create `UPICollectionDialog.tsx`
+
+New dialog for initiating UPI collection:
+
+```text
++----------------------------------+
+|    Collect EMI via UPI           |
++----------------------------------+
+| Application: APP-2024-001        |
+| EMI #3 | Due: 15 Feb 2026        |
+| Amount: Rs 5,250                 |
++----------------------------------+
+| [ Generate Payment Link ]        |
++----------------------------------+
+| (After generation)               |
+| +-----------------------------+  |
+| |      [QR CODE]              |  |
+| +-----------------------------+  |
+| Payment Link: npay.biz/xxx       |
+| [ Copy Link ] [ Share WhatsApp ] |
+| Status: Pending                  |
+| [ Refresh Status ]               |
++----------------------------------+
+```
+
+### 3. Update `CollectionsTable.tsx`
+
+Add "Collect UPI" button alongside existing "Pay" button:
+- Show for pending/overdue EMIs
+- Opens `UPICollectionDialog`
+
+### 4. Create `useUPICollection.ts` hook
+
+Handle UPI collection operations:
+- `initiateCollection(scheduleId, amount, ...)`
+- `checkStatus(clientReferenceId)`
+- Query for existing transactions
+
+---
+
+## File Changes Summary
+
+| File | Action | Description |
+|------|--------|-------------|
+| `supabase/functions/nupay-collection-authenticate/index.ts` | CREATE | Auth token generation |
+| `supabase/functions/nupay-create-upi-collection/index.ts` | CREATE | Initiate UPI collection |
+| `supabase/functions/nupay-collection-status/index.ts` | CREATE | Check transaction status |
+| `supabase/functions/nupay-collection-webhook/index.ts` | CREATE | Handle webhooks, auto-reconcile |
+| `src/pages/LOS/NupaySettings.tsx` | MODIFY | Add Collection 360 config section |
+| `src/components/LOS/Collections/UPICollectionDialog.tsx` | CREATE | UPI payment initiation UI |
+| `src/components/LOS/Collections/CollectionsTable.tsx` | MODIFY | Add "Collect UPI" action |
+| `src/hooks/useUPICollection.ts` | CREATE | UPI collection hook |
+
+---
+
+## Integration Flow
+
+```text
+COLLECTION INITIATION:
++------------------+     +------------------------+     +---------------------+
+| Collections UI   |---->| nupay-create-upi-      |---->| Nupay Collection    |
+| "Collect UPI"    |     | collection             |     | 360 API             |
++------------------+     +------------------------+     +---------------------+
+         |                         |                            |
+         |                         v                            |
+         |               Store in nupay_upi_transactions        |
+         |                         |                            |
+         v                         v                            v
+    Show QR + Link  <--------  payment_link  <---------  API Response
+
+PAYMENT COMPLETION:
++------------------+     +------------------------+     +---------------------+
+| Customer pays    |---->| Nupay webhook          |---->| nupay-collection-   |
+| via UPI          |     | POST to our endpoint   |     | webhook             |
++------------------+     +------------------------+     +---------------------+
+                                                               |
+                                    +------------------<-------+
+                                    |
+                                    v
+                         +---------------------+
+                         | If SUCCESS:         |
+                         | - Update txn status |
+                         | - Insert payment    |
+                         | - Update schedule   |
+                         +---------------------+
+```
+
+---
 
 ## Technical Notes
 
-### DOB Priority Logic
-When storing DOB, use this priority:
-1. Aadhaar verified DOB (most authoritative)
-2. PAN verified DOB (secondary)
-3. Default `1990-01-01` (last resort for schema compliance)
+### Token Management
+Collection 360 tokens expire in 30 minutes (vs 30 days for eMandate). The `nupay-collection-authenticate` function will:
+1. Check `nupay_upi_auth_tokens` for valid token (with 5 min buffer)
+2. If expired, request new token
+3. Cache with 25 min expiry (5 min safety buffer)
 
-### Placeholder Detection
-Before storing DOB, check it's not a placeholder:
-```typescript
-const isValidDob = dob && dob !== 'DOB verified' && /^\d{4}-\d{2}-\d{2}$/.test(dob);
-```
+### Client Reference ID Format
+Format: `EMI_{schedule_id_first8chars}_{timestamp_ms}`
+Example: `EMI_a1b2c3d4_1706832000000`
+Length: 8-14 characters (API limit)
 
-### Address Structure
-The `current_address` JSONB column expects:
-```json
-{
-  "line1": "House/Building/Street",
-  "line2": "Locality/Landmark",
-  "city": "District name",
-  "state": "State name",
-  "pincode": "6-digit PIN"
-}
-```
+### Webhook Auto-Reconciliation
+When webhook receives `SUCCESS`:
+1. Find `nupay_upi_transactions` by `client_reference_id`
+2. Get linked `schedule_id` and `loan_application_id`
+3. Insert into `loan_payments`:
+   - `payment_method`: 'upi_collection'
+   - `transaction_reference`: UTR from webhook
+4. Update `loan_repayment_schedule` status
 
-### Mock Mode
-The new public Aadhaar details endpoint will support mock mode:
-- Returns mock data when VerifiedU credentials not configured
-- Includes `is_mock: true` flag in response
-- Mock DOB: "1990-01-15", Mock Gender: "Male"
+### Error Handling
+- Token expiry: Auto-refresh on 401/403
+- Duplicate request (NP4008): Return existing transaction
+- Rate limit (NP4006): Implement exponential backoff
+
+---
+
+## Configuration Required
+
+Users need to obtain from Nupay:
+1. `access_key` (public key, format: `nu_pub_xxx`)
+2. `access_secret` (private key, format: `nu_prv_xxx`)
+3. `provider_id` (service provider identifier)
+
+These are configured in the Nupay Settings page under a new "Collection 360" tab.
