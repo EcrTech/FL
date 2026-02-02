@@ -11,11 +11,11 @@ import { toast } from "sonner";
 interface PANVerificationStepProps {
   panNumber: string;
   onPanChange: (pan: string) => void;
-  onVerified: (data: { name: string; status: string }) => void;
+  onVerified: (data: { name: string; status: string; dob?: string }) => void;
   onNext: () => void;
   onBack: () => void;
   isVerified: boolean;
-  verifiedData?: { name: string; status: string };
+  verifiedData?: { name: string; status: string; dob?: string };
 }
 
 export function PANVerificationStep({
@@ -72,6 +72,7 @@ export function PANVerificationStep({
         onVerified({
           name: verifyData.data?.name || 'Name retrieved',
           status: 'Verified',
+          dob: verifyData.data?.dob,
         });
         toast.success("PAN verified successfully!");
       } else {

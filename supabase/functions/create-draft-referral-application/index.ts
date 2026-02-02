@@ -16,7 +16,7 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const body = await req.json();
-    const { referralCode, basicInfo, panNumber, aadhaarNumber, aadhaarData } = body;
+    const { referralCode, basicInfo, panNumber, aadhaarNumber, aadhaarData, panData } = body;
 
     console.log('[CreateDraftReferralApp] Starting with referral code:', referralCode);
 
@@ -73,8 +73,35 @@ Deno.serve(async (req) => {
     const firstName = nameParts[0] || '';
     const lastName = nameParts.slice(1).join(' ') || '';
 
-    // Extract DOB from Aadhaar verification data if available
-    const dob = aadhaarData?.dob || '1990-01-01';
+    // Helper function to check if DOB is a valid date (not placeholder)
+    const isValidDob = (dob: string | undefined) => {
+      return dob && dob !== 'DOB verified' && /^\d{4}-\d{2}-\d{2}$/.test(dob);
+    };
+
+    // Extract DOB - prioritize Aadhaar DOB, then PAN DOB, then default
+    let dob = '1990-01-01';
+    if (isValidDob(aadhaarData?.dob)) {
+      dob = aadhaarData.dob;
+    } else if (isValidDob(panData?.dob)) {
+      dob = panData.dob;
+    }
+
+    // Extract gender from Aadhaar data
+    const gender = aadhaarData?.gender || null;
+
+    // Build current_address JSONB from structured Aadhaar address data
+    let currentAddress = null;
+    if (aadhaarData?.addressData) {
+      currentAddress = {
+        line1: aadhaarData.addressData.line1 || '',
+        line2: aadhaarData.addressData.line2 || '',
+        city: aadhaarData.addressData.city || '',
+        state: aadhaarData.addressData.state || '',
+        pincode: aadhaarData.addressData.pincode || '',
+      };
+    }
+
+    console.log('[CreateDraftReferralApp] Extracted data - DOB:', dob, 'Gender:', gender, 'Has Address:', !!currentAddress);
 
     const { error: applicantError } = await supabase
       .from('loan_applicants')
@@ -88,6 +115,8 @@ Deno.serve(async (req) => {
         pan_number: panNumber?.toUpperCase() || null,
         aadhaar_number: aadhaarNumber?.replace(/\s/g, '') || null,
         dob: dob,
+        gender: gender,
+        current_address: currentAddress,
       });
 
     if (applicantError) {

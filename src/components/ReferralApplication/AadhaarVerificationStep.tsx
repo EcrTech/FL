@@ -20,7 +20,20 @@ interface CommunicationAddress {
 }
 
 interface AadhaarVerificationStepProps {
-  onVerified: (data: { name: string; address: string; dob: string; aadhaarNumber?: string }) => void;
+  onVerified: (data: { 
+    name: string; 
+    address: string; 
+    dob: string; 
+    aadhaarNumber?: string;
+    gender?: string;
+    addressData?: {
+      line1: string;
+      line2: string;
+      city: string;
+      state: string;
+      pincode: string;
+    };
+  }) => void;
   onNext: () => void;
   onBack: () => void;
   isVerified: boolean;
