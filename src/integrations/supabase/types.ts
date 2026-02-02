@@ -5482,37 +5482,52 @@ export type Database = {
       }
       nupay_config: {
         Row: {
+          access_key: string | null
+          access_secret: string | null
           api_endpoint: string
           api_key: string
+          collection_api_endpoint: string | null
+          collection_enabled: boolean | null
           created_at: string
           environment: string
           id: string
           is_active: boolean | null
           org_id: string
+          provider_id: string | null
           redirect_url: string | null
           updated_at: string
           webhook_url: string | null
         }
         Insert: {
+          access_key?: string | null
+          access_secret?: string | null
           api_endpoint?: string
           api_key: string
+          collection_api_endpoint?: string | null
+          collection_enabled?: boolean | null
           created_at?: string
           environment: string
           id?: string
           is_active?: boolean | null
           org_id: string
+          provider_id?: string | null
           redirect_url?: string | null
           updated_at?: string
           webhook_url?: string | null
         }
         Update: {
+          access_key?: string | null
+          access_secret?: string | null
           api_endpoint?: string
           api_key?: string
+          collection_api_endpoint?: string | null
+          collection_enabled?: boolean | null
           created_at?: string
           environment?: string
           id?: string
           is_active?: boolean | null
           org_id?: string
+          provider_id?: string | null
           redirect_url?: string | null
           updated_at?: string
           webhook_url?: string | null
@@ -5685,6 +5700,162 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nupay_upi_auth_tokens: {
+        Row: {
+          created_at: string | null
+          environment: string
+          expires_at: string
+          id: string
+          org_id: string
+          token: string
+        }
+        Insert: {
+          created_at?: string | null
+          environment: string
+          expires_at: string
+          id?: string
+          org_id: string
+          token: string
+        }
+        Update: {
+          created_at?: string | null
+          environment?: string
+          expires_at?: string
+          id?: string
+          org_id?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nupay_upi_auth_tokens_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nupay_upi_transactions: {
+        Row: {
+          client_reference_id: string
+          convenience_fee: number | null
+          created_at: string | null
+          created_by: string | null
+          customer_unique_id: string | null
+          expires_at: string | null
+          gst_amount: number | null
+          id: string
+          loan_application_id: string
+          npci_transaction_id: string | null
+          nupay_reference_id: string | null
+          org_id: string
+          payee_vpa: string | null
+          payer_email: string | null
+          payer_mobile: string | null
+          payer_name: string | null
+          payer_vpa: string | null
+          payment_link: string | null
+          request_amount: number
+          request_payload: Json | null
+          response_payload: Json | null
+          schedule_id: string | null
+          status: string
+          status_description: string | null
+          transaction_amount: number | null
+          transaction_id: string | null
+          transaction_timestamp: string | null
+          updated_at: string | null
+          utr: string | null
+          webhook_payload: Json | null
+        }
+        Insert: {
+          client_reference_id: string
+          convenience_fee?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_unique_id?: string | null
+          expires_at?: string | null
+          gst_amount?: number | null
+          id?: string
+          loan_application_id: string
+          npci_transaction_id?: string | null
+          nupay_reference_id?: string | null
+          org_id: string
+          payee_vpa?: string | null
+          payer_email?: string | null
+          payer_mobile?: string | null
+          payer_name?: string | null
+          payer_vpa?: string | null
+          payment_link?: string | null
+          request_amount: number
+          request_payload?: Json | null
+          response_payload?: Json | null
+          schedule_id?: string | null
+          status?: string
+          status_description?: string | null
+          transaction_amount?: number | null
+          transaction_id?: string | null
+          transaction_timestamp?: string | null
+          updated_at?: string | null
+          utr?: string | null
+          webhook_payload?: Json | null
+        }
+        Update: {
+          client_reference_id?: string
+          convenience_fee?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_unique_id?: string | null
+          expires_at?: string | null
+          gst_amount?: number | null
+          id?: string
+          loan_application_id?: string
+          npci_transaction_id?: string | null
+          nupay_reference_id?: string | null
+          org_id?: string
+          payee_vpa?: string | null
+          payer_email?: string | null
+          payer_mobile?: string | null
+          payer_name?: string | null
+          payer_vpa?: string | null
+          payment_link?: string | null
+          request_amount?: number
+          request_payload?: Json | null
+          response_payload?: Json | null
+          schedule_id?: string | null
+          status?: string
+          status_description?: string | null
+          transaction_amount?: number | null
+          transaction_id?: string | null
+          transaction_timestamp?: string | null
+          updated_at?: string | null
+          utr?: string | null
+          webhook_payload?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nupay_upi_transactions_loan_application_id_fkey"
+            columns: ["loan_application_id"]
+            isOneToOne: false
+            referencedRelation: "loan_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nupay_upi_transactions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nupay_upi_transactions_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "loan_repayment_schedule"
             referencedColumns: ["id"]
           },
         ]
