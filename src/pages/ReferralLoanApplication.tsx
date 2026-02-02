@@ -541,9 +541,13 @@ export default function ReferralLoanApplication() {
                   formData={{
                     name: basicInfo.name,
                     requestedAmount: basicInfo.requestedAmount,
-                    tenureDays: basicInfo.tenureDays,
+                    phone: basicInfo.phone,
                   }}
                   onUpdate={(data) => setBasicInfo((prev) => ({ ...prev, ...data }))}
+                  consents={consents}
+                  onConsentChange={handleConsentChange}
+                  verificationStatus={{ phoneVerified: verificationStatus.phoneVerified }}
+                  onVerificationComplete={() => handleVerificationComplete('phone')}
                   onContinue={() => setBasicInfoSubStep(2)}
                 />
               </div>
@@ -553,14 +557,15 @@ export default function ReferralLoanApplication() {
               <div className="animate-slide-in-right">
                 <ContactConsentScreen
                   formData={{
-                    phone: basicInfo.phone,
                     email: basicInfo.email,
                     officeEmail: basicInfo.officeEmail,
+                    tenureDays: basicInfo.tenureDays,
                   }}
                   onUpdate={(data) => setBasicInfo((prev) => ({ ...prev, ...data }))}
-                  consents={consents}
-                  onConsentChange={handleConsentChange}
-                  verificationStatus={verificationStatus}
+                  verificationStatus={{
+                    emailVerified: verificationStatus.emailVerified,
+                    officeEmailVerified: verificationStatus.officeEmailVerified,
+                  }}
                   onVerificationComplete={handleVerificationComplete}
                   onContinue={() => setCurrentStep(2)}
                 />

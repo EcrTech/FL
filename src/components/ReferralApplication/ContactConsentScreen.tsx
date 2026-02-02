@@ -2,71 +2,66 @@ import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Phone, Mail, Building2, ArrowRight, Shield, Check, Loader2, Clock } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { Mail, Building2, Calendar, ArrowRight, Shield, Check, Loader2, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 interface ContactConsentScreenProps {
   formData: {
-    phone: string;
     email: string;
     officeEmail: string;
+    tenureDays: number;
   };
-  onUpdate: (data: Partial<{ phone: string; email: string; officeEmail: string }>) => void;
-  consents: {
-    householdIncome: boolean;
-    termsAndConditions: boolean;
-    aadhaarConsent: boolean;
-  };
-  onConsentChange: (consent: 'householdIncome' | 'termsAndConditions' | 'aadhaarConsent', value: boolean) => void;
+  onUpdate: (data: Partial<{ email: string; officeEmail: string; tenureDays: number }>) => void;
   verificationStatus: {
     emailVerified: boolean;
-    phoneVerified: boolean;
     officeEmailVerified: boolean;
   };
-  onVerificationComplete: (type: 'email' | 'phone' | 'officeEmail') => void;
+  onVerificationComplete: (type: 'email' | 'officeEmail') => void;
   onContinue: () => void;
 }
 
 export function ContactConsentScreen({
   formData,
   onUpdate,
-  consents,
-  onConsentChange,
   verificationStatus,
   onVerificationComplete,
   onContinue,
 }: ContactConsentScreenProps) {
+  const [localTenure, setLocalTenure] = useState(formData.tenureDays || 30);
+
   // OTP states
-  const [phoneOtpSent, setPhoneOtpSent] = useState(false);
   const [emailOtpSent, setEmailOtpSent] = useState(false);
   const [officeEmailOtpSent, setOfficeEmailOtpSent] = useState(false);
-  const [phoneOtp, setPhoneOtp] = useState("");
   const [emailOtp, setEmailOtp] = useState("");
   const [officeEmailOtp, setOfficeEmailOtp] = useState("");
-  const [phoneSessionId, setPhoneSessionId] = useState("");
   const [emailSessionId, setEmailSessionId] = useState("");
   const [officeEmailSessionId, setOfficeEmailSessionId] = useState("");
-  const [sendingPhoneOtp, setSendingPhoneOtp] = useState(false);
   const [sendingEmailOtp, setSendingEmailOtp] = useState(false);
   const [sendingOfficeEmailOtp, setSendingOfficeEmailOtp] = useState(false);
-  const [verifyingPhone, setVerifyingPhone] = useState(false);
   const [verifyingEmail, setVerifyingEmail] = useState(false);
   const [verifyingOfficeEmail, setVerifyingOfficeEmail] = useState(false);
-  const [phoneTimer, setPhoneTimer] = useState(0);
   const [emailTimer, setEmailTimer] = useState(0);
   const [officeEmailTimer, setOfficeEmailTimer] = useState(0);
-  const [phoneTestOtp, setPhoneTestOtp] = useState<string | null>(null);
 
   // Refs to track sent values
-  const lastPhoneSentRef = useRef("");
   const lastEmailSentRef = useRef("");
   const lastOfficeEmailSentRef = useRef("");
 
-  const startTimer = (type: 'email' | 'phone' | 'officeEmail') => {
-    const setTimer = type === 'email' ? setEmailTimer : type === 'phone' ? setPhoneTimer : setOfficeEmailTimer;
+  // Sync local tenure with form data
+  useEffect(() => {
+    if (formData.tenureDays > 0) setLocalTenure(formData.tenureDays);
+  }, [formData.tenureDays]);
+
+  const handleTenureChange = (value: number) => {
+    setLocalTenure(value);
+    onUpdate({ tenureDays: value });
+  };
+
+  const startTimer = (type: 'email' | 'officeEmail') => {
+    const setTimer = type === 'email' ? setEmailTimer : setOfficeEmailTimer;
     setTimer(120);
     const interval = setInterval(() => {
       setTimer((prev) => {
@@ -85,27 +80,23 @@ export function ContactConsentScreen({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const sendOtp = async (type: 'email' | 'phone' | 'officeEmail') => {
-    const identifier = type === 'email' ? formData.email : type === 'phone' ? formData.phone : formData.officeEmail;
+  const sendOtp = async (type: 'email' | 'officeEmail') => {
+    const identifier = type === 'email' ? formData.email : formData.officeEmail;
     
-    if ((type === 'email' || type === 'officeEmail') && !identifier.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-      return;
-    }
-    
-    if (type === 'phone' && formData.phone.replace(/\D/g, '').length < 10) {
+    if (!identifier.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
       return;
     }
 
-    const setSending = type === 'email' ? setSendingEmailOtp : type === 'phone' ? setSendingPhoneOtp : setSendingOfficeEmailOtp;
-    const setOtpSent = type === 'email' ? setEmailOtpSent : type === 'phone' ? setPhoneOtpSent : setOfficeEmailOtpSent;
-    const setSessionId = type === 'email' ? setEmailSessionId : type === 'phone' ? setPhoneSessionId : setOfficeEmailSessionId;
+    const setSending = type === 'email' ? setSendingEmailOtp : setSendingOfficeEmailOtp;
+    const setOtpSent = type === 'email' ? setEmailOtpSent : setOfficeEmailOtpSent;
+    const setSessionId = type === 'email' ? setEmailSessionId : setOfficeEmailSessionId;
 
     setSending(true);
     try {
       const { data, error } = await supabase.functions.invoke('send-public-otp', {
         body: {
-          identifier: type === 'phone' ? `+91${formData.phone.replace(/\D/g, '')}` : identifier,
-          identifierType: type === 'officeEmail' ? 'email' : type,
+          identifier: identifier,
+          identifierType: 'email',
         },
       });
 
@@ -115,38 +106,17 @@ export function ContactConsentScreen({
       setOtpSent(true);
       startTimer(type);
       
-      if (type === 'phone') lastPhoneSentRef.current = formData.phone;
-      else if (type === 'email') lastEmailSentRef.current = formData.email;
+      if (type === 'email') lastEmailSentRef.current = formData.email;
       else lastOfficeEmailSentRef.current = formData.officeEmail;
       
-      if (type === 'phone' && data.isTestMode && data.testOtp) {
-        setPhoneTestOtp(data.testOtp);
-        toast.success(`Test Mode: Use OTP: ${data.testOtp}`);
-      } else {
-        toast.success(type === 'phone' ? 'OTP sent via WhatsApp' : `OTP sent to your ${type === 'officeEmail' ? 'office email' : type}`);
-      }
+      toast.success(`OTP sent to your ${type === 'officeEmail' ? 'office email' : 'email'}`);
     } catch (error: any) {
       console.error('Error sending OTP:', error);
-      toast.error(error.message || `Failed to send OTP`);
+      toast.error(error.message || 'Failed to send OTP');
     } finally {
       setSending(false);
     }
   };
-
-  // Auto-send OTP for phone
-  useEffect(() => {
-    const cleanPhone = formData.phone.replace(/\D/g, '');
-    if (
-      cleanPhone.length === 10 && 
-      !phoneOtpSent && 
-      !verificationStatus.phoneVerified && 
-      !sendingPhoneOtp &&
-      lastPhoneSentRef.current !== formData.phone
-    ) {
-      const timer = setTimeout(() => sendOtp('phone'), 500);
-      return () => clearTimeout(timer);
-    }
-  }, [formData.phone, phoneOtpSent, verificationStatus.phoneVerified, sendingPhoneOtp]);
 
   // Auto-send OTP for email
   useEffect(() => {
@@ -178,10 +148,10 @@ export function ContactConsentScreen({
     }
   }, [formData.officeEmail, officeEmailOtpSent, verificationStatus.officeEmailVerified, sendingOfficeEmailOtp]);
 
-  const verifyOtp = async (type: 'email' | 'phone' | 'officeEmail') => {
-    const sessionId = type === 'email' ? emailSessionId : type === 'phone' ? phoneSessionId : officeEmailSessionId;
-    const otp = type === 'email' ? emailOtp : type === 'phone' ? phoneOtp : officeEmailOtp;
-    const setVerifying = type === 'email' ? setVerifyingEmail : type === 'phone' ? setVerifyingPhone : setVerifyingOfficeEmail;
+  const verifyOtp = async (type: 'email' | 'officeEmail') => {
+    const sessionId = type === 'email' ? emailSessionId : officeEmailSessionId;
+    const otp = type === 'email' ? emailOtp : officeEmailOtp;
+    const setVerifying = type === 'email' ? setVerifyingEmail : setVerifyingOfficeEmail;
 
     if (!sessionId) {
       toast.error("Session expired. Please request a new OTP.");
@@ -216,7 +186,7 @@ export function ContactConsentScreen({
 
       if (data?.verified) {
         onVerificationComplete(type);
-        const label = type === 'officeEmail' ? 'Office email' : type === 'email' ? 'Email' : 'Phone';
+        const label = type === 'officeEmail' ? 'Office email' : 'Email';
         toast.success(`${label} verified successfully`);
       } else {
         toast.error("Verification failed. Please try again.");
@@ -228,16 +198,13 @@ export function ContactConsentScreen({
     }
   };
 
-  const allConsentsChecked = consents.householdIncome && consents.termsAndConditions && consents.aadhaarConsent;
-  const isValidPhone = formData.phone.replace(/\D/g, '').length === 10;
+  const isValidTenure = localTenure >= 1 && localTenure <= 90;
   const isValidEmail = formData.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
   const officeEmailValid = !formData.officeEmail || verificationStatus.officeEmailVerified;
   
   const canContinue = 
-    isValidPhone && 
+    isValidTenure &&
     isValidEmail &&
-    allConsentsChecked &&
-    verificationStatus.phoneVerified &&
     verificationStatus.emailVerified &&
     officeEmailValid;
 
@@ -247,14 +214,14 @@ export function ContactConsentScreen({
       <div className="px-5 py-4">
         <div className="flex items-center gap-3 mb-1">
           <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Phone className="h-5 w-5 text-primary" />
+            <Mail className="h-5 w-5 text-primary" />
           </div>
           <div>
             <h2 className="text-xl font-heading font-bold text-foreground">
               How do we reach you?
             </h2>
             <p className="text-sm text-muted-foreground">
-              We'll send updates on this number
+              We'll send updates on these
             </p>
           </div>
         </div>
@@ -263,66 +230,40 @@ export function ContactConsentScreen({
       {/* Form Card */}
       <div className="flex-1 px-4 pb-4 overflow-y-auto">
         <div className="bg-card rounded-2xl border border-border shadow-sm p-5 space-y-4">
-          {/* Mobile Number Field */}
-          <div className="space-y-2">
-            <Label className="text-xs font-heading font-semibold text-foreground uppercase tracking-wide">
-              Mobile Number <span className="text-destructive">*</span>
+          {/* Tenure Field */}
+          <div className="space-y-3">
+            <Label className="text-xs font-heading font-semibold text-foreground uppercase tracking-wide flex items-center gap-2">
+              <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+              Tenure (Days) <span className="text-destructive">*</span>
             </Label>
-            <div className="flex gap-2">
-              <div className="h-[52px] w-14 flex items-center justify-center bg-muted rounded-[14px] border border-border text-sm font-medium text-muted-foreground">
-                +91
-              </div>
-              <div className="relative flex-1">
-                <Input
-                  type="tel"
-                  placeholder="Enter 10-digit mobile"
-                  value={formData.phone}
-                  onChange={(e) => onUpdate({ phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
-                  disabled={verificationStatus.phoneVerified}
-                  maxLength={10}
-                  className="h-[52px] text-base font-body rounded-[14px] border-[1.5px] border-border bg-background focus:border-primary focus:ring-4 focus:ring-primary/10 pr-24"
-                />
-                {verificationStatus.phoneVerified ? (
-                  <Badge className="absolute right-3 top-1/2 -translate-y-1/2 bg-[hsl(var(--success))] text-white border-0 text-[10px]">
-                    <Check className="h-3 w-3 mr-1" /> Verified
-                  </Badge>
-                ) : sendingPhoneOtp ? (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                  </div>
-                ) : null}
+            <Input
+              type="number"
+              placeholder="Select tenure (1-90 days)"
+              value={localTenure || ""}
+              onChange={(e) => handleTenureChange(parseInt(e.target.value) || 0)}
+              min={1}
+              max={90}
+              className="h-[52px] text-base font-body rounded-[14px] border-[1.5px] border-border bg-background focus:border-primary focus:ring-4 focus:ring-primary/10"
+            />
+            {/* Slider */}
+            <div className="pt-1 pb-2">
+              <Slider
+                value={[localTenure]}
+                onValueChange={([val]) => handleTenureChange(val)}
+                min={1}
+                max={90}
+                step={1}
+                className="w-full"
+              />
+              <div className="flex justify-between mt-1.5 text-[10px] text-muted-foreground font-medium">
+                <span>1 day</span>
+                <span>90 days</span>
               </div>
             </div>
-            {phoneOtpSent && !verificationStatus.phoneVerified && (
-              <div className="space-y-2 mt-2">
-                {phoneTestOtp && (
-                  <div className="p-2.5 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-lg">
-                    Test Mode: Use OTP: <code className="bg-amber-100 px-1 py-0.5 rounded font-mono font-bold">{phoneTestOtp}</code>
-                  </div>
-                )}
-                <div className="flex gap-2 p-3 bg-primary/5 rounded-xl">
-                  <Input
-                    placeholder="Enter 6-digit OTP"
-                    value={phoneOtp}
-                    onChange={(e) => setPhoneOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    className="h-10 bg-white rounded-lg font-mono tracking-widest text-center"
-                    maxLength={6}
-                  />
-                  <Button
-                    onClick={() => verifyOtp('phone')}
-                    disabled={verifyingPhone || phoneOtp.length !== 6}
-                    className="h-10 px-4 bg-primary hover:bg-primary/90 rounded-lg text-sm"
-                  >
-                    {verifyingPhone ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verify'}
-                  </Button>
-                  {phoneTimer > 0 && (
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground min-w-[45px]">
-                      <Clock className="h-3 w-3" />
-                      {formatTimer(phoneTimer)}
-                    </div>
-                  )}
-                </div>
-              </div>
+            {localTenure > 0 && !isValidTenure && (
+              <p className="text-xs text-destructive">
+                Please enter a tenure between 1 and 90 days
+              </p>
             )}
           </div>
 
@@ -431,51 +372,6 @@ export function ContactConsentScreen({
                 )}
               </div>
             )}
-          </div>
-
-          {/* Divider */}
-          <div className="border-t border-border pt-4">
-            <h4 className="text-xs font-heading font-bold text-foreground uppercase tracking-wider mb-3">
-              Declarations
-            </h4>
-            
-            <div className="space-y-3">
-              <label className="flex items-start gap-3 cursor-pointer">
-                <Checkbox
-                  checked={consents.householdIncome}
-                  onCheckedChange={(checked) => onConsentChange('householdIncome', checked as boolean)}
-                  className="mt-0.5 h-[22px] w-[22px] rounded-md border-2"
-                />
-                <span className="text-[13px] text-muted-foreground leading-relaxed">
-                  Household income {">"} ₹3 Lakh/year
-                </span>
-              </label>
-
-              <label className="flex items-start gap-3 cursor-pointer">
-                <Checkbox
-                  checked={consents.termsAndConditions}
-                  onCheckedChange={(checked) => onConsentChange('termsAndConditions', checked as boolean)}
-                  className="mt-0.5 h-[22px] w-[22px] rounded-md border-2"
-                />
-                <span className="text-[13px] text-muted-foreground leading-relaxed">
-                  I agree to{' '}
-                  <a href="/terms" className="text-primary underline" target="_blank">Terms</a>,{' '}
-                  <a href="/privacy" className="text-primary underline" target="_blank">Privacy Policy</a>{' '}
-                  & Gradation of Risk
-                </span>
-              </label>
-
-              <label className="flex items-start gap-3 cursor-pointer">
-                <Checkbox
-                  checked={consents.aadhaarConsent}
-                  onCheckedChange={(checked) => onConsentChange('aadhaarConsent', checked as boolean)}
-                  className="mt-0.5 h-[22px] w-[22px] rounded-md border-2"
-                />
-                <span className="text-[13px] text-muted-foreground leading-relaxed">
-                  I consent to CKYC verification & communications from Skyrise Credit
-                </span>
-              </label>
-            </div>
           </div>
 
           {/* Continue Button */}
