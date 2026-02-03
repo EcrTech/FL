@@ -56,14 +56,22 @@ export const QuickDial = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('phone, org_id')
         .eq('id', user.id)
         .single();
 
-      if (!profile?.phone) {
-        notify.error("Phone number required", "Please add your phone number in your profile settings");
+      if (profileError) {
+        console.error('Error fetching profile:', profileError);
+        notify.error("Profile error", "Could not load your profile. Please try again.");
+        setIsDialing(false);
+        return;
+      }
+
+      const agentPhone = profile?.phone?.trim();
+      if (!agentPhone) {
+        notify.error("Phone number required", "Please add your phone number in your profile settings and save changes");
         setIsDialing(false);
         return;
       }
@@ -94,12 +102,12 @@ export const QuickDial = () => {
       }
 
       // Make the call
-      console.log('Initiating call with:', { contactId, agentPhone: profile.phone, customerPhone: cleanedPhone });
+      console.log('Initiating call with:', { contactId, agentPhone, customerPhone: cleanedPhone });
       
       const { data, error } = await supabase.functions.invoke('exotel-make-call', {
         body: {
           contactId: contactId,
-          agentPhoneNumber: profile.phone,
+          agentPhoneNumber: agentPhone,
           customerPhoneNumber: cleanedPhone,
         },
       });
