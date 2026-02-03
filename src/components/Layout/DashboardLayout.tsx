@@ -285,7 +285,7 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                   onClick={() => setSidebarOpen(false)}
                 >
                   <MessageSquare size={18} />
-                  <span>Campaigns</span>
+                  <span>Communications</span>
                 </Link>
               )}
 
