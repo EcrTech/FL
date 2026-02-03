@@ -407,6 +407,15 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                     </Link>
                   )}
                   
+                  <Link
+                    to="/exotel-settings"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
+                    onClick={() => setSidebarOpen(false)}
+                  >
+                    <Phone size={18} />
+                    <span>Exotel Settings</span>
+                  </Link>
+                  
                 </>
               )}
             </nav>
