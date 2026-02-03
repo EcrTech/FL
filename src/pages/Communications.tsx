@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { LoadingState } from "@/components/common/LoadingState";
 import { useNotification } from "@/hooks/useNotification";
-import { MessageSquare, Mail, Search, Send, User, Plus, Download, RefreshCw, Inbox } from "lucide-react";
+import { MessageSquare, Mail, Search, Send, User, Plus, Download, RefreshCw, Inbox, Phone, PhoneCall } from "lucide-react";
 import { format } from "date-fns";
 import { useOrgContext } from "@/hooks/useOrgContext";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
@@ -336,6 +336,10 @@ export default function Communications() {
                 <Mail className="h-4 w-4 mr-2" />
                 Email Campaigns
               </TabsTrigger>
+              <TabsTrigger value="calling">
+                <Phone className="h-4 w-4 mr-2" />
+                Calling
+              </TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
@@ -621,6 +625,55 @@ export default function Communications() {
                   </CardContent>
                 </Card>
               )}
+            </div>
+          </TabsContent>
+
+          {/* Calling Tab */}
+          <TabsContent value="calling" className="h-full m-0 p-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Calling Dashboard Card */}
+              <Card 
+                className="cursor-pointer hover:shadow-lg transition-shadow"
+                onClick={() => navigate('/calling-dashboard')}
+              >
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="p-3 rounded-full bg-primary/10">
+                      <PhoneCall className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold">Calling Dashboard</h3>
+                      <p className="text-sm text-muted-foreground">View call analytics and agent performance</p>
+                    </div>
+                  </div>
+                  <Button className="w-full">
+                    <PhoneCall className="h-4 w-4 mr-2" />
+                    Open Dashboard
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Call Logs Card */}
+              <Card 
+                className="cursor-pointer hover:shadow-lg transition-shadow"
+                onClick={() => navigate('/call-logs')}
+              >
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="p-3 rounded-full bg-green-500/10">
+                      <Phone className="h-6 w-6 text-green-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold">Call Logs</h3>
+                      <p className="text-sm text-muted-foreground">View call history and recordings</p>
+                    </div>
+                  </div>
+                  <Button variant="outline" className="w-full">
+                    <Phone className="h-4 w-4 mr-2" />
+                    View Call Logs
+                  </Button>
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
         </Tabs>
