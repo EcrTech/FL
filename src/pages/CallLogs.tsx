@@ -34,6 +34,10 @@ interface CallLog {
     first_name: string;
     last_name: string | null;
   };
+  profiles?: {
+    first_name: string;
+    last_name: string | null;
+  };
   call_dispositions?: {
     name: string;
     category: string;
@@ -60,6 +64,7 @@ export default function CallLogs() {
         .select(`
           *,
           contacts (first_name, last_name),
+          profiles:profiles!call_logs_agent_id_fkey(first_name, last_name),
           call_dispositions (name, category)
         `)
         .eq('org_id', orgId!)
@@ -239,7 +244,11 @@ export default function CallLogs() {
                         <TableCell className="font-mono text-sm">
                           {log.call_type === 'outbound' ? log.to_number : log.from_number}
                         </TableCell>
-                        <TableCell>Agent</TableCell>
+                        <TableCell>
+                          {log.profiles 
+                            ? `${log.profiles.first_name} ${log.profiles.last_name || ''}`.trim()
+                            : 'N/A'}
+                        </TableCell>
                         <TableCell>
                           <Badge
                             variant={
