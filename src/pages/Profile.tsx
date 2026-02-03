@@ -109,12 +109,13 @@ export default function Profile() {
   // Update profile mutation
   const updateProfileMutation = useMutation({
     mutationFn: async () => {
+      const trimmedPhone = phone.trim();
       const { error } = await supabase
         .from("profiles")
         .update({
-          first_name: firstName,
-          last_name: lastName,
-          phone: phone,
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          phone: trimmedPhone || null,
           email_enabled: emailNotifications,
           sms_enabled: smsNotifications,
           updated_at: new Date().toISOString(),
@@ -123,7 +124,9 @@ export default function Profile() {
       if (error) throw error;
     },
     onSuccess: () => {
+      // Invalidate all profile-related queries to ensure consistency
       queryClient.invalidateQueries({ queryKey: ["user-profile"] });
+      queryClient.invalidateQueries({ queryKey: ["user-profile-calling"] });
       toast.success("Profile updated successfully");
     },
     onError: (error: any) => {
