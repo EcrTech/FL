@@ -60,7 +60,7 @@ export const QuickDial = () => {
         .from('profiles')
         .select('phone, org_id')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       if (profileError) {
         console.error('Error fetching profile:', profileError);
@@ -69,7 +69,13 @@ export const QuickDial = () => {
         return;
       }
 
-      const agentPhone = profile?.phone?.trim();
+      if (!profile) {
+        notify.error("Profile not found", "Your profile was not found. Please contact support.");
+        setIsDialing(false);
+        return;
+      }
+
+      const agentPhone = profile.phone?.trim();
       if (!agentPhone) {
         notify.error("Phone number required", "Please add your phone number in your profile settings and save changes");
         setIsDialing(false);
