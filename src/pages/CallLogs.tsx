@@ -30,7 +30,6 @@ interface CallLog {
   ended_at: string | null;
   recording_url: string | null;
   disposition_id: string | null;
-  sub_disposition_id: string | null;
   contacts?: {
     first_name: string;
     last_name: string | null;
@@ -38,9 +37,6 @@ interface CallLog {
   call_dispositions?: {
     name: string;
     category: string;
-  };
-  call_sub_dispositions?: {
-    name: string;
   };
 }
 
@@ -64,8 +60,7 @@ export default function CallLogs() {
         .select(`
           *,
           contacts (first_name, last_name),
-          call_dispositions (name, category),
-          call_sub_dispositions (name)
+          call_dispositions (name, category)
         `)
         .eq('org_id', orgId!)
         .gte('created_at', fromDate.toISOString())
@@ -224,7 +219,6 @@ export default function CallLogs() {
                         </div>
                       </TableHead>
                       <TableHead>Disposition</TableHead>
-                      <TableHead>Sub-Disposition</TableHead>
                       <TableHead>Recording</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -264,14 +258,7 @@ export default function CallLogs() {
                           {log.call_dispositions ? (
                             <Badge variant="outline">{log.call_dispositions.name}</Badge>
                           ) : (
-                            <span className="text-xs text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {log.call_sub_dispositions ? (
-                            <Badge variant="secondary">{log.call_sub_dispositions.name}</Badge>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">-</span>
+                            <Badge variant="outline" className="opacity-50">Pending</Badge>
                           )}
                         </TableCell>
                         <TableCell>
@@ -279,7 +266,7 @@ export default function CallLogs() {
                             <CallRecordingPlayer callLogId={log.id} />
                           ) : (
                             <span className="text-xs text-muted-foreground">
-                              No Recording
+                              N/A
                             </span>
                           )}
                         </TableCell>
