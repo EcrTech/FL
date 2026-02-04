@@ -23,6 +23,8 @@ import {
   Video,
   Volume2,
   ImageIcon,
+  Paperclip,
+  X,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -72,7 +74,11 @@ export function WhatsAppChatDialog({
   const [sending, setSending] = useState(false);
   const [newMessage, setNewMessage] = useState("");
   const [autoSendTriggered, setAutoSendTriggered] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   // Format phone number for queries - ensure country code is present
@@ -186,8 +192,134 @@ export function WhatsAppChatDialog({
     return hoursDiff < 24;
   }, [messages]);
 
+  // Helper to determine media type from MIME type
+  const getMediaType = (mimeType: string): 'image' | 'document' | 'video' | 'audio' => {
+    if (mimeType.startsWith('image/')) return 'image';
+    if (mimeType.startsWith('video/')) return 'video';
+    if (mimeType.startsWith('audio/')) return 'audio';
+    return 'document';
+  };
+
+  // Handle file selection
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    // Check file size (16MB limit for most WhatsApp media)
+    const maxSize = 16 * 1024 * 1024; // 16MB
+    if (file.size > maxSize) {
+      toast({
+        title: "File too large",
+        description: "Maximum file size is 16MB",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setSelectedFile(file);
+    
+    // Create preview for images
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFilePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setFilePreview(null);
+    }
+  };
+
+  // Clear selected file
+  const clearSelectedFile = () => {
+    setSelectedFile(null);
+    setFilePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Send attachment
+  const sendAttachment = async () => {
+    if (!selectedFile || uploading || sending) return;
+    
+    if (!isSessionActive()) {
+      toast({
+        title: "Session expired",
+        description: "You can only send attachments within 24 hours of receiving a reply",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploading(true);
+    setSending(true);
+
+    try {
+      // 1. Upload file to Supabase Storage
+      const fileExt = selectedFile.name.split('.').pop();
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `${contactId}/${fileName}`;
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('whatsapp-media')
+        .upload(filePath, selectedFile);
+
+      if (uploadError) {
+        throw new Error(`Upload failed: ${uploadError.message}`);
+      }
+
+      // 2. Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('whatsapp-media')
+        .getPublicUrl(filePath);
+
+      // 3. Send via edge function
+      const mediaType = getMediaType(selectedFile.type);
+      const response = await supabase.functions.invoke('send-whatsapp-message', {
+        body: {
+          contactId,
+          phoneNumber: formattedPhone,
+          mediaType,
+          mediaUrl: publicUrl,
+          mediaCaption: newMessage.trim() || undefined,
+        },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to send attachment');
+      }
+
+      // Clear inputs
+      clearSelectedFile();
+      setNewMessage("");
+      await fetchMessages();
+
+      toast({
+        title: "Attachment sent",
+        description: "Your file was sent successfully",
+      });
+    } catch (error) {
+      console.error('Error sending attachment:', error);
+      toast({
+        title: "Failed to send",
+        description: error instanceof Error ? error.message : "Could not send attachment",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+      setSending(false);
+    }
+  };
+
   // Send a follow-up message (within session window)
   const sendFollowUpMessage = async () => {
+    // If a file is selected, send as attachment instead
+    if (selectedFile) {
+      await sendAttachment();
+      return;
+    }
+    
     if (!newMessage.trim() || sending) return;
     
     if (!isSessionActive()) {
@@ -532,12 +664,61 @@ export function WhatsAppChatDialog({
 
         {/* Input Area */}
         <div className="p-3 border-t bg-background">
+          {/* File Preview */}
+          {selectedFile && (
+            <div className="mb-2 p-2 bg-muted rounded-lg flex items-center gap-2">
+              {filePreview ? (
+                <img src={filePreview} alt="Preview" className="h-12 w-12 object-cover rounded" />
+              ) : (
+                <div className="h-12 w-12 bg-muted-foreground/20 rounded flex items-center justify-center">
+                  <FileText className="h-6 w-6 text-muted-foreground" />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{selectedFile.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {(selectedFile.size / 1024).toFixed(1)} KB
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={clearSelectedFile}
+                className="h-8 w-8"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+          
+          {/* Hidden file input */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileSelect}
+            accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx"
+            className="hidden"
+          />
+          
           <div className="flex gap-2">
+            {/* Attachment button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={!isSessionActive() || sending || uploading}
+              className="shrink-0"
+            >
+              <Paperclip className="h-5 w-5" />
+            </Button>
+            
             <Input
               placeholder={
-                isSessionActive()
-                  ? "Type a message..."
-                  : "Session expired - waiting for reply"
+                selectedFile
+                  ? "Add a caption (optional)..."
+                  : isSessionActive()
+                    ? "Type a message..."
+                    : "Session expired - waiting for reply"
               }
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
@@ -553,10 +734,10 @@ export function WhatsAppChatDialog({
             <Button
               size="icon"
               onClick={sendFollowUpMessage}
-              disabled={!newMessage.trim() || !isSessionActive() || sending}
+              disabled={(!newMessage.trim() && !selectedFile) || !isSessionActive() || sending}
               className="bg-green-600 hover:bg-green-700"
             >
-              {sending ? (
+              {sending || uploading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Send className="h-4 w-4" />
