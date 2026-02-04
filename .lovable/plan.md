@@ -1,170 +1,171 @@
 
-# Fix: Referral Application Data and Video KYC Issues
+# Fix: Document Re-upload Details Not Updating in UI
 
-## Problems Identified
+## Overview
+When a document is re-uploaded and parsed again, the extracted details are not reflected in the UI. This is caused by **incomplete query invalidation** in the frontend and **restrictive sync logic** in the backend that prevents overwriting existing data.
 
-### Problem 1: Loan Amount and Tenure Not Saved
-The user submitted ₹25,000 for 30 days, but the application shows ₹50,000 for 365 days.
+## Root Cause Analysis
 
-**Root Cause:** The parent form state initializes `requestedAmount` and `tenureDays` to `0`, while the UI components show visual defaults of ₹25,000 and 30 days. The `onUpdate` callback only fires when the user *changes* the value, so if they accept the displayed default, the parent state remains `0`, and the backend falls back to its hardcoded defaults.
+### Issue 1: Frontend Query Invalidation Gap
+After parsing, `DocumentUpload.tsx` invalidates:
+- `loan-documents` (document list)
+- `bank-statement-parsed` (for bank statements)
 
-| Component | Initial Value | UI Shows |
-|-----------|---------------|----------|
-| Parent State | 0 | - |
-| LoanRequirementsScreen | formData.requestedAmount \|\| 25000 | ₹25,000 |
-| ContactConsentScreen | formData.tenureDays \|\| 30 | 30 days |
-| Backend Fallback | 50000 / 365 | - |
+But it does **NOT** invalidate:
+- `loan-application` (main query with `loan_applicants` data)
+- `loan-application-basic` (used by DocumentDataVerification)
 
-### Problem 2: Video KYC Not Reflecting
-**Root Cause:** When the user completes Video KYC, it creates a draft application and links the recording to it. But when the form is submitted, the edge function creates a **new application** instead of updating the existing draft. The Video KYC recording stays orphaned on the draft.
+This means the applicant data synced by the edge function is never refetched.
 
-| Step | Application ID | Status |
-|------|----------------|--------|
-| Draft Created | 52d7adca-... (DRAFT-...) | Has Video KYC |
-| Final Submission | 2a46e6d1-... (LA-...) | **Missing** Video KYC |
+### Issue 2: Backend Won't Overwrite Existing Data
+The `parse-loan-document` edge function only syncs OCR data if fields are empty/default:
+
+| Field | Condition to Update |
+|-------|---------------------|
+| DOB | Only if current = `'1990-01-01'` |
+| Gender | Only if current is null/empty |
+| Address | Only if current is null/empty |
+
+When corrected data is parsed, the function sees existing values and skips the update.
+
+### Issue 3: Local React State Not Re-syncing
+`ApplicationDetail.tsx` copies `primaryApplicant` to local `applicantData` state. Even if the query refetches, the local state may not re-initialize properly.
 
 ---
 
 ## Solution
 
-### Fix 1: Initialize Parent State with Correct Defaults
+### Fix 1: Broaden Query Invalidation (Frontend)
+**File:** `src/components/LOS/DocumentUpload.tsx`
 
-**File:** `src/pages/ReferralLoanApplication.tsx`
-
-Change the initial state from:
-```typescript
-const [basicInfo, setBasicInfo] = useState({
-  name: "",
-  email: "",
-  officeEmail: "",
-  phone: "",
-  requestedAmount: 0,  // Problem
-  tenureDays: 0,       // Problem
-});
-```
-
-To:
-```typescript
-const [basicInfo, setBasicInfo] = useState({
-  name: "",
-  email: "",
-  officeEmail: "",
-  phone: "",
-  requestedAmount: 25000,  // Fixed: Match UI default
-  tenureDays: 30,          // Fixed: Match UI default
-});
-```
-
-### Fix 2: Update Draft Instead of Creating New Application
-
-**File:** `supabase/functions/submit-loan-application/index.ts`
-
-Modify the referral application handling to check for and update an existing draft:
-
-```text
-Before line 199 (Process referral application), add:
-1. Check if body.draftApplicationId exists
-2. If exists, fetch the draft application
-3. Update the draft instead of creating new
-4. Transfer all verification records and recordings
-```
-
-**Changes:**
-1. Check for `body.draftApplicationId` in the request
-2. If found, UPDATE the existing draft application with:
-   - New application number (LA-...)
-   - Verified applicant data
-   - Status change to 'in_progress'
-   - Current stage to 'application_login'
-3. Update the applicant record attached to this draft
-4. Skip creating a new application
-
-### Fix 3: Remove Backend Fallback Defaults
-
-**File:** `supabase/functions/submit-loan-application/index.ts`
-
-After implementing Fix 1, we should also update the backend to use sensible product defaults rather than arbitrary values:
-
-Change:
-```typescript
-requested_amount: applicant.requestedAmount || 50000,
-tenure_days: applicant.tenureDays || 365,
-```
-
-To:
-```typescript
-requested_amount: applicant.requestedAmount || 25000,  // Match product default
-tenure_days: applicant.tenureDays || 30,               // Match product default
-```
-
----
-
-## Technical Details
-
-### Files to Modify
-
-| File | Change |
-|------|--------|
-| `src/pages/ReferralLoanApplication.tsx` | Initialize `requestedAmount: 25000` and `tenureDays: 30` |
-| `supabase/functions/submit-loan-application/index.ts` | Add draft update logic before line 199, update fallback defaults |
-
-### Draft Update Logic (Pseudocode)
+After successful parsing, invalidate additional queries that display applicant/OCR data:
 
 ```typescript
-// Check if we have an existing draft to update (for referral applications)
-const draftId = body.draftApplicationId;
-let application: any;
-let applicationNumber: string;
+// In parseMutation.onSuccess (around line 202)
+onSuccess: async (data) => {
+  queryClient.invalidateQueries({ queryKey: ["loan-documents", applicationId] });
+  
+  // NEW: Invalidate application and applicant queries
+  queryClient.invalidateQueries({ queryKey: ["loan-application"] });
+  queryClient.invalidateQueries({ queryKey: ["loan-application-basic", applicationId] });
+  
+  if (data.docType === "bank_statement") {
+    queryClient.invalidateQueries({ queryKey: ["bank-statement-parsed", applicationId] });
+    // Also invalidate bank details
+    queryClient.invalidateQueries({ queryKey: ["applicant-bank-details", applicationId] });
+  }
+  ...
+}
+```
 
-if (draftId) {
-  // Update existing draft
-  const { data: existingDraft } = await supabase
-    .from('loan_applications')
-    .select('*')
-    .eq('id', draftId)
-    .eq('status', 'draft')
-    .single();
+Also update the `handleParseAll` function (around line 271) with the same invalidations.
 
-  if (existingDraft) {
-    applicationNumber = generateApplicationNumber();
-    const { data: updatedApp } = await supabase
-      .from('loan_applications')
-      .update({
-        application_number: applicationNumber,
-        requested_amount: applicant.requestedAmount || 25000,
-        tenure_days: applicant.tenureDays || 30,
-        tenure_months: Math.ceil((applicant.tenureDays || 30) / 30),
-        current_stage: 'application_login',
-        status: 'in_progress',
-        // ... other fields
-      })
-      .eq('id', draftId)
-      .select()
-      .single();
-    
-    application = updatedApp;
+### Fix 2: Allow Overwrite on Re-parse (Backend)
+**File:** `supabase/functions/parse-loan-document/index.ts`
+
+Modify the sync logic to update fields if the new OCR data differs from the current value:
+
+**Before (current logic):**
+```typescript
+if (mergedData.dob && applicant.dob === '1990-01-01') {
+  updateData.dob = mergedData.dob;
+}
+if (mergedData.gender && !applicant.gender) {
+  updateData.gender = mergedData.gender;
+}
+```
+
+**After (new logic):**
+```typescript
+// Update DOB if we have new data and it differs
+if (mergedData.dob) {
+  const newDob = mergedData.dob;
+  const currentDob = applicant.dob;
+  // Update if current is default OR if new value differs from current
+  if (currentDob === '1990-01-01' || newDob !== currentDob) {
+    const dobDate = new Date(newDob);
+    if (!isNaN(dobDate.getTime())) {
+      updateData.dob = newDob;
+    }
   }
 }
 
-// Only create new application if no draft was updated
-if (!application) {
-  // Existing insert logic...
+// Update gender if we have new data and current is empty or different
+if (mergedData.gender) {
+  const normalizedGender = mergedData.gender.toLowerCase();
+  const currentGender = (applicant.gender || '').toLowerCase();
+  if (!currentGender || normalizedGender !== currentGender) {
+    updateData.gender = mergedData.gender;
+  }
 }
+
+// Update address if we have new data
+if (mergedData.address && documentType === 'aadhaar_card') {
+  // Always update address from Aadhaar OCR (authoritative source)
+  const addressStr = mergedData.address;
+  // ... existing address parsing logic ...
+  updateData.current_address = { ... };
+}
+```
+
+### Fix 3: Ensure Local State Re-syncs (Frontend)
+The existing `useEffect` at line 740-757 should already handle this, but we need to ensure it triggers on actual data changes:
+
+**File:** `src/pages/LOS/ApplicationDetail.tsx`
+
+Add more specific dependencies to ensure state updates when applicant data changes:
+
+```typescript
+useEffect(() => {
+  if (primaryApplicant) {
+    // ... existing logic to populate applicantData
+  }
+}, [
+  primaryApplicant?.id,
+  primaryApplicant?.gender,
+  primaryApplicant?.dob,
+  primaryApplicant?.current_address,
+  primaryApplicant?.marital_status,
+  primaryApplicant?.religion,
+  primaryApplicant?.pan_number,
+  primaryApplicant?.mobile
+]);
 ```
 
 ---
 
-## Expected Results After Fix
+## Files to Modify
 
-1. **Loan Amount/Tenure**: Applications will correctly reflect ₹25,000 / 30 days when user accepts defaults
-2. **Video KYC**: Recording will remain attached to the same application through draft-to-submission transition
-3. **Data Integrity**: All verification records (PAN, Aadhaar, Video KYC) stay linked to the final application
+| File | Changes |
+|------|---------|
+| `src/components/LOS/DocumentUpload.tsx` | Add broader query invalidations in `parseMutation.onSuccess` and `handleParseAll` |
+| `supabase/functions/parse-loan-document/index.ts` | Update sync logic to allow overwrites when data differs |
+| `src/pages/LOS/ApplicationDetail.tsx` | Improve useEffect dependencies for applicantData sync |
+
+---
+
+## Technical Flow After Fix
+
+```text
+1. User re-uploads document
+2. Document parsed via edge function
+3. Edge function syncs NEW OCR values to loan_applicants (overwrites if different)
+4. Frontend receives success response
+5. Frontend invalidates loan-application & loan-application-basic queries
+6. React Query refetches applicant data from database
+7. ApplicationDetail useEffect detects changed primaryApplicant fields
+8. Local applicantData state updates
+9. UI reflects new values
+```
+
+---
 
 ## Verification Steps
 
 After implementation:
-1. Submit a test referral application without changing the loan amount slider
-2. Verify the application shows ₹25,000 for 30 days
-3. Complete Video KYC in a new referral application
-4. Verify the Video KYC recording appears in the submitted application
-5. Check `loan_verifications` table shows video_kyc linked to final application ID
+1. Upload a PAN card and parse it
+2. Note the extracted DOB in the UI
+3. Upload a different PAN card with a different DOB
+4. Re-parse the document
+5. Verify the UI updates to show the new DOB
+6. Check that DocumentDataVerification table also shows updated values
