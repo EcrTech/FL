@@ -1,171 +1,88 @@
 
-# Fix: Document Re-upload Details Not Updating in UI
+# Fix: eMandate Response Parsing Bug
 
-## Overview
-When a document is re-uploaded and parsed again, the extracted details are not reflected in the UI. This is caused by **incomplete query invalidation** in the frontend and **restrictive sync logic** in the backend that prevents overwriting existing data.
+## Problem Summary
+When the Nupay API returns a successful mandate creation response, the `nupay_id`, `nupay_ref_no`, and `registration_url` are not being extracted and saved to the database. This means mandates appear as "submitted" but without the registration URL needed for users to complete authorization.
 
-## Root Cause Analysis
+## Root Cause
+The Nupay API returns data in a **nested structure**, but the edge function looks for values at the **top level**.
 
-### Issue 1: Frontend Query Invalidation Gap
-After parsing, `DocumentUpload.tsx` invalidates:
-- `loan-documents` (document list)
-- `bank-statement-parsed` (for bank statements)
+### Actual Nupay Response Structure
+```text
+{
+  "StatusCode": "NP000",
+  "StatusDesc": "Data submitted successfully",
+  "data": {
+    "customer": {
+      "id": "21bf3dcl",           <-- Mandate ID is HERE
+      "nupay_ref_no": "NP71177001834056367"  <-- Reference is HERE
+    },
+    "url": "https://uat.nupay.net?c=21bf3dcl"  <-- URL is HERE
+  }
+}
+```
 
-But it does **NOT** invalidate:
-- `loan-application` (main query with `loan_applicants` data)
-- `loan-application-basic` (used by DocumentDataVerification)
+### Current Code (Incorrect)
+```text
+const nupayId = responseData.id || responseData.Id;
+const nupayRefNo = responseData.ref_no || responseData.RefNo;
+const registrationUrl = responseData.registration_url || responseData.url;
+```
 
-This means the applicant data synced by the edge function is never refetched.
-
-### Issue 2: Backend Won't Overwrite Existing Data
-The `parse-loan-document` edge function only syncs OCR data if fields are empty/default:
-
-| Field | Condition to Update |
-|-------|---------------------|
-| DOB | Only if current = `'1990-01-01'` |
-| Gender | Only if current is null/empty |
-| Address | Only if current is null/empty |
-
-When corrected data is parsed, the function sees existing values and skips the update.
-
-### Issue 3: Local React State Not Re-syncing
-`ApplicationDetail.tsx` copies `primaryApplicant` to local `applicantData` state. Even if the query refetches, the local state may not re-initialize properly.
+These all return `undefined` because they look at the wrong nesting level.
 
 ---
 
 ## Solution
 
-### Fix 1: Broaden Query Invalidation (Frontend)
-**File:** `src/components/LOS/DocumentUpload.tsx`
+### File to Modify
+`supabase/functions/nupay-create-mandate/index.ts`
 
-After successful parsing, invalidate additional queries that display applicant/OCR data:
+### Changes Required
 
+Update lines 224-226 to correctly navigate the nested response structure:
+
+**Before:**
 ```typescript
-// In parseMutation.onSuccess (around line 202)
-onSuccess: async (data) => {
-  queryClient.invalidateQueries({ queryKey: ["loan-documents", applicationId] });
-  
-  // NEW: Invalidate application and applicant queries
-  queryClient.invalidateQueries({ queryKey: ["loan-application"] });
-  queryClient.invalidateQueries({ queryKey: ["loan-application-basic", applicationId] });
-  
-  if (data.docType === "bank_statement") {
-    queryClient.invalidateQueries({ queryKey: ["bank-statement-parsed", applicationId] });
-    // Also invalidate bank details
-    queryClient.invalidateQueries({ queryKey: ["applicant-bank-details", applicationId] });
-  }
-  ...
-}
+const nupayId = responseData.id || responseData.Id || responseData.uniq_id;
+const nupayRefNo = responseData.ref_no || responseData.RefNo || responseData.reference_no;
+const registrationUrl = responseData.registration_url || responseData.RegistrationUrl || responseData.url;
 ```
 
-Also update the `handleParseAll` function (around line 271) with the same invalidations.
-
-### Fix 2: Allow Overwrite on Re-parse (Backend)
-**File:** `supabase/functions/parse-loan-document/index.ts`
-
-Modify the sync logic to update fields if the new OCR data differs from the current value:
-
-**Before (current logic):**
+**After:**
 ```typescript
-if (mergedData.dob && applicant.dob === '1990-01-01') {
-  updateData.dob = mergedData.dob;
-}
-if (mergedData.gender && !applicant.gender) {
-  updateData.gender = mergedData.gender;
-}
+// Nupay API returns data nested under data.customer and data.url
+const customerData = responseData.data?.customer;
+const nupayId = customerData?.id || responseData.id || responseData.Id;
+const nupayRefNo = customerData?.nupay_ref_no || responseData.ref_no || responseData.RefNo;
+const registrationUrl = responseData.data?.url || responseData.url || responseData.registration_url;
 ```
 
-**After (new logic):**
+Additionally, add logging to help debug future issues:
 ```typescript
-// Update DOB if we have new data and it differs
-if (mergedData.dob) {
-  const newDob = mergedData.dob;
-  const currentDob = applicant.dob;
-  // Update if current is default OR if new value differs from current
-  if (currentDob === '1990-01-01' || newDob !== currentDob) {
-    const dobDate = new Date(newDob);
-    if (!isNaN(dobDate.getTime())) {
-      updateData.dob = newDob;
-    }
-  }
-}
-
-// Update gender if we have new data and current is empty or different
-if (mergedData.gender) {
-  const normalizedGender = mergedData.gender.toLowerCase();
-  const currentGender = (applicant.gender || '').toLowerCase();
-  if (!currentGender || normalizedGender !== currentGender) {
-    updateData.gender = mergedData.gender;
-  }
-}
-
-// Update address if we have new data
-if (mergedData.address && documentType === 'aadhaar_card') {
-  // Always update address from Aadhaar OCR (authoritative source)
-  const addressStr = mergedData.address;
-  // ... existing address parsing logic ...
-  updateData.current_address = { ... };
-}
-```
-
-### Fix 3: Ensure Local State Re-syncs (Frontend)
-The existing `useEffect` at line 740-757 should already handle this, but we need to ensure it triggers on actual data changes:
-
-**File:** `src/pages/LOS/ApplicationDetail.tsx`
-
-Add more specific dependencies to ensure state updates when applicant data changes:
-
-```typescript
-useEffect(() => {
-  if (primaryApplicant) {
-    // ... existing logic to populate applicantData
-  }
-}, [
-  primaryApplicant?.id,
-  primaryApplicant?.gender,
-  primaryApplicant?.dob,
-  primaryApplicant?.current_address,
-  primaryApplicant?.marital_status,
-  primaryApplicant?.religion,
-  primaryApplicant?.pan_number,
-  primaryApplicant?.mobile
-]);
-```
-
----
-
-## Files to Modify
-
-| File | Changes |
-|------|---------|
-| `src/components/LOS/DocumentUpload.tsx` | Add broader query invalidations in `parseMutation.onSuccess` and `handleParseAll` |
-| `supabase/functions/parse-loan-document/index.ts` | Update sync logic to allow overwrites when data differs |
-| `src/pages/LOS/ApplicationDetail.tsx` | Improve useEffect dependencies for applicantData sync |
-
----
-
-## Technical Flow After Fix
-
-```text
-1. User re-uploads document
-2. Document parsed via edge function
-3. Edge function syncs NEW OCR values to loan_applicants (overwrites if different)
-4. Frontend receives success response
-5. Frontend invalidates loan-application & loan-application-basic queries
-6. React Query refetches applicant data from database
-7. ApplicationDetail useEffect detects changed primaryApplicant fields
-8. Local applicantData state updates
-9. UI reflects new values
+console.log(`[Nupay-CreateMandate] Extracted - nupayId: ${nupayId}, refNo: ${nupayRefNo}, url: ${registrationUrl}`);
 ```
 
 ---
 
 ## Verification Steps
 
-After implementation:
-1. Upload a PAN card and parse it
-2. Note the extracted DOB in the UI
-3. Upload a different PAN card with a different DOB
-4. Re-parse the document
-5. Verify the UI updates to show the new DOB
-6. Check that DocumentDataVerification table also shows updated values
+After deploying:
+1. Navigate to a loan application in disbursement stage
+2. Open the eMandate section
+3. Fill in bank details and submit
+4. Verify the `nupay_mandates` table now has:
+   - `nupay_id` populated (e.g., "21bf3dcl")
+   - `nupay_ref_no` populated (e.g., "NP71177001834056367")
+   - `registration_url` populated (e.g., "https://uat.nupay.net?c=...")
+5. Confirm the registration URL/QR code appears in the UI
+
+---
+
+## Technical Details
+
+| Field | Correct Path | Fallback Paths |
+|-------|-------------|----------------|
+| Mandate ID | `data.customer.id` | `id`, `Id` |
+| Reference No | `data.customer.nupay_ref_no` | `ref_no`, `RefNo` |
+| Registration URL | `data.url` | `url`, `registration_url` |
