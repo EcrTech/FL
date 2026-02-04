@@ -1,5 +1,15 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
+import { 
+  safeBase64Encode, 
+  getPdfPageCount, 
+  extractPdfPages, 
+  getChunkConfig, 
+  mergeOcrData, 
+  getChunkPrompt,
+  calculateProgress,
+  type ParsingProgress 
+} from "../_shared/pdfUtils.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -38,6 +48,7 @@ Return ONLY valid JSON with these fields.`,
 - salary_credits: Total salary/regular income credits (number only)
 - emi_debits: Total EMI/loan debits (number only)
 - bounce_count: Number of bounced transactions/insufficient fund instances (number only, 0 if none)
+- transactions: Array of transactions with {date, description, debit, credit, balance}
 Return ONLY valid JSON with these fields. Use 0 or null for missing values.`,
 
   salary_slip_1: `Extract the following from this salary slip:
@@ -184,33 +195,49 @@ Return ONLY valid JSON with these fields. Use null for missing values.`,
 Return ONLY valid JSON with these fields. Use null for missing values.`,
 };
 
+// Document types that benefit from chunked processing
+const CHUNKABLE_DOC_TYPES = ['bank_statement', 'itr_year_1', 'itr_year_2', 'form_16_year_1', 'form_16_year_2'];
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+
+  if (!lovableApiKey) {
+    return new Response(
+      JSON.stringify({ success: false, error: "LOVABLE_API_KEY is not configured" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
   try {
-    const { documentId, documentType, filePath } = await req.json();
-    console.log(`[ParseDocument] Processing: ${documentType}, ID: ${documentId}`);
+    const { 
+      documentId, 
+      documentType, 
+      filePath,
+      // Chunking parameters (optional - for continuation invocations)
+      currentPage = 1,
+      totalPages = 0,
+      accumulatedData = null,
+    } = await req.json();
+    
+    const isFirstChunk = currentPage === 1 && totalPages === 0;
+    console.log(`[ParseDocument] Processing: ${documentType}, ID: ${documentId}, Page: ${currentPage}/${totalPages || 'unknown'}`);
 
     if (!documentId || !documentType || !filePath) {
       throw new Error("Missing required parameters: documentId, documentType, filePath");
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
-
-    if (!lovableApiKey) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
     // Fetch the document to get loan_application_id for syncing
     const { data: docRecord, error: docFetchError } = await supabase
       .from("loan_documents")
-      .select("loan_application_id")
+      .select("loan_application_id, ocr_data, parsing_status")
       .eq("id", documentId)
       .single();
 
@@ -218,7 +245,6 @@ serve(async (req) => {
       console.warn(`[ParseDocument] Could not fetch document record:`, docFetchError);
     }
     const loanApplicationId = docRecord?.loan_application_id;
-    console.log(`[ParseDocument] Loan Application ID: ${loanApplicationId}`);
 
     // Download the document from storage
     console.log(`[ParseDocument] Downloading file: ${filePath}`);
@@ -231,32 +257,72 @@ serve(async (req) => {
       throw new Error(`Failed to download document: ${downloadError.message}`);
     }
 
-    // Convert to base64 without using spread (avoids "Maximum call stack size" for large files)
     const arrayBuffer = await fileData.arrayBuffer();
-    const bytes = new Uint8Array(arrayBuffer);
-    let binary = "";
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    const base64 = btoa(binary);
-
+    const fileBytes = new Uint8Array(arrayBuffer);
+    
     // Detect file type from path or content
     const fileExtension = filePath.split('.').pop()?.toLowerCase() || '';
     const isPdf = fileExtension === 'pdf' || fileData.type === 'application/pdf';
+    const isChunkable = isPdf && CHUNKABLE_DOC_TYPES.includes(documentType);
     
-    console.log(`[ParseDocument] File size: ${arrayBuffer.byteLength}, isPDF: ${isPdf}`);
+    console.log(`[ParseDocument] File size: ${arrayBuffer.byteLength}, isPDF: ${isPdf}, isChunkable: ${isChunkable}`);
+
+    let actualTotalPages = totalPages;
+    let pdfBytesToParse = fileBytes;
+    const chunkConfig = getChunkConfig(documentType);
+
+    // For PDFs, determine if we need chunked processing
+    if (isPdf && isChunkable) {
+      // Get total page count if this is the first chunk
+      if (isFirstChunk) {
+        actualTotalPages = await getPdfPageCount(fileBytes);
+        console.log(`[ParseDocument] PDF has ${actualTotalPages} pages`);
+        
+        // Update status to processing if we're starting
+        await supabase
+          .from("loan_documents")
+          .update({
+            parsing_status: 'processing',
+            parsing_started_at: new Date().toISOString(),
+            parsing_progress: calculateProgress(1, actualTotalPages, chunkConfig.pagesPerChunk),
+          })
+          .eq("id", documentId);
+      }
+
+      // Calculate chunk range
+      const endPage = Math.min(currentPage + chunkConfig.pagesPerChunk - 1, actualTotalPages);
+      
+      // Extract only the pages we need for this chunk
+      if (actualTotalPages > chunkConfig.pagesPerChunk) {
+        console.log(`[ParseDocument] Extracting pages ${currentPage}-${endPage} of ${actualTotalPages}`);
+        pdfBytesToParse = await extractPdfPages(fileBytes, currentPage, endPage);
+      }
+    }
+
+    // Convert to base64 safely
+    const base64 = safeBase64Encode(pdfBytesToParse.buffer);
 
     // Get the appropriate prompt for this document type
-    const prompt = DOCUMENT_PROMPTS[documentType] || `Extract all relevant information from this document and return as JSON.`;
+    const basePrompt = DOCUMENT_PROMPTS[documentType] || `Extract all relevant information from this document and return as JSON.`;
+    
+    // Adjust prompt for chunked processing
+    const prompt = isPdf && isChunkable && actualTotalPages > chunkConfig.pagesPerChunk
+      ? getChunkPrompt(
+          basePrompt,
+          documentType,
+          currentPage,
+          Math.min(currentPage + chunkConfig.pagesPerChunk - 1, actualTotalPages),
+          actualTotalPages,
+          accumulatedData,
+          isFirstChunk
+        )
+      : basePrompt;
 
     let aiResponse: Response;
 
     if (isPdf) {
-      // For PDFs, use Gemini with file upload approach via inline_data
-      // Gemini supports PDFs via the generativeai format with inline_data
       console.log(`[ParseDocument] Using Gemini Pro for PDF parsing...`);
       
-      // Use google/gemini-2.5-pro which has better PDF support
       aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -283,11 +349,10 @@ serve(async (req) => {
               ],
             },
           ],
-          max_tokens: 4000,
+          max_tokens: chunkConfig.maxTokens,
         }),
       });
     } else {
-      // For images, use the standard image_url approach
       const mimeType = fileData.type || "image/jpeg";
       console.log(`[ParseDocument] Using Gemini Flash for image parsing, MIME: ${mimeType}`);
       
@@ -316,7 +381,7 @@ serve(async (req) => {
               ],
             },
           ],
-          max_tokens: 4000,
+          max_tokens: chunkConfig.maxTokens,
         }),
       });
     }
@@ -324,6 +389,19 @@ serve(async (req) => {
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
       console.error(`[ParseDocument] AI API error: ${aiResponse.status}`, errorText);
+      
+      // Mark as failed
+      await supabase
+        .from("loan_documents")
+        .update({
+          parsing_status: 'failed',
+          parsing_progress: {
+            ...calculateProgress(currentPage, actualTotalPages, chunkConfig.pagesPerChunk),
+            error: `AI API error: ${aiResponse.status}`,
+            failed_at_page: currentPage,
+          },
+        })
+        .eq("id", documentId);
       
       if (aiResponse.status === 429) {
         throw new Error("Rate limit exceeded. Please try again later.");
@@ -341,26 +419,99 @@ serve(async (req) => {
     // Parse the JSON from the response
     let parsedData: Record<string, any> = {};
     try {
-      // Try to extract JSON from the response (it might be wrapped in markdown code blocks)
       const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
       const jsonStr = jsonMatch[1]?.trim() || content.trim();
       parsedData = JSON.parse(jsonStr);
       console.log(`[ParseDocument] Parsed data:`, JSON.stringify(parsedData).substring(0, 500));
     } catch (parseError) {
       console.error(`[ParseDocument] JSON parse error:`, parseError);
-      // Store raw content if JSON parsing fails
       parsedData = { raw_text: content, parse_error: true };
     }
 
-    // Update the document with parsed data
+    // Merge with accumulated data if this is a continuation
+    let mergedData = parsedData;
+    if (accumulatedData && !parsedData.parse_error) {
+      mergedData = mergeOcrData(accumulatedData, parsedData, documentType);
+      console.log(`[ParseDocument] Merged data with previous chunks`);
+    }
+
+    // Determine if we need to continue with more chunks
+    const nextPage = currentPage + chunkConfig.pagesPerChunk;
+    const hasMorePages = isPdf && isChunkable && actualTotalPages > 1 && nextPage <= actualTotalPages;
+
+    if (hasMorePages) {
+      // Update progress and save partial results
+      const progress = calculateProgress(nextPage - 1, actualTotalPages, chunkConfig.pagesPerChunk);
+      
+      await supabase
+        .from("loan_documents")
+        .update({
+          ocr_data: {
+            ...mergedData,
+            parsed_at: new Date().toISOString(),
+            document_type: documentType,
+            parsing_in_progress: true,
+          },
+          parsing_progress: progress,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", documentId);
+
+      // Trigger self-invocation for next chunk (fire-and-forget)
+      console.log(`[ParseDocument] Triggering continuation for pages ${nextPage}-${Math.min(nextPage + chunkConfig.pagesPerChunk - 1, actualTotalPages)}`);
+      
+      fetch(`${supabaseUrl}/functions/v1/parse-loan-document`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+        },
+        body: JSON.stringify({
+          documentId,
+          documentType,
+          filePath,
+          currentPage: nextPage,
+          totalPages: actualTotalPages,
+          accumulatedData: mergedData,
+        }),
+      }).then(res => {
+        console.log(`[ParseDocument] Continuation triggered, status: ${res.status}`);
+      }).catch(err => {
+        console.error(`[ParseDocument] Failed to trigger continuation:`, err);
+      });
+
+      // Return immediately with processing status
+      return new Response(
+        JSON.stringify({
+          success: true,
+          status: "processing",
+          message: `Processing pages ${currentPage}-${nextPage - 1} of ${actualTotalPages}`,
+          progress,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // This is the final chunk or a single-page document
+    // Update the document with final parsed data
+    const finalData: Record<string, any> = {
+      ...mergedData,
+      parsed_at: new Date().toISOString(),
+      document_type: documentType,
+    };
+    if ('parsing_in_progress' in finalData) {
+      delete finalData.parsing_in_progress;
+    }
+
     const { error: updateError } = await supabase
       .from("loan_documents")
       .update({
-        ocr_data: {
-          ...parsedData,
-          parsed_at: new Date().toISOString(),
-          document_type: documentType,
-        },
+        ocr_data: finalData,
+        parsing_status: 'completed',
+        parsing_completed_at: new Date().toISOString(),
+        parsing_progress: actualTotalPages > 1 
+          ? calculateProgress(actualTotalPages, actualTotalPages, chunkConfig.pagesPerChunk)
+          : { current_page: 1, total_pages: 1, chunks_completed: 1, total_chunks: 1 },
         updated_at: new Date().toISOString(),
       })
       .eq("id", documentId);
@@ -375,10 +526,9 @@ serve(async (req) => {
     // === Sync OCR data to loan_applicants for Aadhaar/PAN ===
     const isAadhaarOrPan = documentType === 'aadhaar_card' || documentType === 'aadhar_card' || documentType === 'pan_card';
     
-    if (isAadhaarOrPan && !parsedData.parse_error && loanApplicationId) {
+    if (isAadhaarOrPan && !mergedData.parse_error && loanApplicationId) {
       console.log(`[ParseDocument] Syncing OCR data to loan_applicants for ${documentType}`);
       
-      // Find the primary applicant for this application
       const { data: applicant, error: applicantFetchError } = await supabase
         .from("loan_applicants")
         .select("id, dob, current_address, gender")
@@ -389,30 +539,24 @@ serve(async (req) => {
       if (applicant && !applicantFetchError) {
         const updateData: Record<string, unknown> = {};
         
-        // Sync DOB if currently default placeholder
-        if (parsedData.dob && applicant.dob === '1990-01-01') {
-          // Validate and format DOB
-          const dobDate = new Date(parsedData.dob);
+        if (mergedData.dob && applicant.dob === '1990-01-01') {
+          const dobDate = new Date(mergedData.dob);
           if (!isNaN(dobDate.getTime())) {
-            updateData.dob = parsedData.dob;
+            updateData.dob = mergedData.dob;
           }
         }
         
-        // Sync gender from Aadhaar if not set
         if (documentType === 'aadhaar_card' || documentType === 'aadhar_card') {
-          if (parsedData.gender && !applicant.gender) {
-            updateData.gender = parsedData.gender;
+          if (mergedData.gender && !applicant.gender) {
+            updateData.gender = mergedData.gender;
           }
           
-          // Sync address if not set (or is null)
-          if (parsedData.address && !applicant.current_address) {
-            const addressStr = parsedData.address;
+          if (mergedData.address && !applicant.current_address) {
+            const addressStr = mergedData.address;
             
-            // Extract pincode (6 digits at end)
             const pincodeMatch = addressStr.match(/(\d{6})\s*$/);
             const pincode = pincodeMatch ? pincodeMatch[1] : '';
             
-            // Extract state (common Indian states)
             const statePatterns = [
               'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
               'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka',
@@ -429,9 +573,8 @@ serve(async (req) => {
               }
             }
             
-            // Build structured address
             updateData.current_address = {
-              line1: addressStr, // Full address as line1
+              line1: addressStr,
               line2: '',
               city: '',
               state: state,
@@ -442,7 +585,6 @@ serve(async (req) => {
           }
         }
         
-        // Perform update if we have changes
         if (Object.keys(updateData).length > 0) {
           const { error: syncError } = await supabase
             .from("loan_applicants")
@@ -465,12 +607,32 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        data: parsedData,
+        status: "completed",
+        data: mergedData,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
     console.error(`[ParseDocument] Error:`, error);
+    
+    // Try to update status to failed
+    try {
+      const { documentId } = await req.clone().json();
+      if (documentId) {
+        await supabase
+          .from("loan_documents")
+          .update({
+            parsing_status: 'failed',
+            parsing_progress: {
+              error: error instanceof Error ? error.message : "Unknown error",
+            },
+          })
+          .eq("id", documentId);
+      }
+    } catch (e) {
+      console.error(`[ParseDocument] Failed to update error status:`, e);
+    }
+    
     return new Response(
       JSON.stringify({
         success: false,

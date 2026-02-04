@@ -210,7 +210,27 @@ export default function CreditBureauDialog({
         throw new Error(parseResult.error || "Failed to parse report");
       }
 
+      // Handle both immediate and chunked processing responses
       const parsed = parseResult.data;
+      
+      // If processing in background (large PDF), show appropriate message
+      if (parseResult.status === "processing") {
+        toast({
+          title: "Report parsing started",
+          description: parseResult.message || "Large document being processed in background...",
+        });
+        // Set partial data if available
+        if (parsed) {
+          setFormData(prev => ({
+            ...prev,
+            bureau_type: parsed.bureau_type || prev.bureau_type,
+            credit_score: parsed.credit_score?.toString() || prev.credit_score,
+            report_file_path: uploadData.path,
+          }));
+        }
+        return uploadData.path;
+      }
+
       setFormData(prev => ({
         ...prev,
         bureau_type: parsed.bureau_type || prev.bureau_type,
