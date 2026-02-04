@@ -34,6 +34,7 @@ interface NupayConfig {
   environment: "uat" | "production";
   api_key: string;
   api_endpoint: string;
+  esign_api_key: string | null;
   webhook_url: string | null;
   redirect_url: string | null;
   is_active: boolean;
@@ -70,10 +71,12 @@ const NupaySettings = () => {
   const [uatApiKey, setUatApiKey] = useState("");
   const [uatEndpoint, setUatEndpoint] = useState("https://nachuat.nupaybiz.com");
   const [uatEsignEndpoint, setUatEsignEndpoint] = useState("https://esignuat.nupaybiz.com");
+  const [uatEsignApiKey, setUatEsignApiKey] = useState("");
   const [uatRedirectUrl, setUatRedirectUrl] = useState("");
   const [prodApiKey, setProdApiKey] = useState("");
   const [prodEndpoint, setProdEndpoint] = useState("https://nach.nupaybiz.com");
   const [prodEsignEndpoint, setProdEsignEndpoint] = useState("https://esign.nupaybiz.com");
+  const [prodEsignApiKey, setProdEsignApiKey] = useState("");
   const [prodRedirectUrl, setProdRedirectUrl] = useState("");
   
   // Collection 360 Form states
@@ -108,6 +111,7 @@ const NupaySettings = () => {
         setUatApiKey(uatConfig.api_key || "");
         setUatEndpoint(uatConfig.api_endpoint || "https://nachuat.nupaybiz.com");
         setUatEsignEndpoint((uatConfig as unknown as { esign_api_endpoint?: string }).esign_api_endpoint || "https://esignuat.nupaybiz.com");
+        setUatEsignApiKey(uatConfig.esign_api_key || "");
         setUatRedirectUrl(uatConfig.redirect_url || "");
         // Collection 360 fields
         setUatAccessKey(uatConfig.access_key || "");
@@ -120,6 +124,7 @@ const NupaySettings = () => {
         setProdApiKey(prodConfig.api_key || "");
         setProdEndpoint(prodConfig.api_endpoint || "https://nach.nupaybiz.com");
         setProdEsignEndpoint((prodConfig as unknown as { esign_api_endpoint?: string }).esign_api_endpoint || "https://esign.nupaybiz.com");
+        setProdEsignApiKey(prodConfig.esign_api_key || "");
         setProdRedirectUrl(prodConfig.redirect_url || "");
         // Collection 360 fields
         setProdAccessKey(prodConfig.access_key || "");
@@ -172,11 +177,12 @@ const NupaySettings = () => {
 
   // Save eMandate config mutation
   const saveConfigMutation = useMutation({
-    mutationFn: async ({ environment, apiKey, endpoint, esignEndpoint, redirectUrl, isActive }: {
+    mutationFn: async ({ environment, apiKey, endpoint, esignEndpoint, esignApiKey, redirectUrl, isActive }: {
       environment: "uat" | "production";
       apiKey: string;
       endpoint: string;
       esignEndpoint: string;
+      esignApiKey: string;
       redirectUrl: string;
       isActive: boolean;
     }) => {
@@ -192,6 +198,7 @@ const NupaySettings = () => {
           api_key: apiKey,
           api_endpoint: endpoint,
           esign_api_endpoint: esignEndpoint || null,
+          esign_api_key: esignApiKey || null,
           webhook_url: webhookUrl,
           redirect_url: redirectUrl || null,
           is_active: isActive,
@@ -440,6 +447,19 @@ const NupaySettings = () => {
                   </p>
                 </div>
                 <div>
+                  <Label htmlFor="uatEsignApiKey">E-Sign API Key (Optional)</Label>
+                  <Input
+                    id="uatEsignApiKey"
+                    type="password"
+                    value={uatEsignApiKey}
+                    onChange={(e) => setUatEsignApiKey(e.target.value)}
+                    placeholder="Leave blank to use main API key"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Separate API key for e-signature if provided by Nupay (falls back to main API key if empty)
+                  </p>
+                </div>
+                <div>
                   <Label>Webhook URL</Label>
                   <div className="flex gap-2">
                     <Input value={webhookUrl} readOnly className="bg-muted" />
@@ -473,6 +493,7 @@ const NupaySettings = () => {
                     apiKey: uatApiKey,
                     endpoint: uatEndpoint,
                     esignEndpoint: uatEsignEndpoint,
+                    esignApiKey: uatEsignApiKey,
                     redirectUrl: uatRedirectUrl,
                     isActive: uatConfig?.is_active || false,
                   })}
@@ -542,6 +563,19 @@ const NupaySettings = () => {
                   </p>
                 </div>
                 <div>
+                  <Label htmlFor="prodEsignApiKey">E-Sign API Key (Optional)</Label>
+                  <Input
+                    id="prodEsignApiKey"
+                    type="password"
+                    value={prodEsignApiKey}
+                    onChange={(e) => setProdEsignApiKey(e.target.value)}
+                    placeholder="Leave blank to use main API key"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Separate API key for e-signature if provided by Nupay (falls back to main API key if empty)
+                  </p>
+                </div>
+                <div>
                   <Label>Webhook URL</Label>
                   <div className="flex gap-2">
                     <Input value={webhookUrl} readOnly className="bg-muted" />
@@ -572,6 +606,7 @@ const NupaySettings = () => {
                     apiKey: prodApiKey,
                     endpoint: prodEndpoint,
                     esignEndpoint: prodEsignEndpoint,
+                    esignApiKey: prodEsignApiKey,
                     redirectUrl: prodRedirectUrl,
                     isActive: prodConfig?.is_active || false,
                   })}

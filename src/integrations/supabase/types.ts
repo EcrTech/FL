@@ -5503,6 +5503,7 @@ export type Database = {
           created_at: string
           environment: string
           esign_api_endpoint: string | null
+          esign_api_key: string | null
           id: string
           is_active: boolean | null
           org_id: string
@@ -5521,6 +5522,7 @@ export type Database = {
           created_at?: string
           environment: string
           esign_api_endpoint?: string | null
+          esign_api_key?: string | null
           id?: string
           is_active?: boolean | null
           org_id: string
@@ -5539,6 +5541,7 @@ export type Database = {
           created_at?: string
           environment?: string
           esign_api_endpoint?: string | null
+          esign_api_key?: string | null
           id?: string
           is_active?: boolean | null
           org_id?: string
