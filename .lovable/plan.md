@@ -1,132 +1,180 @@
 
-# Fix Plan: WhatsApp Message Sending Issues
+# Fix Plan: WhatsApp Image and Attachment Support
 
 ## Problem Summary
 
-When sending WhatsApp follow-up messages from the chat dialog, messages fail silently. The logs reveal **three distinct issues**:
+When respondents send images or other attachments via WhatsApp, they don't appear in the chatbot. The webhook receives the media correctly but ignores it because:
 
-| Issue | Root Cause | Impact |
-|-------|------------|--------|
-| Foreign Key Violation | `ApplicationCard` and `ApplicantProfileCard` pass `loan_application.id` instead of `contact.id` | Database insert fails |
-| Exotel API Rejection | Text message payload uses `text: "message"` instead of `text: { body: "message" }` | Exotel returns empty response |
-| Silent Failure | Edge function returns `success: true` even when DB insert fails | UI shows no error |
-
----
-
-## Detailed Analysis
-
-### Issue 1: Wrong ID Being Passed to WhatsAppChatDialog
-
-The `WhatsAppChatDialog` component expects a `contactId` prop that references the `contacts` table. However:
-
-- **`ApplicationCard.tsx` (line 212)**: Passes `application.id` (loan_applications ID)
-- **`ApplicantProfileCard.tsx` (line 569)**: Passes `applicationId` (loan_applications ID)
-
-The `whatsapp_messages` table has a foreign key constraint:
-```
-whatsapp_messages_contact_id_fkey → contacts.id
-```
-
-This causes the database error:
-```
-Key is not present in table "contacts"
-```
-
-### Issue 2: Incorrect Exotel Text Message Payload Format
-
-The edge function sends text messages with:
-```typescript
-// Current (incorrect)
-content: {
-  type: "text",
-  text: messageContent  // string directly
-}
-```
-
-Exotel V2 API requires:
-```typescript
-// Required format
-content: {
-  type: "text",
-  text: { body: messageContent }  // nested object
-}
-```
-
-This is why the Exotel raw response is empty - the API is rejecting the malformed payload silently.
-
-### Issue 3: Success Returned Despite Failures
-
-In `send-whatsapp-message/index.ts`, the function returns `success: true` even when:
-- Exotel returns an empty response (line 247-267)
-- Database insert fails (line 312-315)
+1. The webhook only extracts text from `text` and `button` content types
+2. Media URLs (`image.url`, `document.url`, etc.) are not captured
+3. The database has `media_url` and `media_type` columns, but they're never populated
+4. The chat UI only renders text content, not media
 
 ---
 
-## Implementation Plan
+## Current Flow (Broken)
 
-### Phase 1: Fix Exotel Text Message Payload
+```text
+Exotel sends image message
+    ↓
+content: { type: "image", image: { url: "..." } }
+    ↓
+parseExotelPayload() only checks text/button → body = ""
+    ↓
+Message with empty body is processed
+    ↓
+Condition fails: "if (normalizedMsg.type === 'inbound' && normalizedMsg.body)"
+    ↓
+Message is IGNORED - never stored
+```
 
-**File:** `supabase/functions/send-whatsapp-message/index.ts`
+---
 
-Update the text message payload structure (lines 213-226):
+## Proposed Solution
 
+### Phase 1: Update Webhook to Capture Media
+
+Modify `parseExotelPayload()` in the webhook to:
+- Extract media URLs from `image`, `document`, `video`, `audio`, `sticker` content types
+- Set a placeholder body text for media messages (e.g., "[Image]", "[Document]")
+- Return both the media URL and media type
+
+**Content Types to Support:**
+
+| Type | Exotel Structure | Media URL Path |
+|------|------------------|----------------|
+| image | `content.image.url` | Image URL |
+| document | `content.document.url` | PDF/Doc URL |
+| video | `content.video.url` | Video URL |
+| audio | `content.audio.url` | Audio URL |
+| sticker | `content.sticker.url` | Sticker URL |
+
+### Phase 2: Store Media in Database
+
+Update the webhook to populate:
+- `media_url`: The Exotel S3 URL for the attachment
+- `media_type`: The content type (image, document, video, audio, sticker)
+- `message_content`: A placeholder like "[Image]" or the caption if provided
+
+### Phase 3: Update Chat UI to Render Media
+
+Modify `WhatsAppChatDialog.tsx` to:
+- Fetch `media_url` and `media_type` from the query
+- Render images inline with `<img>` tags
+- Show document links as downloadable attachments
+- Display appropriate icons for video/audio with clickable links
+
+---
+
+## Technical Implementation
+
+### File 1: `supabase/functions/whatsapp-webhook/index.ts`
+
+**Changes to Interface:**
 ```typescript
-// Before
-content: {
-  type: "text",
-  text: messageContent
-}
-
-// After
-content: {
-  type: "text",
-  text: { body: messageContent }
+interface NormalizedMessage {
+  // ... existing fields
+  mediaUrl: string | null;      // NEW
+  mediaType: string | null;     // NEW
 }
 ```
 
-Also fix response parsing to extract `sid` from nested Exotel V2 response:
-
+**Changes to `parseExotelPayload()`:**
 ```typescript
-const exotelSid = exotelResult.response?.whatsapp?.messages?.[0]?.data?.sid 
-  || exotelResult.sid 
-  || exotelResult.id;
+// Extract media from different content types
+let body = '';
+let mediaUrl: string | null = null;
+let mediaType: string | null = null;
+
+const contentType = msg.content?.type;
+
+if (contentType === 'text' && msg.content.text?.body) {
+  body = msg.content.text.body;
+} else if (contentType === 'button' && msg.content.button?.text) {
+  body = msg.content.button.text;
+} else if (contentType === 'image') {
+  mediaUrl = msg.content.image?.url || null;
+  mediaType = 'image';
+  body = msg.content.image?.caption || '[Image]';
+} else if (contentType === 'document') {
+  mediaUrl = msg.content.document?.url || null;
+  mediaType = 'document';
+  body = msg.content.document?.caption || '[Document]';
+} else if (contentType === 'video') {
+  mediaUrl = msg.content.video?.url || null;
+  mediaType = 'video';
+  body = msg.content.video?.caption || '[Video]';
+} else if (contentType === 'audio') {
+  mediaUrl = msg.content.audio?.url || null;
+  mediaType = 'audio';
+  body = '[Audio]';
+}
 ```
 
-### Phase 2: Fix Contact ID Resolution
+**Changes to inbound condition:**
+```typescript
+// Allow messages with either text body OR media
+if (normalizedMsg.type === 'inbound' && (normalizedMsg.body || normalizedMsg.mediaUrl)) {
+```
 
-**Approach A (Recommended):** Resolve the actual contact ID in the edge function using phone number
+**Changes to database insert:**
+```typescript
+.insert({
+  // ... existing fields
+  media_url: normalizedMsg.mediaUrl,
+  media_type: normalizedMsg.mediaType,
+})
+```
 
-Modify `send-whatsapp-message/index.ts` to:
-1. Accept `contactId` as optional
-2. Look up or create contact from phone number if not provided
-3. Use the resolved contact ID for database operations
+### File 2: `src/components/LOS/Relationships/WhatsAppChatDialog.tsx`
 
-This is more resilient since:
-- It ensures the correct contact is always found
-- Creates a contact if one doesn't exist for the phone number
-- Works regardless of what the frontend passes
+**Update interface and query:**
+```typescript
+interface WhatsAppMessage {
+  // ... existing fields
+  media_url: string | null;
+  media_type: string | null;
+}
 
-**Alternative Approach B:** Fix the calling components
+// Add to select query
+.select('id, direction, message_content, sent_at, status, phone_number, created_at, media_url, media_type')
+```
 
-Update these components to pass the correct contact ID:
-- `src/components/LOS/Relationships/ApplicationCard.tsx`
-- `src/components/LOS/ApplicantProfileCard.tsx`
+**Add media rendering in the message bubble:**
+```typescript
+{/* Media content */}
+{msg.media_url && (
+  <div className="mb-2">
+    {msg.media_type === 'image' ? (
+      <img 
+        src={msg.media_url} 
+        alt="Shared image" 
+        className="max-w-full rounded-lg cursor-pointer"
+        onClick={() => window.open(msg.media_url, '_blank')}
+      />
+    ) : msg.media_type === 'document' ? (
+      <a 
+        href={msg.media_url} 
+        target="_blank" 
+        rel="noopener noreferrer"
+        className="flex items-center gap-2 p-2 bg-white/50 rounded"
+      >
+        <FileText className="h-5 w-5" />
+        <span className="text-sm underline">View Document</span>
+      </a>
+    ) : (
+      <a href={msg.media_url} target="_blank">
+        View {msg.media_type}
+      </a>
+    )}
+  </div>
+)}
 
-This requires finding/fetching the contact associated with each loan application.
-
-### Phase 3: Improve Error Handling
-
-**File:** `supabase/functions/send-whatsapp-message/index.ts`
-
-1. Check for empty Exotel response and treat as failure
-2. If database insert fails, still return the Exotel message ID but indicate partial success
-3. Return proper error structure so UI can display issues
-
-### Phase 4: Update Frontend Error Handling (Optional)
-
-**File:** `src/components/LOS/Relationships/WhatsAppChatDialog.tsx`
-
-Improve error detection in `sendFollowUpMessage` to handle edge cases where the response looks successful but message wasn't stored.
+{/* Text content */}
+{msg.message_content && !msg.message_content.startsWith('[') && (
+  <p className="text-sm whitespace-pre-wrap">{msg.message_content}</p>
+)}
+```
 
 ---
 
@@ -134,104 +182,15 @@ Improve error detection in `sendFollowUpMessage` to handle edge cases where the 
 
 | File | Changes |
 |------|---------|
-| `supabase/functions/send-whatsapp-message/index.ts` | Fix text payload format, add contact resolution, improve error handling |
-| `src/components/LOS/Relationships/ApplicationCard.tsx` | (Optional) Pass correct contact_id |
-| `src/components/LOS/ApplicantProfileCard.tsx` | (Optional) Pass correct contact_id |
+| `supabase/functions/whatsapp-webhook/index.ts` | Add media extraction and storage |
+| `src/components/LOS/Relationships/WhatsAppChatDialog.tsx` | Add media rendering |
 
 ---
 
-## Technical Details
+## Important Note on URL Expiry
 
-### Exotel V2 Correct Payload Structure
+The Exotel S3 URLs are **pre-signed and expire after 15 minutes**. For long-term storage:
+- Consider downloading the media to your own storage (Lovable Cloud Storage)
+- Or accept that old media links will expire (simpler approach for now)
 
-```typescript
-{
-  whatsapp: {
-    messages: [{
-      from: "+91XXXXXXXXXX",
-      to: "91XXXXXXXXXX",
-      content: {
-        type: "text",
-        text: { 
-          body: "Your message content here" 
-        }
-      }
-    }]
-  }
-}
-```
-
-### Exotel V2 Response Structure
-
-```typescript
-{
-  response: {
-    whatsapp: {
-      messages: [{
-        data: {
-          sid: "message_sid_here",
-          from: "+91XXXXXXXXXX",
-          to: "91XXXXXXXXXX"
-        }
-      }]
-    }
-  }
-}
-```
-
-### Contact Resolution Logic
-
-```typescript
-// In edge function
-async function resolveContactId(
-  supabaseClient: any,
-  phoneNumber: string,
-  orgId: string,
-  providedContactId?: string
-): Promise<string> {
-  // If valid contact ID provided, verify it exists
-  if (providedContactId) {
-    const { data: contact } = await supabaseClient
-      .from('contacts')
-      .select('id')
-      .eq('id', providedContactId)
-      .single();
-    
-    if (contact) return contact.id;
-  }
-  
-  // Look up contact by phone number
-  const { data: existingContact } = await supabaseClient
-    .from('contacts')
-    .select('id')
-    .eq('phone', phoneNumber)
-    .eq('org_id', orgId)
-    .single();
-  
-  if (existingContact) return existingContact.id;
-  
-  // Create new contact if not found
-  const { data: newContact } = await supabaseClient
-    .from('contacts')
-    .insert({
-      phone: phoneNumber,
-      org_id: orgId,
-      first_name: phoneNumber, // Placeholder
-      source: 'whatsapp'
-    })
-    .select('id')
-    .single();
-  
-  return newContact?.id;
-}
-```
-
----
-
-## Testing Checklist
-
-- [ ] Send a follow-up text message and verify it appears in chat
-- [ ] Verify message is stored in `whatsapp_messages` table with correct `contact_id`
-- [ ] Verify Exotel actually receives the message (check their logs/webhook)
-- [ ] Test error scenarios (invalid phone, network failure) show proper UI feedback
-- [ ] Test conversation template still works correctly
+This plan implements the simpler approach first - storing the URLs as-is. If media persistence is critical, a follow-up task can add media re-hosting.
