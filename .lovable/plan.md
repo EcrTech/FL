@@ -1,81 +1,120 @@
 
-# Fix: E-Sign NP034 "Token Mismatch" Error
+# Fix: E-Sign Token Mismatch Error (NP034)
 
 ## Problem Summary
-The E-Sign edge function fails at Step 2 (processForSign) with error **NP034 "Token mismatch"**, not NP004 as originally reported. The upload step succeeds but the process step fails.
+The E-Sign edge function fails at **Step 1 (Upload)** with error **NP034 "Token mismatch"**. The last edit changed the header format from `Token` to `Authorization: Bearer`, which Nupay does not accept for these endpoints.
 
-## Root Cause
-The eSign function requests **two separate tokens** (one for upload, one for processForSign), but Nupay expects the **same session token** for the entire document flow.
+## Root Cause Analysis
 
-| Function | Token Strategy | Result |
-|----------|---------------|--------|
-| **eMandate** | Uses `nupay-authenticate` with caching | ✅ Works |
-| **eSign** | Calls `getNewToken()` twice (lines 383, 397) | ❌ NP034 Token mismatch |
+### Evidence from Logs:
+```
+[E-Sign] Upload response: {"StatusCode":"NP034","StatusDesc":"Token mismatch."}
+```
+
+The error occurs immediately after sending the upload request with the wrong header format.
+
+### Header Comparison:
+
+| Function | Header Format | Result |
+|----------|--------------|--------|
+| `nupay-create-mandate` | `"Token": token` | ✅ Works |
+| `nupay-esign-request` (current) | `"Authorization": "Bearer ${token}"` | ❌ NP034 Error |
+
+### Code Evidence:
+The working eMandate function at line 200-205 explicitly states:
+```typescript
+// Use correct headers per API spec: "Token" header (not "Authorization: Bearer")
+headers: {
+  "api-key": config.api_key,
+  "Token": token, // Correct header per API spec
+```
+
+The recent edit (shown in diff) changed eSign to use `Authorization: Bearer` format, which is incorrect.
+
+---
 
 ## Solution
-Modify `nupay-esign-request/index.ts` to use a **single token for both steps** instead of requesting fresh tokens for each step.
+
+Revert the header format in `nupay-esign-request/index.ts` back to `Token` and add enhanced debugging.
+
+### Changes to `supabase/functions/nupay-esign-request/index.ts`:
+
+**1. Step 1 - Upload (Line 177-178):**
+```typescript
+// Before (broken)
+headers: {
+  "api-key": apiKey,
+  "Authorization": `Bearer ${token}`,  // WRONG
+}
+
+// After (fixed)
+headers: {
+  "api-key": apiKey,
+  "Token": token,  // Correct per Nupay API spec
+}
+```
+
+**2. Step 2 - Process (Line 258-260):**
+```typescript
+// Before (broken)
+headers: {
+  "api-key": apiKey,
+  "Authorization": `Bearer ${token}`,  // WRONG
+  "Content-Type": "application/json",
+}
+
+// After (fixed)
+headers: {
+  "api-key": apiKey,
+  "Token": token,  // Correct per Nupay API spec
+  "Content-Type": "application/json",
+}
+```
+
+**3. Add Enhanced Debugging (after each fetch):**
+```typescript
+// Add request details logging
+console.log(`[E-Sign] Request headers: api-key=YES, Token=${token.substring(0, 20)}...`);
+console.log(`[E-Sign] Request URL: ${endpoint}`);
+
+// Add response details
+console.log(`[E-Sign] Response status: ${response.status}`);
+console.log(`[E-Sign] Response headers:`, JSON.stringify(Object.fromEntries(response.headers.entries())));
+console.log(`[E-Sign] Response body: ${responseText}`);
+```
 
 ---
 
-## Changes Required
+## Technical Context
 
-### File: `supabase/functions/nupay-esign-request/index.ts`
+### Why `Token` vs `Authorization: Bearer`?
 
-**Remove the second token request and reuse the first token:**
+Nupay's API documentation specifies the `Token` header for their `/api/` endpoints:
+- `/api/EMandate/eManadate` - uses `Token` header ✅
+- `/api/SignDocument/addRequestFile` - should use `Token` header
+- `/api/SignDocument/processForSign` - should use `Token` header
 
-**Current Code (lines 381-410):**
-```typescript
-// Step 1: Get fresh token for upload
-console.log("[E-Sign] Getting fresh token for Step 1 (Upload)...");
-const token1 = await getNewToken(apiEndpoint, apiKey);
-
-// Step 1: Upload document to Nupay
-const { nupayRefNo } = await uploadDocumentToNupay(..., token1, ...);
-
-// Step 2: Get FRESH token for processForSign (critical - tokens may be single-use)
-console.log("[E-Sign] Getting fresh token for Step 2 (Process)...");
-const token2 = await getNewToken(apiEndpoint, apiKey);
-
-// Step 2: Process for signing - use FRESH token
-const { signerUrl, ... } = await processForSign(..., token2, ...);
-```
-
-**Fixed Code:**
-```typescript
-// Get single token for the entire eSign session
-console.log("[E-Sign] Getting token for eSign session...");
-const token = await getNewToken(apiEndpoint, apiKey);
-
-// Step 1: Upload document to Nupay
-const { nupayRefNo } = await uploadDocumentToNupay(..., token, ...);
-
-// Step 2: Process for signing - use SAME token (Nupay session requirement)
-console.log("[E-Sign] Step 2: Using same session token for processForSign...");
-const { signerUrl, ... } = await processForSign(..., token, ...);
-```
-
----
-
-## Technical Details
-
-### Why This Fixes It:
-- Nupay issues a session-bound token when you authenticate
-- The upload (`addRequestFile`) and process (`processForSign`) calls must use the same session
-- Getting a new token starts a new session that doesn't have the uploaded document
-
-### Evidence from Database:
-```
-esign_response: { StatusCode: "NP034", StatusDesc: "Token mismatch." }
-```
-
-This confirms the second request is using a different session than the first.
+The `Authorization: Bearer` format is used by Supabase's own auth system, not Nupay's API.
 
 ---
 
 ## Verification Steps
+
 After deployment:
 1. Open a loan application in disbursement stage
 2. Click "E-Sign" on the Combined Loan Pack
 3. Fill in signer details and submit
-4. Verify the request succeeds without NP034 error
-5. Verify the signer URL is generated and notifications are sent
+4. Check logs for successful upload (NP000 response)
+5. Verify signer URL is generated
+
+---
+
+## Debug Log Enhancement
+
+The updated function will log:
+- Full request headers (masked)
+- Request URL
+- Response status code
+- Response headers
+- Full response body
+- Token first 20 characters for verification
