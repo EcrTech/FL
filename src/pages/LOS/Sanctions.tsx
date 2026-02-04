@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Eye, CheckCircle, Loader2, Send, Upload, FileCheck } from "lucide-react";
+import { Eye, CheckCircle, Loader2, Send, Upload, FileCheck, Filter } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -40,6 +41,7 @@ export default function Sanctions() {
   const [sanctioningId, setSanctioningId] = useState<string | null>(null);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [selectedApp, setSelectedApp] = useState<SanctionApplication | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   // Optimized: Single query with JOINs instead of 3 separate queries
   const { data: applications, isLoading } = useQuery({
@@ -225,6 +227,18 @@ export default function Sanctions() {
     return <Badge variant="secondary">New</Badge>;
   };
 
+  const getAppStatus = (app: SanctionApplication): string => {
+    if (app.sanction_status === 'signed') return 'signed';
+    if (app.documents_emailed_at) return 'emailed';
+    if (app.sanction_id) return 'pending';
+    return 'new';
+  };
+
+  const filteredApplications = applications?.filter((app) => {
+    if (statusFilter === "all") return true;
+    return getAppStatus(app) === statusFilter;
+  }) || [];
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -232,6 +246,21 @@ export default function Sanctions() {
           <div>
             <h1 className="text-2xl font-bold">Sanctions</h1>
             <p className="text-muted-foreground">Approved applications pending sanction</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="new">New</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="emailed">Emailed</SelectItem>
+                <SelectItem value="signed">Signed</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -247,11 +276,15 @@ export default function Sanctions() {
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
-            ) : !applications || applications.length === 0 ? (
+            ) : filteredApplications.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <CheckCircle className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium">No Approved Applications</h3>
-                <p className="text-muted-foreground">No applications pending sanction at this time.</p>
+                <h3 className="text-lg font-medium">No Applications Found</h3>
+                <p className="text-muted-foreground">
+                  {statusFilter === "all" 
+                    ? "No applications pending sanction at this time." 
+                    : `No applications with "${statusFilter}" status.`}
+                </p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -276,7 +309,7 @@ export default function Sanctions() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {applications.map((app) => {
+                    {filteredApplications.map((app) => {
                       const loanCalc = calculateLoanDetails(
                         app.approved_amount || 0,
                         app.interest_rate || 1,
