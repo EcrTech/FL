@@ -7,7 +7,8 @@ const corsHeaders = {
 
 const RATE_LIMIT_WEBHOOKS_PER_MINUTE = 100;
 
-interface ExotelWebhookPayload {
+// Legacy flat payload format
+interface ExotelFlatPayload {
   sid?: string;
   id?: string;
   to?: string;
@@ -19,6 +20,52 @@ interface ExotelWebhookPayload {
   error_code?: string;
   error_message?: string;
 }
+
+// Nested Exotel WhatsApp payload format
+interface ExotelNestedMessage {
+  callback_type: 'incoming_message' | 'dlr';
+  sid: string;
+  from?: string;
+  to?: string;
+  profile_name?: string;
+  timestamp?: string;
+  content?: {
+    type: 'text' | 'button';
+    text?: { body: string };
+    button?: { payload: string; text: string };
+  };
+  exo_status_code?: number;
+  exo_detailed_status?: string;
+  description?: string;
+}
+
+interface ExotelNestedPayload {
+  whatsapp: {
+    messages: ExotelNestedMessage[];
+  };
+}
+
+// Normalized message structure for processing
+interface NormalizedMessage {
+  type: 'inbound' | 'dlr' | 'unknown';
+  sid: string;
+  from: string;
+  to: string;
+  body: string;
+  status: string;
+  profileName: string;
+  timestamp: string | null;
+  errorMessage: string | null;
+}
+
+// Map Exotel status codes to our status strings
+const EXOTEL_STATUS_MAP: Record<number, string> = {
+  30001: 'sent',        // EX_MESSAGE_SENT
+  30002: 'delivered',   // EX_MESSAGE_DELIVERED
+  30003: 'read',        // EX_MESSAGE_SEEN
+  30004: 'failed',      // EX_MESSAGE_FAILED
+  30005: 'failed',      // EX_MESSAGE_EXPIRED
+};
 
 // Rate limiting for webhook calls (IP-based)
 async function checkWebhookRateLimit(supabaseClient: any, ipAddress: string): Promise<boolean> {
@@ -34,13 +81,100 @@ async function checkWebhookRateLimit(supabaseClient: any, ipAddress: string): Pr
   return (count || 0) < RATE_LIMIT_WEBHOOKS_PER_MINUTE;
 }
 
-// Validate webhook payload structure
-function validateWebhookPayload(payload: any): payload is ExotelWebhookPayload {
+// Validate webhook payload - accepts both nested and flat formats
+function validateWebhookPayload(payload: any): boolean {
+  // Accept nested Exotel format
+  if (payload?.whatsapp?.messages?.length > 0) {
+    return true;
+  }
+  // Accept legacy flat format
   return (
     payload &&
     (typeof payload.sid === 'string' || typeof payload.id === 'string') &&
     (typeof payload.to === 'string' || typeof payload.from === 'string')
   );
+}
+
+// Parse and normalize Exotel payload from either nested or flat format
+function parseExotelPayload(payload: any): NormalizedMessage | null {
+  // Check for nested format (new Exotel WhatsApp API)
+  if (payload?.whatsapp?.messages?.[0]) {
+    const msg = payload.whatsapp.messages[0] as ExotelNestedMessage;
+    
+    // Determine message type from callback_type
+    let type: 'inbound' | 'dlr' | 'unknown' = 'unknown';
+    if (msg.callback_type === 'incoming_message') {
+      type = 'inbound';
+    } else if (msg.callback_type === 'dlr') {
+      type = 'dlr';
+    }
+    
+    // Extract message body from content (text or button click)
+    let body = '';
+    if (msg.content?.type === 'text' && msg.content.text?.body) {
+      body = msg.content.text.body;
+    } else if (msg.content?.type === 'button' && msg.content.button?.text) {
+      body = msg.content.button.text;
+    }
+    
+    // Map Exotel status code to our status string for DLR
+    let status = '';
+    if (type === 'dlr' && msg.exo_status_code) {
+      status = EXOTEL_STATUS_MAP[msg.exo_status_code] || 'unknown';
+    }
+    
+    return {
+      type,
+      sid: msg.sid || '',
+      from: msg.from || '',
+      to: msg.to || '',
+      body,
+      status,
+      profileName: msg.profile_name || '',
+      timestamp: msg.timestamp || null,
+      errorMessage: msg.description || null,
+    };
+  }
+  
+  // Legacy flat format fallback
+  if (payload?.sid || payload?.id) {
+    const flat = payload as ExotelFlatPayload;
+    const direction = flat.direction?.toLowerCase();
+    
+    return {
+      type: direction === 'inbound' ? 'inbound' : (flat.status ? 'dlr' : 'unknown'),
+      sid: flat.sid || flat.id || '',
+      from: flat.from || '',
+      to: flat.to || '',
+      body: flat.body || '',
+      status: flat.status?.toLowerCase() || '',
+      profileName: '',
+      timestamp: flat.timestamp || null,
+      errorMessage: flat.error_message || flat.error_code || null,
+    };
+  }
+  
+  return null;
+}
+
+// Normalize phone number to consistent format with + prefix
+function normalizePhoneNumber(phone: string): string {
+  // Remove all non-digit characters except +
+  let cleaned = phone.replace(/[^\d+]/g, '');
+  
+  // Ensure + prefix for storage
+  if (!cleaned.startsWith('+')) {
+    // If it's a 10-digit Indian number, add +91
+    if (cleaned.length === 10) {
+      cleaned = '+91' + cleaned;
+    } else if (cleaned.startsWith('91') && cleaned.length === 12) {
+      cleaned = '+' + cleaned;
+    } else {
+      cleaned = '+' + cleaned;
+    }
+  }
+  
+  return cleaned;
 }
 
 Deno.serve(async (req) => {
@@ -85,6 +219,22 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Parse and normalize the payload
+    const normalizedMsg = parseExotelPayload(payload);
+    
+    if (!normalizedMsg) {
+      console.error('Failed to parse webhook payload:', payload);
+      return new Response(
+        JSON.stringify({ error: 'Failed to parse payload' }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    console.log('Normalized message:', JSON.stringify(normalizedMsg, null, 2));
+
     // Log rate limit
     await supabaseClient
       .from('rate_limit_log')
@@ -94,15 +244,11 @@ Deno.serve(async (req) => {
         ip_address: clientIp,
       });
 
-    const messageId = payload.sid || payload.id;
-    const status = payload.status?.toLowerCase();
-    const direction = payload.direction?.toLowerCase();
-    
     // Handle inbound messages (new messages from customers)
-    if (direction === 'inbound' && payload.body) {
-      console.log('Received inbound message:', payload);
+    if (normalizedMsg.type === 'inbound' && normalizedMsg.body) {
+      console.log('Processing inbound message:', normalizedMsg);
       
-      const phoneNumber = payload.from?.replace(/[^\d+]/g, '') || '';
+      const phoneNumber = normalizePhoneNumber(normalizedMsg.from);
       
       // Find existing contact by phone number
       const { data: contacts } = await supabaseClient
@@ -136,8 +282,8 @@ Deno.serve(async (req) => {
         orgId = whatsappSettings[0].org_id;
         console.log('Creating new contact for phone:', phoneNumber, 'in org:', orgId);
         
-        // Use phone number as name since Exotel doesn't provide name
-        const firstName = phoneNumber;
+        // Use profile_name from Exotel if available, otherwise use phone number
+        const firstName = normalizedMsg.profileName || phoneNumber;
         
         // Create new contact
         const { data: newContact, error: createError } = await supabaseClient
@@ -172,11 +318,11 @@ Deno.serve(async (req) => {
           contact_id: contactId,
           conversation_id: phoneNumber,
           direction: 'inbound',
-          message_content: payload.body || '',
+          message_content: normalizedMsg.body,
           phone_number: phoneNumber,
-          exotel_message_id: messageId,
+          exotel_message_id: normalizedMsg.sid,
           status: 'received',
-          sent_at: payload.timestamp ? new Date(payload.timestamp) : new Date(),
+          sent_at: normalizedMsg.timestamp ? new Date(normalizedMsg.timestamp) : new Date(),
         });
       
       if (insertError) {
@@ -187,7 +333,7 @@ Deno.serve(async (req) => {
         );
       }
       
-      console.log('Stored inbound message from:', phoneNumber);
+      console.log('Stored inbound message from:', phoneNumber, 'content:', normalizedMsg.body);
       
       return new Response(
         JSON.stringify({ success: true, message: 'Inbound message stored' }),
@@ -195,40 +341,40 @@ Deno.serve(async (req) => {
       );
     }
     
-    // Handle status updates for outbound messages
-    if (status && messageId) {
-      const timestamp = payload.timestamp ? new Date(payload.timestamp) : new Date();
+    // Handle delivery reports (DLR) - status updates for outbound messages
+    if (normalizedMsg.type === 'dlr' && normalizedMsg.status && normalizedMsg.sid) {
+      console.log('Processing DLR:', normalizedMsg);
+      
+      const timestamp = normalizedMsg.timestamp ? new Date(normalizedMsg.timestamp) : new Date();
 
       // Find the message by exotel_message_id
       const { data: message, error: fetchError } = await supabaseClient
         .from('whatsapp_messages')
         .select('*')
-        .eq('exotel_message_id', messageId)
+        .eq('exotel_message_id', normalizedMsg.sid)
         .single();
 
       if (fetchError || !message) {
-        console.error('Message not found:', messageId, fetchError);
+        console.error('Message not found for DLR:', normalizedMsg.sid, fetchError);
+        // Don't return 404 for DLR - just acknowledge
         return new Response(
-          JSON.stringify({ error: 'Message not found' }),
-          {
-            status: 404,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          }
+          JSON.stringify({ success: true, message: 'DLR received but message not found' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
       // Prepare update data based on status
-      const updateData: any = { status: status };
+      const updateData: any = { status: normalizedMsg.status };
 
-      if (status === 'delivered' || status === 'sent') {
+      if (normalizedMsg.status === 'delivered' || normalizedMsg.status === 'sent') {
         updateData.delivered_at = timestamp.toISOString();
-      } else if (status === 'read') {
+      } else if (normalizedMsg.status === 'read') {
         updateData.read_at = timestamp.toISOString();
         if (!message.delivered_at) {
           updateData.delivered_at = timestamp.toISOString();
         }
-      } else if (status === 'failed' || status === 'undelivered') {
-        updateData.error_message = payload.error_message || payload.error_code || 'Message delivery failed';
+      } else if (normalizedMsg.status === 'failed') {
+        updateData.error_message = normalizedMsg.errorMessage || 'Message delivery failed';
       }
 
       // Update the message status
@@ -248,7 +394,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      console.log(`Updated message ${message.id} to status: ${status}`);
+      console.log(`Updated message ${message.id} to status: ${normalizedMsg.status}`);
 
       return new Response(
         JSON.stringify({ success: true, message: 'Status updated' }),
@@ -258,7 +404,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // For other webhook types, just acknowledge
+    // For other webhook types or unknown, just acknowledge
+    console.log('Webhook type not handled, acknowledging:', normalizedMsg?.type);
     return new Response(
       JSON.stringify({ success: true, message: 'Webhook received' }),
       {
