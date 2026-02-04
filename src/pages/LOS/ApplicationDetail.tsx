@@ -737,6 +737,7 @@ export default function ApplicationDetail() {
   const tenureDays = application?.tenure_days;
 
   // Initialize applicant data when primaryApplicant changes
+  // Use specific field dependencies to ensure state updates on refetch after document re-parse
   useEffect(() => {
     if (primaryApplicant) {
       const address = primaryApplicant.current_address as Record<string, any> | string | null;
@@ -754,7 +755,16 @@ export default function ApplicationDetail() {
         current_address: addressStr,
       });
     }
-  }, [primaryApplicant]);
+  }, [
+    primaryApplicant?.id,
+    primaryApplicant?.gender,
+    primaryApplicant?.dob,
+    primaryApplicant?.current_address,
+    primaryApplicant?.marital_status,
+    primaryApplicant?.religion,
+    primaryApplicant?.pan_number,
+    primaryApplicant?.mobile
+  ]);
 
   if (isLoading || isOrgLoading) {
     return (
