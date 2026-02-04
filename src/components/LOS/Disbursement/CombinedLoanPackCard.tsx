@@ -250,7 +250,7 @@ export default function CombinedLoanPackCard({
                 signerName={borrowerName}
                 signerEmail={applicant?.email || ""}
                 signerMobile={applicant?.mobile || ""}
-                environment="uat"
+                environment="production"
                 onSuccess={onRefetch}
               />
             )}
