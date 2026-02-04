@@ -399,10 +399,21 @@ serve(async (req) => {
       refNo
     );
 
-    // Step 2: Process for signing - get FRESH token (Nupay may invalidate token after upload)
+    // Step 2: Process for signing - get FRESH token
+    // Add delay to ensure Nupay generates a new token (tokens are cached by timestamp)
+    console.log("[E-Sign] Step 2: Waiting 2 seconds for fresh token...");
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
     console.log("[E-Sign] Step 2: Getting fresh token for processForSign...");
     const token2 = await getNewToken(apiEndpoint, apiKey);
     console.log(`[E-Sign] Step 2: Fresh token obtained: ${token2.substring(0, 20)}...`);
+    
+    // Verify tokens are different
+    if (token === token2) {
+      console.warn("[E-Sign] WARNING: Token2 is identical to Token1 - Nupay may still be caching");
+    } else {
+      console.log("[E-Sign] Step 2: Confirmed tokens are different ✓");
+    }
     
     const { signerUrl, docketId, documentId: nupayDocumentId } = await processForSign(
       apiEndpoint,
