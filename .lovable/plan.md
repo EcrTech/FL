@@ -1,151 +1,85 @@
 
-# Fix: E-Sign Dialog Notification Override Fields (Like eMandate)
+# Fix: E-Sign "Login Failed" Error (NP004)
 
 ## Problem Summary
-The E-Sign dialog currently allows editing signer details, but:
-1. **Unclear labels** - Fields labeled "Mobile Number" and "Email" don't make it clear that the signing link notifications will be sent there
-2. **Bug** - Lines 141-145 use `useState()` incorrectly as an initializer instead of `useEffect` for syncing props to state
-3. **No visual distinction** - Unlike the updated eMandate dialog, there's no "Notification Settings" section to clarify where the signing URL will be sent
+The E-Sign edge function fails at Step 2 (processForSign) with error `"Login failed."` (NP004), even though Step 1 (upload document) succeeds with the same authentication token.
 
-## Solution Overview
-Update `ESignDocumentDialog.tsx` to:
-1. Fix the state sync bug (replace useState with useEffect)
-2. Add separate "Notification Settings" section with clear labels
-3. Add notification phone/email state variables (separate from signer details)
-4. Update help text to make it clear these are where the signing link goes
+## Root Cause Analysis
 
----
+### Evidence:
+| Step | Endpoint | Result | Token Used |
+|------|----------|--------|------------|
+| Auth | `/Auth/token` | ✅ Returns JWT | N/A |
+| Step 1: Upload | `/api/SignDocument/addRequestFile` | ✅ Success (NP000) | Fresh JWT |
+| Step 2: Process | `/api/SignDocument/processForSign` | ❌ Login failed (NP004) | Fresh JWT |
 
-## Changes Required
+### Diagnosis:
+The same token works for upload but fails for processForSign. This strongly indicates one of:
+1. **API credentials issue**: The production API key may not have eSign permissions enabled
+2. **Different auth required**: Nupay may require different API key for eSign vs eMandate
+3. **Account configuration**: The Nupay merchant account may need eSign module activation
 
-### File: `src/components/LOS/Sanction/ESignDocumentDialog.tsx`
+## Recommended Solution
 
-#### Change 1: Add notification override state variables (after line 61)
-```typescript
-// Notification override fields (for testing or different notification recipient)
-const [notificationPhone, setNotificationPhone] = useState(defaultSignerMobile);
-const [notificationEmail, setNotificationEmail] = useState(defaultSignerEmail);
+### Option A: Verify Nupay Credentials with Provider (Recommended)
+**This is a configuration issue, not a code issue.** The user needs to:
+1. Contact Nupay support to verify their API key has eSign module enabled
+2. Confirm if eSign requires a separate API key
+3. Check if their merchant account has eSign service activated
+
+### Option B: Add Separate eSign Credentials to Config (If Needed)
+If Nupay confirms a separate API key is needed for eSign:
+
+**Database Migration:**
+```sql
+-- Add separate eSign API key column if Nupay requires different credentials
+ALTER TABLE nupay_config 
+ADD COLUMN IF NOT EXISTS esign_api_key TEXT;
+
+COMMENT ON COLUMN nupay_config.esign_api_key IS 'Separate API key for eSign service if required by Nupay';
 ```
 
-#### Change 2: Fix the state sync bug - replace incorrect useState with useEffect (lines 141-145)
-**Before:**
+**Edge Function Update (nupay-esign-request/index.ts):**
 ```typescript
-// Update form when defaults change
-useState(() => {
-  setSignerName(defaultSignerName);
-  setSignerEmail(defaultSignerEmail);
-  setSignerMobile(defaultSignerMobile);
-});
-```
-
-**After:**
-```typescript
-// Reset form when dialog opens
-useEffect(() => {
-  if (open) {
-    setSignerName(defaultSignerName);
-    setSignerEmail(defaultSignerEmail);
-    setSignerMobile(defaultSignerMobile);
-    setNotificationPhone(defaultSignerMobile);
-    setNotificationEmail(defaultSignerEmail);
-    setSignerUrl(null);
-  }
-}, [open, defaultSignerName, defaultSignerEmail, defaultSignerMobile]);
-```
-
-#### Change 3: Add import for useEffect (line 1)
-```typescript
-import { useState, useEffect } from "react";
-```
-
-#### Change 4: Add Notification Settings section to the form (after Signature Position, around line 213)
-```typescript
-<hr className="my-4" />
-<p className="text-sm font-medium text-muted-foreground">Notification Settings</p>
-<p className="text-xs text-muted-foreground mb-2">
-  The signing link will be sent to these contacts
-</p>
-
-<div className="space-y-2">
-  <Label htmlFor="notifPhone">Notification Mobile</Label>
-  <Input
-    id="notifPhone"
-    value={notificationPhone}
-    onChange={(e) => setNotificationPhone(e.target.value)}
-    placeholder="10-digit mobile number"
-    type="tel"
-  />
-  <p className="text-xs text-muted-foreground">
-    WhatsApp message with signing link will be sent here
-  </p>
-</div>
-
-<div className="space-y-2">
-  <Label htmlFor="notifEmail">Notification Email (Optional)</Label>
-  <Input
-    id="notifEmail"
-    type="email"
-    value={notificationEmail}
-    onChange={(e) => setNotificationEmail(e.target.value)}
-    placeholder="email@example.com"
-  />
-  <p className="text-xs text-muted-foreground">
-    Email with signing link will be sent here
-  </p>
-</div>
-```
-
-#### Change 5: Update mutation call to use notification values (around line 107)
-**Before:**
-```typescript
-signerEmail: signerEmail || undefined,
-signerMobile: cleanMobile,
-```
-
-**After:**
-```typescript
-signerEmail: notificationEmail || undefined,
-signerMobile: notificationPhone.replace(/\D/g, ""),
-```
-
-#### Change 6: Update validation to use notification phone (around line 93-97)
-**Before:**
-```typescript
-const cleanMobile = signerMobile.replace(/\D/g, "");
-if (cleanMobile.length < 10) {
-  toast.error("Please enter a valid 10-digit mobile number");
-  return;
-}
-```
-
-**After:**
-```typescript
-const cleanMobile = notificationPhone.replace(/\D/g, "");
-if (cleanMobile.length < 10) {
-  toast.error("Please enter a valid 10-digit notification mobile number");
-  return;
-}
+// Use esign_api_key if available, otherwise fall back to api_key
+const apiKey = configData.esign_api_key || configData.api_key;
 ```
 
 ---
 
-## Technical Summary
+## Technical Details
 
-| Component | Current State | Updated State |
-|-----------|--------------|---------------|
-| Signer Name | Form field for Aadhaar name | Unchanged (used for signing) |
-| Signer Mobile | Form field (used for signing + notification) | Separate from notification mobile |
-| Signer Email | Form field (used for signing + notification) | Separate from notification email |
-| Notification Mobile | N/A | New editable field |
-| Notification Email | N/A | New editable field |
+### Current nupay_config Schema:
+| Column | Value | Used For |
+|--------|-------|----------|
+| `api_key` | `YmFhNTIwY2...` (Base64) | eMandate + eSign (shared) |
+| `api_endpoint` | `https://nupaybiz.com/autonach` | eMandate |
+| `esign_api_endpoint` | `https://nupaybiz.com/autonach` | eSign |
+| `esign_api_key` | ❌ **Does not exist** | - |
+
+### What the Logs Show:
+- Token obtained: `eyJ0eXAiOiJKV1QiLCJh...` decodes to `{"id": 1, "timestamp": ...}`
+- The `"id": 1` suggests this may be a test/limited access token
+- eMandate works because it uses the same auth successfully
+- eSign's processForSign endpoint appears to have stricter auth requirements
 
 ---
 
-## Verification Steps
-After implementation:
-1. Open a loan application in disbursement stage
-2. Click "E-Sign" on the Combined Loan Pack
-3. Verify "Notification Settings" section appears below "Signature Position"
-4. Enter different test values for Notification Mobile and Email
-5. Submit the e-sign request
-6. Verify WhatsApp and Email are sent to the test contacts (not the applicant's original details)
+## Immediate Action Items
+
+1. **User Action Required**: Contact Nupay to:
+   - Verify the production API key has eSign permissions
+   - Check if eSign requires a separate API key
+   - Confirm the merchant account has eSign module activated
+
+2. **If Separate Key Needed**: I will:
+   - Add `esign_api_key` column to `nupay_config`
+   - Update the edge function to use the eSign-specific key
+   - Add UI for entering the eSign API key in settings
+
+---
+
+## Questions for User
+- Do you have separate API credentials from Nupay specifically for the eSign service?
+- Has Nupay confirmed that your production account has the eSign module activated?
+- Would you like me to add support for a separate eSign API key in the settings?
