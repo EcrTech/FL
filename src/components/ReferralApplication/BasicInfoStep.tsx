@@ -652,12 +652,12 @@ export function BasicInfoStep({
               onCheckedChange={(checked) => onConsentChange('termsAndConditions', checked as boolean)}
               className="mt-0.5 h-5 w-5 rounded border-2"
             />
-            <Label htmlFor="termsAndConditions" className="text-sm text-muted-foreground font-body leading-relaxed cursor-pointer">
-              I have read and agreed to the{' '}
-              <a href="/terms" className="text-primary font-semibold hover:underline" target="_blank">Terms and Conditions</a>,{' '}
-              <a href="/privacy" className="text-primary font-semibold hover:underline" target="_blank">Privacy Policy</a> and{' '}
-              <a href="/risk" className="text-primary font-semibold hover:underline" target="_blank">Gradation of Risk</a>
-            </Label>
+      <Label htmlFor="termsAndConditions" className="text-sm text-muted-foreground font-body leading-relaxed cursor-pointer">
+        I have read and agreed to the{' '}
+        <a href="https://paisaasaarthi.com/terms" className="text-primary font-semibold hover:underline" target="_blank" rel="noopener noreferrer">Terms and Conditions</a>,{' '}
+        <a href="https://paisaasaarthi.com/privacy" className="text-primary font-semibold hover:underline" target="_blank" rel="noopener noreferrer">Privacy Policy</a> and{' '}
+        <a href="/risk" className="text-primary font-semibold hover:underline" target="_blank">Gradation of Risk</a>
+      </Label>
           </div>
 
           <div className="flex items-start space-x-4 p-4 bg-[hsl(var(--coral-500))]/5 rounded-lg border-l-4 border-[hsl(var(--coral-500))]">

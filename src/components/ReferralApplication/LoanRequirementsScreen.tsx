@@ -350,12 +350,12 @@ export function LoanRequirementsScreen({
                   onCheckedChange={(checked) => onConsentChange('termsAndConditions', checked as boolean)}
                   className="mt-0.5 h-[22px] w-[22px] rounded-md border-2"
                 />
-                <span className="text-[13px] text-muted-foreground leading-relaxed">
-                  I agree to{' '}
-                  <a href="/terms" className="text-primary underline" target="_blank">Terms</a>,{' '}
-                  <a href="/privacy" className="text-primary underline" target="_blank">Privacy Policy</a>{' '}
-                  & Gradation of Risk
-                </span>
+      <span className="text-[13px] text-muted-foreground leading-relaxed">
+        I agree to{' '}
+        <a href="https://paisaasaarthi.com/terms" className="text-primary underline" target="_blank" rel="noopener noreferrer">Terms</a>,{' '}
+        <a href="https://paisaasaarthi.com/privacy" className="text-primary underline" target="_blank" rel="noopener noreferrer">Privacy Policy</a>{' '}
+        & Gradation of Risk
+      </span>
               </label>
 
               <label className="flex items-start gap-3 cursor-pointer">
