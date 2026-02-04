@@ -13,6 +13,10 @@ interface SendMessageRequest {
   templateName?: string; // For hardcoded templates like "conversation"
   templateVariables?: Record<string, string>;
   message?: string;
+  // Media attachment support
+  mediaType?: 'image' | 'document' | 'video' | 'audio';
+  mediaUrl?: string;
+  mediaCaption?: string;
 }
 
 /**
@@ -169,14 +173,16 @@ Deno.serve(async (req) => {
     console.log('✓ User authenticated:', user.email);
 
     const body: SendMessageRequest = await req.json();
-    const { contactId: providedContactId, phoneNumber, templateId, templateName, templateVariables, message } = body;
+    const { contactId: providedContactId, phoneNumber, templateId, templateName, templateVariables, message, mediaType, mediaUrl, mediaCaption } = body;
 
     console.log('Request body:', {
       providedContactId,
       phoneNumber,
       templateId: templateId || 'N/A',
       templateName: templateName || 'N/A',
-      hasMessage: !!message
+      hasMessage: !!message,
+      hasMedia: !!mediaUrl,
+      mediaType: mediaType || 'N/A'
     });
 
     // Fetch user profile and org_id
@@ -327,6 +333,31 @@ Deno.serve(async (req) => {
           }]
         }
       };
+    } else if (mediaUrl && mediaType) {
+      // Media message (image, document, video, audio)
+      const mediaContent: any = {
+        url: mediaUrl,
+      };
+      // Only add caption if provided
+      if (mediaCaption) {
+        mediaContent.caption = mediaCaption;
+      }
+      
+      exotelPayload = {
+        whatsapp: {
+          messages: [{
+            from: whatsappSettings.whatsapp_source_number,
+            to: phoneDigits,
+            content: {
+              type: mediaType,
+              [mediaType]: mediaContent
+            }
+          }]
+        }
+      };
+      
+      // Use caption as message content for storage, or generate placeholder
+      messageContent = mediaCaption || `[${mediaType.charAt(0).toUpperCase() + mediaType.slice(1)}]`;
     } else {
       // Use standard messaging API for plain messages or database templates
       // FIX: Exotel V2 API requires text content as { body: "..." } not just a string
@@ -437,6 +468,8 @@ Deno.serve(async (req) => {
         status: 'sent',
         direction: 'outbound',
         sent_at: new Date().toISOString(),
+        media_url: mediaUrl || null,
+        media_type: mediaType || null,
       })
       .select()
       .single();
