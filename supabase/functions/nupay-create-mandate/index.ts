@@ -220,10 +220,13 @@ serve(async (req) => {
 
     console.log(`[Nupay-CreateMandate] Response:`, JSON.stringify(responseData));
 
-    // Extract Nupay mandate details
-    const nupayId = responseData.id || responseData.Id || responseData.uniq_id;
-    const nupayRefNo = responseData.ref_no || responseData.RefNo || responseData.reference_no;
-    const registrationUrl = responseData.registration_url || responseData.RegistrationUrl || responseData.url;
+    // Extract Nupay mandate details - API returns nested structure under data.customer and data.url
+    const customerData = responseData.data?.customer;
+    const nupayId = customerData?.id || responseData.id || responseData.Id;
+    const nupayRefNo = customerData?.nupay_ref_no || responseData.ref_no || responseData.RefNo;
+    const registrationUrl = responseData.data?.url || responseData.url || responseData.registration_url;
+    
+    console.log(`[Nupay-CreateMandate] Extracted - nupayId: ${nupayId}, refNo: ${nupayRefNo}, url: ${registrationUrl}`);
 
     // Store mandate in database
     const { data: mandate, error: insertError } = await supabase
