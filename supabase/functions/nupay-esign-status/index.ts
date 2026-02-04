@@ -40,8 +40,10 @@ async function getNupayToken(supabase: SupabaseClient<any, any, any>, orgId: str
     throw new Error("Nupay configuration not found or inactive");
   }
 
-  const configData = config as { api_endpoint: string; api_key: string };
-  const authEndpoint = `${configData.api_endpoint}/Auth/token`;
+  const configData = config as { api_endpoint: string; api_key: string; esign_api_endpoint?: string };
+  // Use esign_api_endpoint if available, otherwise fall back to api_endpoint
+  const esignEndpoint = configData.esign_api_endpoint || configData.api_endpoint;
+  const authEndpoint = `${esignEndpoint}/Auth/token`;
   const authResponse = await fetch(authEndpoint, {
     method: "GET",
     headers: {
@@ -140,7 +142,7 @@ serve(async (req) => {
 
     const { data: config } = await supabase
       .from("nupay_config")
-      .select("api_endpoint, api_key")
+      .select("api_endpoint, api_key, esign_api_endpoint")
       .eq("org_id", org_id)
       .eq("environment", environment)
       .single();
@@ -149,8 +151,11 @@ serve(async (req) => {
       throw new Error("Nupay config not found");
     }
 
+    // Use esign_api_endpoint if available, otherwise fall back to api_endpoint
+    const esignApiEndpoint = (config as { esign_api_endpoint?: string }).esign_api_endpoint || config.api_endpoint;
+
     // Call Nupay status API
-    const statusEndpoint = `${config.api_endpoint}/api/SignDocument/documentStatus`;
+    const statusEndpoint = `${esignApiEndpoint}/api/SignDocument/documentStatus`;
     console.log(`[E-Sign-Status] Checking status from ${statusEndpoint}`);
 
     const statusResponse = await fetch(statusEndpoint, {
