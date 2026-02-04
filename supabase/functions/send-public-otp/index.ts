@@ -100,7 +100,7 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: 'Paisaa Saarthi <noreply@in-sync.co.in>',
+          from: 'Paisaa Saarthi <info@paisaasaarthi.com>',
           to: identifier,
           subject: 'Your OTP for Loan Application',
           html: `

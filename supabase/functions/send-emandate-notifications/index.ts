@@ -32,8 +32,8 @@ async function sendEmailNotification(
     return { success: false, error: "RESEND_API_KEY not configured" };
   }
 
-  const fromEmail = `noreply@${emailSettings.sending_domain}`;
-  const fromName = emailSettings.from_name || "eMandate";
+  const fromEmail = `info@${emailSettings.sending_domain}`;
+  const fromName = emailSettings.from_name || "Paisaa Saarthi eMandate";
 
   const amountDisplay = collectionAmount 
     ? `₹${collectionAmount.toLocaleString("en-IN")}` 
@@ -249,7 +249,7 @@ serve(async (req) => {
       // Use org's verified domain if available, otherwise use global verified domain
       const effectiveEmailSettings = emailSettings?.sending_domain 
         ? emailSettings 
-        : { sending_domain: "in-sync.co.in", from_name: "eMandate" };
+        : { sending_domain: "paisaasaarthi.com", from_name: "Paisaa Saarthi eMandate" };
 
       const emailResult = await sendEmailNotification(
         signer_email,
