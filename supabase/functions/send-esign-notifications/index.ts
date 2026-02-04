@@ -32,7 +32,8 @@ async function sendEmailNotification(
   }
 
   const documentLabel = documentType === "sanction_letter" ? "Sanction Letter" :
-    documentType === "loan_agreement" ? "Loan Agreement" : "Daily Repayment Schedule";
+    documentType === "loan_agreement" ? "Loan Agreement" :
+    documentType === "combined_loan_pack" ? "Combined Loan Pack" : "Daily Repayment Schedule";
 
   const fromEmail = `noreply@${emailSettings.sending_domain}`;
   const fromName = emailSettings.from_name || "E-Sign";
