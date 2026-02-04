@@ -1,85 +1,81 @@
 
-# Fix: E-Sign "Login Failed" Error (NP004)
+# Fix: E-Sign NP034 "Token Mismatch" Error
 
 ## Problem Summary
-The E-Sign edge function fails at Step 2 (processForSign) with error `"Login failed."` (NP004), even though Step 1 (upload document) succeeds with the same authentication token.
+The E-Sign edge function fails at Step 2 (processForSign) with error **NP034 "Token mismatch"**, not NP004 as originally reported. The upload step succeeds but the process step fails.
 
-## Root Cause Analysis
+## Root Cause
+The eSign function requests **two separate tokens** (one for upload, one for processForSign), but Nupay expects the **same session token** for the entire document flow.
 
-### Evidence:
-| Step | Endpoint | Result | Token Used |
-|------|----------|--------|------------|
-| Auth | `/Auth/token` | ✅ Returns JWT | N/A |
-| Step 1: Upload | `/api/SignDocument/addRequestFile` | ✅ Success (NP000) | Fresh JWT |
-| Step 2: Process | `/api/SignDocument/processForSign` | ❌ Login failed (NP004) | Fresh JWT |
+| Function | Token Strategy | Result |
+|----------|---------------|--------|
+| **eMandate** | Uses `nupay-authenticate` with caching | ✅ Works |
+| **eSign** | Calls `getNewToken()` twice (lines 383, 397) | ❌ NP034 Token mismatch |
 
-### Diagnosis:
-The same token works for upload but fails for processForSign. This strongly indicates one of:
-1. **API credentials issue**: The production API key may not have eSign permissions enabled
-2. **Different auth required**: Nupay may require different API key for eSign vs eMandate
-3. **Account configuration**: The Nupay merchant account may need eSign module activation
+## Solution
+Modify `nupay-esign-request/index.ts` to use a **single token for both steps** instead of requesting fresh tokens for each step.
 
-## Recommended Solution
+---
 
-### Option A: Verify Nupay Credentials with Provider (Recommended)
-**This is a configuration issue, not a code issue.** The user needs to:
-1. Contact Nupay support to verify their API key has eSign module enabled
-2. Confirm if eSign requires a separate API key
-3. Check if their merchant account has eSign service activated
+## Changes Required
 
-### Option B: Add Separate eSign Credentials to Config (If Needed)
-If Nupay confirms a separate API key is needed for eSign:
+### File: `supabase/functions/nupay-esign-request/index.ts`
 
-**Database Migration:**
-```sql
--- Add separate eSign API key column if Nupay requires different credentials
-ALTER TABLE nupay_config 
-ADD COLUMN IF NOT EXISTS esign_api_key TEXT;
+**Remove the second token request and reuse the first token:**
 
-COMMENT ON COLUMN nupay_config.esign_api_key IS 'Separate API key for eSign service if required by Nupay';
+**Current Code (lines 381-410):**
+```typescript
+// Step 1: Get fresh token for upload
+console.log("[E-Sign] Getting fresh token for Step 1 (Upload)...");
+const token1 = await getNewToken(apiEndpoint, apiKey);
+
+// Step 1: Upload document to Nupay
+const { nupayRefNo } = await uploadDocumentToNupay(..., token1, ...);
+
+// Step 2: Get FRESH token for processForSign (critical - tokens may be single-use)
+console.log("[E-Sign] Getting fresh token for Step 2 (Process)...");
+const token2 = await getNewToken(apiEndpoint, apiKey);
+
+// Step 2: Process for signing - use FRESH token
+const { signerUrl, ... } = await processForSign(..., token2, ...);
 ```
 
-**Edge Function Update (nupay-esign-request/index.ts):**
+**Fixed Code:**
 ```typescript
-// Use esign_api_key if available, otherwise fall back to api_key
-const apiKey = configData.esign_api_key || configData.api_key;
+// Get single token for the entire eSign session
+console.log("[E-Sign] Getting token for eSign session...");
+const token = await getNewToken(apiEndpoint, apiKey);
+
+// Step 1: Upload document to Nupay
+const { nupayRefNo } = await uploadDocumentToNupay(..., token, ...);
+
+// Step 2: Process for signing - use SAME token (Nupay session requirement)
+console.log("[E-Sign] Step 2: Using same session token for processForSign...");
+const { signerUrl, ... } = await processForSign(..., token, ...);
 ```
 
 ---
 
 ## Technical Details
 
-### Current nupay_config Schema:
-| Column | Value | Used For |
-|--------|-------|----------|
-| `api_key` | `YmFhNTIwY2...` (Base64) | eMandate + eSign (shared) |
-| `api_endpoint` | `https://nupaybiz.com/autonach` | eMandate |
-| `esign_api_endpoint` | `https://nupaybiz.com/autonach` | eSign |
-| `esign_api_key` | ❌ **Does not exist** | - |
+### Why This Fixes It:
+- Nupay issues a session-bound token when you authenticate
+- The upload (`addRequestFile`) and process (`processForSign`) calls must use the same session
+- Getting a new token starts a new session that doesn't have the uploaded document
 
-### What the Logs Show:
-- Token obtained: `eyJ0eXAiOiJKV1QiLCJh...` decodes to `{"id": 1, "timestamp": ...}`
-- The `"id": 1` suggests this may be a test/limited access token
-- eMandate works because it uses the same auth successfully
-- eSign's processForSign endpoint appears to have stricter auth requirements
+### Evidence from Database:
+```
+esign_response: { StatusCode: "NP034", StatusDesc: "Token mismatch." }
+```
+
+This confirms the second request is using a different session than the first.
 
 ---
 
-## Immediate Action Items
-
-1. **User Action Required**: Contact Nupay to:
-   - Verify the production API key has eSign permissions
-   - Check if eSign requires a separate API key
-   - Confirm the merchant account has eSign module activated
-
-2. **If Separate Key Needed**: I will:
-   - Add `esign_api_key` column to `nupay_config`
-   - Update the edge function to use the eSign-specific key
-   - Add UI for entering the eSign API key in settings
-
----
-
-## Questions for User
-- Do you have separate API credentials from Nupay specifically for the eSign service?
-- Has Nupay confirmed that your production account has the eSign module activated?
-- Would you like me to add support for a separate eSign API key in the settings?
+## Verification Steps
+After deployment:
+1. Open a loan application in disbursement stage
+2. Click "E-Sign" on the Combined Loan Pack
+3. Fill in signer details and submit
+4. Verify the request succeeds without NP034 error
+5. Verify the signer URL is generated and notifications are sent
