@@ -35,7 +35,7 @@ export default function ESignDocumentButton({
   signerEmail = "",
   signerMobile = "",
   disabled = false,
-  environment = "uat",
+  environment = "production",
   onSuccess,
 }: ESignDocumentButtonProps) {
   const [dialogOpen, setDialogOpen] = useState(false);

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +21,7 @@ import {
 import { Loader2, Send, FileSignature, Copy, ExternalLink } from "lucide-react";
 import { useESignRequest } from "@/hooks/useESignDocument";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ESignDocumentDialogProps {
   open: boolean;
@@ -49,7 +51,7 @@ export default function ESignDocumentDialog({
   defaultSignerName = "",
   defaultSignerEmail = "",
   defaultSignerMobile = "",
-  environment = "uat",
+  environment = "production",
   onSuccess,
 }: ESignDocumentDialogProps) {
   const [signerName, setSignerName] = useState(defaultSignerName);
@@ -57,6 +59,25 @@ export default function ESignDocumentDialog({
   const [signerMobile, setSignerMobile] = useState(defaultSignerMobile);
   const [appearance, setAppearance] = useState<AppearancePosition>("bottom-right");
   const [signerUrl, setSignerUrl] = useState<string | null>(null);
+
+  // Auto-detect active Nupay environment from DB
+  const { data: nupayConfig } = useQuery({
+    queryKey: ["nupay-config-active", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("nupay_config")
+        .select("environment")
+        .eq("org_id", orgId)
+        .eq("is_active", true)
+        .single();
+      if (error) return null;
+      return data;
+    },
+    enabled: !!orgId && open,
+  });
+
+  // Use detected environment or fallback to production
+  const activeEnvironment = (nupayConfig?.environment as "uat" | "production") || environment;
 
   const esignMutation = useESignRequest();
 
@@ -85,7 +106,7 @@ export default function ESignDocumentDialog({
         signerEmail: signerEmail || undefined,
         signerMobile: cleanMobile,
         appearance,
-        environment,
+        environment: activeEnvironment,
       });
 
       if (result.signer_url) {
