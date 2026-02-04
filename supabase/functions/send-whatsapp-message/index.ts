@@ -335,8 +335,9 @@ Deno.serve(async (req) => {
       };
     } else if (mediaUrl && mediaType) {
       // Media message (image, document, video, audio)
+      // Exotel V2 API expects "link" not "url" for media content
       const mediaContent: any = {
-        url: mediaUrl,
+        link: mediaUrl,
       };
       // Only add caption if provided
       if (mediaCaption) {
