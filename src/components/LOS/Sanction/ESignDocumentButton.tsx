@@ -15,7 +15,7 @@ interface ESignDocumentButtonProps {
   orgId: string;
   applicationId: string;
   documentId: string;
-  documentType: "sanction_letter" | "loan_agreement" | "daily_schedule";
+  documentType: "sanction_letter" | "loan_agreement" | "daily_schedule" | "combined_loan_pack";
   documentLabel: string;
   signerName?: string;
   signerEmail?: string;

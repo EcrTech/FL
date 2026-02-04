@@ -11,7 +11,7 @@ interface ESignRequest {
   org_id: string;
   application_id: string;
   document_id: string;
-  document_type: "sanction_letter" | "loan_agreement" | "daily_schedule";
+  document_type: "sanction_letter" | "loan_agreement" | "daily_schedule" | "combined_loan_pack";
   signer_name: string;
   signer_email?: string;
   signer_mobile: string;
@@ -89,7 +89,8 @@ async function createPdfFromDocument(
 
   // Add header
   const documentTitle = documentType === "sanction_letter" ? "SANCTION LETTER" :
-    documentType === "loan_agreement" ? "LOAN AGREEMENT" : "DAILY REPAYMENT SCHEDULE";
+    documentType === "loan_agreement" ? "LOAN AGREEMENT" :
+    documentType === "combined_loan_pack" ? "COMBINED LOAN PACK" : "DAILY REPAYMENT SCHEDULE";
 
   page.drawText(documentTitle, {
     x: 50,
@@ -368,7 +369,8 @@ serve(async (req) => {
     // Generate reference number (max 20 chars for Nupay, alphanumeric only)
     const refNo = `ES${Date.now().toString(36).toUpperCase()}`;
     const documentTitle = document_type === "sanction_letter" ? "Sanction Letter" :
-      document_type === "loan_agreement" ? "Loan Agreement" : "Daily Repayment Schedule";
+      document_type === "loan_agreement" ? "Loan Agreement" :
+      document_type === "combined_loan_pack" ? "Combined Loan Pack" : "Daily Repayment Schedule";
 
     console.log(`[E-Sign] Generated ref_no: ${refNo}`);
 

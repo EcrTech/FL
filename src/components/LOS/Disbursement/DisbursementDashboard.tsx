@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { 
   FileText, Download, Printer, Loader2, Send, Check, 
-  TrendingUp, Banknote, Calculator, Calendar, Upload, FileCheck
+  TrendingUp, Banknote, Calculator, Calendar, Upload, FileCheck,
+  Package, Eye
 } from "lucide-react";
 import { addMonths } from "date-fns";
 import html2pdf from "html2pdf.js";
@@ -16,16 +17,18 @@ import html2pdf from "html2pdf.js";
 import SanctionLetterDocument from "../Sanction/templates/SanctionLetterDocument";
 import LoanAgreementDocument from "../Sanction/templates/LoanAgreementDocument";
 import DailyRepaymentScheduleDocument from "../Sanction/templates/DailyRepaymentScheduleDocument";
+import CombinedLoanDocuments from "../Sanction/templates/CombinedLoanDocuments";
 import UploadSignedDocumentDialog from "../Sanction/UploadSignedDocumentDialog";
 import ESignDocumentButton from "../Sanction/ESignDocumentButton";
 import EMandateSection from "./EMandateSection";
+import CombinedLoanPackCard from "./CombinedLoanPackCard";
 
 
 interface DisbursementDashboardProps {
   applicationId: string;
 }
 
-type DocumentType = "sanction_letter" | "loan_agreement" | "daily_schedule";
+type DocumentType = "sanction_letter" | "loan_agreement" | "daily_schedule" | "combined_loan_pack";
 
 const documentTypes: { key: DocumentType; label: string; shortLabel: string }[] = [
   { key: "sanction_letter", label: "Sanction Letter", shortLabel: "Sanction" },
@@ -94,6 +97,7 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
     sanction_letter: null,
     loan_agreement: null,
     daily_schedule: null,
+    combined_loan_pack: null,
   });
   const queryClient = useQueryClient();
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
@@ -478,12 +482,42 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
         </CardContent>
       </Card>
 
+      {/* Combined Loan Pack Card */}
+      {sanction && (
+        <CombinedLoanPackCard
+          applicationId={applicationId}
+          application={application}
+          sanction={sanction}
+          generatedDocs={generatedDocs || []}
+          applicant={applicant}
+          orgSettings={orgSettings}
+          bankDetails={bankDetails}
+          loanAmount={loanAmount}
+          tenureMonths={tenureMonths}
+          tenureDays={tenureDays}
+          interestRate={interestRate}
+          monthlyEMI={monthlyEMI}
+          processingFee={processingFee}
+          gstOnProcessingFee={gstOnProcessingFee}
+          firstEmiDate={firstEmiDate}
+          borrowerName={borrowerName}
+          borrowerAddress={borrowerAddress}
+          borrowerPhone={borrowerPhone}
+          printRef={(el) => { printRefs.current.combined_loan_pack = el; }}
+          onGenerate={() => generateMutation.mutate("combined_loan_pack")}
+          isGenerating={generateMutation.isPending}
+          onRefetch={refetchDocs}
+          conditionsArray={conditionsArray}
+          defaultTerms={defaultTerms}
+        />
+      )}
+
       {/* Loan Documents Card */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            Loan Documents
+            Individual Documents
           </CardTitle>
         </CardHeader>
         <CardContent>
