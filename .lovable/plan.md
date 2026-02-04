@@ -1,218 +1,183 @@
 
-# Feature Plan: Add WhatsApp Attachment/Image Sending
+# Updated Plan: Combined Loan Documents with E-Sign + Notifications
 
-## Current State
+## Overview
 
-The WhatsApp chat dialog currently only supports:
-- **Receiving** images and attachments (just implemented)
-- **Sending** text messages only
-
-There is no UI for attaching files and no backend logic to upload and send media via Exotel's WhatsApp API.
+Merge the three sanction stage documents (Sanction Letter, Loan Agreement, Daily Repayment Schedule) into a single "Combined Loan Pack" PDF that can be downloaded, sent for e-signature with automatic WhatsApp and Email notifications, and viewed after signing.
 
 ---
 
-## How Exotel Media Messages Work
+## Existing Notification System (Already Implemented)
 
-To send media via WhatsApp through Exotel, you need to:
-1. Host the media file on a **publicly accessible URL** (Exotel fetches it from this URL)
-2. Send an API request with the media URL and type
+The e-sign notification delivery is already fully automated:
 
-**Exotel V2 API Media Payload:**
-```json
-{
-  "whatsapp": {
-    "messages": [{
-      "from": "+91XXXXXXXXXX",
-      "to": "91XXXXXXXXXX",
-      "content": {
-        "type": "image",
-        "image": {
-          "url": "https://your-bucket.supabase.co/storage/v1/object/public/...",
-          "caption": "Optional caption text"
-        }
-      }
-    }]
-  }
-}
-```
+1. **Trigger**: When `nupay-esign-request` successfully registers a document, it calls `send-esign-notifications`
+2. **Channels**: Automatically sends via WhatsApp (Exotel) and Email (Resend) based on signer details
+3. **WhatsApp Template**: Uses approved `esign_request` template with 2 variables (Signer Name, Signing URL)
+4. **Email Template**: Congratulatory green-themed email with "Sign Document" button
 
-Supported media types: `image`, `document`, `video`, `audio`
+**Only Update Needed**: Add `combined_loan_pack` to the document label mapping for proper email subject/body display.
 
 ---
 
-## Implementation Plan
+## Files to Create/Modify
 
-### Phase 1: Create Storage Bucket for WhatsApp Media
+| File | Action | Description |
+|------|--------|-------------|
+| `src/components/LOS/Sanction/templates/CombinedLoanDocuments.tsx` | CREATE | Combined template with all 3 documents |
+| `src/components/LOS/Disbursement/DisbursementDashboard.tsx` | MODIFY | Add Combined Loan Pack card with actions |
+| `supabase/functions/nupay-esign-request/index.ts` | MODIFY | Generate proper combined PDF for e-sign |
+| `supabase/functions/send-esign-notifications/index.ts` | MODIFY | Add `combined_loan_pack` label mapping |
+| `src/hooks/useESignDocument.ts` | MODIFY | Add combined_loan_pack type |
+| `src/components/LOS/Sanction/ESignDocumentDialog.tsx` | MODIFY | Add combined_loan_pack type |
+| `src/components/LOS/Sanction/ESignDocumentButton.tsx` | MODIFY | Add combined_loan_pack type |
 
-Create a public storage bucket to host uploaded files so Exotel can access them.
+---
 
-**Database Migration:**
-```sql
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('whatsapp-media', 'whatsapp-media', true);
+## Technical Implementation Details
 
--- RLS policy to allow authenticated users to upload
-CREATE POLICY "Authenticated users can upload media"
-ON storage.objects FOR INSERT
-TO authenticated
-WITH CHECK (bucket_id = 'whatsapp-media');
+### 1. Create Combined Template
 
--- Public read access (Exotel needs this)
-CREATE POLICY "Public can view whatsapp media"
-ON storage.objects FOR SELECT
-TO public
-USING (bucket_id = 'whatsapp-media');
-```
+**File**: `src/components/LOS/Sanction/templates/CombinedLoanDocuments.tsx`
 
-### Phase 2: Update Edge Function
+Renders all three existing document templates in sequence with CSS page breaks:
 
-Modify `send-whatsapp-message` to accept media uploads.
-
-**New Request Parameters:**
-```typescript
-interface SendMessageRequest {
-  // ... existing fields
-  mediaType?: 'image' | 'document' | 'video' | 'audio';
-  mediaUrl?: string;       // Public URL of the uploaded file
-  mediaCaption?: string;   // Optional caption
-}
-```
-
-**New Payload Logic:**
-```typescript
-if (mediaUrl && mediaType) {
-  exotelPayload = {
-    whatsapp: {
-      messages: [{
-        from: whatsappSettings.whatsapp_source_number,
-        to: phoneDigits,
-        content: {
-          type: mediaType,
-          [mediaType]: {
-            url: mediaUrl,
-            caption: mediaCaption || undefined
-          }
-        }
-      }]
-    }
-  };
-}
-```
-
-**Store Media in Database:**
-```typescript
-.insert({
-  // ... existing fields
-  media_url: mediaUrl || null,
-  media_type: mediaType || null,
-})
-```
-
-### Phase 3: Update Chat UI
-
-Add attachment button and upload flow to `WhatsAppChatDialog.tsx`.
-
-**New UI Elements:**
-- Paperclip/attachment button next to the send button
-- Hidden file input for selecting files
-- Upload progress indicator
-- Image/file preview before sending
-
-**File Upload Flow:**
-```typescript
-const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
-  
-  // 1. Upload to Supabase Storage
-  const filePath = `${contactId}/${Date.now()}_${file.name}`;
-  const { data, error } = await supabase.storage
-    .from('whatsapp-media')
-    .upload(filePath, file);
-  
-  // 2. Get public URL
-  const { data: { publicUrl } } = supabase.storage
-    .from('whatsapp-media')
-    .getPublicUrl(filePath);
-  
-  // 3. Send via edge function with mediaUrl
-  await supabase.functions.invoke('send-whatsapp-message', {
-    body: {
-      contactId,
-      phoneNumber,
-      mediaType: getMediaType(file.type),
-      mediaUrl: publicUrl,
-      mediaCaption: caption || undefined,
-    },
-  });
-};
-```
-
-**Helper to determine media type:**
-```typescript
-const getMediaType = (mimeType: string): 'image' | 'document' | 'video' | 'audio' => {
-  if (mimeType.startsWith('image/')) return 'image';
-  if (mimeType.startsWith('video/')) return 'video';
-  if (mimeType.startsWith('audio/')) return 'audio';
-  return 'document';
-};
-```
-
-**UI Changes:**
 ```tsx
-<div className="flex items-center gap-2">
-  <input
-    type="file"
-    ref={fileInputRef}
-    onChange={handleFileSelect}
-    accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
-    className="hidden"
-  />
-  <Button
-    variant="ghost"
-    size="icon"
-    onClick={() => fileInputRef.current?.click()}
-    disabled={!isSessionActive() || sending}
-  >
-    <Paperclip className="h-5 w-5" />
-  </Button>
-  <Input ... />
-  <Button ...>
-    <Send />
-  </Button>
-</div>
+export default function CombinedLoanDocuments(props) {
+  return (
+    <div>
+      <SanctionLetterDocument {...props} />
+      <div className="break-before-page print:break-before-page" />
+      <LoanAgreementDocument {...props} />
+      <div className="break-before-page print:break-before-page" />
+      <DailyRepaymentScheduleDocument {...props} />
+    </div>
+  );
+}
+```
+
+### 2. Update Dashboard UI
+
+**File**: `src/components/LOS/Disbursement/DisbursementDashboard.tsx`
+
+Add a "Combined Loan Pack" card with:
+- Generate All button (creates record in `loan_generated_documents`)
+- Download All button (html2pdf with pagebreak options)
+- E-Sign All button (reuses `ESignDocumentButton` with combined type)
+- View Signed Document button (appears after e-signature complete)
+
+The card will be prominently displayed above the individual document cards.
+
+### 3. Update E-Sign Request Edge Function
+
+**File**: `supabase/functions/nupay-esign-request/index.ts`
+
+Add `combined_loan_pack` to document type handling:
+- Generate multi-page PDF with all three document sections
+- Sanction Letter pages
+- Loan Agreement pages  
+- Daily Repayment Schedule pages
+- Single signature placeholder at the end
+
+### 4. Update Notification Label (Key Change)
+
+**File**: `supabase/functions/send-esign-notifications/index.ts`
+
+Update the document label mapping at line 34-35:
+
+```typescript
+// Current:
+const documentLabel = documentType === "sanction_letter" ? "Sanction Letter" :
+  documentType === "loan_agreement" ? "Loan Agreement" : "Daily Repayment Schedule";
+
+// Updated:
+const documentLabel = documentType === "sanction_letter" ? "Sanction Letter" :
+  documentType === "loan_agreement" ? "Loan Agreement" :
+  documentType === "combined_loan_pack" ? "Combined Loan Pack" : "Daily Repayment Schedule";
+```
+
+This ensures:
+- Email subject shows: "Congratulations! Please Sign Your Combined Loan Pack"
+- Email body shows: "Combined Loan Pack - Ready for your signature"
+
+### 5. Update Type Definitions
+
+**Files**: `useESignDocument.ts`, `ESignDocumentDialog.tsx`, `ESignDocumentButton.tsx`
+
+Add `combined_loan_pack` to document type unions:
+
+```typescript
+documentType: "sanction_letter" | "loan_agreement" | "daily_schedule" | "combined_loan_pack";
 ```
 
 ---
 
-## Files to Modify
+## Complete E-Sign Flow with Notifications
 
-| File | Changes |
-|------|---------|
-| Database migration | Create `whatsapp-media` storage bucket with RLS policies |
-| `supabase/functions/send-whatsapp-message/index.ts` | Add media URL and type handling in Exotel payload |
-| `src/components/LOS/Relationships/WhatsAppChatDialog.tsx` | Add attachment button, file upload, and preview UI |
+```text
+1. User clicks "Generate All" 
+   → Creates record in loan_generated_documents with type "combined_loan_pack"
+   
+2. User clicks "E-Sign All"
+   → Opens ESignDocumentDialog with document_type = "combined_loan_pack"
+   
+3. Dialog calls nupay-esign-request edge function
+   → Generates combined PDF (all 3 documents)
+   → Uploads to Nupay
+   → Returns signing URL
+   
+4. nupay-esign-request calls send-esign-notifications
+   → Sends WhatsApp via Exotel (esign_request template)
+   → Sends Email via Resend (green congratulatory template)
+   → Both messages include signing link
+   
+5. Borrower receives link via WhatsApp + Email
+   → Opens link
+   → Signs document via Aadhaar OTP
+   
+6. Nupay returns signed PDF (via webhook or polling)
+   → Stores in loan-documents bucket: signed/{app_id}/combined_loan_pack_signed_{timestamp}.pdf
+   → Updates loan_generated_documents.signed_document_path
+   → Updates loan_generated_documents.customer_signed = true
+   
+7. UI shows "View Signed Document" button
+   → Opens signed combined PDF in new tab
+```
 
 ---
 
-## Limitations
+## UI Wireframe
 
-1. **File size**: Exotel/WhatsApp has limits (~16MB for most media, 100MB for documents)
-2. **Session required**: Media can only be sent within the 24-hour session window (same as text)
-3. **Processing time**: Large files may take a moment to upload before sending
+```text
+┌─────────────────────────────────────────────────────────────┐
+│ 📄 Loan Documents                                           │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │ 📦 Combined Loan Pack                    [✓ Signed] │   │
+│  │ All documents in one file for easy signing          │   │
+│  │                                                      │   │
+│  │ [Generate All] [Download] [E-Sign] [View Signed]    │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐        │
+│  │ 📄 Sanction  │ │ 📄 Agreement │ │ 📄 Repayment │        │
+│  │ [Generated]  │ │ [Generated]  │ │ [Generated]  │        │
+│  │ [📄][🖨️][⬇️] │ │ [📄][🖨️][⬇️] │ │ [📄][🖨️][⬇️] │        │
+│  └──────────────┘ └──────────────┘ └──────────────┘        │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ---
 
-## Technical Flow
+## Summary of Notification Handling
 
-```
-1. User clicks attachment button
-2. File picker opens
-3. User selects image/document
-4. File uploads to Supabase Storage (public bucket)
-5. Public URL is generated
-6. Edge function called with mediaUrl + mediaType
-7. Exotel fetches media from URL and sends via WhatsApp
-8. Message stored in database with media_url
-9. UI updates to show sent media
-```
+| Component | Status | Notes |
+|-----------|--------|-------|
+| WhatsApp delivery (Exotel) | Already implemented | Uses `esign_request` template |
+| Email delivery (Resend) | Already implemented | Green congratulatory theme |
+| Auto-trigger on e-sign | Already implemented | Called from nupay-esign-request |
+| Combined Loan Pack label | Needs update | Add mapping in send-esign-notifications |
+| Status tracking | Already implemented | Webhook + polling update DB |
+| Signed PDF storage | Already implemented | Stores in loan-documents bucket |
+| View Signed button | Already implemented | Opens signed PDF URL |
