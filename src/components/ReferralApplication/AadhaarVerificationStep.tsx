@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Check, Loader2, ArrowLeft, ArrowRight, FileCheck, ShieldCheck, MapPin, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 interface CommunicationAddress {
   addressLine1: string;
@@ -67,6 +68,7 @@ export function AadhaarVerificationStep({
 }: AadhaarVerificationStepProps) {
   const [searchParams] = useSearchParams();
   const [initiatingDigilocker, setInitiatingDigilocker] = useState(false);
+  const { trackAadhaarStart, trackAadhaarSuccess, trackStep } = useAnalytics();
   
   const [localDifferentAddress, setLocalDifferentAddress] = useState(isDifferentAddress);
   const [localCommAddress, setLocalCommAddress] = useState<CommunicationAddress>(
@@ -85,6 +87,11 @@ export function AadhaarVerificationStep({
         try {
           const verifiedInfo = JSON.parse(storedData);
           onVerified(verifiedInfo);
+          
+          // Track Aadhaar verification success
+          trackAadhaarSuccess();
+          trackStep(3, 'aadhaar_verified', 'referral');
+          
           toast.success("Aadhaar verified successfully via DigiLocker");
         } catch (e) {
           console.error("Failed to parse verified Aadhaar data:", e);
@@ -105,6 +112,9 @@ export function AadhaarVerificationStep({
   const initiateDigilocker = async () => {
     setInitiatingDigilocker(true);
     try {
+      // Track Aadhaar/DigiLocker initiation
+      trackAadhaarStart();
+      
       // Build a clean returnUrl without any query params
       const cleanUrl = `${window.location.origin}${window.location.pathname}`;
       const baseUrl = window.location.origin;
