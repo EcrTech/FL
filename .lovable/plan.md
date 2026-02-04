@@ -1,99 +1,44 @@
 
-# Plan: Switch All Nupay E-Sign Components to Production
+# Configure Nupay eMandate Production URLs
 
-## Problem
+## Overview
+Your production eMandate URLs from Nupay use a different base path than what's currently configured. We need to update the production endpoint in the database.
 
-The E-Sign request is failing because the components are still defaulting to "uat" environment, but only the production configuration is active in the database.
+## URL Mapping
 
-## Root Cause Analysis
+| Purpose | Nupay URL | How System Constructs It |
+|---------|-----------|-------------------------|
+| Auth Token | `https://nupaybiz.com/autonach/Auth/token` | `{api_endpoint}/Auth/token` |
+| Create Mandate | `https://nupaybiz.com/autonach/api/EMandate/eManadate` | `{api_endpoint}/api/EMandate/eManadate` |
+| Get Bank List | `https://nupaybiz.com/autonach/api/EMandate/getBankList` | `{api_endpoint}/api/EMandate/getBankList` |
+| Get Category List | `https://nupaybiz.com/autonach/api/EMandate/getCategoryList` | `{api_endpoint}/api/EMandate/getCategoryList` |
+| Get Status | `https://nupaybiz.com/autonach/api/EMandate/getStatus/{id}` | `{api_endpoint}/api/EMandate/getStatus/{id}` |
 
-The E-Sign components have hardcoded defaults:
-- `ESignDocumentButton.tsx` (line 38): `environment = "uat"`
-- `ESignDocumentDialog.tsx` (line 52): `environment = "uat"`
+## What Needs to Change
 
-Even though `CombinedLoanPackCard.tsx` was updated to pass `environment="production"`, this approach is fragile - every component that uses E-Sign would need to know the correct environment.
+**Current Production Endpoint:**
+`https://nach.nupaybiz.com`
 
-## Solution: Auto-Detect Active Environment
+**Correct Production Endpoint:**
+`https://nupaybiz.com/autonach`
 
-Instead of hardcoding, we should fetch the active Nupay configuration and use its environment automatically (like `CreateMandateDialog.tsx` already does).
+## Steps
 
----
+1. Navigate to **LOS Settings** then **Nupay eMandate** (the path is `/los/settings/nupay`)
+2. In the **Production Environment** section, update the **eMandate API Endpoint** field from:
+   - `https://nach.nupaybiz.com`
+   to:
+   - `https://nupaybiz.com/autonach`
+3. Click **Save Configuration**
 
-## Files to Modify
+No code changes are required - the edge functions already construct URLs correctly by appending paths like `/Auth/token` and `/api/EMandate/eManadate` to the base endpoint.
 
-| File | Change |
-|------|--------|
-| `src/components/LOS/Sanction/ESignDocumentDialog.tsx` | Fetch active Nupay config and use its environment |
-| `src/components/LOS/Sanction/ESignDocumentButton.tsx` | Change default from "uat" to "production" as fallback |
-| `src/components/LOS/Disbursement/CombinedLoanPackCard.tsx` | Remove hardcoded environment prop (will be auto-detected) |
+## Technical Details
 
----
+The following edge functions use the `api_endpoint` from `nupay_config`:
+- `nupay-authenticate` - appends `/Auth/token`
+- `nupay-create-mandate` - appends `/api/EMandate/eManadate`
+- `nupay-get-banks` - appends `/api/EMandate/getBankList`
+- `nupay-get-status` - appends `/api/EMandate/getStatus/{id}`
 
-## Implementation Details
-
-### 1. Update ESignDocumentDialog.tsx
-
-Add a query to fetch the active Nupay config and use its environment:
-
-```typescript
-// Add query to fetch active config
-const { data: nupayConfig } = useQuery({
-  queryKey: ["nupay-config-active", orgId],
-  queryFn: async () => {
-    const { data, error } = await supabase
-      .from("nupay_config")
-      .select("environment")
-      .eq("org_id", orgId)
-      .eq("is_active", true)
-      .single();
-    if (error) return null;
-    return data;
-  },
-  enabled: !!orgId && open,
-});
-
-// Use detected environment or fallback to production
-const activeEnvironment = nupayConfig?.environment || environment || "production";
-```
-
-Then use `activeEnvironment` when calling the E-Sign mutation.
-
-### 2. Update ESignDocumentButton.tsx
-
-Change the default value from "uat" to "production":
-
-```typescript
-// Line 38: Change from
-environment = "uat",
-// To
-environment = "production",
-```
-
-### 3. Clean Up CombinedLoanPackCard.tsx
-
-Remove the explicit `environment="production"` prop since it will now be auto-detected:
-
-```tsx
-// Remove this line:
-environment="production"
-// The dialog will auto-detect the active environment
-```
-
----
-
-## Why This Approach?
-
-1. **Centralized logic**: Environment detection happens in the dialog component, not scattered across all callers
-2. **Future-proof**: If a user switches back to UAT for testing, it will automatically work
-3. **Consistent with eMandate**: Uses the same pattern as `CreateMandateDialog.tsx` which already works correctly
-4. **Fallback to production**: If no config is found, defaults to production (safer for live operations)
-
----
-
-## Technical Summary
-
-| Component | Before | After |
-|-----------|--------|-------|
-| ESignDocumentButton | Default: "uat" | Default: "production" |
-| ESignDocumentDialog | Uses passed prop (default "uat") | Auto-detects from DB, fallback to "production" |
-| CombinedLoanPackCard | Passes "production" explicitly | Relies on auto-detection |
+All will work correctly once the production endpoint is updated to `https://nupaybiz.com/autonach`.
