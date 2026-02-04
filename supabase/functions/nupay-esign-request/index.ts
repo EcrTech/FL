@@ -171,18 +171,23 @@ async function uploadDocumentToNupay(
   const pdfBlob = new Blob([new Uint8Array(pdfBytes).buffer], { type: "application/pdf" });
   formData.append("document", pdfBlob, `${refNo}.pdf`);
 
+  // Log request details before sending
+  console.log(`[E-Sign] Upload request URL: ${uploadEndpoint}`);
+  console.log(`[E-Sign] Upload request headers: api-key=${apiKey.substring(0, 10)}..., Token=${token.substring(0, 20)}...`);
+
   const uploadResponse = await fetch(uploadEndpoint, {
     method: "POST",
     headers: {
       "api-key": apiKey,
-      "Authorization": `Bearer ${token}`,
+      "Token": token,  // Correct per Nupay API spec (not "Authorization: Bearer")
     },
     body: formData,
   });
 
   const responseText = await uploadResponse.text();
   console.log(`[E-Sign] Upload response status: ${uploadResponse.status}`);
-  console.log(`[E-Sign] Upload response: ${responseText}`);
+  console.log(`[E-Sign] Upload response headers:`, JSON.stringify(Object.fromEntries(uploadResponse.headers.entries())));
+  console.log(`[E-Sign] Upload response body: ${responseText}`);
 
   let uploadData;
   try {
@@ -251,13 +256,14 @@ async function processForSign(
   };
 
   console.log(`[E-Sign] Process payload:`, JSON.stringify(payload, null, 2));
-  console.log(`[E-Sign] Request headers: api-key=${apiKey.substring(0, 10)}..., Token=${token.substring(0, 20)}...`);
+  console.log(`[E-Sign] Process request URL: ${processEndpoint}`);
+  console.log(`[E-Sign] Process request headers: api-key=${apiKey.substring(0, 10)}..., Token=${token.substring(0, 20)}...`);
 
   const processResponse = await fetch(processEndpoint, {
     method: "POST",
     headers: {
       "api-key": apiKey,
-      "Authorization": `Bearer ${token}`,
+      "Token": token,  // Correct per Nupay API spec (not "Authorization: Bearer")
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
@@ -265,7 +271,8 @@ async function processForSign(
 
   const responseText = await processResponse.text();
   console.log(`[E-Sign] Process response status: ${processResponse.status}`);
-  console.log(`[E-Sign] Process response: ${responseText}`);
+  console.log(`[E-Sign] Process response headers:`, JSON.stringify(Object.fromEntries(processResponse.headers.entries())));
+  console.log(`[E-Sign] Process response body: ${responseText}`);
 
   let processData;
   try {
