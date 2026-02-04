@@ -1,125 +1,170 @@
 
-# Send WhatsApp Application Confirmation on Submission
+# Fix: Referral Application Data and Video KYC Issues
 
-## Overview
-When a loan application is submitted, automatically send a WhatsApp message using the Meta-approved `app_confirmation` template with:
-- **Variable 1**: Applicant's Name
-- **Variable 2**: Application Number (loan account number)
+## Problems Identified
 
-## Template Details
-Based on the screenshot provided:
-- **Template Name**: `app_confirmation`
-- **Language**: English
-- **Body**: "Dear {{1}} Thanks for your application Your application ID is {{2}}. Our team will get in touch with you soon."
+### Problem 1: Loan Amount and Tenure Not Saved
+The user submitted ₹25,000 for 30 days, but the application shows ₹50,000 for 365 days.
 
-## Implementation Approach
+**Root Cause:** The parent form state initializes `requestedAmount` and `tenureDays` to `0`, while the UI components show visual defaults of ₹25,000 and 30 days. The `onUpdate` callback only fires when the user *changes* the value, so if they accept the displayed default, the parent state remains `0`, and the backend falls back to its hardcoded defaults.
 
-### Create a New Edge Function
-Create a dedicated `send-application-confirmation` edge function that:
-1. Takes applicant details (name, phone, application number, org_id)
-2. Fetches WhatsApp settings for the organization
-3. Sends the `app_confirmation` template via Exotel API
-4. Logs the message in `whatsapp_messages` table
+| Component | Initial Value | UI Shows |
+|-----------|---------------|----------|
+| Parent State | 0 | - |
+| LoanRequirementsScreen | formData.requestedAmount \|\| 25000 | ₹25,000 |
+| ContactConsentScreen | formData.tenureDays \|\| 30 | 30 days |
+| Backend Fallback | 50000 / 365 | - |
 
-### Trigger Points
-Modify `submit-loan-application` to call the notification function at two points:
+### Problem 2: Video KYC Not Reflecting
+**Root Cause:** When the user completes Video KYC, it creates a draft application and links the recording to it. But when the form is submitted, the edge function creates a **new application** instead of updating the existing draft. The Video KYC recording stays orphaned on the draft.
 
-| Application Type | Trigger Location | Applicant Name Source | Phone Source |
-|-----------------|------------------|----------------------|--------------|
-| Referral Application | After line 371 | `body.applicant.name` | `body.applicant.phone` |
-| Public Form Application | After line 716 | `body.personalDetails.fullName` | `body.personalDetails.mobile` |
+| Step | Application ID | Status |
+|------|----------------|--------|
+| Draft Created | 52d7adca-... (DRAFT-...) | Has Video KYC |
+| Final Submission | 2a46e6d1-... (LA-...) | **Missing** Video KYC |
+
+---
+
+## Solution
+
+### Fix 1: Initialize Parent State with Correct Defaults
+
+**File:** `src/pages/ReferralLoanApplication.tsx`
+
+Change the initial state from:
+```typescript
+const [basicInfo, setBasicInfo] = useState({
+  name: "",
+  email: "",
+  officeEmail: "",
+  phone: "",
+  requestedAmount: 0,  // Problem
+  tenureDays: 0,       // Problem
+});
+```
+
+To:
+```typescript
+const [basicInfo, setBasicInfo] = useState({
+  name: "",
+  email: "",
+  officeEmail: "",
+  phone: "",
+  requestedAmount: 25000,  // Fixed: Match UI default
+  tenureDays: 30,          // Fixed: Match UI default
+});
+```
+
+### Fix 2: Update Draft Instead of Creating New Application
+
+**File:** `supabase/functions/submit-loan-application/index.ts`
+
+Modify the referral application handling to check for and update an existing draft:
+
+```text
+Before line 199 (Process referral application), add:
+1. Check if body.draftApplicationId exists
+2. If exists, fetch the draft application
+3. Update the draft instead of creating new
+4. Transfer all verification records and recordings
+```
+
+**Changes:**
+1. Check for `body.draftApplicationId` in the request
+2. If found, UPDATE the existing draft application with:
+   - New application number (LA-...)
+   - Verified applicant data
+   - Status change to 'in_progress'
+   - Current stage to 'application_login'
+3. Update the applicant record attached to this draft
+4. Skip creating a new application
+
+### Fix 3: Remove Backend Fallback Defaults
+
+**File:** `supabase/functions/submit-loan-application/index.ts`
+
+After implementing Fix 1, we should also update the backend to use sensible product defaults rather than arbitrary values:
+
+Change:
+```typescript
+requested_amount: applicant.requestedAmount || 50000,
+tenure_days: applicant.tenureDays || 365,
+```
+
+To:
+```typescript
+requested_amount: applicant.requestedAmount || 25000,  // Match product default
+tenure_days: applicant.tenureDays || 30,               // Match product default
+```
+
+---
 
 ## Technical Details
 
-### 1. New Edge Function: `send-application-confirmation`
+### Files to Modify
+
+| File | Change |
+|------|--------|
+| `src/pages/ReferralLoanApplication.tsx` | Initialize `requestedAmount: 25000` and `tenureDays: 30` |
+| `supabase/functions/submit-loan-application/index.ts` | Add draft update logic before line 199, update fallback defaults |
+
+### Draft Update Logic (Pseudocode)
 
 ```typescript
-// Structure matching existing notification functions
-interface ConfirmationRequest {
-  org_id: string;
-  applicant_name: string;
-  applicant_phone: string;
-  application_number: string;
-}
-```
+// Check if we have an existing draft to update (for referral applications)
+const draftId = body.draftApplicationId;
+let application: any;
+let applicationNumber: string;
 
-**Key behaviors:**
-- Use Exotel V2 API (same pattern as `send-esign-notifications`)
-- Template payload structure:
-```typescript
-{
-  whatsapp: {
-    messages: [{
-      from: whatsapp_source_number,
-      to: formattedPhone,
-      content: {
-        type: "template",
-        template: {
-          name: "app_confirmation",
-          language: { code: "en" },
-          components: [{
-            type: "body",
-            parameters: [
-              { type: "text", text: applicantName },      // {{1}}
-              { type: "text", text: applicationNumber }   // {{2}}
-            ]
-          }]
-        }
-      }
-    }]
+if (draftId) {
+  // Update existing draft
+  const { data: existingDraft } = await supabase
+    .from('loan_applications')
+    .select('*')
+    .eq('id', draftId)
+    .eq('status', 'draft')
+    .single();
+
+  if (existingDraft) {
+    applicationNumber = generateApplicationNumber();
+    const { data: updatedApp } = await supabase
+      .from('loan_applications')
+      .update({
+        application_number: applicationNumber,
+        requested_amount: applicant.requestedAmount || 25000,
+        tenure_days: applicant.tenureDays || 30,
+        tenure_months: Math.ceil((applicant.tenureDays || 30) / 30),
+        current_stage: 'application_login',
+        status: 'in_progress',
+        // ... other fields
+      })
+      .eq('id', draftId)
+      .select()
+      .single();
+    
+    application = updatedApp;
   }
 }
-```
 
-### 2. Modify `submit-loan-application`
-
-Add notification calls after successful application creation:
-
-**For Referral Applications (after line 371):**
-```typescript
-// Send WhatsApp confirmation
-try {
-  await fetch(`${supabaseUrl}/functions/v1/send-application-confirmation`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      org_id: formConfig.org_id,
-      applicant_name: body.applicant.name,
-      applicant_phone: body.applicant.phone,
-      application_number: applicationNumber
-    })
-  });
-} catch (notifyError) {
-  console.log('[submit-loan-application] WhatsApp notification skipped:', notifyError);
+// Only create new application if no draft was updated
+if (!application) {
+  // Existing insert logic...
 }
 ```
 
-**For Public Form Applications (after line 716):**
-Same pattern using `body.personalDetails.fullName` and `body.personalDetails.mobile`
+---
 
-### 3. Message Logging
+## Expected Results After Fix
 
-Store sent messages in `whatsapp_messages` table for:
-- Chat history display
-- Delivery status tracking via webhook callbacks
-
-## Files to Create/Modify
-
-| File | Action |
-|------|--------|
-| `supabase/functions/send-application-confirmation/index.ts` | **Create** - New notification edge function |
-| `supabase/functions/submit-loan-application/index.ts` | **Modify** - Add notification triggers at lines 371 and 716 |
-
-## Error Handling
-
-- Non-blocking: Notification failures won't prevent application submission
-- Graceful degradation: Missing WhatsApp settings simply skip notification
-- Logging: All attempts logged for debugging
+1. **Loan Amount/Tenure**: Applications will correctly reflect ₹25,000 / 30 days when user accepts defaults
+2. **Video KYC**: Recording will remain attached to the same application through draft-to-submission transition
+3. **Data Integrity**: All verification records (PAN, Aadhaar, Video KYC) stay linked to the final application
 
 ## Verification Steps
 
 After implementation:
-1. Submit a test application via referral link
-2. Verify WhatsApp message received with correct name and application number
-3. Check `whatsapp_messages` table for logged message
-4. Submit via public form and verify same behavior
+1. Submit a test referral application without changing the loan amount slider
+2. Verify the application shows ₹25,000 for 30 days
+3. Complete Video KYC in a new referral application
+4. Verify the Video KYC recording appears in the submitted application
+5. Check `loan_verifications` table shows video_kyc linked to final application ID
