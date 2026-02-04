@@ -1,51 +1,84 @@
 
-# Fix: Force Fresh Token Generation for E-Sign Step 2
-
-## Problem Summary
-The E-Sign edge function fails at **Step 2 (Process)** with error **NP004 "Login failed"** because Nupay returns the **same cached token** on consecutive authentication requests within the same second.
+# Fix: E-Sign processForSign "Login failed" (NP004) Error
 
 ## Root Cause Analysis
 
-### Evidence from Logs:
-```
-[E-Sign] Token 1 Auth response: {"token":"eyJ...eyJpZCI6MSwidGltZXN0YW1wIjoxNzcwMjA5OTEzfQ..."}
-[E-Sign] Token 2 Auth response: {"token":"eyJ...eyJpZCI6MSwidGltZXN0YW1wIjoxNzcwMjA5OTEzfQ..."}
-                                                              ^^^^^^^^^^^^^^^^^^^^
-                                                              SAME TIMESTAMP = SAME TOKEN
-```
+After examining logs, code, and all three Nupay edge functions, I found the real issue:
 
-Both tokens have the identical timestamp (`1770209913`), confirming Nupay is caching tokens by timestamp. When the upload (Step 1) uses the token, it becomes invalidated. Step 2 then receives the same (now-invalid) token and fails.
+**Nupay's SignDocument API uses different authentication headers depending on the content type:**
 
-### Flow Diagram:
-```text
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  CURRENT FLOW (BROKEN)                                                      │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  Request 1 → Auth/token → Token A (timestamp 123)  →  Upload ✅             │
-│  Request 2 → Auth/token → Token A (timestamp 123)  →  Process ❌ (NP004)    │
-│                           ↑ SAME TOKEN (cached)                              │
-└─────────────────────────────────────────────────────────────────────────────┘
+| Step | Endpoint | Content Type | Required Header | Current Code |
+|------|----------|--------------|-----------------|--------------|
+| Upload | `addRequestFile` | multipart/form-data | `Token: {jwt}` | ✅ Correct |
+| Process | `processForSign` | application/json | `Authorization: Bearer {jwt}` | ❌ Wrong - using `Token` |
+| Status | `documentStatus` | application/json | `Authorization: Bearer {jwt}` | ✅ Correct |
 
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  FIXED FLOW                                                                 │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  Request 1 → Auth/token → Token A (timestamp 123) → Upload ✅               │
-│  [WAIT 2 SECONDS]                                                           │
-│  Request 2 → Auth/token → Token B (timestamp 125) → Process ✅              │
-│                           ↑ NEW TOKEN (different timestamp)                  │
-└─────────────────────────────────────────────────────────────────────────────┘
+**Evidence:**
+1. The working `nupay-esign-status` function (lines 161-167) uses `Authorization: Bearer` for JSON endpoints
+2. Step 1 (Upload) succeeds with `Token` header (multipart/form-data)
+3. Step 2 (Process) fails with `Token` header (application/json) - returns NP004 "Login failed"
+
+The status check function at line 164 explicitly uses:
+```typescript
+headers: {
+  "Authorization": `Bearer ${token}`,  // ← This format for JSON APIs
+  "api-key": config.api_key,
+  "Content-Type": "application/json",
+}
 ```
 
----
+But the esign-request function at line 264-267 incorrectly uses:
+```typescript
+headers: {
+  "api-key": apiKey,
+  "Token": token,  // ← Wrong for JSON APIs!
+  "Content-Type": "application/json",
+}
+```
 
 ## Solution
 
-Add a **2-second delay** before requesting the second token to ensure Nupay generates a new token with a different timestamp.
+Fix the `processForSign` function to use `Authorization: Bearer ${token}` header format, matching the working status check function.
 
-### Changes to `supabase/functions/nupay-esign-request/index.ts`:
+Also remove the 2-second delay and second token generation since we now know those were not the root cause.
 
-**Between Step 1 and Step 2 (around line 401-404):**
+## Technical Changes
 
+**File: `supabase/functions/nupay-esign-request/index.ts`**
+
+### Change 1: Fix processForSign headers (lines 262-270)
+
+From:
+```typescript
+const processResponse = await fetch(processEndpoint, {
+  method: "POST",
+  headers: {
+    "api-key": apiKey,
+    "Token": token,  // Wrong for JSON APIs
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify(payload),
+});
+```
+
+To:
+```typescript
+const processResponse = await fetch(processEndpoint, {
+  method: "POST",
+  headers: {
+    "api-key": apiKey,
+    "Authorization": `Bearer ${token}`,  // Correct for JSON APIs
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify(payload),
+});
+```
+
+### Change 2: Simplify token handling (lines 402-416)
+
+Remove the unnecessary second token generation since a single token should work when the correct headers are used:
+
+From:
 ```typescript
 // Step 2: Process for signing - get FRESH token
 // Add delay to ensure Nupay generates a new token (tokens are cached by timestamp)
@@ -58,45 +91,66 @@ console.log(`[E-Sign] Step 2: Fresh token obtained: ${token2.substring(0, 20)}..
 
 // Verify tokens are different
 if (token === token2) {
-  console.warn("[E-Sign] WARNING: Token2 is identical to Token1 - Nupay may still be caching");
+  console.warn("[E-Sign] WARNING: Token2 is identical to Token1");
+} else {
+  console.log("[E-Sign] Step 2: Confirmed tokens are different ✓");
 }
 ```
 
----
-
-## Technical Details
-
-### Why the Delay Works
-Nupay's JWT tokens include a `timestamp` field in the payload:
-```json
-{"id":1,"timestamp":1770209913}
+To:
+```typescript
+// Step 2: Process for signing - use same token (different header format for JSON APIs)
+console.log("[E-Sign] Step 2: Processing document for signing...");
 ```
 
-When requests occur within the same second, the timestamp (and thus the token) remains identical. Adding a 2-second delay ensures the timestamp changes, forcing Nupay to generate a genuinely new token.
+### Change 3: Update processForSign call to use same token
 
-### Alternative Approaches Considered
-1. **Retry with exponential backoff**: More complex, but could be a fallback
-2. **Use session-based authentication**: Would require Nupay API changes
-3. **Add timestamp as query parameter**: May not be supported by Nupay
+Change:
+```typescript
+const { signerUrl, docketId, documentId: nupayDocumentId } = await processForSign(
+  apiEndpoint,
+  apiKey,
+  token2,  // token2 is the second token
+```
 
-The delay approach is the simplest and most reliable fix given the observed behavior.
+To:
+```typescript
+const { signerUrl, docketId, documentId: nupayDocumentId } = await processForSign(
+  apiEndpoint,
+  apiKey,
+  token,   // Use same token as upload (different header format handles auth)
+```
 
----
+### Change 4: Update log message in processForSign (line 260)
 
-## Files to Modify
+Update the log to reflect the new header format:
+```typescript
+console.log(`[E-Sign] Process request headers: api-key=${apiKey.substring(0, 10)}..., Authorization=Bearer ${token.substring(0, 20)}...`);
+```
 
-| File | Change |
-|------|--------|
-| `supabase/functions/nupay-esign-request/index.ts` | Add 2-second delay before Step 2 token request, add token comparison warning |
+## Why Previous Fixes Failed
 
----
+1. **Token caching theory (2-second delay)**: We thought Nupay was caching tokens, but the issue was the header format
+2. **Token header theory**: We correctly identified `Token` header for upload, but incorrectly applied it to JSON endpoints
+3. **Fresh token theory**: Getting fresh tokens didn't help because the header format was still wrong
 
-## Verification Steps
+The key insight came from comparing with the **working** `nupay-esign-status` function which uses `Authorization: Bearer` for JSON APIs.
 
-After deployment:
-1. Trigger E-Sign request
-2. Check logs for:
-   - "Waiting 2 seconds for fresh token..." message
-   - Two **different** token values (different timestamps in JWT)
-   - Successful NP000 response from processForSign
-3. Verify signer URL is generated and accessible
+## Summary of Header Rules for Nupay SignDocument API
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│  NUPAY SIGNDOCUMENT API - AUTHENTICATION RULES                  │
+├─────────────────────────────────────────────────────────────────┤
+│  Multipart uploads (FormData):     Token: {jwt}                 │
+│  JSON API calls (POST/GET):        Authorization: Bearer {jwt}  │
+│  All requests also require:        api-key: {api_key}           │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Expected Outcome
+
+After this fix:
+- Step 1 (Upload): Uses `Token` header → ✅ NP000 (Success)
+- Step 2 (Process): Uses `Authorization: Bearer` header → ✅ Should succeed
+- Signer URL will be generated and returned to the user
