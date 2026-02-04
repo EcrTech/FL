@@ -263,7 +263,7 @@ async function processForSign(
     method: "POST",
     headers: {
       "api-key": apiKey,
-      "Token": token,  // Correct per Nupay API spec (not "Authorization: Bearer")
+      "Token": token,  // Use Token header (same as working eMandate)
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
@@ -399,12 +399,15 @@ serve(async (req) => {
       refNo
     );
 
-    // Step 2: Process for signing - use SAME token (Nupay session requirement)
-    console.log("[E-Sign] Step 2: Using same session token for processForSign...");
+    // Step 2: Process for signing - get FRESH token (Nupay may invalidate token after upload)
+    console.log("[E-Sign] Step 2: Getting fresh token for processForSign...");
+    const token2 = await getNewToken(apiEndpoint, apiKey);
+    console.log(`[E-Sign] Step 2: Fresh token obtained: ${token2.substring(0, 20)}...`);
+    
     const { signerUrl, docketId, documentId: nupayDocumentId } = await processForSign(
       apiEndpoint,
       apiKey,
-      token,
+      token2,
       refNo,
       nupayRefNo,
       signer_name,
