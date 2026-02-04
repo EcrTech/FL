@@ -79,6 +79,10 @@ export default function CreateMandateDialog({
   const [finalCollectionDate, setFinalCollectionDate] = useState("");
   const [loanNo, setLoanNo] = useState(existingLoanNo || `LOAN-${Date.now()}`);
 
+  // Notification override fields (for testing or different account holder)
+  const [notificationPhone, setNotificationPhone] = useState(applicantPhone);
+  const [notificationEmail, setNotificationEmail] = useState(applicantEmail || "");
+
   // Determine environment based on config
   const [environment, setEnvironment] = useState<"uat" | "production">("uat");
 
@@ -146,8 +150,8 @@ export default function CreateMandateDialog({
           bank_name: selectedBankName,
           account_type: accountType,
           auth_type: authType,
-          mobile_no: applicantPhone.replace(/\D/g, "").slice(-10),
-          email: applicantEmail,
+          mobile_no: notificationPhone.replace(/\D/g, "").slice(-10),
+          email: notificationEmail || undefined,
         },
       });
 
@@ -187,6 +191,8 @@ export default function CreateMandateDialog({
       setFirstCollectionDate(format(addMonths(new Date(), 1), "yyyy-MM-dd"));
       setCollectionUntilCancel(true);
       setFinalCollectionDate("");
+      setNotificationPhone(applicantPhone);
+      setNotificationEmail(applicantEmail || "");
       setRegistrationUrl(null);
       setShowQR(false);
     }
@@ -333,6 +339,31 @@ export default function CreateMandateDialog({
                 </SelectContent>
               </Select>
             </div>
+
+            <hr className="my-4" />
+            <p className="text-sm font-medium text-muted-foreground">Notification Settings</p>
+            <div>
+              <Label htmlFor="notifPhone">Notification Mobile</Label>
+              <Input
+                id="notifPhone"
+                value={notificationPhone}
+                onChange={(e) => setNotificationPhone(e.target.value)}
+                placeholder="10-digit mobile number"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Registration link will be sent to this number
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="notifEmail">Notification Email (Optional)</Label>
+              <Input
+                id="notifEmail"
+                type="email"
+                value={notificationEmail}
+                onChange={(e) => setNotificationEmail(e.target.value)}
+                placeholder="email@example.com"
+              />
+            </div>
           </div>
         )}
 
@@ -443,6 +474,17 @@ export default function CreateMandateDialog({
                   {collectionUntilCancel ? "Until Cancelled" : `Until ${format(new Date(finalCollectionDate), "dd MMM yyyy")}`}
                 </span>
               </div>
+              <hr />
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Notify Mobile</span>
+                <span className="font-medium">{notificationPhone}</span>
+              </div>
+              {notificationEmail && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Notify Email</span>
+                  <span className="font-medium">{notificationEmail}</span>
+                </div>
+              )}
             </div>
             <p className="text-xs text-muted-foreground">
               By proceeding, you confirm that the customer has authorized this eMandate registration.
