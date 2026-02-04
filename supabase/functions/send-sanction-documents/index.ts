@@ -97,7 +97,7 @@ serve(async (req) => {
       throw new Error("Email domain verification pending. Please verify your domain first.");
     }
 
-    const fromEmail = `loans@${emailSettings.sending_domain}`;
+    const fromEmail = `info@${emailSettings.sending_domain}`;
     const fromName = profile.first_name 
       ? `${profile.first_name} ${profile.last_name || ''}`.trim()
       : "Loan Department";

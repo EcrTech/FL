@@ -130,7 +130,7 @@ serve(async (req) => {
       .eq("id", campaign.org_id)
       .maybeSingle();
 
-    const fromEmail = `noreply@${emailSettings.sending_domain}`;
+    const fromEmail = `info@${emailSettings.sending_domain}`;
     const fromName = org?.name || "Your Organization";
 
     console.log('[send-bulk-email] From:', fromEmail);

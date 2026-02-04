@@ -110,8 +110,8 @@ serve(async (req) => {
       
       // Use org's verified domain if available, otherwise use global verified domain
       const fromEmail = emailSettings?.verification_status === "verified" && emailSettings?.sending_domain
-        ? `Paisaa Saarthi <noreply@${emailSettings.sending_domain}>`
-        : "Paisaa Saarthi <noreply@in-sync.co.in>";
+        ? `Paisaa Saarthi <info@${emailSettings.sending_domain}>`
+        : "Paisaa Saarthi <info@paisaasaarthi.com>";
       
       console.log("Sending email from:", fromEmail, "to:", target);
       

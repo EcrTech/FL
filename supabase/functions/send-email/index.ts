@@ -211,19 +211,19 @@ serve(async (req) => {
           
           // Fall back to default domain instead of failing
           console.log('Domain verification incomplete, falling back to default domain');
-          sendingDomain = 'in-sync.co.in';
+          sendingDomain = 'paisaasaarthi.com';
           skipDomainVerification = true;
         }
       }
     } else {
       // Fallback: Use verified platform domain (same pattern as E-Sign notifications)
-      console.log('No custom email settings found, using platform default domain: in-sync.co.in');
-      sendingDomain = 'in-sync.co.in';
+      console.log('No custom email settings found, using platform default domain: paisaasaarthi.com');
+      sendingDomain = 'paisaasaarthi.com';
       skipDomainVerification = true;
     }
 
     // Use verified domain as sender, user's email as reply-to
-    const fromEmail = `noreply@${sendingDomain}`;
+    const fromEmail = `info@${sendingDomain}`;
     const replyToEmail = user.email || fromEmail;
     const fromName = profile.first_name 
       ? `${profile.first_name} ${profile.last_name || ''}`.trim()
