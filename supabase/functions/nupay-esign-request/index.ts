@@ -175,7 +175,7 @@ async function uploadDocumentToNupay(
     method: "POST",
     headers: {
       "api-key": apiKey,
-      "Token": token,
+      "Authorization": `Bearer ${token}`,
     },
     body: formData,
   });
@@ -257,7 +257,7 @@ async function processForSign(
     method: "POST",
     headers: {
       "api-key": apiKey,
-      "Token": token,
+      "Authorization": `Bearer ${token}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
