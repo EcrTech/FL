@@ -150,8 +150,8 @@ export default function ReferralLoanApplication() {
     email: "",
     officeEmail: "",
     phone: "",
-    requestedAmount: 0,
-    tenureDays: 0,
+    requestedAmount: 25000,  // Match UI default
+    tenureDays: 30,          // Match UI default
   });
 
   const [consents, setConsents] = useState({

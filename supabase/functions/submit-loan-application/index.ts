@@ -197,39 +197,117 @@ Deno.serve(async (req) => {
       }
 
       // Process referral application
-      const applicationNumber = generateApplicationNumber();
-      console.log(`[submit-loan-application] Creating referral application: ${applicationNumber}`);
-
       // Parse name into first/last
       const nameParts = applicant.name.trim().split(' ');
       const firstName = nameParts[0] || '';
       const lastName = nameParts.slice(1).join(' ') || '';
 
-      // Create loan application
-      const { data: application, error: appError } = await supabase
-        .from('loan_applications')
-        .insert({
-          org_id: formConfig.org_id,
-          application_number: applicationNumber,
-          product_type: formConfig.product_type || 'personal_loan',
-          requested_amount: applicant.requestedAmount || 50000,
-          tenure_months: Math.ceil((applicant.tenureDays || 365) / 30),
-          tenure_days: applicant.tenureDays || 365,
-          current_stage: 'application_login',
-          status: 'in_progress',
-          source: 'referral_link',
-          referred_by: referrerUserId,
-          submitted_from_ip: clientIP,
-          latitude: body.geolocation?.latitude || null,
-          longitude: body.geolocation?.longitude || null,
-          geolocation_accuracy: body.geolocation?.accuracy || null,
-        })
-        .select()
-        .single();
+      // Check if we have a draft application to update (preserves Video KYC link)
+      const draftApplicationId = body.draftApplicationId;
+      let application: any;
+      let applicationNumber: string = '';
 
-      if (appError) {
-        console.error('[submit-loan-application] Error creating referral application:', appError);
-        throw appError;
+      if (draftApplicationId) {
+        console.log(`[submit-loan-application] Checking for existing draft: ${draftApplicationId}`);
+        
+        const { data: existingDraft, error: draftError } = await supabase
+          .from('loan_applications')
+          .select('*')
+          .eq('id', draftApplicationId)
+          .eq('status', 'draft')
+          .single();
+
+        if (!draftError && existingDraft) {
+          // Update the existing draft instead of creating new application
+          applicationNumber = generateApplicationNumber();
+          console.log(`[submit-loan-application] Updating draft ${draftApplicationId} to application: ${applicationNumber}`);
+
+          const { data: updatedApp, error: updateError } = await supabase
+            .from('loan_applications')
+            .update({
+              application_number: applicationNumber,
+              product_type: formConfig.product_type || 'personal_loan',
+              requested_amount: applicant.requestedAmount || 25000,
+              tenure_months: Math.ceil((applicant.tenureDays || 30) / 30),
+              tenure_days: applicant.tenureDays || 30,
+              current_stage: 'application_login',
+              status: 'in_progress',
+              source: 'referral_link',
+              referred_by: referrerUserId,
+              submitted_from_ip: clientIP,
+              latitude: body.geolocation?.latitude || null,
+              longitude: body.geolocation?.longitude || null,
+              geolocation_accuracy: body.geolocation?.accuracy || null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', draftApplicationId)
+            .select()
+            .single();
+
+          if (updateError) {
+            console.error('[submit-loan-application] Error updating draft application:', updateError);
+            throw updateError;
+          }
+
+          application = updatedApp;
+          console.log(`[submit-loan-application] Draft converted to application: ${application.id}`);
+
+          // Update the existing applicant record attached to this draft
+          const { error: applicantUpdateError } = await supabase
+            .from('loan_applicants')
+            .update({
+              first_name: firstName,
+              last_name: lastName,
+              pan_number: applicant.pan?.toUpperCase() || null,
+              pan_verified: applicant.panVerified || false,
+              aadhaar_number: applicant.aadhaar?.replace(/\s/g, '') || null,
+              aadhaar_verified: applicant.aadhaarVerified || false,
+              mobile: applicant.phone,
+              email: applicant.email || null,
+              office_email: applicant.officeEmail || null,
+              office_email_verified: applicant.officeEmailVerified || false,
+              video_kyc_completed: applicant.videoKycCompleted || false,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('loan_application_id', draftApplicationId);
+
+          if (applicantUpdateError) {
+            console.error('[submit-loan-application] Error updating draft applicant:', applicantUpdateError);
+          }
+        }
+      }
+
+      // Create new application if no draft was found/updated
+      if (!application) {
+        applicationNumber = generateApplicationNumber();
+        console.log(`[submit-loan-application] Creating new referral application: ${applicationNumber}`);
+
+        const { data: newApp, error: appError } = await supabase
+          .from('loan_applications')
+          .insert({
+            org_id: formConfig.org_id,
+            application_number: applicationNumber,
+            product_type: formConfig.product_type || 'personal_loan',
+            requested_amount: applicant.requestedAmount || 25000,
+            tenure_months: Math.ceil((applicant.tenureDays || 30) / 30),
+            tenure_days: applicant.tenureDays || 30,
+            current_stage: 'application_login',
+            status: 'in_progress',
+            source: 'referral_link',
+            referred_by: referrerUserId,
+            submitted_from_ip: clientIP,
+            latitude: body.geolocation?.latitude || null,
+            longitude: body.geolocation?.longitude || null,
+            geolocation_accuracy: body.geolocation?.accuracy || null,
+          })
+          .select()
+          .single();
+
+        if (appError) {
+          console.error('[submit-loan-application] Error creating referral application:', appError);
+          throw appError;
+        }
+        application = newApp;
       }
 
       // Assign using round-robin
