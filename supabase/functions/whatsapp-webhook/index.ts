@@ -30,9 +30,14 @@ interface ExotelNestedMessage {
   profile_name?: string;
   timestamp?: string;
   content?: {
-    type: 'text' | 'button';
+    type: 'text' | 'button' | 'image' | 'document' | 'video' | 'audio' | 'sticker';
     text?: { body: string };
     button?: { payload: string; text: string };
+    image?: { url: string; caption?: string; mime_type?: string };
+    document?: { url: string; caption?: string; filename?: string; mime_type?: string };
+    video?: { url: string; caption?: string; mime_type?: string };
+    audio?: { url: string; mime_type?: string };
+    sticker?: { url: string; mime_type?: string };
   };
   exo_status_code?: number;
   exo_detailed_status?: string;
@@ -56,6 +61,8 @@ interface NormalizedMessage {
   profileName: string;
   timestamp: string | null;
   errorMessage: string | null;
+  mediaUrl: string | null;
+  mediaType: string | null;
 }
 
 // Map Exotel status codes to our status strings
@@ -109,12 +116,37 @@ function parseExotelPayload(payload: any): NormalizedMessage | null {
       type = 'dlr';
     }
     
-    // Extract message body from content (text or button click)
+    // Extract message body and media from content
     let body = '';
-    if (msg.content?.type === 'text' && msg.content.text?.body) {
+    let mediaUrl: string | null = null;
+    let mediaType: string | null = null;
+    
+    const contentType = msg.content?.type;
+    
+    if (contentType === 'text' && msg.content?.text?.body) {
       body = msg.content.text.body;
-    } else if (msg.content?.type === 'button' && msg.content.button?.text) {
+    } else if (contentType === 'button' && msg.content?.button?.text) {
       body = msg.content.button.text;
+    } else if (contentType === 'image' && msg.content?.image) {
+      mediaUrl = msg.content.image.url || null;
+      mediaType = 'image';
+      body = msg.content.image.caption || '[Image]';
+    } else if (contentType === 'document' && msg.content?.document) {
+      mediaUrl = msg.content.document.url || null;
+      mediaType = 'document';
+      body = msg.content.document.caption || msg.content.document.filename || '[Document]';
+    } else if (contentType === 'video' && msg.content?.video) {
+      mediaUrl = msg.content.video.url || null;
+      mediaType = 'video';
+      body = msg.content.video.caption || '[Video]';
+    } else if (contentType === 'audio' && msg.content?.audio) {
+      mediaUrl = msg.content.audio.url || null;
+      mediaType = 'audio';
+      body = '[Audio]';
+    } else if (contentType === 'sticker' && msg.content?.sticker) {
+      mediaUrl = msg.content.sticker.url || null;
+      mediaType = 'sticker';
+      body = '[Sticker]';
     }
     
     // Map Exotel status code to our status string for DLR
@@ -133,6 +165,8 @@ function parseExotelPayload(payload: any): NormalizedMessage | null {
       profileName: msg.profile_name || '',
       timestamp: msg.timestamp || null,
       errorMessage: msg.description || null,
+      mediaUrl,
+      mediaType,
     };
   }
   
@@ -151,6 +185,8 @@ function parseExotelPayload(payload: any): NormalizedMessage | null {
       profileName: '',
       timestamp: flat.timestamp || null,
       errorMessage: flat.error_message || flat.error_code || null,
+      mediaUrl: null,
+      mediaType: null,
     };
   }
   
@@ -245,7 +281,8 @@ Deno.serve(async (req) => {
       });
 
     // Handle inbound messages (new messages from customers)
-    if (normalizedMsg.type === 'inbound' && normalizedMsg.body) {
+    // Accept messages with either text body OR media
+    if (normalizedMsg.type === 'inbound' && (normalizedMsg.body || normalizedMsg.mediaUrl)) {
       console.log('Processing inbound message:', normalizedMsg);
       
       const phoneNumber = normalizePhoneNumber(normalizedMsg.from);
@@ -310,7 +347,7 @@ Deno.serve(async (req) => {
         console.log('Created new contact:', contactId);
       }
       
-      // Store inbound message
+      // Store inbound message with media fields
       const { error: insertError } = await supabaseClient
         .from('whatsapp_messages')
         .insert({
@@ -323,6 +360,8 @@ Deno.serve(async (req) => {
           exotel_message_id: normalizedMsg.sid,
           status: 'received',
           sent_at: normalizedMsg.timestamp ? new Date(normalizedMsg.timestamp) : new Date(),
+          media_url: normalizedMsg.mediaUrl,
+          media_type: normalizedMsg.mediaType,
         });
       
       if (insertError) {
@@ -333,7 +372,7 @@ Deno.serve(async (req) => {
         );
       }
       
-      console.log('Stored inbound message from:', phoneNumber, 'content:', normalizedMsg.body);
+      console.log('Stored inbound message from:', phoneNumber, 'content:', normalizedMsg.body, 'mediaType:', normalizedMsg.mediaType);
       
       return new Response(
         JSON.stringify({ success: true, message: 'Inbound message stored' }),

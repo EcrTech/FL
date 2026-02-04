@@ -19,6 +19,10 @@ import {
   AlertCircle,
   Loader2,
   Phone,
+  FileText,
+  Video,
+  Volume2,
+  ImageIcon,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -31,6 +35,8 @@ interface WhatsAppMessage {
   status: string;
   phone_number: string;
   created_at: string | null;
+  media_url: string | null;
+  media_type: string | null;
 }
 
 interface WhatsAppChatDialogProps {
@@ -101,7 +107,7 @@ export function WhatsAppChatDialog({
       setLoading(true);
       const { data, error } = await supabase
         .from('whatsapp_messages')
-        .select('id, direction, message_content, sent_at, status, phone_number, created_at')
+        .select('id, direction, message_content, sent_at, status, phone_number, created_at, media_url, media_type')
         .eq('phone_number', formattedPhone)
         .order('created_at', { ascending: true });
 
@@ -298,6 +304,112 @@ export function WhatsAppChatDialog({
     }
   };
 
+  // Render media content based on type
+  const renderMedia = (msg: WhatsAppMessage) => {
+    if (!msg.media_url) return null;
+
+    const mediaType = msg.media_type || 'document';
+
+    switch (mediaType) {
+      case 'image':
+        return (
+          <div className="mb-2">
+            <img 
+              src={msg.media_url} 
+              alt="Shared image" 
+              className="max-w-full max-h-64 rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+              onClick={() => window.open(msg.media_url!, '_blank')}
+              onError={(e) => {
+                // Handle expired URLs gracefully
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+                target.parentElement!.innerHTML = `
+                  <div class="flex items-center gap-2 p-3 bg-gray-100 dark:bg-slate-600 rounded-lg text-muted-foreground">
+                    <span class="text-sm">Image expired or unavailable</span>
+                  </div>
+                `;
+              }}
+            />
+          </div>
+        );
+
+      case 'document':
+        return (
+          <a 
+            href={msg.media_url} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 p-3 bg-white/50 dark:bg-slate-600/50 rounded-lg hover:bg-white/70 dark:hover:bg-slate-600/70 transition-colors mb-2"
+          >
+            <FileText className="h-5 w-5 text-red-500" />
+            <span className="text-sm underline">View Document</span>
+          </a>
+        );
+
+      case 'video':
+        return (
+          <a 
+            href={msg.media_url} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 p-3 bg-white/50 dark:bg-slate-600/50 rounded-lg hover:bg-white/70 dark:hover:bg-slate-600/70 transition-colors mb-2"
+          >
+            <Video className="h-5 w-5 text-blue-500" />
+            <span className="text-sm underline">View Video</span>
+          </a>
+        );
+
+      case 'audio':
+        return (
+          <a 
+            href={msg.media_url} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 p-3 bg-white/50 dark:bg-slate-600/50 rounded-lg hover:bg-white/70 dark:hover:bg-slate-600/70 transition-colors mb-2"
+          >
+            <Volume2 className="h-5 w-5 text-green-500" />
+            <span className="text-sm underline">Play Audio</span>
+          </a>
+        );
+
+      case 'sticker':
+        return (
+          <div className="mb-2">
+            <img 
+              src={msg.media_url} 
+              alt="Sticker" 
+              className="max-w-32 max-h-32 cursor-pointer"
+              onClick={() => window.open(msg.media_url!, '_blank')}
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+              }}
+            />
+          </div>
+        );
+
+      default:
+        return (
+          <a 
+            href={msg.media_url} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 p-3 bg-white/50 dark:bg-slate-600/50 rounded-lg hover:bg-white/70 dark:hover:bg-slate-600/70 transition-colors mb-2"
+          >
+            <ImageIcon className="h-5 w-5 text-muted-foreground" />
+            <span className="text-sm underline">View Attachment</span>
+          </a>
+        );
+    }
+  };
+
+  // Check if message content is just a placeholder
+  const isPlaceholderContent = (content: string | null) => {
+    if (!content) return true;
+    const placeholders = ['[Image]', '[Document]', '[Video]', '[Audio]', '[Sticker]'];
+    return placeholders.includes(content);
+  };
+
   const initials = contactName
     .split(' ')
     .map(n => n[0])
@@ -365,7 +477,14 @@ export function WhatsAppChatDialog({
                             : 'bg-white dark:bg-slate-700 text-foreground'
                         }`}
                       >
-                        <p className="text-sm whitespace-pre-wrap">{msg.message_content}</p>
+                        {/* Render media content */}
+                        {renderMedia(msg)}
+                        
+                        {/* Render text content (skip if just a placeholder) */}
+                        {msg.message_content && !isPlaceholderContent(msg.message_content) && (
+                          <p className="text-sm whitespace-pre-wrap">{msg.message_content}</p>
+                        )}
+                        
                         <div className="flex items-center justify-end gap-1 mt-1">
                           <span className="text-[10px] text-muted-foreground">
                             {msg.sent_at || msg.created_at
