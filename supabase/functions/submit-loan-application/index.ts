@@ -369,6 +369,23 @@ Deno.serve(async (req) => {
       }
 
       console.log(`[submit-loan-application] Referral application completed: ${applicationNumber}`);
+
+      // Send WhatsApp application confirmation (non-blocking)
+      try {
+        console.log(`[submit-loan-application] Sending WhatsApp confirmation for referral application`);
+        await fetch(`${supabaseUrl}/functions/v1/send-application-confirmation`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            org_id: formConfig.org_id,
+            applicant_name: body.applicant.name,
+            applicant_phone: body.applicant.phone,
+            application_number: applicationNumber
+          })
+        });
+      } catch (notifyError) {
+        console.log('[submit-loan-application] WhatsApp confirmation skipped:', notifyError);
+      }
       
       return new Response(
         JSON.stringify({
@@ -714,6 +731,23 @@ Deno.serve(async (req) => {
     }
 
     console.log(`[submit-loan-application] Application ${applicationNumber} submitted successfully`);
+
+    // Send WhatsApp application confirmation (non-blocking)
+    try {
+      console.log(`[submit-loan-application] Sending WhatsApp confirmation for public form application`);
+      await fetch(`${supabaseUrl}/functions/v1/send-application-confirmation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          org_id: formConfig.org_id,
+          applicant_name: body.personalDetails.fullName,
+          applicant_phone: body.personalDetails.mobile,
+          application_number: applicationNumber
+        })
+      });
+    } catch (notifyError) {
+      console.log('[submit-loan-application] WhatsApp confirmation skipped:', notifyError);
+    }
 
     return new Response(
       JSON.stringify({
