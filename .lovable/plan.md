@@ -1,74 +1,99 @@
 
-# Plan: Fix Database Constraint and Remove Individual Documents Section
+# Plan: Switch All Nupay E-Sign Components to Production
 
-## Problem Summary
+## Problem
 
-Two issues need to be resolved:
+The E-Sign request is failing because the components are still defaulting to "uat" environment, but only the production configuration is active in the database.
 
-1. **Database constraint error**: The `loan_generated_documents` table has a CHECK constraint that only allows these document types:
-   - `sanction_letter`, `loan_agreement`, `daily_schedule`, `kfs`, `dpn`
-   - Missing: `combined_loan_pack`
+## Root Cause Analysis
 
-2. **Individual Documents section still visible**: This section needs to be completely removed since we now use the Combined Loan Pack for everything.
+The E-Sign components have hardcoded defaults:
+- `ESignDocumentButton.tsx` (line 38): `environment = "uat"`
+- `ESignDocumentDialog.tsx` (line 52): `environment = "uat"`
 
----
+Even though `CombinedLoanPackCard.tsx` was updated to pass `environment="production"`, this approach is fragile - every component that uses E-Sign would need to know the correct environment.
 
-## Implementation Steps
+## Solution: Auto-Detect Active Environment
 
-### Step 1: Database Migration
-
-Add `combined_loan_pack` to the allowed document types in the CHECK constraint.
-
-```sql
--- Drop existing constraint
-ALTER TABLE loan_generated_documents 
-DROP CONSTRAINT loan_generated_documents_document_type_check;
-
--- Add new constraint with combined_loan_pack
-ALTER TABLE loan_generated_documents 
-ADD CONSTRAINT loan_generated_documents_document_type_check 
-CHECK (document_type = ANY (ARRAY[
-  'sanction_letter'::text, 
-  'loan_agreement'::text, 
-  'daily_schedule'::text, 
-  'kfs'::text, 
-  'dpn'::text,
-  'combined_loan_pack'::text
-]));
-```
-
-### Step 2: Remove Individual Documents Section
-
-**File**: `src/components/LOS/Disbursement/DisbursementDashboard.tsx`
-
-Remove the entire "Individual Documents" Card (approximately lines 515-664), which includes:
-- The Card with title "Individual Documents"
-- The grid of 3 document cards (Sanction, Agreement, Repayment)
-- All the individual Generate/Print/Download/E-Sign buttons
-- Upload Signed Document buttons for individual docs
-
-**Keep**:
-- The Combined Loan Pack Card (above this section)
-- The hidden document templates (needed for PDF generation)
-- The eMandate Registration section
-- The Upload Signed Document Dialog (may be needed for combined pack)
+Instead of hardcoding, we should fetch the active Nupay configuration and use its environment automatically (like `CreateMandateDialog.tsx` already does).
 
 ---
 
 ## Files to Modify
 
-| File | Action | Description |
-|------|--------|-------------|
-| Database | MIGRATE | Add `combined_loan_pack` to document_type CHECK constraint |
-| `src/components/LOS/Disbursement/DisbursementDashboard.tsx` | MODIFY | Remove "Individual Documents" section (lines 515-664) |
+| File | Change |
+|------|--------|
+| `src/components/LOS/Sanction/ESignDocumentDialog.tsx` | Fetch active Nupay config and use its environment |
+| `src/components/LOS/Sanction/ESignDocumentButton.tsx` | Change default from "uat" to "production" as fallback |
+| `src/components/LOS/Disbursement/CombinedLoanPackCard.tsx` | Remove hardcoded environment prop (will be auto-detected) |
 
 ---
 
-## After Implementation
+## Implementation Details
 
-The Disbursement Dashboard will show:
-1. Loan Summary Card
-2. **Combined Loan Pack Card** (with Generate, Download, Print, E-Sign, View Signed)
-3. eMandate Registration Section
+### 1. Update ESignDocumentDialog.tsx
 
-No more individual document cards - everything goes through the Combined Loan Pack.
+Add a query to fetch the active Nupay config and use its environment:
+
+```typescript
+// Add query to fetch active config
+const { data: nupayConfig } = useQuery({
+  queryKey: ["nupay-config-active", orgId],
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from("nupay_config")
+      .select("environment")
+      .eq("org_id", orgId)
+      .eq("is_active", true)
+      .single();
+    if (error) return null;
+    return data;
+  },
+  enabled: !!orgId && open,
+});
+
+// Use detected environment or fallback to production
+const activeEnvironment = nupayConfig?.environment || environment || "production";
+```
+
+Then use `activeEnvironment` when calling the E-Sign mutation.
+
+### 2. Update ESignDocumentButton.tsx
+
+Change the default value from "uat" to "production":
+
+```typescript
+// Line 38: Change from
+environment = "uat",
+// To
+environment = "production",
+```
+
+### 3. Clean Up CombinedLoanPackCard.tsx
+
+Remove the explicit `environment="production"` prop since it will now be auto-detected:
+
+```tsx
+// Remove this line:
+environment="production"
+// The dialog will auto-detect the active environment
+```
+
+---
+
+## Why This Approach?
+
+1. **Centralized logic**: Environment detection happens in the dialog component, not scattered across all callers
+2. **Future-proof**: If a user switches back to UAT for testing, it will automatically work
+3. **Consistent with eMandate**: Uses the same pattern as `CreateMandateDialog.tsx` which already works correctly
+4. **Fallback to production**: If no config is found, defaults to production (safer for live operations)
+
+---
+
+## Technical Summary
+
+| Component | Before | After |
+|-----------|--------|-------|
+| ESignDocumentButton | Default: "uat" | Default: "production" |
+| ESignDocumentDialog | Uses passed prop (default "uat") | Auto-detects from DB, fallback to "production" |
+| CombinedLoanPackCard | Passes "production" explicitly | Relies on auto-detection |
