@@ -1,179 +1,186 @@
 
-# Fix Plan: WhatsApp Image and Attachment Support
+# Feature Plan: Add WhatsApp Attachment/Image Sending
 
-## Problem Summary
+## Current State
 
-When respondents send images or other attachments via WhatsApp, they don't appear in the chatbot. The webhook receives the media correctly but ignores it because:
+The WhatsApp chat dialog currently only supports:
+- **Receiving** images and attachments (just implemented)
+- **Sending** text messages only
 
-1. The webhook only extracts text from `text` and `button` content types
-2. Media URLs (`image.url`, `document.url`, etc.) are not captured
-3. The database has `media_url` and `media_type` columns, but they're never populated
-4. The chat UI only renders text content, not media
+There is no UI for attaching files and no backend logic to upload and send media via Exotel's WhatsApp API.
 
 ---
 
-## Current Flow (Broken)
+## How Exotel Media Messages Work
 
-```text
-Exotel sends image message
-    ↓
-content: { type: "image", image: { url: "..." } }
-    ↓
-parseExotelPayload() only checks text/button → body = ""
-    ↓
-Message with empty body is processed
-    ↓
-Condition fails: "if (normalizedMsg.type === 'inbound' && normalizedMsg.body)"
-    ↓
-Message is IGNORED - never stored
+To send media via WhatsApp through Exotel, you need to:
+1. Host the media file on a **publicly accessible URL** (Exotel fetches it from this URL)
+2. Send an API request with the media URL and type
+
+**Exotel V2 API Media Payload:**
+```json
+{
+  "whatsapp": {
+    "messages": [{
+      "from": "+91XXXXXXXXXX",
+      "to": "91XXXXXXXXXX",
+      "content": {
+        "type": "image",
+        "image": {
+          "url": "https://your-bucket.supabase.co/storage/v1/object/public/...",
+          "caption": "Optional caption text"
+        }
+      }
+    }]
+  }
+}
 ```
 
----
-
-## Proposed Solution
-
-### Phase 1: Update Webhook to Capture Media
-
-Modify `parseExotelPayload()` in the webhook to:
-- Extract media URLs from `image`, `document`, `video`, `audio`, `sticker` content types
-- Set a placeholder body text for media messages (e.g., "[Image]", "[Document]")
-- Return both the media URL and media type
-
-**Content Types to Support:**
-
-| Type | Exotel Structure | Media URL Path |
-|------|------------------|----------------|
-| image | `content.image.url` | Image URL |
-| document | `content.document.url` | PDF/Doc URL |
-| video | `content.video.url` | Video URL |
-| audio | `content.audio.url` | Audio URL |
-| sticker | `content.sticker.url` | Sticker URL |
-
-### Phase 2: Store Media in Database
-
-Update the webhook to populate:
-- `media_url`: The Exotel S3 URL for the attachment
-- `media_type`: The content type (image, document, video, audio, sticker)
-- `message_content`: A placeholder like "[Image]" or the caption if provided
-
-### Phase 3: Update Chat UI to Render Media
-
-Modify `WhatsAppChatDialog.tsx` to:
-- Fetch `media_url` and `media_type` from the query
-- Render images inline with `<img>` tags
-- Show document links as downloadable attachments
-- Display appropriate icons for video/audio with clickable links
+Supported media types: `image`, `document`, `video`, `audio`
 
 ---
 
-## Technical Implementation
+## Implementation Plan
 
-### File 1: `supabase/functions/whatsapp-webhook/index.ts`
+### Phase 1: Create Storage Bucket for WhatsApp Media
 
-**Changes to Interface:**
+Create a public storage bucket to host uploaded files so Exotel can access them.
+
+**Database Migration:**
+```sql
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('whatsapp-media', 'whatsapp-media', true);
+
+-- RLS policy to allow authenticated users to upload
+CREATE POLICY "Authenticated users can upload media"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (bucket_id = 'whatsapp-media');
+
+-- Public read access (Exotel needs this)
+CREATE POLICY "Public can view whatsapp media"
+ON storage.objects FOR SELECT
+TO public
+USING (bucket_id = 'whatsapp-media');
+```
+
+### Phase 2: Update Edge Function
+
+Modify `send-whatsapp-message` to accept media uploads.
+
+**New Request Parameters:**
 ```typescript
-interface NormalizedMessage {
+interface SendMessageRequest {
   // ... existing fields
-  mediaUrl: string | null;      // NEW
-  mediaType: string | null;     // NEW
+  mediaType?: 'image' | 'document' | 'video' | 'audio';
+  mediaUrl?: string;       // Public URL of the uploaded file
+  mediaCaption?: string;   // Optional caption
 }
 ```
 
-**Changes to `parseExotelPayload()`:**
+**New Payload Logic:**
 ```typescript
-// Extract media from different content types
-let body = '';
-let mediaUrl: string | null = null;
-let mediaType: string | null = null;
-
-const contentType = msg.content?.type;
-
-if (contentType === 'text' && msg.content.text?.body) {
-  body = msg.content.text.body;
-} else if (contentType === 'button' && msg.content.button?.text) {
-  body = msg.content.button.text;
-} else if (contentType === 'image') {
-  mediaUrl = msg.content.image?.url || null;
-  mediaType = 'image';
-  body = msg.content.image?.caption || '[Image]';
-} else if (contentType === 'document') {
-  mediaUrl = msg.content.document?.url || null;
-  mediaType = 'document';
-  body = msg.content.document?.caption || '[Document]';
-} else if (contentType === 'video') {
-  mediaUrl = msg.content.video?.url || null;
-  mediaType = 'video';
-  body = msg.content.video?.caption || '[Video]';
-} else if (contentType === 'audio') {
-  mediaUrl = msg.content.audio?.url || null;
-  mediaType = 'audio';
-  body = '[Audio]';
+if (mediaUrl && mediaType) {
+  exotelPayload = {
+    whatsapp: {
+      messages: [{
+        from: whatsappSettings.whatsapp_source_number,
+        to: phoneDigits,
+        content: {
+          type: mediaType,
+          [mediaType]: {
+            url: mediaUrl,
+            caption: mediaCaption || undefined
+          }
+        }
+      }]
+    }
+  };
 }
 ```
 
-**Changes to inbound condition:**
-```typescript
-// Allow messages with either text body OR media
-if (normalizedMsg.type === 'inbound' && (normalizedMsg.body || normalizedMsg.mediaUrl)) {
-```
-
-**Changes to database insert:**
+**Store Media in Database:**
 ```typescript
 .insert({
   // ... existing fields
-  media_url: normalizedMsg.mediaUrl,
-  media_type: normalizedMsg.mediaType,
+  media_url: mediaUrl || null,
+  media_type: mediaType || null,
 })
 ```
 
-### File 2: `src/components/LOS/Relationships/WhatsAppChatDialog.tsx`
+### Phase 3: Update Chat UI
 
-**Update interface and query:**
+Add attachment button and upload flow to `WhatsAppChatDialog.tsx`.
+
+**New UI Elements:**
+- Paperclip/attachment button next to the send button
+- Hidden file input for selecting files
+- Upload progress indicator
+- Image/file preview before sending
+
+**File Upload Flow:**
 ```typescript
-interface WhatsAppMessage {
-  // ... existing fields
-  media_url: string | null;
-  media_type: string | null;
-}
-
-// Add to select query
-.select('id, direction, message_content, sent_at, status, phone_number, created_at, media_url, media_type')
+const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  
+  // 1. Upload to Supabase Storage
+  const filePath = `${contactId}/${Date.now()}_${file.name}`;
+  const { data, error } = await supabase.storage
+    .from('whatsapp-media')
+    .upload(filePath, file);
+  
+  // 2. Get public URL
+  const { data: { publicUrl } } = supabase.storage
+    .from('whatsapp-media')
+    .getPublicUrl(filePath);
+  
+  // 3. Send via edge function with mediaUrl
+  await supabase.functions.invoke('send-whatsapp-message', {
+    body: {
+      contactId,
+      phoneNumber,
+      mediaType: getMediaType(file.type),
+      mediaUrl: publicUrl,
+      mediaCaption: caption || undefined,
+    },
+  });
+};
 ```
 
-**Add media rendering in the message bubble:**
+**Helper to determine media type:**
 ```typescript
-{/* Media content */}
-{msg.media_url && (
-  <div className="mb-2">
-    {msg.media_type === 'image' ? (
-      <img 
-        src={msg.media_url} 
-        alt="Shared image" 
-        className="max-w-full rounded-lg cursor-pointer"
-        onClick={() => window.open(msg.media_url, '_blank')}
-      />
-    ) : msg.media_type === 'document' ? (
-      <a 
-        href={msg.media_url} 
-        target="_blank" 
-        rel="noopener noreferrer"
-        className="flex items-center gap-2 p-2 bg-white/50 rounded"
-      >
-        <FileText className="h-5 w-5" />
-        <span className="text-sm underline">View Document</span>
-      </a>
-    ) : (
-      <a href={msg.media_url} target="_blank">
-        View {msg.media_type}
-      </a>
-    )}
-  </div>
-)}
+const getMediaType = (mimeType: string): 'image' | 'document' | 'video' | 'audio' => {
+  if (mimeType.startsWith('image/')) return 'image';
+  if (mimeType.startsWith('video/')) return 'video';
+  if (mimeType.startsWith('audio/')) return 'audio';
+  return 'document';
+};
+```
 
-{/* Text content */}
-{msg.message_content && !msg.message_content.startsWith('[') && (
-  <p className="text-sm whitespace-pre-wrap">{msg.message_content}</p>
-)}
+**UI Changes:**
+```tsx
+<div className="flex items-center gap-2">
+  <input
+    type="file"
+    ref={fileInputRef}
+    onChange={handleFileSelect}
+    accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
+    className="hidden"
+  />
+  <Button
+    variant="ghost"
+    size="icon"
+    onClick={() => fileInputRef.current?.click()}
+    disabled={!isSessionActive() || sending}
+  >
+    <Paperclip className="h-5 w-5" />
+  </Button>
+  <Input ... />
+  <Button ...>
+    <Send />
+  </Button>
+</div>
 ```
 
 ---
@@ -182,15 +189,30 @@ interface WhatsAppMessage {
 
 | File | Changes |
 |------|---------|
-| `supabase/functions/whatsapp-webhook/index.ts` | Add media extraction and storage |
-| `src/components/LOS/Relationships/WhatsAppChatDialog.tsx` | Add media rendering |
+| Database migration | Create `whatsapp-media` storage bucket with RLS policies |
+| `supabase/functions/send-whatsapp-message/index.ts` | Add media URL and type handling in Exotel payload |
+| `src/components/LOS/Relationships/WhatsAppChatDialog.tsx` | Add attachment button, file upload, and preview UI |
 
 ---
 
-## Important Note on URL Expiry
+## Limitations
 
-The Exotel S3 URLs are **pre-signed and expire after 15 minutes**. For long-term storage:
-- Consider downloading the media to your own storage (Lovable Cloud Storage)
-- Or accept that old media links will expire (simpler approach for now)
+1. **File size**: Exotel/WhatsApp has limits (~16MB for most media, 100MB for documents)
+2. **Session required**: Media can only be sent within the 24-hour session window (same as text)
+3. **Processing time**: Large files may take a moment to upload before sending
 
-This plan implements the simpler approach first - storing the URLs as-is. If media persistence is critical, a follow-up task can add media re-hosting.
+---
+
+## Technical Flow
+
+```
+1. User clicks attachment button
+2. File picker opens
+3. User selects image/document
+4. File uploads to Supabase Storage (public bucket)
+5. Public URL is generated
+6. Edge function called with mediaUrl + mediaType
+7. Exotel fetches media from URL and sends via WhatsApp
+8. Message stored in database with media_url
+9. UI updates to show sent media
+```
