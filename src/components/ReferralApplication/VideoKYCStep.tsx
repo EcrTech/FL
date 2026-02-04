@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { RecordingStageOverlay, RECORDING_STAGES } from "@/components/VideoKYC/RecordingStageOverlay";
 import { useRecordingStages } from "@/hooks/useRecordingStages";
+import { trackVideoKYCComplete } from "@/utils/analytics";
 
 interface VideoKYCStepProps {
   onComplete: () => void;
@@ -296,6 +297,9 @@ export function VideoKYCStep({
           console.log('[VideoKYC] Starting upload with applicationId:', applicationId, 'orgId:', orgId);
           const uploadSuccess = await uploadVideo(videoBlob);
           if (uploadSuccess) {
+            // Track Video KYC completion (primary Google Ads conversion)
+            trackVideoKYCComplete(applicationId);
+            
             setStep('completed');
             toast.success("Video KYC uploaded successfully");
             onComplete();

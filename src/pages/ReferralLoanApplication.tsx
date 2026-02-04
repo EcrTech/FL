@@ -11,6 +11,7 @@ import { ContactConsentScreen } from "@/components/ReferralApplication/ContactCo
 import { PANVerificationStep } from "@/components/ReferralApplication/PANVerificationStep";
 import { AadhaarVerificationStep } from "@/components/ReferralApplication/AadhaarVerificationStep";
 import { VideoKYCStep } from "@/components/ReferralApplication/VideoKYCStep";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 interface ReferrerInfo {
   name: string;
@@ -75,6 +76,7 @@ export default function ReferralLoanApplication() {
   console.log('[ReferralLoanApplication] Component mounting at', new Date().toISOString());
   
   const { referralCode } = useParams<{ referralCode: string }>();
+  const { trackStep, trackFormStart, trackConversion, trackVideoKYC, trackMetaEvent } = useAnalytics();
   
   // Debug: Log referral code and environment
   console.log('[ReferralLoanApplication] URL referralCode param:', referralCode);
@@ -401,6 +403,9 @@ export default function ReferralLoanApplication() {
 
   // Handle entering Video KYC step
   const handleEnterVideoStep = async () => {
+    // Track step 4 - Video KYC
+    trackStep(4, 'video_kyc', 'referral');
+    
     // Create draft application to get ID for video upload
     const appId = await createDraftApplication();
     if (appId) {
@@ -415,6 +420,12 @@ export default function ReferralLoanApplication() {
       toast.error("Location is required to submit the application. Please enable location access.");
       return;
     }
+    
+    // Track Video KYC completion (primary Google Ads conversion)
+    if (draftApplicationId) {
+      trackVideoKYC(draftApplicationId);
+    }
+    
     setVideoKycCompleted(true);
     await submitApplication();
   };
@@ -465,6 +476,14 @@ export default function ReferralLoanApplication() {
 
       setApplicationNumber(data?.applicationNumber);
       setSubmissionSuccess(true);
+      
+      // Track final conversion - Purchase event
+      trackConversion(
+        data?.applicationNumber || draftApplicationId || 'unknown',
+        basicInfo.requestedAmount,
+        'referral'
+      );
+      
       // Clear saved form state after successful submission
       localStorage.removeItem(REFERRAL_FORM_STORAGE_KEY);
       console.log('[ReferralLoanApplication] Form state cleared from localStorage after submission');

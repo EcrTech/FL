@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Check, Loader2, AlertCircle, ArrowLeft, ArrowRight, CreditCard, ShieldCheck, XCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 interface PANVerificationStepProps {
   panNumber: string;
@@ -30,6 +31,7 @@ export function PANVerificationStep({
   const [verifying, setVerifying] = useState(false);
   const [verificationError, setVerificationError] = useState<string | null>(null);
   const verificationAttemptedRef = useRef<string | null>(null);
+  const { trackPAN, trackStep } = useAnalytics();
 
   const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
   const isValidPan = panRegex.test(panNumber);
@@ -74,6 +76,11 @@ export function PANVerificationStep({
           status: 'Verified',
           dob: verifyData.data?.dob,
         });
+        
+        // Track PAN verification success
+        trackPAN();
+        trackStep(2, 'pan_verified', 'referral');
+        
         toast.success("PAN verified successfully!");
       } else {
         // PAN verification failed but we got a response

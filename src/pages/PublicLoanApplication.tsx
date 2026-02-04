@@ -14,6 +14,7 @@ import { DocumentUploadStep } from "@/components/PublicLoanApplication/DocumentU
 import { ReviewStep } from "@/components/PublicLoanApplication/ReviewStep";
 import { ConsentOTPStep } from "@/components/PublicLoanApplication/ConsentOTPStep";
 import { SuccessScreen } from "@/components/PublicLoanApplication/SuccessScreen";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 export interface LoanFormData {
   loanDetails: {
@@ -151,6 +152,8 @@ export default function PublicLoanApplication() {
   const [honeypot, setHoneypot] = useState("");
   const [draftId, setDraftId] = useState<string | null>(null);
   const [savingDraft, setSavingDraft] = useState(false);
+  
+  const { trackStep, trackConversion, trackMetaEvent } = useAnalytics();
 
   useEffect(() => {
     async function fetchFormConfig() {
@@ -274,9 +277,28 @@ export default function PublicLoanApplication() {
 
   const nextStep = async () => {
     if (currentStep < STEPS.length) {
+      // Track step progression
+      const stepNames = ['loan_details', 'personal_info', 'address', 'employment', 'documents', 'review', 'consent'];
+      trackStep(currentStep + 1, stepNames[currentStep] || 'unknown', 'public');
+      
+      // Track Meta SubmitApplication on personal details completion
       if (currentStep === 2 && formData.personalDetails.fullName && formData.personalDetails.mobile) {
+        trackMetaEvent('SubmitApplication', {
+          content_name: 'Public Loan Application',
+          value: parseFloat(formData.loanDetails.amount) || 0,
+          currency: 'INR',
+        });
         saveDraftApplication();
       }
+      
+      // Track CompleteRegistration on review step
+      if (currentStep === 6) {
+        trackMetaEvent('CompleteRegistration', {
+          content_name: 'Public Loan Application Review',
+          status: 'complete',
+        });
+      }
+      
       setCurrentStep(currentStep + 1);
       window.scrollTo(0, 0);
     }
@@ -338,6 +360,14 @@ export default function PublicLoanApplication() {
       }
 
       setApplicationNumber(response.data.applicationNumber);
+      
+      // Track final conversion - Purchase event
+      trackConversion(
+        response.data.applicationNumber || draftId || 'unknown',
+        parseFloat(formData.loanDetails.amount) || 0,
+        'public'
+      );
+      
       setCurrentStep(8);
     } catch (err: any) {
       console.error("Submission error:", err);
