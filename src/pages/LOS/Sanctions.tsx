@@ -7,8 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Eye, CheckCircle, Loader2, Send, Upload, FileCheck, Filter } from "lucide-react";
+import { Eye, CheckCircle, Loader2, Send, Upload, FileCheck, Filter, X, CalendarIcon } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { DateRange } from "react-day-picker";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -42,6 +46,10 @@ export default function Sanctions() {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [selectedApp, setSelectedApp] = useState<SanctionApplication | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [minAmount, setMinAmount] = useState<string>("");
+  const [maxAmount, setMaxAmount] = useState<string>("");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [approvedByFilter, setApprovedByFilter] = useState<string>("all");
 
   // Optimized: Single query with JOINs instead of 3 separate queries
   const { data: applications, isLoading } = useQuery({
@@ -234,10 +242,41 @@ export default function Sanctions() {
     return 'new';
   };
 
+  // Get unique approvers for filter dropdown
+  const approvers = [...new Set(applications?.map(app => app.approver_name).filter(Boolean) || [])];
+
   const filteredApplications = applications?.filter((app) => {
-    if (statusFilter === "all") return true;
-    return getAppStatus(app) === statusFilter;
+    // Status filter
+    if (statusFilter !== "all" && getAppStatus(app) !== statusFilter) return false;
+    
+    // Amount filter
+    const minAmt = minAmount ? parseFloat(minAmount) : null;
+    const maxAmt = maxAmount ? parseFloat(maxAmount) : null;
+    if (minAmt && app.approved_amount < minAmt) return false;
+    if (maxAmt && app.approved_amount > maxAmt) return false;
+    
+    // Date filter
+    if (dateRange?.from) {
+      const appDate = new Date(app.updated_at);
+      if (appDate < dateRange.from) return false;
+      if (dateRange.to && appDate > new Date(dateRange.to.setHours(23, 59, 59, 999))) return false;
+    }
+    
+    // Approved by filter
+    if (approvedByFilter !== "all" && app.approver_name !== approvedByFilter) return false;
+    
+    return true;
   }) || [];
+
+  const hasActiveFilters = statusFilter !== "all" || minAmount || maxAmount || dateRange || approvedByFilter !== "all";
+
+  const clearFilters = () => {
+    setStatusFilter("all");
+    setMinAmount("");
+    setMaxAmount("");
+    setDateRange(undefined);
+    setApprovedByFilter("all");
+  };
 
   return (
     <DashboardLayout>
@@ -247,11 +286,13 @@ export default function Sanctions() {
             <h1 className="text-2xl font-bold">Sanctions</h1>
             <p className="text-muted-foreground">Approved applications pending sanction</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Filter className="h-4 w-4 text-muted-foreground" />
+            
+            {/* Status Filter */}
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by status" />
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
@@ -261,6 +302,78 @@ export default function Sanctions() {
                 <SelectItem value="signed">Signed</SelectItem>
               </SelectContent>
             </Select>
+            
+            {/* Amount Range Filter */}
+            <div className="flex items-center gap-1">
+              <Input
+                type="number"
+                placeholder="Min ₹"
+                value={minAmount}
+                onChange={(e) => setMinAmount(e.target.value)}
+                className="w-[100px]"
+              />
+              <span className="text-muted-foreground">-</span>
+              <Input
+                type="number"
+                placeholder="Max ₹"
+                value={maxAmount}
+                onChange={(e) => setMaxAmount(e.target.value)}
+                className="w-[100px]"
+              />
+            </div>
+            
+            {/* Date Range Filter */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-[200px] justify-start text-left font-normal">
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dateRange?.from ? (
+                    dateRange.to ? (
+                      <>
+                        {format(dateRange.from, "MMM d")} - {format(dateRange.to, "MMM d")}
+                      </>
+                    ) : (
+                      format(dateRange.from, "MMM d, yyyy")
+                    )
+                  ) : (
+                    <span className="text-muted-foreground">Date range</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  initialFocus
+                  mode="range"
+                  defaultMonth={dateRange?.from}
+                  selected={dateRange}
+                  onSelect={setDateRange}
+                  numberOfMonths={2}
+                />
+              </PopoverContent>
+            </Popover>
+            
+            {/* Approved By Filter */}
+            <Select value={approvedByFilter} onValueChange={setApprovedByFilter}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Approved By" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Approvers</SelectItem>
+                {approvers.map((approver) => (
+                  <SelectItem key={approver} value={approver!}>
+                    {approver}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            {/* Clear Filters */}
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters}>
+                <X className="h-4 w-4 mr-1" />
+                Clear
+              </Button>
+            )}
           </div>
         </div>
 
