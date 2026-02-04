@@ -539,19 +539,33 @@ serve(async (req) => {
       if (applicant && !applicantFetchError) {
         const updateData: Record<string, unknown> = {};
         
-        if (mergedData.dob && applicant.dob === '1990-01-01') {
-          const dobDate = new Date(mergedData.dob);
-          if (!isNaN(dobDate.getTime())) {
-            updateData.dob = mergedData.dob;
+        // Update DOB if we have new data and it differs from current value
+        if (mergedData.dob) {
+          const newDob = mergedData.dob;
+          const currentDob = applicant.dob;
+          // Update if current is default OR if new value differs from current
+          if (currentDob === '1990-01-01' || newDob !== currentDob) {
+            const dobDate = new Date(newDob);
+            if (!isNaN(dobDate.getTime())) {
+              updateData.dob = newDob;
+              console.log(`[ParseDocument] Updating DOB: ${currentDob} -> ${newDob}`);
+            }
           }
         }
         
         if (documentType === 'aadhaar_card' || documentType === 'aadhar_card') {
-          if (mergedData.gender && !applicant.gender) {
-            updateData.gender = mergedData.gender;
+          // Update gender if we have new data and current is empty or different
+          if (mergedData.gender) {
+            const normalizedGender = mergedData.gender.toLowerCase();
+            const currentGender = (applicant.gender || '').toLowerCase();
+            if (!currentGender || normalizedGender !== currentGender) {
+              updateData.gender = mergedData.gender;
+              console.log(`[ParseDocument] Updating gender: ${applicant.gender} -> ${mergedData.gender}`);
+            }
           }
           
-          if (mergedData.address && !applicant.current_address) {
+          // Always update address from Aadhaar OCR (authoritative source for address)
+          if (mergedData.address) {
             const addressStr = mergedData.address;
             
             const pincodeMatch = addressStr.match(/(\d{6})\s*$/);
@@ -581,7 +595,7 @@ serve(async (req) => {
               pincode: pincode
             };
             
-            console.log(`[ParseDocument] Extracted address - state: ${state}, pincode: ${pincode}`);
+            console.log(`[ParseDocument] Updating address - state: ${state}, pincode: ${pincode}`);
           }
         }
         

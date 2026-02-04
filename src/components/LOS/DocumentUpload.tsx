@@ -202,9 +202,14 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
     onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ["loan-documents", applicationId] });
       
+      // Invalidate application and applicant queries to reflect OCR-synced data
+      queryClient.invalidateQueries({ queryKey: ["loan-application"] });
+      queryClient.invalidateQueries({ queryKey: ["loan-application-basic", applicationId] });
+      
       // Invalidate bank statement query to update Bank Details section
       if (data.docType === "bank_statement") {
         queryClient.invalidateQueries({ queryKey: ["bank-statement-parsed", applicationId] });
+        queryClient.invalidateQueries({ queryKey: ["applicant-bank-details", applicationId] });
       }
       
       // Check if processing in background (chunked parsing)
@@ -270,6 +275,10 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
     setIsParsingAll(false);
     queryClient.invalidateQueries({ queryKey: ["loan-documents", applicationId] });
     queryClient.invalidateQueries({ queryKey: ["bank-statement-parsed", applicationId] });
+    // Invalidate application and applicant queries to reflect OCR-synced data
+    queryClient.invalidateQueries({ queryKey: ["loan-application"] });
+    queryClient.invalidateQueries({ queryKey: ["loan-application-basic", applicationId] });
+    queryClient.invalidateQueries({ queryKey: ["applicant-bank-details", applicationId] });
     
     if (errorCount === 0) {
       toast({ title: "All documents parsed", description: `Successfully parsed ${successCount} documents` });
