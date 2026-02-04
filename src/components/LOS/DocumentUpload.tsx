@@ -86,6 +86,12 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
       return data;
     },
     enabled: !!applicationId,
+    // Poll every 2 seconds if any document is being processed
+    refetchInterval: (query) => {
+      const docs = query.state.data as any[] | undefined;
+      const hasProcessing = docs?.some((doc) => doc.parsing_status === 'processing');
+      return hasProcessing ? 2000 : false;
+    },
   });
 
   // Fetch verifications for this application
@@ -201,7 +207,15 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
         queryClient.invalidateQueries({ queryKey: ["bank-statement-parsed", applicationId] });
       }
       
-      toast({ title: "Document parsed successfully", description: "Data extracted using AI" });
+      // Check if processing in background (chunked parsing)
+      if (data.status === "processing") {
+        toast({ 
+          title: "Document parsing started", 
+          description: data.message || "Large document being processed in background...",
+        });
+      } else {
+        toast({ title: "Document parsed successfully", description: "Data extracted using AI" });
+      }
       setParsingDoc(null);
     },
     onError: (error: any) => {
@@ -419,7 +433,10 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
     if (!docConfig?.parseable) return null;
 
     const isParsing = parsingDoc === docType;
-    const hasParsedData = document?.ocr_data && !document.ocr_data.parse_error;
+    const isProcessingInBackground = document?.parsing_status === 'processing';
+    const hasParsedData = document?.ocr_data && !document.ocr_data.parse_error && !document.ocr_data.parsing_in_progress;
+    const hasFailed = document?.parsing_status === 'failed';
+    const progress = document?.parsing_progress as { current_page?: number; total_pages?: number; error?: string } | null;
 
     if (!document) {
       return (
@@ -434,7 +451,11 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
       );
     }
 
-    if (isParsing) {
+    if (isParsing || isProcessingInBackground) {
+      const tooltipText = isProcessingInBackground && progress?.total_pages && progress.total_pages > 1
+        ? `Parsing page ${progress.current_page || 1} of ${progress.total_pages}...`
+        : 'Parsing with AI...';
+      
       return (
         <Tooltip>
           <TooltipTrigger asChild>
@@ -442,7 +463,27 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
               <Loader2 className="h-4 w-4 animate-spin text-primary" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Parsing with AI...</TooltipContent>
+          <TooltipContent>{tooltipText}</TooltipContent>
+        </Tooltip>
+      );
+    }
+
+    if (hasFailed) {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8"
+              onClick={() => handleParse(docType, document.id, document.file_path)}
+            >
+              <XCircle className="h-4 w-4 text-destructive" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            Parsing failed{progress?.error ? `: ${progress.error}` : ''} - Click to retry
+          </TooltipContent>
         </Tooltip>
       );
     }

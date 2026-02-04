@@ -4344,6 +4344,10 @@ export type Database = {
           loan_application_id: string
           mime_type: string | null
           ocr_data: Json | null
+          parsing_completed_at: string | null
+          parsing_progress: Json | null
+          parsing_started_at: string | null
+          parsing_status: string | null
           rejection_reason: string | null
           updated_at: string
           upload_status: string
@@ -4363,6 +4367,10 @@ export type Database = {
           loan_application_id: string
           mime_type?: string | null
           ocr_data?: Json | null
+          parsing_completed_at?: string | null
+          parsing_progress?: Json | null
+          parsing_started_at?: string | null
+          parsing_status?: string | null
           rejection_reason?: string | null
           updated_at?: string
           upload_status?: string
@@ -4382,6 +4390,10 @@ export type Database = {
           loan_application_id?: string
           mime_type?: string | null
           ocr_data?: Json | null
+          parsing_completed_at?: string | null
+          parsing_progress?: Json | null
+          parsing_started_at?: string | null
+          parsing_status?: string | null
           rejection_reason?: string | null
           updated_at?: string
           upload_status?: string
