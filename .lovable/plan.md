@@ -1,178 +1,132 @@
 
-# Fix Plan: WhatsApp Webhook to Handle Exotel's Nested Payload Format
+# Fix Plan: WhatsApp Message Sending Issues
 
 ## Problem Summary
-The `whatsapp-webhook` edge function is receiving WhatsApp responses from Exotel, but rejecting them all because it expects a flat payload structure while Exotel sends a nested structure.
+
+When sending WhatsApp follow-up messages from the chat dialog, messages fail silently. The logs reveal **three distinct issues**:
+
+| Issue | Root Cause | Impact |
+|-------|------------|--------|
+| Foreign Key Violation | `ApplicationCard` and `ApplicantProfileCard` pass `loan_application.id` instead of `contact.id` | Database insert fails |
+| Exotel API Rejection | Text message payload uses `text: "message"` instead of `text: { body: "message" }` | Exotel returns empty response |
+| Silent Failure | Edge function returns `success: true` even when DB insert fails | UI shows no error |
 
 ---
 
-## Current vs Expected Payload Formats
+## Detailed Analysis
 
-### What the code expects (flat):
-```json
-{
-  "sid": "message_id",
-  "from": "+919158455686",
-  "direction": "inbound",
-  "body": "Hello"
+### Issue 1: Wrong ID Being Passed to WhatsAppChatDialog
+
+The `WhatsAppChatDialog` component expects a `contactId` prop that references the `contacts` table. However:
+
+- **`ApplicationCard.tsx` (line 212)**: Passes `application.id` (loan_applications ID)
+- **`ApplicantProfileCard.tsx` (line 569)**: Passes `applicationId` (loan_applications ID)
+
+The `whatsapp_messages` table has a foreign key constraint:
+```
+whatsapp_messages_contact_id_fkey → contacts.id
+```
+
+This causes the database error:
+```
+Key is not present in table "contacts"
+```
+
+### Issue 2: Incorrect Exotel Text Message Payload Format
+
+The edge function sends text messages with:
+```typescript
+// Current (incorrect)
+content: {
+  type: "text",
+  text: messageContent  // string directly
 }
 ```
 
-### What Exotel actually sends (nested):
-```json
-{
-  "whatsapp": {
-    "messages": [
-      {
-        "callback_type": "incoming_message",
-        "sid": "c5d40b17527aaf93b5ba0905287b1a24",
-        "from": "+919158455686",
-        "to": "+919211514326",
-        "profile_name": "Aman",
-        "content": {
-          "type": "text",
-          "text": { "body": "Hello" }
-        }
-      }
-    ]
-  }
+Exotel V2 API requires:
+```typescript
+// Required format
+content: {
+  type: "text",
+  text: { body: messageContent }  // nested object
 }
 ```
 
----
+This is why the Exotel raw response is empty - the API is rejecting the malformed payload silently.
 
-## Types of Callbacks Being Missed
+### Issue 3: Success Returned Despite Failures
 
-| Callback Type | Description | Data Location |
-|---------------|-------------|---------------|
-| `incoming_message` (text) | Customer sends text | `content.text.body` |
-| `incoming_message` (button) | Customer clicks quick-reply button | `content.button.text` |
-| `dlr` (Delivery Report) | Message delivered/seen | `exo_status_code`, `exo_detailed_status` |
+In `send-whatsapp-message/index.ts`, the function returns `success: true` even when:
+- Exotel returns an empty response (line 247-267)
+- Database insert fails (line 312-315)
 
 ---
 
-## Implementation Changes
+## Implementation Plan
 
-### File: `supabase/functions/whatsapp-webhook/index.ts`
+### Phase 1: Fix Exotel Text Message Payload
 
-1. **Update Interface Definitions** - Add new interfaces for nested Exotel format:
-   ```typescript
-   interface ExotelNestedMessage {
-     callback_type: 'incoming_message' | 'dlr';
-     sid: string;
-     from?: string;
-     to?: string;
-     profile_name?: string;
-     timestamp?: string;
-     content?: {
-       type: 'text' | 'button';
-       text?: { body: string };
-       button?: { payload: string; text: string };
-     };
-     exo_status_code?: number;
-     exo_detailed_status?: string;
-     description?: string;
-   }
-   
-   interface ExotelNestedPayload {
-     whatsapp: {
-       messages: ExotelNestedMessage[];
-     };
-   }
-   ```
+**File:** `supabase/functions/send-whatsapp-message/index.ts`
 
-2. **Add Payload Detection Function** - Detect and normalize both formats:
-   ```typescript
-   function parseExotelPayload(payload: any): {
-     type: 'inbound' | 'dlr' | 'unknown';
-     message: ExotelNestedMessage | null;
-   } {
-     // Check for nested format
-     if (payload?.whatsapp?.messages?.[0]) {
-       const msg = payload.whatsapp.messages[0];
-       const type = msg.callback_type === 'incoming_message' ? 'inbound' : 
-                    msg.callback_type === 'dlr' ? 'dlr' : 'unknown';
-       return { type, message: msg };
-     }
-     
-     // Legacy flat format fallback
-     if (payload?.sid || payload?.id) {
-       return {
-         type: payload.direction === 'inbound' ? 'inbound' : 'dlr',
-         message: payload
-       };
-     }
-     
-     return { type: 'unknown', message: null };
-   }
-   ```
+Update the text message payload structure (lines 213-226):
 
-3. **Update Validation Function** - Accept both formats:
-   ```typescript
-   function validateWebhookPayload(payload: any): boolean {
-     // Accept nested Exotel format
-     if (payload?.whatsapp?.messages?.length > 0) {
-       return true;
-     }
-     // Accept legacy flat format
-     return (
-       payload &&
-       (typeof payload.sid === 'string' || typeof payload.id === 'string') &&
-       (typeof payload.to === 'string' || typeof payload.from === 'string')
-     );
-   }
-   ```
+```typescript
+// Before
+content: {
+  type: "text",
+  text: messageContent
+}
 
-4. **Handle Inbound Messages** - Extract content from nested structure:
-   ```typescript
-   // For text messages
-   const messageBody = msg.content?.text?.body || '';
-   
-   // For button clicks (quick replies)
-   const buttonResponse = msg.content?.button?.text || '';
-   
-   // Combined content
-   const messageContent = messageBody || buttonResponse;
-   ```
-
-5. **Handle Delivery Reports (DLR)** - Map Exotel status codes:
-   ```typescript
-   const STATUS_MAP: Record<number, string> = {
-     30001: 'sent',        // EX_MESSAGE_SENT
-     30002: 'delivered',   // EX_MESSAGE_DELIVERED
-     30003: 'read',        // EX_MESSAGE_SEEN
-     30004: 'failed',      // EX_MESSAGE_FAILED
-   };
-   
-   const status = STATUS_MAP[msg.exo_status_code] || 'unknown';
-   ```
-
-6. **Use Profile Name for Contact Creation** - Exotel provides `profile_name`:
-   ```typescript
-   // When creating new contacts from inbound messages
-   const firstName = msg.profile_name || phoneNumber;
-   ```
-
----
-
-## Updated Processing Flow
-
-```text
-1. Receive webhook POST
-2. Parse JSON payload
-3. Detect format (nested vs flat)
-4. For nested format:
-   a. Extract message from whatsapp.messages[0]
-   b. Check callback_type
-   c. If 'incoming_message':
-      - Extract text from content.text.body OR content.button.text
-      - Find/create contact using profile_name
-      - Store message with direction='inbound'
-   d. If 'dlr':
-      - Map exo_status_code to status string
-      - Update existing message status
-5. Return success
+// After
+content: {
+  type: "text",
+  text: { body: messageContent }
+}
 ```
+
+Also fix response parsing to extract `sid` from nested Exotel V2 response:
+
+```typescript
+const exotelSid = exotelResult.response?.whatsapp?.messages?.[0]?.data?.sid 
+  || exotelResult.sid 
+  || exotelResult.id;
+```
+
+### Phase 2: Fix Contact ID Resolution
+
+**Approach A (Recommended):** Resolve the actual contact ID in the edge function using phone number
+
+Modify `send-whatsapp-message/index.ts` to:
+1. Accept `contactId` as optional
+2. Look up or create contact from phone number if not provided
+3. Use the resolved contact ID for database operations
+
+This is more resilient since:
+- It ensures the correct contact is always found
+- Creates a contact if one doesn't exist for the phone number
+- Works regardless of what the frontend passes
+
+**Alternative Approach B:** Fix the calling components
+
+Update these components to pass the correct contact ID:
+- `src/components/LOS/Relationships/ApplicationCard.tsx`
+- `src/components/LOS/ApplicantProfileCard.tsx`
+
+This requires finding/fetching the contact associated with each loan application.
+
+### Phase 3: Improve Error Handling
+
+**File:** `supabase/functions/send-whatsapp-message/index.ts`
+
+1. Check for empty Exotel response and treat as failure
+2. If database insert fails, still return the Exotel message ID but indicate partial success
+3. Return proper error structure so UI can display issues
+
+### Phase 4: Update Frontend Error Handling (Optional)
+
+**File:** `src/components/LOS/Relationships/WhatsAppChatDialog.tsx`
+
+Improve error detection in `sendFollowUpMessage` to handle edge cases where the response looks successful but message wasn't stored.
 
 ---
 
@@ -180,22 +134,104 @@ The `whatsapp-webhook` edge function is receiving WhatsApp responses from Exotel
 
 | File | Changes |
 |------|---------|
-| `supabase/functions/whatsapp-webhook/index.ts` | Full refactor to handle nested payload format |
+| `supabase/functions/send-whatsapp-message/index.ts` | Fix text payload format, add contact resolution, improve error handling |
+| `src/components/LOS/Relationships/ApplicationCard.tsx` | (Optional) Pass correct contact_id |
+| `src/components/LOS/ApplicantProfileCard.tsx` | (Optional) Pass correct contact_id |
 
 ---
 
-## Testing Plan
+## Technical Details
 
-After deployment:
-1. Send a WhatsApp template message to a test number
-2. Have the recipient reply with text - verify it appears in chat
-3. Have the recipient click a quick-reply button - verify button response recorded
-4. Check that delivery/read receipts update message status
+### Exotel V2 Correct Payload Structure
+
+```typescript
+{
+  whatsapp: {
+    messages: [{
+      from: "+91XXXXXXXXXX",
+      to: "91XXXXXXXXXX",
+      content: {
+        type: "text",
+        text: { 
+          body: "Your message content here" 
+        }
+      }
+    }]
+  }
+}
+```
+
+### Exotel V2 Response Structure
+
+```typescript
+{
+  response: {
+    whatsapp: {
+      messages: [{
+        data: {
+          sid: "message_sid_here",
+          from: "+91XXXXXXXXXX",
+          to: "91XXXXXXXXXX"
+        }
+      }]
+    }
+  }
+}
+```
+
+### Contact Resolution Logic
+
+```typescript
+// In edge function
+async function resolveContactId(
+  supabaseClient: any,
+  phoneNumber: string,
+  orgId: string,
+  providedContactId?: string
+): Promise<string> {
+  // If valid contact ID provided, verify it exists
+  if (providedContactId) {
+    const { data: contact } = await supabaseClient
+      .from('contacts')
+      .select('id')
+      .eq('id', providedContactId)
+      .single();
+    
+    if (contact) return contact.id;
+  }
+  
+  // Look up contact by phone number
+  const { data: existingContact } = await supabaseClient
+    .from('contacts')
+    .select('id')
+    .eq('phone', phoneNumber)
+    .eq('org_id', orgId)
+    .single();
+  
+  if (existingContact) return existingContact.id;
+  
+  // Create new contact if not found
+  const { data: newContact } = await supabaseClient
+    .from('contacts')
+    .insert({
+      phone: phoneNumber,
+      org_id: orgId,
+      first_name: phoneNumber, // Placeholder
+      source: 'whatsapp'
+    })
+    .select('id')
+    .single();
+  
+  return newContact?.id;
+}
+```
 
 ---
 
-## Additional Notes
+## Testing Checklist
 
-- The code will support **both** payload formats for backward compatibility
-- Button responses (quick-reply clicks) will be stored as regular inbound messages
-- The `profile_name` field will be used for better contact names instead of phone numbers
+- [ ] Send a follow-up text message and verify it appears in chat
+- [ ] Verify message is stored in `whatsapp_messages` table with correct `contact_id`
+- [ ] Verify Exotel actually receives the message (check their logs/webhook)
+- [ ] Test error scenarios (invalid phone, network failure) show proper UI feedback
+- [ ] Test conversation template still works correctly
