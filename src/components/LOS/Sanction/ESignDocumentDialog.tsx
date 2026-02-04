@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
@@ -59,6 +59,10 @@ export default function ESignDocumentDialog({
   const [signerMobile, setSignerMobile] = useState(defaultSignerMobile);
   const [appearance, setAppearance] = useState<AppearancePosition>("bottom-right");
   const [signerUrl, setSignerUrl] = useState<string | null>(null);
+  
+  // Notification override fields (for testing or different notification recipient)
+  const [notificationPhone, setNotificationPhone] = useState(defaultSignerMobile);
+  const [notificationEmail, setNotificationEmail] = useState(defaultSignerEmail);
 
   // Auto-detect active Nupay environment from DB
   const { data: nupayConfig } = useQuery({
@@ -89,10 +93,10 @@ export default function ESignDocumentDialog({
       return;
     }
 
-    // Validate mobile number
-    const cleanMobile = signerMobile.replace(/\D/g, "");
+    // Validate notification mobile number
+    const cleanMobile = notificationPhone.replace(/\D/g, "");
     if (cleanMobile.length < 10) {
-      toast.error("Please enter a valid 10-digit mobile number");
+      toast.error("Please enter a valid 10-digit notification mobile number");
       return;
     }
 
@@ -103,7 +107,7 @@ export default function ESignDocumentDialog({
         documentId,
         documentType,
         signerName,
-        signerEmail: signerEmail || undefined,
+        signerEmail: notificationEmail || undefined,
         signerMobile: cleanMobile,
         appearance,
         environment: activeEnvironment,
@@ -137,12 +141,17 @@ export default function ESignDocumentDialog({
     onOpenChange(false);
   };
 
-  // Update form when defaults change
-  useState(() => {
-    setSignerName(defaultSignerName);
-    setSignerEmail(defaultSignerEmail);
-    setSignerMobile(defaultSignerMobile);
-  });
+  // Reset form when dialog opens
+  useEffect(() => {
+    if (open) {
+      setSignerName(defaultSignerName);
+      setSignerEmail(defaultSignerEmail);
+      setSignerMobile(defaultSignerMobile);
+      setNotificationPhone(defaultSignerMobile);
+      setNotificationEmail(defaultSignerEmail);
+      setSignerUrl(null);
+    }
+  }, [open, defaultSignerName, defaultSignerEmail, defaultSignerMobile]);
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -210,6 +219,40 @@ export default function ESignDocumentDialog({
                   <SelectItem value="top-left">Top Left</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <hr className="my-4" />
+            <p className="text-sm font-medium text-muted-foreground">Notification Settings</p>
+            <p className="text-xs text-muted-foreground mb-2">
+              The signing link will be sent to these contacts
+            </p>
+
+            <div className="space-y-2">
+              <Label htmlFor="notifPhone">Notification Mobile</Label>
+              <Input
+                id="notifPhone"
+                value={notificationPhone}
+                onChange={(e) => setNotificationPhone(e.target.value)}
+                placeholder="10-digit mobile number"
+                type="tel"
+              />
+              <p className="text-xs text-muted-foreground">
+                WhatsApp message with signing link will be sent here
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="notifEmail">Notification Email (Optional)</Label>
+              <Input
+                id="notifEmail"
+                type="email"
+                value={notificationEmail}
+                onChange={(e) => setNotificationEmail(e.target.value)}
+                placeholder="email@example.com"
+              />
+              <p className="text-xs text-muted-foreground">
+                Email with signing link will be sent here
+              </p>
             </div>
 
             <DialogFooter>
