@@ -257,13 +257,13 @@ async function processForSign(
 
   console.log(`[E-Sign] Process payload:`, JSON.stringify(payload, null, 2));
   console.log(`[E-Sign] Process request URL: ${processEndpoint}`);
-  console.log(`[E-Sign] Process request headers: api-key=${apiKey.substring(0, 10)}..., Authorization=Bearer ${token.substring(0, 20)}...`);
+  console.log(`[E-Sign] Process request headers: api-key=${apiKey.substring(0, 10)}..., Token=${token.substring(0, 20)}...`);
 
   const processResponse = await fetch(processEndpoint, {
     method: "POST",
     headers: {
       "api-key": apiKey,
-      "Authorization": `Bearer ${token}`,  // JSON APIs use Authorization: Bearer (unlike multipart which uses Token)
+      "Token": token,  // SignDocument API uses Token header for all requests
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
@@ -399,13 +399,26 @@ serve(async (req) => {
       refNo
     );
 
-    // Step 2: Process for signing - use same token with different header format (Authorization: Bearer for JSON APIs)
-    console.log("[E-Sign] Step 2: Processing document for signing...");
+    // Step 2: Process for signing - get FRESH token (Nupay invalidates token after upload)
+    console.log("[E-Sign] Step 2: Waiting 2 seconds then getting fresh token...");
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    const token2 = await getNewToken(apiEndpoint, apiKey);
+    console.log(`[E-Sign] Step 2: Fresh token obtained: ${token2.substring(0, 20)}...`);
+    
+    if (token === token2) {
+      console.warn("[E-Sign] WARNING: Tokens are identical - extending wait time");
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      const token3 = await getNewToken(apiEndpoint, apiKey);
+      console.log(`[E-Sign] Step 2: Third attempt token: ${token3.substring(0, 20)}...`);
+    }
+    
+    const finalToken = token === token2 ? await getNewToken(apiEndpoint, apiKey) : token2;
     
     const { signerUrl, docketId, documentId: nupayDocumentId } = await processForSign(
       apiEndpoint,
       apiKey,
-      token,  // Same token works - JSON APIs just need Authorization: Bearer header format
+      finalToken,  // Use fresh token for Step 2
       refNo,
       nupayRefNo,
       signer_name,
