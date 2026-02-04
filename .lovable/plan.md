@@ -1,51 +1,86 @@
 
-# Add Notification Override Fields to eMandate Dialog
+# Fix: E-Sign Dialog Notification Override Fields (Like eMandate)
 
 ## Problem Summary
-When creating an eMandate, notifications (WhatsApp + Email) are sent to the **primary applicant's stored contact details** rather than allowing you to specify different recipients for testing or when the account holder differs from the primary applicant.
+The E-Sign dialog currently allows editing signer details, but:
+1. **Unclear labels** - Fields labeled "Mobile Number" and "Email" don't make it clear that the signing link notifications will be sent there
+2. **Bug** - Lines 141-145 use `useState()` incorrectly as an initializer instead of `useEffect` for syncing props to state
+3. **No visual distinction** - Unlike the updated eMandate dialog, there's no "Notification Settings" section to clarify where the signing URL will be sent
 
 ## Solution Overview
-Add editable "Notification Phone" and "Notification Email" fields to the eMandate dialog that:
-1. Pre-populate with the primary applicant's details (current behavior)
-2. Allow you to override them for testing or different account holders
-3. Pass the overridden values to the notification edge function
+Update `ESignDocumentDialog.tsx` to:
+1. Fix the state sync bug (replace useState with useEffect)
+2. Add separate "Notification Settings" section with clear labels
+3. Add notification phone/email state variables (separate from signer details)
+4. Update help text to make it clear these are where the signing link goes
 
 ---
 
 ## Changes Required
 
-### File 1: `src/components/LOS/Mandate/CreateMandateDialog.tsx`
+### File: `src/components/LOS/Sanction/ESignDocumentDialog.tsx`
 
-**Add new state variables** for notification overrides (after line 80):
+#### Change 1: Add notification override state variables (after line 61)
 ```typescript
-// Notification override fields (for testing or different account holder)
-const [notificationPhone, setNotificationPhone] = useState(applicantPhone);
-const [notificationEmail, setNotificationEmail] = useState(applicantEmail || "");
+// Notification override fields (for testing or different notification recipient)
+const [notificationPhone, setNotificationPhone] = useState(defaultSignerMobile);
+const [notificationEmail, setNotificationEmail] = useState(defaultSignerEmail);
 ```
 
-**Update useEffect** to reset notification fields when dialog opens (around line 191):
+#### Change 2: Fix the state sync bug - replace incorrect useState with useEffect (lines 141-145)
+**Before:**
 ```typescript
-setNotificationPhone(applicantPhone);
-setNotificationEmail(applicantEmail || "");
+// Update form when defaults change
+useState(() => {
+  setSignerName(defaultSignerName);
+  setSignerEmail(defaultSignerEmail);
+  setSignerMobile(defaultSignerMobile);
+});
 ```
 
-**Add notification fields to Step 2 (Account Details)** - after the Account Type selector (around line 335):
+**After:**
+```typescript
+// Reset form when dialog opens
+useEffect(() => {
+  if (open) {
+    setSignerName(defaultSignerName);
+    setSignerEmail(defaultSignerEmail);
+    setSignerMobile(defaultSignerMobile);
+    setNotificationPhone(defaultSignerMobile);
+    setNotificationEmail(defaultSignerEmail);
+    setSignerUrl(null);
+  }
+}, [open, defaultSignerName, defaultSignerEmail, defaultSignerMobile]);
+```
+
+#### Change 3: Add import for useEffect (line 1)
+```typescript
+import { useState, useEffect } from "react";
+```
+
+#### Change 4: Add Notification Settings section to the form (after Signature Position, around line 213)
 ```typescript
 <hr className="my-4" />
 <p className="text-sm font-medium text-muted-foreground">Notification Settings</p>
-<div>
+<p className="text-xs text-muted-foreground mb-2">
+  The signing link will be sent to these contacts
+</p>
+
+<div className="space-y-2">
   <Label htmlFor="notifPhone">Notification Mobile</Label>
   <Input
     id="notifPhone"
     value={notificationPhone}
     onChange={(e) => setNotificationPhone(e.target.value)}
     placeholder="10-digit mobile number"
+    type="tel"
   />
-  <p className="text-xs text-muted-foreground mt-1">
-    Registration link will be sent to this number
+  <p className="text-xs text-muted-foreground">
+    WhatsApp message with signing link will be sent here
   </p>
 </div>
-<div>
+
+<div className="space-y-2">
   <Label htmlFor="notifEmail">Notification Email (Optional)</Label>
   <Input
     id="notifEmail"
@@ -54,45 +89,63 @@ setNotificationEmail(applicantEmail || "");
     onChange={(e) => setNotificationEmail(e.target.value)}
     placeholder="email@example.com"
   />
+  <p className="text-xs text-muted-foreground">
+    Email with signing link will be sent here
+  </p>
 </div>
 ```
 
-**Update mutation payload** to use notification overrides (lines 149-150):
+#### Change 5: Update mutation call to use notification values (around line 107)
+**Before:**
 ```typescript
-mobile_no: notificationPhone.replace(/\D/g, "").slice(-10),
-email: notificationEmail || undefined,
+signerEmail: signerEmail || undefined,
+signerMobile: cleanMobile,
 ```
 
-**Add notification details to confirmation step** (around line 445):
+**After:**
 ```typescript
-<hr />
-<div className="flex justify-between">
-  <span className="text-muted-foreground">Notify Mobile</span>
-  <span className="font-medium">{notificationPhone}</span>
-</div>
-{notificationEmail && (
-  <div className="flex justify-between">
-    <span className="text-muted-foreground">Notify Email</span>
-    <span className="font-medium">{notificationEmail}</span>
-  </div>
-)}
+signerEmail: notificationEmail || undefined,
+signerMobile: notificationPhone.replace(/\D/g, ""),
+```
+
+#### Change 6: Update validation to use notification phone (around line 93-97)
+**Before:**
+```typescript
+const cleanMobile = signerMobile.replace(/\D/g, "");
+if (cleanMobile.length < 10) {
+  toast.error("Please enter a valid 10-digit mobile number");
+  return;
+}
+```
+
+**After:**
+```typescript
+const cleanMobile = notificationPhone.replace(/\D/g, "");
+if (cleanMobile.length < 10) {
+  toast.error("Please enter a valid 10-digit notification mobile number");
+  return;
+}
 ```
 
 ---
 
-## Technical Details
+## Technical Summary
 
-| Field | Default Value | Editable | Used For |
-|-------|--------------|----------|----------|
-| notificationPhone | Primary applicant's phone | Yes | WhatsApp notification |
-| notificationEmail | Primary applicant's email | Yes | Email notification |
+| Component | Current State | Updated State |
+|-----------|--------------|---------------|
+| Signer Name | Form field for Aadhaar name | Unchanged (used for signing) |
+| Signer Mobile | Form field (used for signing + notification) | Separate from notification mobile |
+| Signer Email | Form field (used for signing + notification) | Separate from notification email |
+| Notification Mobile | N/A | New editable field |
+| Notification Email | N/A | New editable field |
+
+---
 
 ## Verification Steps
 After implementation:
 1. Open a loan application in disbursement stage
-2. Click "Register eMandate"
-3. Complete Step 1 (Bank Selection)
-4. On Step 2 (Account Details), verify new "Notification Settings" section appears
-5. Change the Notification Mobile and Email to test values
-6. Complete the mandate creation
-7. Verify notifications are sent to your test contact details
+2. Click "E-Sign" on the Combined Loan Pack
+3. Verify "Notification Settings" section appears below "Signature Position"
+4. Enter different test values for Notification Mobile and Email
+5. Submit the e-sign request
+6. Verify WhatsApp and Email are sent to the test contacts (not the applicant's original details)
