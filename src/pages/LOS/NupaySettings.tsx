@@ -69,9 +69,11 @@ const NupaySettings = () => {
   // eMandate Form states
   const [uatApiKey, setUatApiKey] = useState("");
   const [uatEndpoint, setUatEndpoint] = useState("https://nachuat.nupaybiz.com");
+  const [uatEsignEndpoint, setUatEsignEndpoint] = useState("https://esignuat.nupaybiz.com");
   const [uatRedirectUrl, setUatRedirectUrl] = useState("");
   const [prodApiKey, setProdApiKey] = useState("");
   const [prodEndpoint, setProdEndpoint] = useState("https://nach.nupaybiz.com");
+  const [prodEsignEndpoint, setProdEsignEndpoint] = useState("https://esign.nupaybiz.com");
   const [prodRedirectUrl, setProdRedirectUrl] = useState("");
   
   // Collection 360 Form states
@@ -105,6 +107,7 @@ const NupaySettings = () => {
       if (uatConfig) {
         setUatApiKey(uatConfig.api_key || "");
         setUatEndpoint(uatConfig.api_endpoint || "https://nachuat.nupaybiz.com");
+        setUatEsignEndpoint((uatConfig as unknown as { esign_api_endpoint?: string }).esign_api_endpoint || "https://esignuat.nupaybiz.com");
         setUatRedirectUrl(uatConfig.redirect_url || "");
         // Collection 360 fields
         setUatAccessKey(uatConfig.access_key || "");
@@ -116,6 +119,7 @@ const NupaySettings = () => {
       if (prodConfig) {
         setProdApiKey(prodConfig.api_key || "");
         setProdEndpoint(prodConfig.api_endpoint || "https://nach.nupaybiz.com");
+        setProdEsignEndpoint((prodConfig as unknown as { esign_api_endpoint?: string }).esign_api_endpoint || "https://esign.nupaybiz.com");
         setProdRedirectUrl(prodConfig.redirect_url || "");
         // Collection 360 fields
         setProdAccessKey(prodConfig.access_key || "");
@@ -168,10 +172,11 @@ const NupaySettings = () => {
 
   // Save eMandate config mutation
   const saveConfigMutation = useMutation({
-    mutationFn: async ({ environment, apiKey, endpoint, redirectUrl, isActive }: {
+    mutationFn: async ({ environment, apiKey, endpoint, esignEndpoint, redirectUrl, isActive }: {
       environment: "uat" | "production";
       apiKey: string;
       endpoint: string;
+      esignEndpoint: string;
       redirectUrl: string;
       isActive: boolean;
     }) => {
@@ -186,6 +191,7 @@ const NupaySettings = () => {
           environment,
           api_key: apiKey,
           api_endpoint: endpoint,
+          esign_api_endpoint: esignEndpoint || null,
           webhook_url: webhookUrl,
           redirect_url: redirectUrl || null,
           is_active: isActive,
@@ -413,13 +419,25 @@ const NupaySettings = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="uatEndpoint">API Endpoint</Label>
+                  <Label htmlFor="uatEndpoint">eMandate API Endpoint</Label>
                   <Input
                     id="uatEndpoint"
                     value={uatEndpoint}
                     onChange={(e) => setUatEndpoint(e.target.value)}
                     placeholder="https://nachuat.nupaybiz.com"
                   />
+                </div>
+                <div>
+                  <Label htmlFor="uatEsignEndpoint">E-Sign API Endpoint</Label>
+                  <Input
+                    id="uatEsignEndpoint"
+                    value={uatEsignEndpoint}
+                    onChange={(e) => setUatEsignEndpoint(e.target.value)}
+                    placeholder="https://esignuat.nupaybiz.com"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Separate endpoint for Aadhaar e-signature service
+                  </p>
                 </div>
                 <div>
                   <Label>Webhook URL</Label>
@@ -454,6 +472,7 @@ const NupaySettings = () => {
                     environment: "uat",
                     apiKey: uatApiKey,
                     endpoint: uatEndpoint,
+                    esignEndpoint: uatEsignEndpoint,
                     redirectUrl: uatRedirectUrl,
                     isActive: uatConfig?.is_active || false,
                   })}
@@ -502,13 +521,25 @@ const NupaySettings = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="prodEndpoint">API Endpoint</Label>
+                  <Label htmlFor="prodEndpoint">eMandate API Endpoint</Label>
                   <Input
                     id="prodEndpoint"
                     value={prodEndpoint}
                     onChange={(e) => setProdEndpoint(e.target.value)}
                     placeholder="https://nach.nupaybiz.com"
                   />
+                </div>
+                <div>
+                  <Label htmlFor="prodEsignEndpoint">E-Sign API Endpoint</Label>
+                  <Input
+                    id="prodEsignEndpoint"
+                    value={prodEsignEndpoint}
+                    onChange={(e) => setProdEsignEndpoint(e.target.value)}
+                    placeholder="https://esign.nupaybiz.com"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Separate endpoint for Aadhaar e-signature service
+                  </p>
                 </div>
                 <div>
                   <Label>Webhook URL</Label>
@@ -540,6 +571,7 @@ const NupaySettings = () => {
                     environment: "production",
                     apiKey: prodApiKey,
                     endpoint: prodEndpoint,
+                    esignEndpoint: prodEsignEndpoint,
                     redirectUrl: prodRedirectUrl,
                     isActive: prodConfig?.is_active || false,
                   })}
