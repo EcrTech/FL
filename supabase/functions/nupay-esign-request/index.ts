@@ -357,11 +357,13 @@ serve(async (req) => {
       throw new Error("Nupay configuration not found or inactive");
     }
 
-    const configData = config as { api_endpoint: string; api_key: string; esign_api_endpoint?: string };
+    const configData = config as { api_endpoint: string; api_key: string; esign_api_endpoint?: string; esign_api_key?: string };
     // Use esign_api_endpoint if available, otherwise fall back to api_endpoint
     const apiEndpoint = configData.esign_api_endpoint || configData.api_endpoint;
-    const apiKey = configData.api_key;
+    // Use esign_api_key if available (for separate eSign credentials), otherwise fall back to api_key
+    const apiKey = configData.esign_api_key || configData.api_key;
     console.log(`[E-Sign] Using API endpoint: ${apiEndpoint}`);
+    console.log(`[E-Sign] Using ${configData.esign_api_key ? 'separate eSign API key' : 'shared API key'}`);
 
     // Generate PDF
     console.log("[E-Sign] Generating PDF document...");
