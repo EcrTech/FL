@@ -378,29 +378,26 @@ serve(async (req) => {
 
     console.log(`[E-Sign] Generated ref_no: ${refNo}`);
 
-    // Step 1: Get fresh token for upload
-    console.log("[E-Sign] Getting fresh token for Step 1 (Upload)...");
-    const token1 = await getNewToken(apiEndpoint, apiKey);
+    // Get single token for the entire eSign session (Nupay requires same token for upload + process)
+    console.log("[E-Sign] Getting token for eSign session...");
+    const token = await getNewToken(apiEndpoint, apiKey);
 
     // Step 1: Upload document to Nupay
     const { nupayRefNo } = await uploadDocumentToNupay(
       apiEndpoint,
       apiKey,
-      token1,
+      token,
       pdfBytes,
       documentTitle,
       refNo
     );
 
-    // Step 2: Get FRESH token for processForSign (critical - tokens may be single-use)
-    console.log("[E-Sign] Getting fresh token for Step 2 (Process)...");
-    const token2 = await getNewToken(apiEndpoint, apiKey);
-
-    // Step 2: Process for signing (add signers) - use FRESH token
+    // Step 2: Process for signing - use SAME token (Nupay session requirement)
+    console.log("[E-Sign] Step 2: Using same session token for processForSign...");
     const { signerUrl, docketId, documentId: nupayDocumentId } = await processForSign(
       apiEndpoint,
       apiKey,
-      token2,
+      token,
       refNo,
       nupayRefNo,
       signer_name,
