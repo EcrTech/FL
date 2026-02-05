@@ -1,97 +1,89 @@
 
-# Fix NACH Status Check Error
+# Fix eMandate Status Not Updating After Successful Registration
 
-## Problem
+## Problem Identified
 
-The "Check Status" button for eMandate/NACH is failing with error:
-```
-"org_id and environment are required"
-```
+The Nupay API returns status data in a **nested structure**, but the edge function is trying to access fields at the **top level**.
 
-The `nupay-get-status` edge function requires an `environment` parameter ("uat" or "production"), but the frontend is not sending it.
-
-## Current Request Payload (Missing `environment`)
+### Actual API Response Structure
 ```json
 {
-  "org_id": "UUID",
-  "mandate_id": "UUID", 
-  "nupay_id": "NUPAY-REF-ID"
+  "StatusCode": "NP000",
+  "data": {
+    "customer": {
+      "accptd": "accepted",
+      "umrn": "ICIC7030502261009198",
+      "npci_ref_no": "123f6d3d5777b547b5b8ad9681224cd7",
+      "reason_code": "000",
+      "reason_desc": "accepted",
+      "reject_by": "NA",
+      ...
+    }
+  }
 }
 ```
 
-## Required Request Payload
-```json
-{
-  "org_id": "UUID",
-  "environment": "uat",  // <-- MISSING
-  "mandate_id": "UUID",
-  "nupay_id": "NUPAY-REF-ID"
-}
+### Current Code (Incorrect)
+```typescript
+const nupayStatus = statusData.accptd || statusData.status;  // Looking at root level
+const umrn = statusData.umrn || statusData.UMRN;             // Also root level
+```
+
+### What It Should Be
+```typescript
+const customerData = statusData.data?.customer || statusData.Data?.customer || {};
+const nupayStatus = customerData.accptd || statusData.accptd;  // Check nested first
+const umrn = customerData.umrn;
 ```
 
 ## Solution
 
-Update `EMandateSection.tsx` to fetch the active Nupay configuration and include the `environment` in the status check call.
+Update `nupay-get-status/index.ts` to correctly extract data from the nested `data.customer` object.
 
 ## Implementation
 
-### File: `src/components/LOS/Disbursement/EMandateSection.tsx`
+### File: `supabase/functions/nupay-get-status/index.ts`
 
-1. **Add a query to fetch the active Nupay config** (similar to `CreateMandateDialog`):
-
-```typescript
-// Add after the mandate query (around line 68)
-const { data: nupayConfig } = useQuery({
-  queryKey: ["nupay-config", orgId],
-  queryFn: async () => {
-    const { data, error } = await supabase
-      .from("nupay_config")
-      .select("environment")
-      .eq("org_id", orgId)
-      .eq("is_active", true)
-      .maybeSingle();
-    
-    if (error && error.code !== "PGRST116") {
-      console.error("Error fetching Nupay config:", error);
-    }
-    return data;
-  },
-  enabled: !!orgId,
-});
-```
-
-2. **Update `handleCheckStatus` to include the environment** (lines 78-84):
+**Lines 145-162** - Update the data extraction logic:
 
 ```typescript
-const response = await supabase.functions.invoke("nupay-get-status", {
-  body: {
-    org_id: orgId,
-    environment: nupayConfig?.environment || "uat",  // Add this
-    mandate_id: mandateData.id,
-    nupay_id: mandateData.nupay_id,
-  },
-});
+// Extract customer data from nested structure
+// API returns: { StatusCode, data: { customer: { ... } } }
+const customerData = statusData.data?.customer || statusData.Data?.customer || {};
+
+// Map Nupay status to our status
+const nupayStatus = customerData.accptd || statusData.accptd || statusData.status || statusData.Status;
+let newStatus = mandate.status;
+
+if (nupayStatus === "accepted" || nupayStatus === "Accepted" || nupayStatus === "SUCCESS") {
+  newStatus = "accepted";
+} else if (nupayStatus === "rejected" || nupayStatus === "Rejected" || nupayStatus === "FAILED") {
+  newStatus = "rejected";
+} else if (nupayStatus === "pending" || nupayStatus === "Pending") {
+  newStatus = "submitted";
+}
+
+// Extract additional fields from nested customer data
+const umrn = customerData.umrn || customerData.UMRN || statusData.umrn;
+const npciRef = customerData.npci_ref_no || customerData.npci_ref || statusData.npci_ref;
+const reasonCode = customerData.reason_code || statusData.reason_code;
+const reasonDesc = customerData.reason_desc || statusData.reason_desc;
+const rejectedBy = customerData.reject_by || statusData.reject_by;
 ```
 
-3. **Optionally disable the Check Status button if config is missing**:
-
-```typescript
-disabled={isCheckingStatus || !nupayConfig}
-```
-
-## Changes Summary
+## Technical Summary
 
 | Location | Change |
 |----------|--------|
-| Line ~68 | Add `useQuery` to fetch `nupay_config.environment` |
-| Line 80 | Add `environment: nupayConfig?.environment \|\| "uat"` to request body |
-| Line 239 (optional) | Disable button if `!nupayConfig` |
+| Line 145-146 | Add extraction of nested `data.customer` object |
+| Line 146 | Check `customerData.accptd` first, then fallback to root level |
+| Lines 158-162 | Extract UMRN, NPCI ref, reason codes from `customerData` |
 
-## Why This Fixes It
+## Why This Works
 
-The edge function uses `environment` to:
-1. Call `nupay-authenticate` with the correct environment
-2. Fetch the matching `nupay_config` row (UAT vs Production API endpoints)
-3. Make API calls to the correct Nupay server
+The Nupay getStatus API wraps the actual mandate data inside `data.customer`. By first extracting this nested object, we can correctly read:
+- `accptd: "accepted"` → Updates status to "accepted"
+- `umrn: "ICIC7030502261009198"` → Saved to mandate record
+- `npci_ref_no` → NPCI reference number
 
-Without `environment`, the function immediately returns a 400 error.
+After this fix, clicking "Check Status" will correctly update the mandate status from "submitted" to "accepted", and the UI will display the proper "Active" badge.
