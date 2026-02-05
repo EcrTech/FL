@@ -191,8 +191,12 @@ serve(async (req) => {
     }
 
     // Parse status from response
-    const signerInfo = statusData.data?.signer_info?.[0] || statusData.signer_info?.[0];
-    const signerStatus = signerInfo?.status || statusData.status;
+    // Nupay uses PascalCase "Data" in response
+    const signerInfo = statusData.Data?.signer_info?.[0] || statusData.data?.signer_info?.[0] || statusData.signer_info?.[0];
+    const dataStatus = statusData.Data?.status || statusData.data?.status || statusData.status;
+    const signerStatus = signerInfo?.status || dataStatus;
+
+    console.log(`[E-Sign-Status] Parsed signer status: ${signerStatus}, signer info:`, JSON.stringify(signerInfo));
 
     let newStatus = esignRecord.status;
     let signedAt = null;
@@ -204,11 +208,13 @@ serve(async (req) => {
 
       // Try to download signed document from Nupay
       // Nupay may provide signed_document as base64 or a download URL
-      const signedDocBase64 = statusData.data?.signed_document || 
+      const signedDocBase64 = statusData.Data?.signed_document ||
+                               statusData.data?.signed_document || 
                                statusData.signed_document ||
                                signerInfo?.signed_document;
       
-      const signedDocUrl = statusData.data?.signed_document_url || 
+      const signedDocUrl = statusData.Data?.signed_document_url ||
+                           statusData.data?.signed_document_url || 
                            statusData.signed_document_url ||
                            signerInfo?.signed_document_url ||
                            signerInfo?.download_url;
