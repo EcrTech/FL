@@ -1,115 +1,110 @@
 
-
-# Fix: Download Signed Document from Nupay
+# Add Name and Loan Number Search to Sanctions Page
 
 ## Problem Summary
 
-The "View Signed Document" button is not showing because the signed PDF is never downloaded. The Nupay `documentStatus` API only returns the signing status, not the actual signed document. A separate download API call is required.
+The Sanctions page (`/los/sanctions`) currently has filters for status, amount range, date range, and approver - but **no search functionality** to quickly find applications by:
+- Applicant name
+- Loan ID / Application number
 
-## Current Behavior
+## Current State
 
-1. User signs the document via Nupay
-2. "Check Status" correctly updates status to "signed"
-3. `signed_document_path` stays NULL (no document downloaded)
-4. "View Signed Document" button never appears
+The Sanctions page filter bar includes:
+- Status filter (New, Pending, Emailed, Signed)
+- Amount range (Min/Max)
+- Date range picker
+- Approved By dropdown
+- Clear filters button
+
+**Missing**: A text search box for name/loan number lookup.
 
 ## Solution
 
-Add a new API call to Nupay's document download endpoint after detecting "signed" status.
+Add a prominent search input field that filters applications by:
+- Applicant name (partial match)
+- Loan ID (partial match)
+- Application number (partial match)
 
-### Technical Details
+## Implementation Details
 
-Based on Nupay's API patterns, the signed document is likely available at:
-- `/api/SignDocument/downloadDocument` with the `document_id`
+### Changes to `src/pages/LOS/Sanctions.tsx`
 
-### Changes Required
+1. **Add search state variable**
+   ```typescript
+   const [searchTerm, setSearchTerm] = useState<string>("");
+   ```
 
-#### 1. Update `nupay-esign-status/index.ts`
+2. **Add Search icon import**
+   ```typescript
+   import { Search, Eye, CheckCircle, ... } from "lucide-react";
+   ```
 
-Add document download logic after status is "signed":
+3. **Add search input to filter bar** (before the status filter)
+   ```typescript
+   <div className="relative">
+     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+     <Input
+       placeholder="Search by name or loan number..."
+       value={searchTerm}
+       onChange={(e) => setSearchTerm(e.target.value)}
+       className="pl-10 w-[250px]"
+     />
+   </div>
+   ```
+
+4. **Update filter logic** to include search:
+   ```typescript
+   const filteredApplications = applications?.filter((app) => {
+     // Search filter (name, loan_id, application_number)
+     if (searchTerm) {
+       const search = searchTerm.toLowerCase();
+       const matchesName = app.applicant_name?.toLowerCase().includes(search);
+       const matchesLoanId = app.loan_id?.toLowerCase().includes(search);
+       const matchesAppNumber = app.application_number?.toLowerCase().includes(search);
+       if (!matchesName && !matchesLoanId && !matchesAppNumber) return false;
+     }
+     
+     // ... existing filters
+   });
+   ```
+
+5. **Update hasActiveFilters** to include search:
+   ```typescript
+   const hasActiveFilters = searchTerm || statusFilter !== "all" || ...;
+   ```
+
+6. **Update clearFilters** to reset search:
+   ```typescript
+   const clearFilters = () => {
+     setSearchTerm("");
+     setStatusFilter("all");
+     // ...
+   };
+   ```
+
+## Visual Layout
 
 ```text
-┌─────────────────────────────────────────────────────┐
-│  Current Flow                                        │
-├─────────────────────────────────────────────────────┤
-│  1. Call documentStatus API                         │
-│  2. Check if signed_document in response (NONE)     │
-│  3. Update status to "signed"                       │
-│  4. signed_document_path = NULL                     │
-└─────────────────────────────────────────────────────┘
+Current Layout:
+┌─────────────────────────────────────────────────────────────────────┐
+│ [Filter icon] [Status ▼] [Min ₹ - Max ₹] [Date range] [Approved ▼] │
+└─────────────────────────────────────────────────────────────────────┘
 
-┌─────────────────────────────────────────────────────┐
-│  New Flow                                           │
-├─────────────────────────────────────────────────────┤
-│  1. Call documentStatus API                         │
-│  2. If status = "signed":                           │
-│     a. Call downloadDocument API                    │
-│     b. Receive signed PDF                           │
-│     c. Upload to Supabase Storage                   │
-│  3. Update status with signed_document_path         │
-└─────────────────────────────────────────────────────┘
+New Layout:
+┌───────────────────────────────────────────────────────────────────────────────────┐
+│ [🔍 Search by name or loan number...] [Status ▼] [Min-Max] [Date] [Approved ▼]   │
+└───────────────────────────────────────────────────────────────────────────────────┘
 ```
-
-**New Code to Add (after line 220):**
-
-```typescript
-// If no document in status response, try separate download API
-if (!signedDocBase64 && !signedDocUrl && esignRecord.nupay_document_id) {
-  console.log("[E-Sign-Status] Trying separate download API");
-  
-  // Get fresh token for download
-  const downloadToken = await getNewToken(baseEndpoint, config.api_key);
-  
-  const downloadEndpoint = `${baseEndpoint}/api/SignDocument/downloadDocument`;
-  const downloadResponse = await fetch(downloadEndpoint, {
-    method: "POST",
-    headers: {
-      "api-key": config.api_key,
-      "Token": downloadToken,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      document_id: esignRecord.nupay_document_id,
-    }),
-  });
-  
-  if (downloadResponse.ok) {
-    const contentType = downloadResponse.headers.get("content-type");
-    if (contentType?.includes("application/pdf")) {
-      // Direct PDF binary
-      const arrayBuffer = await downloadResponse.arrayBuffer();
-      pdfBuffer = new Uint8Array(arrayBuffer);
-    } else {
-      // JSON with base64 or URL
-      const downloadData = await downloadResponse.json();
-      signedDocBase64 = downloadData.Data?.document || downloadData.document;
-      signedDocUrl = downloadData.Data?.document_url || downloadData.document_url;
-    }
-  }
-}
-```
-
-#### 2. Add Token Helper Function
-
-Copy the `getNewToken` helper function from `nupay-esign-request/index.ts` to `nupay-esign-status/index.ts`.
-
-#### 3. Alternative: Ask User for Correct Download Endpoint
-
-Since the exact Nupay download endpoint is unknown, we may need to ask you for the correct cURL command from Nupay documentation for downloading signed documents.
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `supabase/functions/nupay-esign-status/index.ts` | Add separate download API call for signed documents |
+| `src/pages/LOS/Sanctions.tsx` | Add search input and filter logic |
 
-## Questions for You
+## Technical Notes
 
-Before implementing, could you confirm:
-
-1. **Do you have documentation for the Nupay download signed document API?** (Similar to how you provided the cURL for `processForSign`)
-
-2. **Or should I try the endpoint `/api/SignDocument/downloadDocument` with the document_id?**
-
-If you don't have the documentation, I can implement a trial approach and we can debug from the logs.
-
+- Search is case-insensitive
+- Matches partial strings (contains match, not exact)
+- Searches across: applicant_name, loan_id, application_number
+- No debounce needed since filtering is done client-side on already-fetched data
