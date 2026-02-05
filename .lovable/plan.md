@@ -1,163 +1,171 @@
 
-# SMS Templates Implementation Plan
+# Plan: Add Option for Reinitiating NACH/eMandate
 
-## Context
-You've shared your DLT-registered OTP template from TATA Tele portal:
+## Overview
+Currently, the eMandate registration can only be reinitiated when the mandate status is `rejected` or `expired`. This enhancement will add a "Reinitiate NACH" button that allows staff to create a new mandate even when a previous one is in `submitted` or `cancelled` status, with the option to prefill bank details from the previous attempt.
 
-| Field | Value |
-|-------|-------|
-| Template Name | OTP |
-| DLT Template ID | 1607100000000371566 |
-| Content | `Your PaisaaSaarthi OTP is {#var#}. Valid for 10 mins` |
-| Variable | var1 = OTP |
-| Category | Banking / Insurance / Financial Products |
+## Current Behavior
+- **No Mandate**: "Register eMandate" button shown
+- **Rejected/Expired**: "Register New Mandate" button shown
+- **Submitted/Pending**: Only "Check Status" button available (no reinitiation)
+- **Active/Accepted**: No action buttons (mandate is working)
+- **Cancelled**: No reinitiation option currently
 
----
+## Proposed Changes
 
-## Current Gap
-The Templates page currently has WhatsApp and Email tabs but **no SMS tab**. We need to add SMS template management with DLT compliance support.
+### 1. Update EMandateSection.tsx - Button Logic
+Expand the reinitiation conditions to include `submitted`, `cancelled`, and `pending` statuses. Add a confirmation dialog for cases where an existing mandate might be replaced.
 
----
+**Changes:**
+- Add state for confirmation dialog (`showReinitiateConfirm`)
+- Modify button visibility logic to show "Reinitiate NACH" for more statuses
+- Pass previous mandate data to the dialog for prefilling
+- Show warning when reinitiating over an existing submitted/pending mandate
 
-## Implementation Plan
+### 2. Update CreateMandateDialog.tsx - Prefill Support
+Add optional prop to receive previous mandate data and prefill the form fields.
 
-### Phase 1: Database - SMS Templates Table
+**Changes:**
+- Add new prop: `prefillData?: { bankName, bankAccountNo, ifsc, accountType, accountHolderName }`
+- Update `useEffect` to populate form fields from prefillData when provided
+- Fields will still be editable (prefill is convenience, not locked)
 
-Create a dedicated `sms_templates` table:
+### 3. Add Confirmation Dialog
+When reinitiating over a `submitted` or `pending` mandate, show a warning that the previous registration link will become invalid.
 
-| Column | Type | Description |
-|--------|------|-------------|
-| id | uuid | Primary key |
-| org_id | uuid | Organization (FK) |
-| name | text | Template name (e.g., "OTP") |
-| dlt_template_id | text | DLT registered ID (required) |
-| content | text | Message content with `{#var#}` placeholders |
-| variables | jsonb | Variable mapping `[{dlt_var: "#var#", name: "otp", description: "OTP code"}]` |
-| category | text | transactional/promotional |
-| language | text | English, Hindi, etc. |
-| char_count | integer | Character count for reference |
-| is_active | boolean | Enable/disable |
-| created_at | timestamptz | Creation time |
-| updated_at | timestamptz | Last update |
-
-Update `sms_automation_rules.sms_template_id` to reference this new table.
-
----
-
-### Phase 2: Frontend - SMS Tab in Templates Page
-
-Add an SMS tab to `src/pages/Templates.tsx`:
+## User Experience Flow
 
 ```text
-Templates
-├── WhatsApp (existing)
-├── Email (existing)
-└── SMS (NEW)
-    ├── List all SMS templates
-    ├── Create SMS Template button
-    └── Template cards with:
-        - Name & DLT Template ID
-        - Content preview
-        - Variable badges
-        - Character count indicator
-        - Edit/Delete actions
++------------------+     +-------------------+     +------------------+
+| EMandateSection  | --> | Confirm Dialog    | --> | CreateMandate    |
+| [Reinitiate]     |     | (if submitted/    |     | Dialog           |
+|                  |     |  pending)         |     | [Prefilled]      |
++------------------+     +-------------------+     +------------------+
 ```
 
----
+## Technical Details
 
-### Phase 3: SMS Template Form Dialog
+### EMandateSection.tsx Changes
 
-Create `src/components/Templates/SMSTemplateDialog.tsx`:
-
-**Form Fields:**
-1. **Template Name** - Friendly name (e.g., "OTP Verification")
-2. **DLT Template ID** - Required, from DLT portal (e.g., `1607100000000371566`)
-3. **Content** - Exact DLT-registered content with `{#var#}` placeholders
-4. **Variables** - Define variable mappings:
-   - DLT Placeholder: `#var#`
-   - System Variable: `otp`
-   - Description: "4-digit OTP code"
-5. **Category** - Transactional / Promotional
-6. **Language** - English, Hindi, etc.
-
-**Features:**
-- Character counter (160/1 segment indicator)
-- Variable preview with sample values
-- Validation for DLT Template ID format
-
----
-
-### Phase 4: Variable Substitution Logic
-
-Update `send-sms` edge function to handle DLT variable format:
-
-**Current Flow:**
+**New State:**
 ```typescript
-// Replaces {{variable}} format
-finalMessage = messageContent.replace(/{{variable}}/gi, value);
+const [showReinitiateConfirm, setShowReinitiateConfirm] = useState(false);
 ```
 
-**Updated Flow:**
+**Updated Button Logic (Line 247-256):**
 ```typescript
-// 1. Fetch template with variable mappings
-// 2. For each variable mapping: {dlt_var: "#var#", name: "otp"}
-// 3. Replace {#var#} with actual value from templateVariables.otp
-finalMessage = content.replace(/{#var#}/g, templateVariables.otp);
+{/* Show reinitiate for rejected, expired, cancelled, submitted, pending */}
+{getMandateStatus() !== "accepted" && mandateData && (
+  <Button 
+    variant="outline" 
+    size="sm"
+    onClick={() => {
+      // Show confirmation for submitted/pending (link will be invalidated)
+      if (getMandateStatus() === "submitted" || getMandateStatus() === "pending") {
+        setShowReinitiateConfirm(true);
+      } else {
+        setMandateDialogOpen(true);
+      }
+    }}
+  >
+    <CreditCard className="h-4 w-4 mr-2" />
+    Reinitiate NACH
+  </Button>
+)}
 ```
 
----
+**Add ConfirmDialog:**
+```typescript
+<ConfirmDialog
+  open={showReinitiateConfirm}
+  onOpenChange={setShowReinitiateConfirm}
+  title="Reinitiate eMandate?"
+  description="The previous registration link will become invalid. The customer will need to complete authentication again with the new link."
+  onConfirm={() => {
+    setShowReinitiateConfirm(false);
+    setMandateDialogOpen(true);
+  }}
+  confirmText="Reinitiate"
+  variant="default"
+/>
+```
 
-### Phase 5: Pre-populate Your OTP Template
+**Pass Prefill Data to Dialog:**
+```typescript
+<CreateMandateDialog
+  // ... existing props
+  prefillData={mandateData ? {
+    bankName: mandateData.bank_name,
+    bankAccountNo: mandateData.bank_account_no,
+    ifsc: mandateData.ifsc_code,
+    accountType: mandateData.account_type,
+    accountHolderName: mandateData.account_holder_name,
+  } : undefined}
+/>
+```
 
-After the table is created, we'll add your OTP template:
+### CreateMandateDialog.tsx Changes
 
-| Field | Value |
-|-------|-------|
-| Name | OTP Verification |
-| DLT Template ID | 1607100000000371566 |
-| Content | `Your PaisaaSaarthi OTP is {#var#}. Valid for 10 mins` |
-| Variables | `[{"dlt_var": "#var#", "name": "otp", "description": "4-digit OTP"}]` |
-| Category | transactional |
+**New Interface Prop:**
+```typescript
+interface CreateMandateDialogProps {
+  // ... existing props
+  prefillData?: {
+    bankName?: string;
+    bankAccountNo?: string;
+    ifsc?: string;
+    accountType?: string;
+    accountHolderName?: string;
+  };
+}
+```
 
----
+**Updated useEffect (Line 178-199):**
+```typescript
+useEffect(() => {
+  if (open) {
+    setStep("bank");
+    // Prefill from previous mandate if provided
+    if (prefillData) {
+      setAccountHolderName(prefillData.accountHolderName || applicantName);
+      setBankAccountNo(prefillData.bankAccountNo || "");
+      setBankAccountNoConfirm(prefillData.bankAccountNo || "");
+      setIfscCode(prefillData.ifsc || "");
+      setAccountType((prefillData.accountType as "Savings" | "Current") || "Savings");
+    } else {
+      setAccountHolderName(applicantName);
+      setBankAccountNo("");
+      setBankAccountNoConfirm("");
+      setIfscCode("");
+      setAccountType("Savings");
+    }
+    // Reset other fields
+    setSelectedBankId(null);
+    setSelectedBankName("");
+    setAuthType("");
+    // ... rest of resets
+  }
+}, [open, applicantName, emiAmount, prefillData]);
+```
 
-## Files to Create/Modify
+## Files to Modify
 
-### New Files
-| File | Purpose |
-|------|---------|
-| `src/components/Templates/SMSTemplateDialog.tsx` | Create/Edit SMS template form |
-
-### Modified Files
 | File | Changes |
 |------|---------|
-| `src/pages/Templates.tsx` | Add SMS tab and template management |
-| `supabase/functions/send-sms/index.ts` | Update variable substitution for DLT format |
+| `src/components/LOS/Disbursement/EMandateSection.tsx` | Add reinitiate button logic, confirmation dialog, pass prefill data |
+| `src/components/LOS/Mandate/CreateMandateDialog.tsx` | Add prefillData prop, prefill form fields on open |
 
-### Database Migration
-- Create `sms_templates` table
-- Update `sms_automation_rules.sms_template_id` FK reference
-- Enable RLS policies
+## Edge Cases Handled
 
----
+1. **Submitted Mandate**: Warning shown that previous link will be invalidated
+2. **Pending Mandate**: Same as submitted - confirmation required
+3. **Rejected/Expired/Cancelled**: Direct reinitiation allowed (no active link)
+4. **Active Mandate**: Reinitiate button hidden (mandate is working)
+5. **No Mandate**: Original "Register eMandate" button shown
 
-## Variable Format Mapping
+## Benefits
 
-| DLT Format | System Variable | Usage |
-|------------|-----------------|-------|
-| `{#var#}` | `{{otp}}` | OTP code |
-| `{#var1#}` | `{{name}}` | Customer name |
-| `{#var2#}` | `{{amount}}` | Loan amount |
-
-The template stores the exact DLT content, and the system maps variables during send time.
-
----
-
-## Implementation Order
-
-1. Create `sms_templates` database table with RLS
-2. Add SMS tab to Templates page with list view
-3. Create SMSTemplateDialog component
-4. Update send-sms function for DLT variable handling
-5. Add your OTP template as initial data
-6. Test end-to-end with Test SMS button
+- Staff can reinitiate without waiting for expiry when customer has issues
+- Prefilled bank details reduce data entry errors
+- Confirmation prevents accidental invalidation of working registration links
+- Clean UX with appropriate warnings
