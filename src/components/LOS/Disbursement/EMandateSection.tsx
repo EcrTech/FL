@@ -47,6 +47,25 @@ export default function EMandateSection({
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [showReinitiateConfirm, setShowReinitiateConfirm] = useState(false);
 
+  // Fetch active Nupay config for environment
+  const { data: nupayConfig } = useQuery({
+    queryKey: ["nupay-config", orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("nupay_config")
+        .select("environment")
+        .eq("org_id", orgId)
+        .eq("is_active", true)
+        .maybeSingle();
+      
+      if (error && error.code !== "PGRST116") {
+        console.error("Error fetching Nupay config:", error);
+      }
+      return data;
+    },
+    enabled: !!orgId,
+  });
+
   // Fetch existing mandate for this application
   const { data: mandateData, isLoading: loadingMandate, refetch: refetchMandate } = useQuery({
     queryKey: ["nupay-mandates", applicationId],
@@ -78,6 +97,7 @@ export default function EMandateSection({
       const response = await supabase.functions.invoke("nupay-get-status", {
         body: {
           org_id: orgId,
+          environment: nupayConfig?.environment || "uat",
           mandate_id: mandateData.id,
           nupay_id: mandateData.nupay_id,
         },
