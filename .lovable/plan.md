@@ -1,109 +1,89 @@
 
-# Fix: Bank Details Auto-fill After Bank Statement Parsing
+# Fix: Nupay E-Sign Status API Header Correction
 
-## Problem
-After parsing a bank statement, the bank details are no longer automatically filling in the details page. This is a regression - it was working previously.
+## Problem Identified
+Based on the provided cURL request, the Nupay SignDocument API requires the token to be passed in a `Token` header, not an `Authorization: Bearer` header.
 
-## Root Cause
-The issue is a **React Query key mismatch**:
+**Correct format (from your cURL):**
+```
+--header 'api-key: zdJgIjc*********************'
+--header 'Token: eyJ0eXAiOiJKV1QiLCJhbGc**************************************'
+--header 'Content-Type: application/json'
+```
 
-| Component | Query Key Used |
-|-----------|----------------|
-| `BankDetailsSection.tsx` | `["applicant-bank-details", applicantId]` |
-| `DocumentUpload.tsx` | `["applicant-bank-details", applicationId]` |
+## Current State Analysis
 
-Since `applicationId` and `applicantId` are different UUIDs, the cache invalidation in `DocumentUpload` never triggers a refetch in `BankDetailsSection`. The UI shows stale (empty) data because it doesn't know new OCR data is available.
+### `nupay-esign-request` (processForSign) - CORRECT
+The main e-sign request function is already using the correct header format:
+```typescript
+// Line 262-268
+headers: {
+  "api-key": apiKey,
+  "Token": token,  // ✅ Correct
+  "Content-Type": "application/json",
+}
+```
+
+### `nupay-esign-status` (documentStatus) - INCORRECT
+The status check function is using the wrong header format:
+```typescript
+// Line 161-167
+headers: {
+  "Authorization": `Bearer ${token}`,  // ❌ Wrong
+  "api-key": config.api_key,
+  "Content-Type": "application/json",
+}
+```
 
 ## Solution
 
-### 1. Update DocumentUpload Component Interface
-Add the `id` field to the `Applicant` interface so we can access the applicant's ID:
+Update `nupay-esign-status/index.ts` to use the correct `Token` header format instead of `Authorization: Bearer`.
 
+### Change Required
+
+**File:** `supabase/functions/nupay-esign-status/index.ts`
+
+**Before (Line 161-167):**
 ```typescript
-interface Applicant {
-  id?: string;  // Add this
-  first_name: string;
-  last_name?: string;
-  mobile?: string;
-  pan_number?: string;
-}
+const statusResponse = await fetch(statusEndpoint, {
+  method: "POST",
+  headers: {
+    "Authorization": `Bearer ${token}`,
+    "api-key": config.api_key,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    document_id: esignRecord.nupay_document_id,
+  }),
+});
 ```
 
-### 2. Fix Query Invalidation in parseMutation
-Update line 212 to use `applicant?.id`:
-
+**After:**
 ```typescript
-// Before
-queryClient.invalidateQueries({ queryKey: ["applicant-bank-details", applicationId] });
-
-// After
-if (applicant?.id) {
-  queryClient.invalidateQueries({ queryKey: ["applicant-bank-details", applicant.id] });
-}
-```
-
-### 3. Fix Query Invalidation in handleParseAll
-Update line 281 similarly:
-
-```typescript
-// Before
-queryClient.invalidateQueries({ queryKey: ["applicant-bank-details", applicationId] });
-
-// After
-if (applicant?.id) {
-  queryClient.invalidateQueries({ queryKey: ["applicant-bank-details", applicant.id] });
-}
+const statusResponse = await fetch(statusEndpoint, {
+  method: "POST",
+  headers: {
+    "api-key": config.api_key,
+    "Token": token,  // Fixed: Use Token header like processForSign
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    document_id: esignRecord.nupay_document_id,
+  }),
+});
 ```
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/components/LOS/DocumentUpload.tsx` | Add `id` to Applicant interface, fix query invalidation keys |
+| `supabase/functions/nupay-esign-status/index.ts` | Replace `Authorization: Bearer ${token}` with `Token: ${token}` on line 164 |
 
-## Expected Behavior After Fix
+## Header Summary After Fix
 
-1. User uploads and parses a bank statement
-2. AI extracts bank details (account number, IFSC, bank name, etc.)
-3. `DocumentUpload` invalidates the correct query key using `applicantId`
-4. `BankDetailsSection` refetches and detects new OCR data
-5. Form auto-fills with extracted data and enters edit mode for user review
+| Function | Endpoint | Headers |
+|----------|----------|---------|
+| `nupay-esign-request` | `/api/SignDocument/processForSign` | `api-key`, `Token`, `Content-Type` |
+| `nupay-esign-status` | `/api/SignDocument/documentStatus` | `api-key`, `Token`, `Content-Type` |
 
-## Technical Details
-
-The data flow relies on these interconnected queries:
-
-```text
-[DocumentUpload]                    [BankDetailsSection]
-      |                                     |
-      v                                     v
-Parse bank_statement              Fetch applicant-bank-details
-      |                                     |
-      v                                     |
-Store ocr_data in                          |
-loan_documents table                       |
-      |                                     |
-      v                                     |
-Invalidate queries:                        |
-  - loan-documents                         |
-  - bank-statement-parsed                  |
-  - applicant-bank-details ----[BROKEN]--->X (wrong key!)
-                                           |
-                                     Never refetches
-                                           |
-                                     Shows stale/empty data
-```
-
-After fix:
-```text
-Invalidate queries:                        |
-  - applicant-bank-details ----[FIXED]---->v
-                                           |
-                                     Refetches with new data
-                                           |
-                                     useEffect detects OCR data
-                                           |
-                                     Auto-fills form fields
-                                           |
-                                     Sets isEditing = true
-```
+Both functions will now use the consistent header format that matches the Nupay API documentation.
