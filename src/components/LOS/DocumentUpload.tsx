@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
 interface Applicant {
+  id?: string;
   first_name: string;
   last_name?: string;
   mobile?: string;
@@ -209,7 +210,9 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
       // Invalidate bank statement query to update Bank Details section
       if (data.docType === "bank_statement") {
         queryClient.invalidateQueries({ queryKey: ["bank-statement-parsed", applicationId] });
-        queryClient.invalidateQueries({ queryKey: ["applicant-bank-details", applicationId] });
+        if (applicant?.id) {
+          queryClient.invalidateQueries({ queryKey: ["applicant-bank-details", applicant.id] });
+        }
       }
       
       // Check if processing in background (chunked parsing)
@@ -278,7 +281,9 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
     // Invalidate application and applicant queries to reflect OCR-synced data
     queryClient.invalidateQueries({ queryKey: ["loan-application"] });
     queryClient.invalidateQueries({ queryKey: ["loan-application-basic", applicationId] });
-    queryClient.invalidateQueries({ queryKey: ["applicant-bank-details", applicationId] });
+    if (applicant?.id) {
+      queryClient.invalidateQueries({ queryKey: ["applicant-bank-details", applicant.id] });
+    }
     
     if (errorCount === 0) {
       toast({ title: "All documents parsed", description: `Successfully parsed ${successCount} documents` });
