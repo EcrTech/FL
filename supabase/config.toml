@@ -95,3 +95,9 @@ verify_jwt = false
 
 [functions.nupay-collection-webhook]
 verify_jwt = false
+
+[functions.send-sms]
+verify_jwt = false
+
+[functions.sms-webhook]
+verify_jwt = false

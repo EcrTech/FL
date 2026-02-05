@@ -126,6 +126,21 @@ Deno.serve(async (req) => {
     console.log(`Found ${rules.length} matching rules`);
     let processedCount = 0;
 
+    // Also find matching SMS automation rules
+    const { data: smsRules, error: smsRulesError } = await supabase
+      .from('sms_automation_rules')
+      .select('*')
+      .eq('org_id', orgId)
+      .eq('trigger_type', triggerType)
+      .eq('is_active', true)
+      .order('priority', { ascending: false });
+
+    if (smsRulesError) {
+      console.error('Error fetching SMS rules:', smsRulesError);
+    }
+
+    console.log(`Found ${smsRules?.length || 0} matching SMS rules`);
+
     // 2. Process each rule
     for (const rule of rules) {
       // Check if trigger config matches
@@ -200,6 +215,81 @@ Deno.serve(async (req) => {
       console.log(`Rule ${rule.name} processed for contact ${contactId}`);
     }
 
+    // 3. Process SMS automation rules
+    if (smsRules && smsRules.length > 0) {
+      for (const rule of smsRules) {
+        // Check if trigger config matches
+        if (!checkTriggerMatch(rule.trigger_config, triggerData, triggerType)) {
+          console.log(`SMS Rule ${rule.name} trigger config doesn't match`);
+          continue;
+        }
+
+        // Check cooldown/frequency limits for SMS
+        const canSend = await checkSmsCooldown(supabase, rule.id, contactId, rule);
+        if (!canSend) {
+          console.log(`SMS Rule ${rule.name} cooldown not met`);
+          continue;
+        }
+
+        // Evaluate conditions
+        const conditionsMet = await evaluateConditions(supabase, rule.conditions, contactId, orgId, rule.condition_logic);
+        if (!conditionsMet) {
+          console.log(`SMS Rule ${rule.name} conditions not met`);
+          continue;
+        }
+
+        // Get contact phone
+        const { data: contact } = await supabase
+          .from('contacts')
+          .select('phone, first_name, last_name')
+          .eq('id', contactId)
+          .single();
+
+        if (!contact?.phone) {
+          console.log('Contact has no phone for SMS');
+          continue;
+        }
+
+        // Calculate scheduled time
+        const scheduledFor = new Date();
+        scheduledFor.setMinutes(scheduledFor.getMinutes() + (rule.send_delay_minutes || 0));
+
+        // Create SMS execution record
+        const { data: smsExecution, error: smsExecError } = await supabase
+          .from('sms_automation_executions')
+          .insert({
+            org_id: orgId,
+            rule_id: rule.id,
+            contact_id: contactId,
+            trigger_type: triggerType,
+            trigger_data: triggerData,
+            status: rule.send_delay_minutes > 0 ? 'scheduled' : 'pending',
+            scheduled_for: rule.send_delay_minutes > 0 ? scheduledFor.toISOString() : null,
+          })
+          .select()
+          .single();
+
+        if (smsExecError) {
+          console.error('Failed to create SMS execution:', smsExecError);
+          continue;
+        }
+
+        // Increment triggered count for SMS rule
+        await supabase
+          .from('sms_automation_rules')
+          .update({ total_triggered: (rule.total_triggered || 0) + 1 })
+          .eq('id', rule.id);
+
+        // If immediate send, trigger SMS sender
+        if (rule.send_delay_minutes === 0) {
+          await sendAutomationSms(supabase, smsExecution.id, rule, contact, orgId);
+        }
+
+        processedCount++;
+        console.log(`SMS Rule ${rule.name} processed for contact ${contactId}`);
+      }
+    }
+
     return new Response(
       JSON.stringify({ 
         message: 'Automation processed', 
@@ -215,6 +305,115 @@ Deno.serve(async (req) => {
     );
   }
 });
+
+async function checkSmsCooldown(supabase: any, ruleId: string, contactId: string, rule: any): Promise<boolean> {
+  // Check if there's a cooldown record
+  const { data: cooldown } = await supabase
+    .from('sms_automation_cooldowns')
+    .select('*')
+    .eq('rule_id', ruleId)
+    .eq('contact_id', contactId)
+    .single();
+
+  if (!cooldown) return true; // No cooldown record, can send
+
+  // Check max sends per contact
+  if (rule.max_sends_per_contact && cooldown.send_count >= rule.max_sends_per_contact) {
+    return false;
+  }
+
+  // Check cooldown period
+  if (rule.cooldown_period_days) {
+    const lastSentDate = new Date(cooldown.last_sent_at);
+    const daysSinceLastSent = (Date.now() - lastSentDate.getTime()) / (1000 * 60 * 60 * 24);
+    if (daysSinceLastSent < rule.cooldown_period_days) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+async function sendAutomationSms(supabase: any, executionId: string, rule: any, contact: any, orgId: string) {
+  try {
+    // Get SMS template if configured
+    let messageContent = 'Hello {{first_name}}, this is an automated notification.';
+    let dltTemplateId = null;
+
+    if (rule.sms_template_id) {
+      const { data: template } = await supabase
+        .from('communication_templates')
+        .select('content, template_id')
+        .eq('id', rule.sms_template_id)
+        .single();
+
+      if (template) {
+        messageContent = template.content;
+        dltTemplateId = template.template_id; // DLT template ID stored in template_id field
+      }
+    }
+
+    // Replace variables in message
+    const personalizedMessage = messageContent
+      .replace(/{{first_name}}/gi, contact.first_name || '')
+      .replace(/{{last_name}}/gi, contact.last_name || '')
+      .replace(/{{full_name}}/gi, `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Customer');
+
+    // Call send-sms function
+    const { error: sendError, data: sendResult } = await supabase.functions.invoke('send-sms', {
+      body: {
+        orgId: orgId,
+        phoneNumber: contact.phone,
+        messageContent: personalizedMessage,
+        templateId: rule.sms_template_id,
+        dltTemplateId: dltTemplateId,
+        contactId: contact.id,
+        triggerType: 'automation',
+        executionId: executionId,
+      }
+    });
+
+    if (sendError) throw sendError;
+    if (sendResult?.error) throw new Error(sendResult.error);
+
+    // Update SMS rule stats
+    await supabase
+      .from('sms_automation_rules')
+      .update({ total_sent: (rule.total_sent || 0) + 1 })
+      .eq('id', rule.id);
+
+    // Record cooldown
+    await supabase
+      .from('sms_automation_cooldowns')
+      .upsert({
+        org_id: orgId,
+        rule_id: rule.id,
+        contact_id: contact.id,
+        last_sent_at: new Date().toISOString(),
+        send_count: 1,
+      }, {
+        onConflict: 'org_id,rule_id,contact_id',
+      });
+
+    console.log(`SMS sent successfully for execution ${executionId}`);
+
+  } catch (error: any) {
+    console.error('Failed to send automation SMS:', error);
+    
+    await supabase
+      .from('sms_automation_executions')
+      .update({ 
+        status: 'failed', 
+        error_message: error.message 
+      })
+      .eq('id', executionId);
+
+    await supabase
+      .from('sms_automation_rules')
+      .update({ total_failed: (rule.total_failed || 0) + 1 })
+      .eq('id', rule.id);
+  }
+}
 
 function checkTriggerMatch(config: any, triggerData: any, triggerType: string): boolean {
   if (triggerType === 'stage_change') {

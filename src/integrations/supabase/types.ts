@@ -3054,9 +3054,11 @@ export type Database = {
           call_recording_enabled: boolean | null
           caller_id: string
           created_at: string | null
+          dlt_entity_id: string | null
           id: string
           is_active: boolean | null
           org_id: string
+          sms_sender_id: string | null
           subdomain: string
           updated_at: string | null
         }
@@ -3067,9 +3069,11 @@ export type Database = {
           call_recording_enabled?: boolean | null
           caller_id: string
           created_at?: string | null
+          dlt_entity_id?: string | null
           id?: string
           is_active?: boolean | null
           org_id: string
+          sms_sender_id?: string | null
           subdomain?: string
           updated_at?: string | null
         }
@@ -3080,9 +3084,11 @@ export type Database = {
           call_recording_enabled?: boolean | null
           caller_id?: string
           created_at?: string | null
+          dlt_entity_id?: string | null
           id?: string
           is_active?: boolean | null
           org_id?: string
+          sms_sender_id?: string | null
           subdomain?: string
           updated_at?: string | null
         }
@@ -7118,6 +7124,353 @@ export type Database = {
             columns: ["wallet_transaction_id"]
             isOneToOne: false
             referencedRelation: "wallet_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sms_automation_cooldowns: {
+        Row: {
+          contact_id: string
+          id: string
+          last_sent_at: string
+          org_id: string
+          rule_id: string
+          send_count: number
+        }
+        Insert: {
+          contact_id: string
+          id?: string
+          last_sent_at?: string
+          org_id: string
+          rule_id: string
+          send_count?: number
+        }
+        Update: {
+          contact_id?: string
+          id?: string
+          last_sent_at?: string
+          org_id?: string
+          rule_id?: string
+          send_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_automation_cooldowns_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_automation_cooldowns_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_with_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_automation_cooldowns_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_automation_cooldowns_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "sms_automation_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sms_automation_executions: {
+        Row: {
+          contact_id: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          loan_application_id: string | null
+          org_id: string
+          rule_id: string
+          scheduled_for: string | null
+          sent_at: string | null
+          sms_message_id: string | null
+          status: string
+          trigger_data: Json | null
+          trigger_type: string
+          updated_at: string
+        }
+        Insert: {
+          contact_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          loan_application_id?: string | null
+          org_id: string
+          rule_id: string
+          scheduled_for?: string | null
+          sent_at?: string | null
+          sms_message_id?: string | null
+          status?: string
+          trigger_data?: Json | null
+          trigger_type: string
+          updated_at?: string
+        }
+        Update: {
+          contact_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          loan_application_id?: string | null
+          org_id?: string
+          rule_id?: string
+          scheduled_for?: string | null
+          sent_at?: string | null
+          sms_message_id?: string | null
+          status?: string
+          trigger_data?: Json | null
+          trigger_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_automation_executions_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_automation_executions_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_with_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_automation_executions_loan_application_id_fkey"
+            columns: ["loan_application_id"]
+            isOneToOne: false
+            referencedRelation: "loan_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_automation_executions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_automation_executions_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "sms_automation_rules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_automation_executions_sms_message_id_fkey"
+            columns: ["sms_message_id"]
+            isOneToOne: false
+            referencedRelation: "sms_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sms_automation_rules: {
+        Row: {
+          condition_logic: string | null
+          conditions: Json | null
+          cooldown_period_days: number | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          max_sends_per_contact: number | null
+          name: string
+          org_id: string
+          priority: number | null
+          send_delay_minutes: number | null
+          sms_template_id: string | null
+          total_failed: number | null
+          total_sent: number | null
+          total_triggered: number | null
+          trigger_config: Json
+          trigger_type: string
+          updated_at: string
+        }
+        Insert: {
+          condition_logic?: string | null
+          conditions?: Json | null
+          cooldown_period_days?: number | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          max_sends_per_contact?: number | null
+          name: string
+          org_id: string
+          priority?: number | null
+          send_delay_minutes?: number | null
+          sms_template_id?: string | null
+          total_failed?: number | null
+          total_sent?: number | null
+          total_triggered?: number | null
+          trigger_config?: Json
+          trigger_type: string
+          updated_at?: string
+        }
+        Update: {
+          condition_logic?: string | null
+          conditions?: Json | null
+          cooldown_period_days?: number | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          max_sends_per_contact?: number | null
+          name?: string
+          org_id?: string
+          priority?: number | null
+          send_delay_minutes?: number | null
+          sms_template_id?: string | null
+          total_failed?: number | null
+          total_sent?: number | null
+          total_triggered?: number | null
+          trigger_config?: Json
+          trigger_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_automation_rules_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_automation_rules_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_automation_rules_sms_template_id_fkey"
+            columns: ["sms_template_id"]
+            isOneToOne: false
+            referencedRelation: "communication_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sms_messages: {
+        Row: {
+          contact_id: string | null
+          created_at: string
+          delivered_at: string | null
+          dlt_template_id: string | null
+          error_message: string | null
+          exotel_sid: string | null
+          id: string
+          loan_application_id: string | null
+          message_content: string
+          org_id: string
+          phone_number: string
+          sent_at: string | null
+          sent_by: string | null
+          status: string
+          template_id: string | null
+          template_variables: Json | null
+          trigger_type: string
+          updated_at: string
+        }
+        Insert: {
+          contact_id?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          dlt_template_id?: string | null
+          error_message?: string | null
+          exotel_sid?: string | null
+          id?: string
+          loan_application_id?: string | null
+          message_content: string
+          org_id: string
+          phone_number: string
+          sent_at?: string | null
+          sent_by?: string | null
+          status?: string
+          template_id?: string | null
+          template_variables?: Json | null
+          trigger_type?: string
+          updated_at?: string
+        }
+        Update: {
+          contact_id?: string | null
+          created_at?: string
+          delivered_at?: string | null
+          dlt_template_id?: string | null
+          error_message?: string | null
+          exotel_sid?: string | null
+          id?: string
+          loan_application_id?: string | null
+          message_content?: string
+          org_id?: string
+          phone_number?: string
+          sent_at?: string | null
+          sent_by?: string | null
+          status?: string
+          template_id?: string | null
+          template_variables?: Json | null
+          trigger_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_messages_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_messages_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_with_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_messages_loan_application_id_fkey"
+            columns: ["loan_application_id"]
+            isOneToOne: false
+            referencedRelation: "loan_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_messages_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_messages_sent_by_fkey"
+            columns: ["sent_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_messages_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "communication_templates"
             referencedColumns: ["id"]
           },
         ]
