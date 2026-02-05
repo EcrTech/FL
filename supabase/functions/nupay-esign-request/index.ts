@@ -235,16 +235,13 @@ async function processForSign(
   console.log(`[E-Sign] Step 2: Processing for sign at ${processEndpoint}`);
   console.log(`[E-Sign] Using token for Step 2: ${token.substring(0, 20)}...`);
 
+  // Always include signer_email - Nupay requires the field to be present (even if empty)
   const signerInfo: Record<string, string> = {
     appearance: appearance,
     signer_name: signerName,
     signer_mobile: signerMobile,
+    signer_email: signerEmail || "",
   };
-  
-  // Add email only if provided
-  if (signerEmail) {
-    signerInfo.signer_email = signerEmail;
-  }
 
   const payload = {
     esign_verification: {
