@@ -11,9 +11,10 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LoadingState } from "@/components/common/LoadingState";
 import { EmptyState } from "@/components/common/EmptyState";
-import { MessageSquare, RefreshCw, Plus, Mail, Send, Loader2 } from "lucide-react";
+import { MessageSquare, RefreshCw, Plus, Mail, Send, Loader2, Smartphone } from "lucide-react";
 import { format } from "date-fns";
 import { StandardEmailTemplateDialog } from "@/components/Templates/StandardEmailTemplateDialog";
+import { SMSTemplateDialog } from "@/components/Templates/SMSTemplateDialog";
 
 interface WhatsAppTemplate {
   id: string;
@@ -41,6 +42,20 @@ interface EmailTemplate {
   updated_at: string;
 }
 
+interface SMSTemplate {
+  id: string;
+  name: string;
+  dlt_template_id: string;
+  content: string;
+  variables: Array<{ dlt_var: string; name: string; description: string }>;
+  category: string;
+  language: string;
+  char_count: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 const Templates = () => {
   const { orgId } = useOrgContext();
   const notify = useNotification();
@@ -51,6 +66,8 @@ const Templates = () => {
   const [activeTab, setActiveTab] = useState("whatsapp");
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [selectedEmailTemplate, setSelectedEmailTemplate] = useState<EmailTemplate | null>(null);
+  const [smsDialogOpen, setSmsDialogOpen] = useState(false);
+  const [selectedSmsTemplate, setSelectedSmsTemplate] = useState<SMSTemplate | null>(null);
   const queryClient = useQueryClient();
 
   // Real-time sync for queue updates
@@ -108,7 +125,23 @@ const Templates = () => {
     enabled: !!orgId,
   });
 
-  const loading = loadingWhatsApp || loadingEmail;
+  const { data: smsTemplates = [], isLoading: loadingSms, refetch: refetchSmsTemplates } = useQuery({
+    queryKey: ['sms-templates', orgId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("sms_templates")
+        .select("*")
+        .eq("org_id", orgId)
+        .eq("is_active", true)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return (data || []) as unknown as SMSTemplate[];
+    },
+    enabled: !!orgId,
+  });
+
+  const loading = loadingWhatsApp || loadingEmail || loadingSms;
 
   const handleSync = async () => {
     // Sync templates from Exotel API
@@ -199,6 +232,35 @@ const Templates = () => {
 
       notify.success("Success", "Template deleted successfully");
       refetchEmailTemplates();
+    } catch (error: any) {
+      console.error("Error deleting template:", error);
+      notify.error("Error", "Failed to delete template");
+    }
+  };
+  
+  const handleCreateSms = () => {
+    setSelectedSmsTemplate(null);
+    setSmsDialogOpen(true);
+  };
+
+  const handleEditSms = (template: SMSTemplate) => {
+    setSelectedSmsTemplate(template);
+    setSmsDialogOpen(true);
+  };
+
+  const handleDeleteSms = async (templateId: string) => {
+    if (!notify.confirm("Are you sure you want to delete this template?")) return;
+
+    try {
+      const { error } = await supabase
+        .from("sms_templates")
+        .update({ is_active: false })
+        .eq("id", templateId);
+
+      if (error) throw error;
+
+      notify.success("Success", "Template deleted successfully");
+      refetchSmsTemplates();
     } catch (error: any) {
       console.error("Error deleting template:", error);
       notify.error("Error", "Failed to delete template");
@@ -299,11 +361,16 @@ const Templates = () => {
                   )}
                 </Button>
               </>
-            ) : (
+          ) : activeTab === "email" ? (
               <Button onClick={handleCreateEmail} variant="default">
                 <Plus className="mr-2 h-4 w-4" />
                 Create Email Template
               </Button>
+          ) : (
+            <Button onClick={handleCreateSms} variant="default">
+              <Plus className="mr-2 h-4 w-4" />
+              Create SMS Template
+            </Button>
             )}
           </div>
         </div>
@@ -318,6 +385,10 @@ const Templates = () => {
               <Mail className="h-4 w-4" />
               Email ({emailTemplates.length})
             </TabsTrigger>
+          <TabsTrigger value="sms" className="flex items-center gap-2">
+            <Smartphone className="h-4 w-4" />
+            SMS ({smsTemplates.length})
+          </TabsTrigger>
           </TabsList>
 
           <TabsContent value="whatsapp" className="mt-6">
@@ -483,6 +554,77 @@ const Templates = () => {
               </div>
             )}
           </TabsContent>
+
+        <TabsContent value="sms" className="mt-6">
+          {smsTemplates.length === 0 ? (
+            <EmptyState
+              icon={<Smartphone className="h-12 w-12" />}
+              title="No SMS templates found"
+              message="Create DLT-compliant SMS templates for automated messaging"
+              action={
+                <Button onClick={handleCreateSms}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create SMS Template
+                </Button>
+              }
+            />
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {smsTemplates.map((template) => (
+                <Card key={template.id}>
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <CardTitle className="text-lg">{template.name}</CardTitle>
+                      <Badge variant="default">{template.category}</Badge>
+                    </div>
+                    <CardDescription className="font-mono text-xs">
+                      DLT ID: {template.dlt_template_id}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="p-3 bg-muted rounded-md text-sm">
+                      {template.content}
+                    </div>
+                    {template.variables && template.variables.length > 0 && (
+                      <div className="text-sm">
+                        <span className="font-medium">Variables:</span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {template.variables.map((v, idx) => (
+                            <Badge key={idx} variant="outline" className="text-xs">
+                              {`{#${v.dlt_var}#}`} → {v.name || "unmapped"}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <span>{template.char_count || template.content.length} chars</span>
+                      <span>{template.language === 'en' ? 'English' : template.language}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleEditSms(template)}
+                        className="flex-1"
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleDeleteSms(template.id)}
+                        className="flex-1"
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
         </Tabs>
       </div>
 
@@ -492,6 +634,13 @@ const Templates = () => {
         template={selectedEmailTemplate}
         onSuccess={refetchEmailTemplates}
       />
+
+    <SMSTemplateDialog
+      open={smsDialogOpen}
+      onOpenChange={setSmsDialogOpen}
+      template={selectedSmsTemplate}
+      onSuccess={refetchSmsTemplates}
+    />
     </DashboardLayout>
   );
 };

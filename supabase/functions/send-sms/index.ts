@@ -8,7 +8,7 @@
  interface SendSmsPayload {
    orgId: string;
    phoneNumber: string;
-   messageContent: string;
+  messageContent?: string;
    templateId?: string;
    templateVariables?: Record<string, string>;
    dltTemplateId?: string;
@@ -19,6 +19,14 @@
    executionId?: string;
  }
  
+interface SMSTemplate {
+  id: string;
+  name: string;
+  dlt_template_id: string;
+  content: string;
+  variables: Array<{ dlt_var: string; name: string; description: string }>;
+}
+
  interface ExotelSettings {
    api_key: string;
    api_token: string;
@@ -59,12 +67,41 @@
      } = payload;
  
      // Validate required fields
-     if (!orgId || !phoneNumber || !messageContent) {
+    if (!orgId || !phoneNumber) {
        return new Response(
-         JSON.stringify({ error: 'Missing required fields: orgId, phoneNumber, messageContent' }),
+        JSON.stringify({ error: 'Missing required fields: orgId, phoneNumber' }),
          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
        );
      }
+
+    // Fetch template if templateId is provided
+    let smsTemplate: SMSTemplate | null = null;
+    let actualDltTemplateId = dltTemplateId;
+    let baseContent = messageContent || '';
+    
+    if (templateId) {
+      const { data: template, error: templateError } = await supabase
+        .from('sms_templates')
+        .select('*')
+        .eq('id', templateId)
+        .single();
+      
+      if (templateError) {
+        console.error('[send-sms] Failed to fetch template:', templateError);
+      } else if (template) {
+        smsTemplate = template as SMSTemplate;
+        baseContent = smsTemplate.content;
+        actualDltTemplateId = smsTemplate.dlt_template_id;
+        console.log('[send-sms] Using template:', smsTemplate.name);
+      }
+    }
+
+    if (!baseContent) {
+      return new Response(
+        JSON.stringify({ error: 'No message content provided and no valid template found' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
  
      // Fetch Exotel settings for the organization
      const { data: exotelSettings, error: settingsError } = await supabase
@@ -97,7 +134,20 @@
      }
  
      // Process message content with template variables
-     let finalMessage = messageContent;
+    let finalMessage = baseContent;
+    
+    // Handle DLT variable substitution if template has variable mappings
+    if (smsTemplate?.variables && templateVariables) {
+      for (const varMapping of smsTemplate.variables) {
+        const systemValue = templateVariables[varMapping.name];
+        if (systemValue !== undefined) {
+          const dltPattern = new RegExp(`\\{#${varMapping.dlt_var}#\\}`, 'gi');
+          finalMessage = finalMessage.replace(dltPattern, systemValue);
+        }
+      }
+    }
+    
+    // Also handle standard {{variable}} format for backward compatibility
      if (templateVariables && Object.keys(templateVariables).length > 0) {
        for (const [key, value] of Object.entries(templateVariables)) {
          finalMessage = finalMessage.replace(new RegExp(`{{${key}}}`, 'gi'), value);
@@ -125,7 +175,7 @@
          message_content: finalMessage,
          template_id: templateId || null,
          template_variables: templateVariables,
-         dlt_template_id: dltTemplateId || null,
+          dlt_template_id: actualDltTemplateId || null,
          status: 'pending',
          trigger_type: triggerType,
          sent_by: sentBy || null,
@@ -159,8 +209,8 @@
        if (settings.dlt_entity_id) {
          formData.append('DltEntityId', settings.dlt_entity_id);
        }
-       if (dltTemplateId) {
-         formData.append('DltTemplateId', dltTemplateId);
+      if (actualDltTemplateId) {
+        formData.append('DltTemplateId', actualDltTemplateId);
        }
  
        const exotelUrl = `https://${subdomain}/v1/Accounts/${settings.account_sid}/Sms/send.json`;
