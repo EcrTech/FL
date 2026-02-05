@@ -1,124 +1,97 @@
 
-# Add Upload Signed Document Option to Combined Loan Pack
+# Fix NACH Status Check Error
 
-## Problem Summary
+## Problem
 
-The Combined Loan Pack card currently supports:
-- Generating the combined document
-- Downloading and printing
-- E-signing via Nupay
-- Viewing signed documents (when available)
+The "Check Status" button for eMandate/NACH is failing with error:
+```
+"org_id and environment are required"
+```
 
-**Missing**: The ability to manually upload a signed document when:
-- The document was signed physically (wet signature)
-- E-sign happened outside the system
-- The Nupay download failed but you have the signed PDF
+The `nupay-get-status` edge function requires an `environment` parameter ("uat" or "production"), but the frontend is not sending it.
 
-## Current Architecture
+## Current Request Payload (Missing `environment`)
+```json
+{
+  "org_id": "UUID",
+  "mandate_id": "UUID", 
+  "nupay_id": "NUPAY-REF-ID"
+}
+```
 
-The codebase already has `UploadSignedDocumentDialog` component that handles:
-- File selection (PDF, JPG, PNG, max 10MB)
-- Upload to `loan-documents` bucket
-- Update `loan_generated_documents` table with `signed_document_path`
-- Mark document as `customer_signed: true`
-
-**Issue**: The dialog currently only supports "Sanction Letter" and "Loan Agreement" as document type options - not "Combined Loan Pack".
+## Required Request Payload
+```json
+{
+  "org_id": "UUID",
+  "environment": "uat",  // <-- MISSING
+  "mandate_id": "UUID",
+  "nupay_id": "NUPAY-REF-ID"
+}
+```
 
 ## Solution
 
-1. Update `UploadSignedDocumentDialog` to include "Combined Loan Pack" option
-2. Add an "Upload Signed" button to the `CombinedLoanPackCard`
-3. Pass the dialog trigger from parent `DisbursementDashboard` to `CombinedLoanPackCard`
+Update `EMandateSection.tsx` to fetch the active Nupay configuration and include the `environment` in the status check call.
 
-## Implementation Details
+## Implementation
 
-### 1. Update `UploadSignedDocumentDialog.tsx`
+### File: `src/components/LOS/Disbursement/EMandateSection.tsx`
 
-Add "Combined Loan Pack" to the document type options:
+1. **Add a query to fetch the active Nupay config** (similar to `CreateMandateDialog`):
 
 ```typescript
-// Line 129-130 - Update docTypeLabel to include combined_loan_pack
-const docTypeLabel = documentType === 'sanction_letter' ? 'Sanction Letter' : 
-                     documentType === 'loan_agreement' ? 'Loan Agreement' : 
-                     documentType === 'combined_loan_pack' ? 'Combined Loan Pack' :
-                     documentType === 'daily_schedule' ? 'Daily Repayment Schedule' : '';
-
-// Lines 150-153 - Add SelectItem for combined_loan_pack
-<SelectItem value="sanction_letter">Sanction Letter</SelectItem>
-<SelectItem value="loan_agreement">Loan Agreement</SelectItem>
-<SelectItem value="daily_schedule">Daily Repayment Schedule</SelectItem>
-<SelectItem value="combined_loan_pack">Combined Loan Pack</SelectItem>
+// Add after the mandate query (around line 68)
+const { data: nupayConfig } = useQuery({
+  queryKey: ["nupay-config", orgId],
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from("nupay_config")
+      .select("environment")
+      .eq("org_id", orgId)
+      .eq("is_active", true)
+      .maybeSingle();
+    
+    if (error && error.code !== "PGRST116") {
+      console.error("Error fetching Nupay config:", error);
+    }
+    return data;
+  },
+  enabled: !!orgId,
+});
 ```
 
-### 2. Update `CombinedLoanPackCard.tsx`
-
-Add props for upload dialog trigger and an "Upload Signed" button:
+2. **Update `handleCheckStatus` to include the environment** (lines 78-84):
 
 ```typescript
-// Add to props interface
-onUploadSigned: () => void;
-
-// Add button in CardContent (after E-Sign button, before View Signed)
-{isCombinedGenerated && !isCombinedSigned && (
-  <Button
-    variant="outline"
-    onClick={onUploadSigned}
-    className="gap-2"
-  >
-    <Upload className="h-4 w-4" />
-    Upload Signed
-  </Button>
-)}
+const response = await supabase.functions.invoke("nupay-get-status", {
+  body: {
+    org_id: orgId,
+    environment: nupayConfig?.environment || "uat",  // Add this
+    mandate_id: mandateData.id,
+    nupay_id: mandateData.nupay_id,
+  },
+});
 ```
 
-### 3. Update `DisbursementDashboard.tsx`
-
-Pass the upload trigger to CombinedLoanPackCard:
+3. **Optionally disable the Check Status button if config is missing**:
 
 ```typescript
-// In the CombinedLoanPackCard usage
-<CombinedLoanPackCard
-  ...existing props...
-  onUploadSigned={() => {
-    setSelectedDocType("combined_loan_pack");
-    setUploadDialogOpen(true);
-  }}
-/>
+disabled={isCheckingStatus || !nupayConfig}
 ```
 
-## Visual Layout After Changes
+## Changes Summary
 
-```text
-Combined Loan Pack Card:
-┌──────────────────────────────────────────────────────────────────────┐
-│ Combined Loan Pack                                    [E-Signed] ✓   │
-│ All loan documents in one file for easy signing                      │
-├──────────────────────────────────────────────────────────────────────┤
-│ [Generated] [Download] [Print] [E-Sign] [Upload Signed] [View Signed]│
-│                                                                      │
-│ Includes: ✓ Sanction Letter  ✓ Loan Agreement  ✓ Daily Schedule      │
-└──────────────────────────────────────────────────────────────────────┘
-```
+| Location | Change |
+|----------|--------|
+| Line ~68 | Add `useQuery` to fetch `nupay_config.environment` |
+| Line 80 | Add `environment: nupayConfig?.environment \|\| "uat"` to request body |
+| Line 239 (optional) | Disable button if `!nupayConfig` |
 
-## Button Visibility Logic
+## Why This Fixes It
 
-| State | Buttons Shown |
-|-------|---------------|
-| Not generated | Generate (disabled) |
-| Generated, not signed | Generate (disabled), Download, Print, E-Sign, **Upload Signed** |
-| Signed (via e-sign or upload) | Download, Print, View Signed Document |
+The edge function uses `environment` to:
+1. Call `nupay-authenticate` with the correct environment
+2. Fetch the matching `nupay_config` row (UAT vs Production API endpoints)
+3. Make API calls to the correct Nupay server
 
-## Files to Modify
-
-| File | Change |
-|------|--------|
-| `src/components/LOS/Sanction/UploadSignedDocumentDialog.tsx` | Add "Combined Loan Pack" and "Daily Repayment Schedule" options |
-| `src/components/LOS/Disbursement/CombinedLoanPackCard.tsx` | Add Upload icon import, `onUploadSigned` prop, and upload button |
-| `src/components/LOS/Disbursement/DisbursementDashboard.tsx` | Pass `onUploadSigned` handler to CombinedLoanPackCard |
-
-## Technical Notes
-
-- Uses existing upload infrastructure (no new database changes needed)
-- Uploads go to `loan-documents` bucket with path: `{orgId}/{applicationId}/signed/combined_loan_pack_{timestamp}.{ext}`
-- Updates `loan_generated_documents` table where `document_type = 'combined_loan_pack'`
-- After upload, the "View Signed Document" button will appear automatically
+Without `environment`, the function immediately returns a 400 error.
