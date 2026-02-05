@@ -1,156 +1,313 @@
 
-# Fix: E-Sign processForSign "Login failed" (NP004) Error
+# SMS Implementation Plan
 
-## Root Cause Analysis
+## Overview
+Implement transactional SMS functionality with automated triggers, integrated into the Communications hub alongside WhatsApp and Calling. The system will use your existing Exotel integration and be fully DLT compliant.
 
-After examining logs, code, and all three Nupay edge functions, I found the real issue:
+---
 
-**Nupay's SignDocument API uses different authentication headers depending on the content type:**
-
-| Step | Endpoint | Content Type | Required Header | Current Code |
-|------|----------|--------------|-----------------|--------------|
-| Upload | `addRequestFile` | multipart/form-data | `Token: {jwt}` | ✅ Correct |
-| Process | `processForSign` | application/json | `Authorization: Bearer {jwt}` | ❌ Wrong - using `Token` |
-| Status | `documentStatus` | application/json | `Authorization: Bearer {jwt}` | ✅ Correct |
-
-**Evidence:**
-1. The working `nupay-esign-status` function (lines 161-167) uses `Authorization: Bearer` for JSON endpoints
-2. Step 1 (Upload) succeeds with `Token` header (multipart/form-data)
-3. Step 2 (Process) fails with `Token` header (application/json) - returns NP004 "Login failed"
-
-The status check function at line 164 explicitly uses:
-```typescript
-headers: {
-  "Authorization": `Bearer ${token}`,  // ← This format for JSON APIs
-  "api-key": config.api_key,
-  "Content-Type": "application/json",
-}
-```
-
-But the esign-request function at line 264-267 incorrectly uses:
-```typescript
-headers: {
-  "api-key": apiKey,
-  "Token": token,  // ← Wrong for JSON APIs!
-  "Content-Type": "application/json",
-}
-```
-
-## Solution
-
-Fix the `processForSign` function to use `Authorization: Bearer ${token}` header format, matching the working status check function.
-
-Also remove the 2-second delay and second token generation since we now know those were not the root cause.
-
-## Technical Changes
-
-**File: `supabase/functions/nupay-esign-request/index.ts`**
-
-### Change 1: Fix processForSign headers (lines 262-270)
-
-From:
-```typescript
-const processResponse = await fetch(processEndpoint, {
-  method: "POST",
-  headers: {
-    "api-key": apiKey,
-    "Token": token,  // Wrong for JSON APIs
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify(payload),
-});
-```
-
-To:
-```typescript
-const processResponse = await fetch(processEndpoint, {
-  method: "POST",
-  headers: {
-    "api-key": apiKey,
-    "Authorization": `Bearer ${token}`,  // Correct for JSON APIs
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify(payload),
-});
-```
-
-### Change 2: Simplify token handling (lines 402-416)
-
-Remove the unnecessary second token generation since a single token should work when the correct headers are used:
-
-From:
-```typescript
-// Step 2: Process for signing - get FRESH token
-// Add delay to ensure Nupay generates a new token (tokens are cached by timestamp)
-console.log("[E-Sign] Step 2: Waiting 2 seconds for fresh token...");
-await new Promise(resolve => setTimeout(resolve, 2000));
-
-console.log("[E-Sign] Step 2: Getting fresh token for processForSign...");
-const token2 = await getNewToken(apiEndpoint, apiKey);
-console.log(`[E-Sign] Step 2: Fresh token obtained: ${token2.substring(0, 20)}...`);
-
-// Verify tokens are different
-if (token === token2) {
-  console.warn("[E-Sign] WARNING: Token2 is identical to Token1");
-} else {
-  console.log("[E-Sign] Step 2: Confirmed tokens are different ✓");
-}
-```
-
-To:
-```typescript
-// Step 2: Process for signing - use same token (different header format for JSON APIs)
-console.log("[E-Sign] Step 2: Processing document for signing...");
-```
-
-### Change 3: Update processForSign call to use same token
-
-Change:
-```typescript
-const { signerUrl, docketId, documentId: nupayDocumentId } = await processForSign(
-  apiEndpoint,
-  apiKey,
-  token2,  // token2 is the second token
-```
-
-To:
-```typescript
-const { signerUrl, docketId, documentId: nupayDocumentId } = await processForSign(
-  apiEndpoint,
-  apiKey,
-  token,   // Use same token as upload (different header format handles auth)
-```
-
-### Change 4: Update log message in processForSign (line 260)
-
-Update the log to reflect the new header format:
-```typescript
-console.log(`[E-Sign] Process request headers: api-key=${apiKey.substring(0, 10)}..., Authorization=Bearer ${token.substring(0, 20)}...`);
-```
-
-## Why Previous Fixes Failed
-
-1. **Token caching theory (2-second delay)**: We thought Nupay was caching tokens, but the issue was the header format
-2. **Token header theory**: We correctly identified `Token` header for upload, but incorrectly applied it to JSON endpoints
-3. **Fresh token theory**: Getting fresh tokens didn't help because the header format was still wrong
-
-The key insight came from comparing with the **working** `nupay-esign-status` function which uses `Authorization: Bearer` for JSON APIs.
-
-## Summary of Header Rules for Nupay SignDocument API
+## Architecture Summary
 
 ```text
-┌─────────────────────────────────────────────────────────────────┐
-│  NUPAY SIGNDOCUMENT API - AUTHENTICATION RULES                  │
-├─────────────────────────────────────────────────────────────────┤
-│  Multipart uploads (FormData):     Token: {jwt}                 │
-│  JSON API calls (POST/GET):        Authorization: Bearer {jwt}  │
-│  All requests also require:        api-key: {api_key}           │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           SMS SYSTEM ARCHITECTURE                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  TRIGGERS                    PROCESSING                    DELIVERY        │
+│  ────────                    ──────────                    ────────        │
+│                                                                             │
+│  ┌─────────────┐            ┌─────────────────┐           ┌─────────────┐  │
+│  │ Loan Status │────────────│ automation-     │──────────▶│ send-sms    │  │
+│  │ Change      │            │ trigger-handler │           │ edge fn     │  │
+│  └─────────────┘            └─────────────────┘           └─────────────┘  │
+│                                    │                            │          │
+│  ┌─────────────┐                   │                            │          │
+│  │ eMandate    │───────────────────┤                            ▼          │
+│  │ Events      │                   │                      ┌───────────┐    │
+│  └─────────────┘                   │                      │  Exotel   │    │
+│                                    │                      │  SMS API  │    │
+│  ┌─────────────┐                   ▼                      └───────────┘    │
+│  │ eSign       │            ┌─────────────────┐                 │          │
+│  │ Events      │────────────│ sms_automation_ │                 │          │
+│  └─────────────┘            │ executions      │                 │          │
+│                             └─────────────────┘                 ▼          │
+│                                                           ┌───────────┐    │
+│                                                           │ sms_      │    │
+│                                                           │ messages  │    │
+│                                                           └───────────┘    │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Expected Outcome
+---
 
-After this fix:
-- Step 1 (Upload): Uses `Token` header → ✅ NP000 (Success)
-- Step 2 (Process): Uses `Authorization: Bearer` header → ✅ Should succeed
-- Signer URL will be generated and returned to the user
+## Phase 1: Database Schema
+
+### 1.1 SMS Messages Table
+Log all SMS communications for tracking and analytics:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid | Primary key |
+| org_id | uuid | Organization (FK) |
+| contact_id | uuid | Recipient contact (FK) |
+| loan_application_id | uuid | Associated loan (optional) |
+| phone_number | text | Destination number |
+| message_content | text | SMS body (max 160 chars recommended) |
+| template_id | uuid | Link to communication_templates |
+| template_variables | jsonb | Variable substitutions |
+| dlt_template_id | text | DLT registered template ID |
+| exotel_sid | text | Exotel message SID for tracking |
+| status | text | pending/sent/delivered/failed |
+| error_message | text | Failure reason if any |
+| sent_at | timestamptz | Dispatch timestamp |
+| delivered_at | timestamptz | Delivery confirmation timestamp |
+| sent_by | uuid | User who triggered (for manual sends) |
+| trigger_type | text | manual/automation/system |
+| created_at | timestamptz | Record creation |
+
+### 1.2 SMS Automation Rules Table
+Configure automated SMS triggers:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid | Primary key |
+| org_id | uuid | Organization |
+| name | text | Rule name |
+| description | text | Rule description |
+| is_active | boolean | Enable/disable toggle |
+| trigger_type | text | stage_change, disposition_set, emandate_status, esign_status |
+| trigger_config | jsonb | Trigger-specific configuration |
+| condition_logic | text | AND/OR for conditions |
+| conditions | jsonb | Additional conditions to check |
+| sms_template_id | uuid | Template to send |
+| send_delay_minutes | integer | Delay before sending |
+| max_sends_per_contact | integer | Limit per contact |
+| cooldown_period_days | integer | Wait between sends |
+| priority | integer | Rule priority |
+| total_triggered | integer | Stats counter |
+| total_sent | integer | Stats counter |
+| total_failed | integer | Stats counter |
+| created_by | uuid | Creator |
+| created_at | timestamptz | Creation time |
+
+### 1.3 SMS Automation Executions Table
+Track each automation run:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid | Primary key |
+| org_id | uuid | Organization |
+| rule_id | uuid | Which rule triggered |
+| contact_id | uuid | Target contact |
+| loan_application_id | uuid | Associated loan |
+| trigger_type | text | What triggered this |
+| trigger_data | jsonb | Trigger context |
+| status | text | pending/sent/failed/skipped |
+| sms_message_id | uuid | Link to sms_messages |
+| scheduled_for | timestamptz | When to send |
+| sent_at | timestamptz | When sent |
+| error_message | text | Failure reason |
+| created_at | timestamptz | Record creation |
+
+### 1.4 Exotel Settings Update
+Add DLT compliance fields:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| sms_sender_id | text | DLT-approved Sender ID (Header) |
+| dlt_entity_id | text | Principal Entity ID from DLT portal |
+
+---
+
+## Phase 2: Backend Edge Functions
+
+### 2.1 send-sms Edge Function
+Core SMS sending function using Exotel API:
+
+```typescript
+// supabase/functions/send-sms/index.ts
+// Key features:
+// - DLT compliance (Entity ID, Template ID in request)
+// - Exotel SMS API: POST /v1/Accounts/{sid}/Sms/send.json
+// - Content-Type: application/x-www-form-urlencoded
+// - Template variable substitution
+// - Status logging to sms_messages table
+```
+
+**Exotel SMS API Format:**
+```
+POST https://{subdomain}/v1/Accounts/{account_sid}/Sms/send.json
+Authorization: Basic {base64(api_key:api_token)}
+Content-Type: application/x-www-form-urlencoded
+
+From={sender_id}&To={phone}&Body={message}&DltEntityId={entity_id}&DltTemplateId={template_id}
+```
+
+### 2.2 sms-automation-trigger Integration
+Extend existing `automation-trigger-handler` to support SMS rules:
+
+- Query both `email_automation_rules` and `sms_automation_rules` for matching triggers
+- Process SMS rules through the same condition evaluation logic
+- Create executions in `sms_automation_executions`
+- Call `send-sms` function for delivery
+
+### 2.3 sms-webhook Edge Function
+Handle Exotel delivery receipts (DLR):
+
+- Receive status updates from Exotel
+- Update `sms_messages.status` (delivered/failed)
+- Update `sms_messages.delivered_at` timestamp
+
+---
+
+## Phase 3: Frontend Components
+
+### 3.1 Communications Hub - SMS Tab
+Add SMS tab to `src/pages/Communications.tsx`:
+
+```
+Communications
+├── Conversations (WhatsApp, Email)
+├── Email Campaigns
+├── Calling
+└── SMS (NEW)
+    ├── SMS Dashboard (stats + recent messages)
+    ├── SMS Automation Rules
+    └── SMS Settings link
+```
+
+### 3.2 SMS Dashboard Component
+New component: `src/components/SMS/SMSDashboard.tsx`
+
+Features:
+- Statistics cards (Total, Sent, Delivered, Failed)
+- Recent SMS messages table with search
+- Export to CSV
+- Auto-refresh with realtime updates
+
+### 3.3 SMS Automation Rules Page
+New page: `src/pages/SMSAutomationRules.tsx`
+
+Features:
+- List all SMS automation rules
+- Create/edit rule wizard:
+  1. Select trigger type (Stage Change, eMandate Status, eSign Status)
+  2. Configure trigger conditions
+  3. Select SMS template
+  4. Set delays and limits
+- Enable/disable toggle
+- Test rule functionality
+- View execution history
+
+### 3.4 SMS Templates in Templates Page
+Update `src/pages/Templates.tsx`:
+
+- Add SMS tab alongside WhatsApp and Email
+- SMS template form with:
+  - Template name
+  - DLT Template ID (required for compliance)
+  - Content (160 char limit indicator)
+  - Variables ({{name}}, {{loan_id}}, etc.)
+  - Category (transactional/promotional)
+
+### 3.5 Exotel Settings Update
+Update `src/pages/ExotelSettings.tsx`:
+
+Add SMS Configuration section:
+- SMS Sender ID (DLT Header)
+- DLT Entity ID (Principal Entity ID)
+- Test SMS button
+
+---
+
+## Phase 4: Automation Triggers
+
+### 4.1 Supported Trigger Types
+The following events will trigger SMS automations:
+
+| Trigger | Description | Example Use Case |
+|---------|-------------|------------------|
+| stage_change | Loan moves to new stage | "Your loan is now under review" |
+| disposition_set | Call outcome recorded | "We tried reaching you..." |
+| emandate_status | eMandate status change | "Your mandate is now active" |
+| esign_status | eSign document status | "Document signed successfully" |
+| payment_due | Payment reminder | "EMI of Rs.X due on..." |
+| loan_approved | Loan approved | "Congratulations! Loan approved" |
+| loan_disbursed | Loan disbursed | "Rs.X credited to your account" |
+
+### 4.2 Database Trigger Integration
+Add SMS trigger support to existing PostgreSQL triggers:
+
+- `trigger_stage_change_automation()` - Already exists, will extend
+- `trigger_emandate_status_change()` - New trigger on `loan_emandate_requests`
+- `trigger_esign_status_change()` - New trigger on `loan_esign_requests`
+
+---
+
+## Files to Create/Modify
+
+### New Files
+| File | Purpose |
+|------|---------|
+| `supabase/functions/send-sms/index.ts` | Core SMS sending function |
+| `supabase/functions/sms-webhook/index.ts` | Delivery receipt handler |
+| `src/components/SMS/SMSDashboard.tsx` | SMS dashboard component |
+| `src/components/SMS/SMSAutomationRuleForm.tsx` | Rule creation wizard |
+| `src/pages/SMSAutomationRules.tsx` | Automation rules management |
+
+### Modified Files
+| File | Changes |
+|------|---------|
+| `supabase/config.toml` | Add send-sms and sms-webhook config |
+| `supabase/functions/automation-trigger-handler/index.ts` | Add SMS rule processing |
+| `src/pages/Communications.tsx` | Add SMS tab |
+| `src/pages/Templates.tsx` | Add SMS templates tab |
+| `src/pages/ExotelSettings.tsx` | Add DLT configuration fields |
+
+### Database Migrations
+| Migration | Purpose |
+|-----------|---------|
+| Create `sms_messages` table | Message logging |
+| Create `sms_automation_rules` table | Automation config |
+| Create `sms_automation_executions` table | Execution tracking |
+| Alter `exotel_settings` | Add DLT fields |
+| Create SMS-related triggers | Event-driven automations |
+
+---
+
+## DLT Compliance Requirements
+
+For each SMS sent, the following will be included:
+
+1. **Principal Entity ID** - Your business ID on DLT portal (stored in `exotel_settings.dlt_entity_id`)
+2. **DLT Template ID** - Each template's registered ID (stored in `communication_templates.template_id`)
+3. **Sender ID (Header)** - Approved sender name (stored in `exotel_settings.sms_sender_id`)
+
+These fields are mandatory for transactional SMS in India and will be passed to Exotel's API.
+
+---
+
+## Implementation Order
+
+1. **Database schema** - Create tables and add DLT fields
+2. **send-sms edge function** - Core sending logic with DLT support
+3. **SMS Dashboard** - View and track messages
+4. **Templates UI update** - Add SMS tab for template management
+5. **Exotel Settings update** - DLT configuration UI
+6. **Automation rules** - Create sms_automation_rules infrastructure
+7. **Trigger integration** - Extend automation-trigger-handler
+8. **Webhook handler** - Delivery status updates
+9. **Testing** - End-to-end verification
+
+---
+
+## Configuration You'll Need to Provide
+
+Before going live, you'll need to enter these in the Exotel Settings page:
+
+1. **DLT Entity ID** - Your Principal Entity ID from TRAI DLT portal
+2. **SMS Sender ID** - Your approved 6-character Header (e.g., "PAISAA")
+3. **DLT Template IDs** - For each SMS template you create
+
+These will be stored securely in your database and included in every SMS API call.
