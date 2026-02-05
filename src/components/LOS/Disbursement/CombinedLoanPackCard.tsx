@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Package, FileText, Download, Printer, Loader2, FileCheck, Eye } from "lucide-react";
+import { Package, FileText, Download, Printer, Loader2, FileCheck, Eye, Upload } from "lucide-react";
 import html2pdf from "html2pdf.js";
 import { supabase } from "@/integrations/supabase/client";
 import CombinedLoanDocuments from "../Sanction/templates/CombinedLoanDocuments";
@@ -67,6 +67,7 @@ interface CombinedLoanPackCardProps {
   onRefetch: () => void;
   conditionsArray: string[] | null;
   defaultTerms: string[];
+  onUploadSigned?: () => void;
 }
 
 export default function CombinedLoanPackCard({
@@ -94,6 +95,7 @@ export default function CombinedLoanPackCard({
   onRefetch,
   conditionsArray,
   defaultTerms,
+  onUploadSigned,
 }: CombinedLoanPackCardProps) {
   // Check if all individual documents are generated
   const sanctionDoc = generatedDocs.find(d => d.document_type === "sanction_letter");
@@ -252,6 +254,18 @@ export default function CombinedLoanPackCard({
                 signerMobile={applicant?.mobile || ""}
                 onSuccess={onRefetch}
               />
+            )}
+
+            {/* Upload Signed Button */}
+            {isCombinedGenerated && !isCombinedSigned && onUploadSigned && (
+              <Button
+                variant="outline"
+                onClick={onUploadSigned}
+                className="gap-2"
+              >
+                <Upload className="h-4 w-4" />
+                Upload Signed
+              </Button>
             )}
 
             {/* View Signed Document Button */}

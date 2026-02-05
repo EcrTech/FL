@@ -127,7 +127,9 @@ export default function UploadSignedDocumentDialog({
   };
 
   const docTypeLabel = documentType === 'sanction_letter' ? 'Sanction Letter' : 
-                       documentType === 'loan_agreement' ? 'Loan Agreement' : '';
+                      documentType === 'loan_agreement' ? 'Loan Agreement' : 
+                      documentType === 'combined_loan_pack' ? 'Combined Loan Pack' :
+                      documentType === 'daily_schedule' ? 'Daily Repayment Schedule' : '';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -150,6 +152,8 @@ export default function UploadSignedDocumentDialog({
                 <SelectContent>
                   <SelectItem value="sanction_letter">Sanction Letter</SelectItem>
                   <SelectItem value="loan_agreement">Loan Agreement</SelectItem>
+                  <SelectItem value="combined_loan_pack">Combined Loan Pack</SelectItem>
+                  <SelectItem value="daily_schedule">Daily Repayment Schedule</SelectItem>
                 </SelectContent>
               </Select>
             </div>
