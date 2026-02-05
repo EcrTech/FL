@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Eye, CheckCircle, Loader2, Send, Upload, FileCheck, Filter, X, CalendarIcon } from "lucide-react";
+import { Eye, CheckCircle, Loader2, Send, Upload, FileCheck, Filter, X, CalendarIcon, Search } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -50,6 +50,7 @@ export default function Sanctions() {
   const [maxAmount, setMaxAmount] = useState<string>("");
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [approvedByFilter, setApprovedByFilter] = useState<string>("all");
+  const [searchTerm, setSearchTerm] = useState<string>("");
 
   // Optimized: Single query with JOINs instead of 3 separate queries
   const { data: applications, isLoading } = useQuery({
@@ -246,6 +247,15 @@ export default function Sanctions() {
   const approvers = [...new Set(applications?.map(app => app.approver_name).filter(Boolean) || [])];
 
   const filteredApplications = applications?.filter((app) => {
+    // Search filter (name, loan_id, application_number)
+    if (searchTerm) {
+      const search = searchTerm.toLowerCase();
+      const matchesName = app.applicant_name?.toLowerCase().includes(search);
+      const matchesLoanId = app.loan_id?.toLowerCase().includes(search);
+      const matchesAppNumber = app.application_number?.toLowerCase().includes(search);
+      if (!matchesName && !matchesLoanId && !matchesAppNumber) return false;
+    }
+    
     // Status filter
     if (statusFilter !== "all" && getAppStatus(app) !== statusFilter) return false;
     
@@ -268,9 +278,10 @@ export default function Sanctions() {
     return true;
   }) || [];
 
-  const hasActiveFilters = statusFilter !== "all" || minAmount || maxAmount || dateRange || approvedByFilter !== "all";
+  const hasActiveFilters = searchTerm || statusFilter !== "all" || minAmount || maxAmount || dateRange || approvedByFilter !== "all";
 
   const clearFilters = () => {
+    setSearchTerm("");
     setStatusFilter("all");
     setMinAmount("");
     setMaxAmount("");
@@ -287,8 +298,19 @@ export default function Sanctions() {
             <p className="text-muted-foreground">Approved applications pending sanction</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            
+            {/* Search Input */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name or loan number..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 w-[250px]"
+              />
+            </div>
+
+            <Filter className="h-4 w-4 text-muted-foreground ml-2" />
+
             {/* Status Filter */}
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[140px]">
