@@ -38,6 +38,13 @@ interface CreateMandateDialogProps {
   emiAmount: number;
   tenure: number;
   loanNo?: string;
+  prefillData?: {
+    bankName?: string;
+    bankAccountNo?: string;
+    ifsc?: string;
+    accountType?: string;
+    accountHolderName?: string;
+  };
 }
 
 type Step = "bank" | "account" | "mandate" | "confirm" | "success";
@@ -55,6 +62,7 @@ export default function CreateMandateDialog({
   emiAmount,
   tenure,
   loanNo: existingLoanNo,
+  prefillData,
 }: CreateMandateDialogProps) {
   const queryClient = useQueryClient();
   const [step, setStep] = useState<Step>("bank");
@@ -181,11 +189,20 @@ export default function CreateMandateDialog({
       setSelectedBankId(null);
       setSelectedBankName("");
       setAuthType("");
-      setAccountHolderName(applicantName);
-      setBankAccountNo("");
-      setBankAccountNoConfirm("");
-      setIfscCode("");
-      setAccountType("Savings");
+      // Prefill from previous mandate if provided
+      if (prefillData) {
+        setAccountHolderName(prefillData.accountHolderName || applicantName);
+        setBankAccountNo(prefillData.bankAccountNo || "");
+        setBankAccountNoConfirm(prefillData.bankAccountNo || "");
+        setIfscCode(prefillData.ifsc || "");
+        setAccountType((prefillData.accountType as "Savings" | "Current") || "Savings");
+      } else {
+        setAccountHolderName(applicantName);
+        setBankAccountNo("");
+        setBankAccountNoConfirm("");
+        setIfscCode("");
+        setAccountType("Savings");
+      }
       setCollectionAmount(emiAmount);
       setFrequency("MNTH");
       setFirstCollectionDate(format(addMonths(new Date(), 1), "yyyy-MM-dd"));
@@ -196,7 +213,7 @@ export default function CreateMandateDialog({
       setRegistrationUrl(null);
       setShowQR(false);
     }
-  }, [open, applicantName, emiAmount]);
+  }, [open, applicantName, emiAmount, prefillData]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
