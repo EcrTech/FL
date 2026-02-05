@@ -13,6 +13,34 @@ interface StatusRequest {
   environment: "uat" | "production";
 }
 
+// Helper function to get a fresh Nupay token (bypasses cache for download operations)
+async function getNewToken(baseEndpoint: string, apiKey: string): Promise<string> {
+  const authEndpoint = `${baseEndpoint}/Auth/token`;
+  console.log("[E-Sign-Status] Getting fresh token from:", authEndpoint);
+  
+  const authResponse = await fetch(authEndpoint, {
+    method: "GET",
+    headers: {
+      "api-key": apiKey,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!authResponse.ok) {
+    const errorText = await authResponse.text();
+    throw new Error(`Token request failed: ${authResponse.status} - ${errorText}`);
+  }
+
+  const authData = await authResponse.json();
+  const token = authData.token || authData.Token;
+
+  if (!token) {
+    throw new Error("No token received from Nupay");
+  }
+
+  return token;
+}
+
 // Helper function to get Nupay auth token
 // deno-lint-ignore no-explicit-any
 async function getNupayToken(supabase: SupabaseClient<any, any, any>, orgId: string, environment: string): Promise<string> {
@@ -267,6 +295,101 @@ serve(async (req) => {
         }
       } else {
         console.log("[E-Sign-Status] No signed document data in Nupay response");
+      }
+
+      // If no document in status response, try separate download API
+      if (!signedDocumentPath && esignRecord.nupay_document_id) {
+        console.log("[E-Sign-Status] Trying separate download API for document");
+        
+        try {
+          // Get fresh token for download (Nupay invalidates tokens per request)
+          const downloadToken = await getNewToken(esignApiEndpoint, config.api_key);
+          
+          const downloadEndpoint = `${esignApiEndpoint}/api/SignDocument/downloadDocument`;
+          console.log("[E-Sign-Status] Calling download endpoint:", downloadEndpoint);
+          
+          const downloadResponse = await fetch(downloadEndpoint, {
+            method: "POST",
+            headers: {
+              "api-key": config.api_key,
+              "Token": downloadToken,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              document_id: esignRecord.nupay_document_id,
+            }),
+          });
+
+          console.log("[E-Sign-Status] Download response status:", downloadResponse.status);
+          const contentType = downloadResponse.headers.get("content-type") || "";
+          console.log("[E-Sign-Status] Download response content-type:", contentType);
+
+          if (downloadResponse.ok) {
+            let pdfBuffer: Uint8Array | null = null;
+
+            if (contentType.includes("application/pdf")) {
+              // Direct PDF binary response
+              console.log("[E-Sign-Status] Received direct PDF binary");
+              const arrayBuffer = await downloadResponse.arrayBuffer();
+              pdfBuffer = new Uint8Array(arrayBuffer);
+            } else {
+              // JSON response with base64 or URL
+              const downloadText = await downloadResponse.text();
+              console.log("[E-Sign-Status] Download response (truncated):", downloadText.substring(0, 500));
+              
+              try {
+                const downloadData = JSON.parse(downloadText);
+                const docBase64 = downloadData.Data?.document || downloadData.data?.document || downloadData.document;
+                const docUrl = downloadData.Data?.document_url || downloadData.data?.document_url || 
+                               downloadData.Data?.download_url || downloadData.data?.download_url ||
+                               downloadData.document_url || downloadData.download_url;
+
+                if (docBase64) {
+                  console.log("[E-Sign-Status] Decoding base64 document from download API");
+                  const binaryString = atob(docBase64);
+                  pdfBuffer = new Uint8Array(binaryString.length);
+                  for (let i = 0; i < binaryString.length; i++) {
+                    pdfBuffer[i] = binaryString.charCodeAt(i);
+                  }
+                } else if (docUrl) {
+                  console.log("[E-Sign-Status] Downloading from URL:", docUrl);
+                  const urlResponse = await fetch(docUrl);
+                  if (urlResponse.ok) {
+                    const arrayBuffer = await urlResponse.arrayBuffer();
+                    pdfBuffer = new Uint8Array(arrayBuffer);
+                  }
+                }
+              } catch (parseError) {
+                console.error("[E-Sign-Status] Failed to parse download response:", parseError);
+              }
+            }
+
+            if (pdfBuffer && pdfBuffer.length > 0) {
+              // Upload to Supabase Storage
+              const fileName = `signed/${esignRecord.application_id}/${esignRecord.document_type}_signed_${Date.now()}.pdf`;
+              console.log("[E-Sign-Status] Uploading signed PDF to storage:", fileName);
+
+              const { error: uploadError } = await supabase.storage
+                .from("loan-documents")
+                .upload(fileName, pdfBuffer, {
+                  contentType: "application/pdf",
+                  upsert: true,
+                });
+
+              if (uploadError) {
+                console.error("[E-Sign-Status] Storage upload failed:", uploadError);
+              } else {
+                signedDocumentPath = fileName;
+                console.log("[E-Sign-Status] Signed document stored via download API:", signedDocumentPath);
+              }
+            }
+          } else {
+            const errorText = await downloadResponse.text();
+            console.error("[E-Sign-Status] Download API failed:", downloadResponse.status, errorText);
+          }
+        } catch (downloadError) {
+          console.error("[E-Sign-Status] Download API error:", downloadError);
+        }
       }
     } else if (signerStatus === "expired") {
       newStatus = "expired";
