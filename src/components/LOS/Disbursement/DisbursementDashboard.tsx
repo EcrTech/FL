@@ -509,6 +509,10 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
           onRefetch={refetchDocs}
           conditionsArray={conditionsArray}
           defaultTerms={defaultTerms}
+          onUploadSigned={() => {
+            setSelectedDocType("combined_loan_pack");
+            setUploadDialogOpen(true);
+          }}
         />
       )}
 
