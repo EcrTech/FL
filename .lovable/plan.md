@@ -1,171 +1,109 @@
 
-# Plan: Add Option for Reinitiating NACH/eMandate
+# Fix: Bank Details Auto-fill After Bank Statement Parsing
 
-## Overview
-Currently, the eMandate registration can only be reinitiated when the mandate status is `rejected` or `expired`. This enhancement will add a "Reinitiate NACH" button that allows staff to create a new mandate even when a previous one is in `submitted` or `cancelled` status, with the option to prefill bank details from the previous attempt.
+## Problem
+After parsing a bank statement, the bank details are no longer automatically filling in the details page. This is a regression - it was working previously.
 
-## Current Behavior
-- **No Mandate**: "Register eMandate" button shown
-- **Rejected/Expired**: "Register New Mandate" button shown
-- **Submitted/Pending**: Only "Check Status" button available (no reinitiation)
-- **Active/Accepted**: No action buttons (mandate is working)
-- **Cancelled**: No reinitiation option currently
+## Root Cause
+The issue is a **React Query key mismatch**:
 
-## Proposed Changes
+| Component | Query Key Used |
+|-----------|----------------|
+| `BankDetailsSection.tsx` | `["applicant-bank-details", applicantId]` |
+| `DocumentUpload.tsx` | `["applicant-bank-details", applicationId]` |
 
-### 1. Update EMandateSection.tsx - Button Logic
-Expand the reinitiation conditions to include `submitted`, `cancelled`, and `pending` statuses. Add a confirmation dialog for cases where an existing mandate might be replaced.
+Since `applicationId` and `applicantId` are different UUIDs, the cache invalidation in `DocumentUpload` never triggers a refetch in `BankDetailsSection`. The UI shows stale (empty) data because it doesn't know new OCR data is available.
 
-**Changes:**
-- Add state for confirmation dialog (`showReinitiateConfirm`)
-- Modify button visibility logic to show "Reinitiate NACH" for more statuses
-- Pass previous mandate data to the dialog for prefilling
-- Show warning when reinitiating over an existing submitted/pending mandate
+## Solution
 
-### 2. Update CreateMandateDialog.tsx - Prefill Support
-Add optional prop to receive previous mandate data and prefill the form fields.
+### 1. Update DocumentUpload Component Interface
+Add the `id` field to the `Applicant` interface so we can access the applicant's ID:
 
-**Changes:**
-- Add new prop: `prefillData?: { bankName, bankAccountNo, ifsc, accountType, accountHolderName }`
-- Update `useEffect` to populate form fields from prefillData when provided
-- Fields will still be editable (prefill is convenience, not locked)
-
-### 3. Add Confirmation Dialog
-When reinitiating over a `submitted` or `pending` mandate, show a warning that the previous registration link will become invalid.
-
-## User Experience Flow
-
-```text
-+------------------+     +-------------------+     +------------------+
-| EMandateSection  | --> | Confirm Dialog    | --> | CreateMandate    |
-| [Reinitiate]     |     | (if submitted/    |     | Dialog           |
-|                  |     |  pending)         |     | [Prefilled]      |
-+------------------+     +-------------------+     +------------------+
-```
-
-## Technical Details
-
-### EMandateSection.tsx Changes
-
-**New State:**
 ```typescript
-const [showReinitiateConfirm, setShowReinitiateConfirm] = useState(false);
-```
-
-**Updated Button Logic (Line 247-256):**
-```typescript
-{/* Show reinitiate for rejected, expired, cancelled, submitted, pending */}
-{getMandateStatus() !== "accepted" && mandateData && (
-  <Button 
-    variant="outline" 
-    size="sm"
-    onClick={() => {
-      // Show confirmation for submitted/pending (link will be invalidated)
-      if (getMandateStatus() === "submitted" || getMandateStatus() === "pending") {
-        setShowReinitiateConfirm(true);
-      } else {
-        setMandateDialogOpen(true);
-      }
-    }}
-  >
-    <CreditCard className="h-4 w-4 mr-2" />
-    Reinitiate NACH
-  </Button>
-)}
-```
-
-**Add ConfirmDialog:**
-```typescript
-<ConfirmDialog
-  open={showReinitiateConfirm}
-  onOpenChange={setShowReinitiateConfirm}
-  title="Reinitiate eMandate?"
-  description="The previous registration link will become invalid. The customer will need to complete authentication again with the new link."
-  onConfirm={() => {
-    setShowReinitiateConfirm(false);
-    setMandateDialogOpen(true);
-  }}
-  confirmText="Reinitiate"
-  variant="default"
-/>
-```
-
-**Pass Prefill Data to Dialog:**
-```typescript
-<CreateMandateDialog
-  // ... existing props
-  prefillData={mandateData ? {
-    bankName: mandateData.bank_name,
-    bankAccountNo: mandateData.bank_account_no,
-    ifsc: mandateData.ifsc_code,
-    accountType: mandateData.account_type,
-    accountHolderName: mandateData.account_holder_name,
-  } : undefined}
-/>
-```
-
-### CreateMandateDialog.tsx Changes
-
-**New Interface Prop:**
-```typescript
-interface CreateMandateDialogProps {
-  // ... existing props
-  prefillData?: {
-    bankName?: string;
-    bankAccountNo?: string;
-    ifsc?: string;
-    accountType?: string;
-    accountHolderName?: string;
-  };
+interface Applicant {
+  id?: string;  // Add this
+  first_name: string;
+  last_name?: string;
+  mobile?: string;
+  pan_number?: string;
 }
 ```
 
-**Updated useEffect (Line 178-199):**
+### 2. Fix Query Invalidation in parseMutation
+Update line 212 to use `applicant?.id`:
+
 ```typescript
-useEffect(() => {
-  if (open) {
-    setStep("bank");
-    // Prefill from previous mandate if provided
-    if (prefillData) {
-      setAccountHolderName(prefillData.accountHolderName || applicantName);
-      setBankAccountNo(prefillData.bankAccountNo || "");
-      setBankAccountNoConfirm(prefillData.bankAccountNo || "");
-      setIfscCode(prefillData.ifsc || "");
-      setAccountType((prefillData.accountType as "Savings" | "Current") || "Savings");
-    } else {
-      setAccountHolderName(applicantName);
-      setBankAccountNo("");
-      setBankAccountNoConfirm("");
-      setIfscCode("");
-      setAccountType("Savings");
-    }
-    // Reset other fields
-    setSelectedBankId(null);
-    setSelectedBankName("");
-    setAuthType("");
-    // ... rest of resets
-  }
-}, [open, applicantName, emiAmount, prefillData]);
+// Before
+queryClient.invalidateQueries({ queryKey: ["applicant-bank-details", applicationId] });
+
+// After
+if (applicant?.id) {
+  queryClient.invalidateQueries({ queryKey: ["applicant-bank-details", applicant.id] });
+}
+```
+
+### 3. Fix Query Invalidation in handleParseAll
+Update line 281 similarly:
+
+```typescript
+// Before
+queryClient.invalidateQueries({ queryKey: ["applicant-bank-details", applicationId] });
+
+// After
+if (applicant?.id) {
+  queryClient.invalidateQueries({ queryKey: ["applicant-bank-details", applicant.id] });
+}
 ```
 
 ## Files to Modify
 
-| File | Changes |
-|------|---------|
-| `src/components/LOS/Disbursement/EMandateSection.tsx` | Add reinitiate button logic, confirmation dialog, pass prefill data |
-| `src/components/LOS/Mandate/CreateMandateDialog.tsx` | Add prefillData prop, prefill form fields on open |
+| File | Change |
+|------|--------|
+| `src/components/LOS/DocumentUpload.tsx` | Add `id` to Applicant interface, fix query invalidation keys |
 
-## Edge Cases Handled
+## Expected Behavior After Fix
 
-1. **Submitted Mandate**: Warning shown that previous link will be invalidated
-2. **Pending Mandate**: Same as submitted - confirmation required
-3. **Rejected/Expired/Cancelled**: Direct reinitiation allowed (no active link)
-4. **Active Mandate**: Reinitiate button hidden (mandate is working)
-5. **No Mandate**: Original "Register eMandate" button shown
+1. User uploads and parses a bank statement
+2. AI extracts bank details (account number, IFSC, bank name, etc.)
+3. `DocumentUpload` invalidates the correct query key using `applicantId`
+4. `BankDetailsSection` refetches and detects new OCR data
+5. Form auto-fills with extracted data and enters edit mode for user review
 
-## Benefits
+## Technical Details
 
-- Staff can reinitiate without waiting for expiry when customer has issues
-- Prefilled bank details reduce data entry errors
-- Confirmation prevents accidental invalidation of working registration links
-- Clean UX with appropriate warnings
+The data flow relies on these interconnected queries:
+
+```text
+[DocumentUpload]                    [BankDetailsSection]
+      |                                     |
+      v                                     v
+Parse bank_statement              Fetch applicant-bank-details
+      |                                     |
+      v                                     |
+Store ocr_data in                          |
+loan_documents table                       |
+      |                                     |
+      v                                     |
+Invalidate queries:                        |
+  - loan-documents                         |
+  - bank-statement-parsed                  |
+  - applicant-bank-details ----[BROKEN]--->X (wrong key!)
+                                           |
+                                     Never refetches
+                                           |
+                                     Shows stale/empty data
+```
+
+After fix:
+```text
+Invalidate queries:                        |
+  - applicant-bank-details ----[FIXED]---->v
+                                           |
+                                     Refetches with new data
+                                           |
+                                     useEffect detects OCR data
+                                           |
+                                     Auto-fills form fields
+                                           |
+                                     Sets isEditing = true
+```
