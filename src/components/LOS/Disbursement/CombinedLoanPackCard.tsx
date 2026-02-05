@@ -257,14 +257,14 @@ export default function CombinedLoanPackCard({
             )}
 
             {/* Upload Signed Button */}
-            {isCombinedGenerated && !isCombinedSigned && onUploadSigned && (
+            {isCombinedGenerated && (!isCombinedSigned || (isCombinedSigned && !combinedDoc?.signed_document_path)) && onUploadSigned && (
               <Button
                 variant="outline"
                 onClick={onUploadSigned}
                 className="gap-2"
               >
                 <Upload className="h-4 w-4" />
-                Upload Signed
+                {isCombinedSigned ? "Re-upload Signed" : "Upload Signed"}
               </Button>
             )}
 
