@@ -7475,6 +7475,59 @@ export type Database = {
           },
         ]
       }
+      sms_templates: {
+        Row: {
+          category: string | null
+          char_count: number | null
+          content: string
+          created_at: string
+          dlt_template_id: string
+          id: string
+          is_active: boolean | null
+          language: string | null
+          name: string
+          org_id: string
+          updated_at: string
+          variables: Json | null
+        }
+        Insert: {
+          category?: string | null
+          char_count?: number | null
+          content: string
+          created_at?: string
+          dlt_template_id: string
+          id?: string
+          is_active?: boolean | null
+          language?: string | null
+          name: string
+          org_id: string
+          updated_at?: string
+          variables?: Json | null
+        }
+        Update: {
+          category?: string | null
+          char_count?: number | null
+          content?: string
+          created_at?: string
+          dlt_template_id?: string
+          id?: string
+          is_active?: boolean | null
+          language?: string | null
+          name?: string
+          org_id?: string
+          updated_at?: string
+          variables?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_templates_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subscription_audit_log: {
         Row: {
           action: string
