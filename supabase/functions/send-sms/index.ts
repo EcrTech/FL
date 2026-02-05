@@ -147,6 +147,14 @@ interface SMSTemplate {
       }
     }
     
+   // Handle direct {#var#} DLT placeholder replacement when no template mapping exists
+   if (templateVariables && Object.keys(templateVariables).length > 0) {
+     for (const [key, value] of Object.entries(templateVariables)) {
+       // Replace {#key#} format (DLT standard)
+       finalMessage = finalMessage.replace(new RegExp(`\\{#${key}#\\}`, 'gi'), value);
+     }
+   }
+   
     // Also handle standard {{variable}} format for backward compatibility
      if (templateVariables && Object.keys(templateVariables).length > 0) {
        for (const [key, value] of Object.entries(templateVariables)) {
