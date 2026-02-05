@@ -40,6 +40,7 @@ import EmailCampaigns from "./pages/EmailCampaigns";
 import EmailCampaignDetail from "./pages/EmailCampaignDetail";
 import EmailAutomations from "./pages/EmailAutomations";
 import EmailAutomationSettings from "./pages/EmailAutomationSettings";
+import SMSAutomationRules from "./pages/SMSAutomationRules";
 import CampaignOverview from "./pages/Campaigns/CampaignOverview";
 import AIInsightsDashboard from "./pages/Campaigns/AIInsightsDashboard";
 import RedefineDataRepository from "./pages/RedefineDataRepository";
@@ -263,6 +264,12 @@ const App = () => {
             <Route path="/email-automations/settings" element={
               <ProtectedRoute requiredRole="admin">
                 <EmailAutomationSettings />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/sms-automation-rules" element={
+              <ProtectedRoute requiredRole="admin">
+                <SMSAutomationRules />
               </ProtectedRoute>
             } />
             

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
+import { SMSDashboard } from "@/components/SMS/SMSDashboard";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { LoadingState } from "@/components/common/LoadingState";
 import { useNotification } from "@/hooks/useNotification";
-import { MessageSquare, Mail, Search, Send, User, Plus, Download, RefreshCw, Inbox, Phone, PhoneCall } from "lucide-react";
+import { MessageSquare, Mail, Search, Send, User, Plus, Download, RefreshCw, Inbox, Phone, PhoneCall, MessageCircle } from "lucide-react";
 import { format } from "date-fns";
 import { useOrgContext } from "@/hooks/useOrgContext";
 import { useRealtimeSync } from "@/hooks/useRealtimeSync";
@@ -339,6 +340,10 @@ export default function Communications() {
               <TabsTrigger value="calling">
                 <Phone className="h-4 w-4 mr-2" />
                 Calling
+              </TabsTrigger>
+              <TabsTrigger value="sms">
+                <MessageCircle className="h-4 w-4 mr-2" />
+                SMS
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -675,6 +680,11 @@ export default function Communications() {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          {/* SMS Tab */}
+          <TabsContent value="sms" className="h-full m-0 p-4">
+            <SMSDashboard />
           </TabsContent>
         </Tabs>
       </div>

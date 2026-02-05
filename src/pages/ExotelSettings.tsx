@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/Layout/DashboardLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useNotification } from "@/hooks/useNotification";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Copy, Check } from "lucide-react";
+import { Loader2, Copy, Check, MessageCircle, Send } from "lucide-react";
 import { useOrgContext } from "@/hooks/useOrgContext";
 
 export default function ExotelSettings() {
@@ -24,9 +24,14 @@ export default function ExotelSettings() {
     caller_id: "",
     call_recording_enabled: true,
     is_active: true,
+    sms_sender_id: "",
+    dlt_entity_id: "",
   });
+  const [testPhone, setTestPhone] = useState("");
+  const [sendingTest, setSendingTest] = useState(false);
 
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/exotel-webhook`;
+  const smsWebhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sms-webhook`;
 
   useEffect(() => {
     if (orgId) {
@@ -53,6 +58,8 @@ export default function ExotelSettings() {
           caller_id: data.caller_id || "",
           call_recording_enabled: data.call_recording_enabled ?? true,
           is_active: data.is_active ?? true,
+          sms_sender_id: data.sms_sender_id || "",
+          dlt_entity_id: data.dlt_entity_id || "",
         });
       }
     } catch (error: any) {
@@ -94,6 +101,40 @@ export default function ExotelSettings() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
     notify.success("Copied!", "Webhook URL copied to clipboard");
+  };
+
+  const handleSendTestSms = async () => {
+    if (!testPhone) {
+      notify.error("Missing phone", "Please enter a phone number");
+      return;
+    }
+    if (!settings.sms_sender_id) {
+      notify.error("Missing Sender ID", "Please configure SMS Sender ID first");
+      return;
+    }
+
+    setSendingTest(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-sms', {
+        body: {
+          orgId: orgId,
+          phoneNumber: testPhone,
+          messageContent: 'This is a test SMS from your loan management system.',
+          triggerType: 'manual',
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      notify.success("SMS Sent", "Test SMS sent successfully");
+      setTestPhone("");
+    } catch (error: any) {
+      console.error('Test SMS error:', error);
+      notify.error("Failed to send", error.message || "Could not send test SMS");
+    } finally {
+      setSendingTest(false);
+    }
   };
 
   if (loading) {
@@ -213,6 +254,90 @@ export default function ExotelSettings() {
               />
             </div>
           </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageCircle className="h-5 w-5" />
+              SMS Configuration (DLT Compliance)
+            </CardTitle>
+            <CardDescription>
+              Configure SMS settings for DLT compliance. These are required for sending SMS in India.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="sms_sender_id">SMS Sender ID (Header) *</Label>
+                <Input
+                  id="sms_sender_id"
+                  value={settings.sms_sender_id}
+                  onChange={(e) => setSettings({ ...settings, sms_sender_id: e.target.value })}
+                  placeholder="e.g., PAISAA"
+                  maxLength={6}
+                />
+                <p className="text-xs text-muted-foreground">
+                  6-character sender ID approved on DLT portal
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="dlt_entity_id">DLT Entity ID *</Label>
+                <Input
+                  id="dlt_entity_id"
+                  value={settings.dlt_entity_id}
+                  onChange={(e) => setSettings({ ...settings, dlt_entity_id: e.target.value })}
+                  placeholder="Enter your Principal Entity ID"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Your business Entity ID from TRAI DLT portal
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t">
+              <Label className="mb-2 block">Test SMS</Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Enter phone number (e.g., 9876543210)"
+                  value={testPhone}
+                  onChange={(e) => setTestPhone(e.target.value)}
+                  className="max-w-xs"
+                />
+                <Button onClick={handleSendTestSms} disabled={sendingTest || !testPhone}>
+                  {sendingTest ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <Send className="h-4 w-4 mr-2" />
+                  )}
+                  Send Test
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Send a test SMS to verify your configuration
+              </p>
+            </div>
+          </CardContent>
+          <CardFooter className="bg-muted/50">
+            <div className="text-sm text-muted-foreground">
+              <p className="font-medium mb-1">SMS Delivery Webhook URL</p>
+              <div className="flex gap-2 items-center">
+                <code className="bg-background px-2 py-1 rounded text-xs">{smsWebhookUrl}</code>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => {
+                    navigator.clipboard.writeText(smsWebhookUrl);
+                    notify.success("Copied!", "SMS webhook URL copied");
+                  }}
+                >
+                  <Copy className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+          </CardFooter>
         </Card>
 
         <Card>
