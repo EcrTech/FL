@@ -1,110 +1,124 @@
 
-# Add Name and Loan Number Search to Sanctions Page
+# Add Upload Signed Document Option to Combined Loan Pack
 
 ## Problem Summary
 
-The Sanctions page (`/los/sanctions`) currently has filters for status, amount range, date range, and approver - but **no search functionality** to quickly find applications by:
-- Applicant name
-- Loan ID / Application number
+The Combined Loan Pack card currently supports:
+- Generating the combined document
+- Downloading and printing
+- E-signing via Nupay
+- Viewing signed documents (when available)
 
-## Current State
+**Missing**: The ability to manually upload a signed document when:
+- The document was signed physically (wet signature)
+- E-sign happened outside the system
+- The Nupay download failed but you have the signed PDF
 
-The Sanctions page filter bar includes:
-- Status filter (New, Pending, Emailed, Signed)
-- Amount range (Min/Max)
-- Date range picker
-- Approved By dropdown
-- Clear filters button
+## Current Architecture
 
-**Missing**: A text search box for name/loan number lookup.
+The codebase already has `UploadSignedDocumentDialog` component that handles:
+- File selection (PDF, JPG, PNG, max 10MB)
+- Upload to `loan-documents` bucket
+- Update `loan_generated_documents` table with `signed_document_path`
+- Mark document as `customer_signed: true`
+
+**Issue**: The dialog currently only supports "Sanction Letter" and "Loan Agreement" as document type options - not "Combined Loan Pack".
 
 ## Solution
 
-Add a prominent search input field that filters applications by:
-- Applicant name (partial match)
-- Loan ID (partial match)
-- Application number (partial match)
+1. Update `UploadSignedDocumentDialog` to include "Combined Loan Pack" option
+2. Add an "Upload Signed" button to the `CombinedLoanPackCard`
+3. Pass the dialog trigger from parent `DisbursementDashboard` to `CombinedLoanPackCard`
 
 ## Implementation Details
 
-### Changes to `src/pages/LOS/Sanctions.tsx`
+### 1. Update `UploadSignedDocumentDialog.tsx`
 
-1. **Add search state variable**
-   ```typescript
-   const [searchTerm, setSearchTerm] = useState<string>("");
-   ```
+Add "Combined Loan Pack" to the document type options:
 
-2. **Add Search icon import**
-   ```typescript
-   import { Search, Eye, CheckCircle, ... } from "lucide-react";
-   ```
+```typescript
+// Line 129-130 - Update docTypeLabel to include combined_loan_pack
+const docTypeLabel = documentType === 'sanction_letter' ? 'Sanction Letter' : 
+                     documentType === 'loan_agreement' ? 'Loan Agreement' : 
+                     documentType === 'combined_loan_pack' ? 'Combined Loan Pack' :
+                     documentType === 'daily_schedule' ? 'Daily Repayment Schedule' : '';
 
-3. **Add search input to filter bar** (before the status filter)
-   ```typescript
-   <div className="relative">
-     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-     <Input
-       placeholder="Search by name or loan number..."
-       value={searchTerm}
-       onChange={(e) => setSearchTerm(e.target.value)}
-       className="pl-10 w-[250px]"
-     />
-   </div>
-   ```
+// Lines 150-153 - Add SelectItem for combined_loan_pack
+<SelectItem value="sanction_letter">Sanction Letter</SelectItem>
+<SelectItem value="loan_agreement">Loan Agreement</SelectItem>
+<SelectItem value="daily_schedule">Daily Repayment Schedule</SelectItem>
+<SelectItem value="combined_loan_pack">Combined Loan Pack</SelectItem>
+```
 
-4. **Update filter logic** to include search:
-   ```typescript
-   const filteredApplications = applications?.filter((app) => {
-     // Search filter (name, loan_id, application_number)
-     if (searchTerm) {
-       const search = searchTerm.toLowerCase();
-       const matchesName = app.applicant_name?.toLowerCase().includes(search);
-       const matchesLoanId = app.loan_id?.toLowerCase().includes(search);
-       const matchesAppNumber = app.application_number?.toLowerCase().includes(search);
-       if (!matchesName && !matchesLoanId && !matchesAppNumber) return false;
-     }
-     
-     // ... existing filters
-   });
-   ```
+### 2. Update `CombinedLoanPackCard.tsx`
 
-5. **Update hasActiveFilters** to include search:
-   ```typescript
-   const hasActiveFilters = searchTerm || statusFilter !== "all" || ...;
-   ```
+Add props for upload dialog trigger and an "Upload Signed" button:
 
-6. **Update clearFilters** to reset search:
-   ```typescript
-   const clearFilters = () => {
-     setSearchTerm("");
-     setStatusFilter("all");
-     // ...
-   };
-   ```
+```typescript
+// Add to props interface
+onUploadSigned: () => void;
 
-## Visual Layout
+// Add button in CardContent (after E-Sign button, before View Signed)
+{isCombinedGenerated && !isCombinedSigned && (
+  <Button
+    variant="outline"
+    onClick={onUploadSigned}
+    className="gap-2"
+  >
+    <Upload className="h-4 w-4" />
+    Upload Signed
+  </Button>
+)}
+```
+
+### 3. Update `DisbursementDashboard.tsx`
+
+Pass the upload trigger to CombinedLoanPackCard:
+
+```typescript
+// In the CombinedLoanPackCard usage
+<CombinedLoanPackCard
+  ...existing props...
+  onUploadSigned={() => {
+    setSelectedDocType("combined_loan_pack");
+    setUploadDialogOpen(true);
+  }}
+/>
+```
+
+## Visual Layout After Changes
 
 ```text
-Current Layout:
-┌─────────────────────────────────────────────────────────────────────┐
-│ [Filter icon] [Status ▼] [Min ₹ - Max ₹] [Date range] [Approved ▼] │
-└─────────────────────────────────────────────────────────────────────┘
-
-New Layout:
-┌───────────────────────────────────────────────────────────────────────────────────┐
-│ [🔍 Search by name or loan number...] [Status ▼] [Min-Max] [Date] [Approved ▼]   │
-└───────────────────────────────────────────────────────────────────────────────────┘
+Combined Loan Pack Card:
+┌──────────────────────────────────────────────────────────────────────┐
+│ Combined Loan Pack                                    [E-Signed] ✓   │
+│ All loan documents in one file for easy signing                      │
+├──────────────────────────────────────────────────────────────────────┤
+│ [Generated] [Download] [Print] [E-Sign] [Upload Signed] [View Signed]│
+│                                                                      │
+│ Includes: ✓ Sanction Letter  ✓ Loan Agreement  ✓ Daily Schedule      │
+└──────────────────────────────────────────────────────────────────────┘
 ```
+
+## Button Visibility Logic
+
+| State | Buttons Shown |
+|-------|---------------|
+| Not generated | Generate (disabled) |
+| Generated, not signed | Generate (disabled), Download, Print, E-Sign, **Upload Signed** |
+| Signed (via e-sign or upload) | Download, Print, View Signed Document |
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/pages/LOS/Sanctions.tsx` | Add search input and filter logic |
+| `src/components/LOS/Sanction/UploadSignedDocumentDialog.tsx` | Add "Combined Loan Pack" and "Daily Repayment Schedule" options |
+| `src/components/LOS/Disbursement/CombinedLoanPackCard.tsx` | Add Upload icon import, `onUploadSigned` prop, and upload button |
+| `src/components/LOS/Disbursement/DisbursementDashboard.tsx` | Pass `onUploadSigned` handler to CombinedLoanPackCard |
 
 ## Technical Notes
 
-- Search is case-insensitive
-- Matches partial strings (contains match, not exact)
-- Searches across: applicant_name, loan_id, application_number
-- No debounce needed since filtering is done client-side on already-fetched data
+- Uses existing upload infrastructure (no new database changes needed)
+- Uploads go to `loan-documents` bucket with path: `{orgId}/{applicationId}/signed/combined_loan_pack_{timestamp}.{ext}`
+- Updates `loan_generated_documents` table where `document_type = 'combined_loan_pack'`
+- After upload, the "View Signed Document" button will appear automatically
