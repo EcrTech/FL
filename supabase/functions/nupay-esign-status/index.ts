@@ -152,14 +152,16 @@ serve(async (req) => {
       );
     }
 
-    // If already signed, return cached status
-    if (esignRecord.status === "signed") {
+    // If already signed AND has document path, return cached status
+    // Otherwise, we need to download the signed document
+    if (esignRecord.status === "signed" && esignRecord.signed_document_path) {
       return new Response(
         JSON.stringify({
           success: true,
           status: "signed",
           signed_at: esignRecord.signed_at,
           esign_request_id: esignRecord.id,
+          signed_document_path: esignRecord.signed_document_path,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
