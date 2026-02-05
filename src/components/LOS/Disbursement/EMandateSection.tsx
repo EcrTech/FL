@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
 import CreateMandateDialog from "../Mandate/CreateMandateDialog";
 import MandateStatusBadge from "../Mandate/MandateStatusBadge";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 
 interface EMandateSectionProps {
   applicationId: string;
@@ -44,6 +45,7 @@ export default function EMandateSection({
   const [mandateDialogOpen, setMandateDialogOpen] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  const [showReinitiateConfirm, setShowReinitiateConfirm] = useState(false);
 
   // Fetch existing mandate for this application
   const { data: mandateData, isLoading: loadingMandate, refetch: refetchMandate } = useQuery({
@@ -244,14 +246,22 @@ export default function EMandateSection({
                   Check Status
                 </Button>
                 
-                {(getMandateStatus() === "rejected" || getMandateStatus() === "expired") && (
+                {/* Show reinitiate for any non-accepted status when mandate exists */}
+                {getMandateStatus() !== "accepted" && (
                   <Button 
-                    variant="default" 
+                    variant="outline" 
                     size="sm"
-                    onClick={() => setMandateDialogOpen(true)}
+                    onClick={() => {
+                      // Show confirmation for submitted/pending (link will be invalidated)
+                      if (getMandateStatus() === "submitted" || getMandateStatus() === "pending") {
+                        setShowReinitiateConfirm(true);
+                      } else {
+                        setMandateDialogOpen(true);
+                      }
+                    }}
                   >
                     <CreditCard className="h-4 w-4 mr-2" />
-                    Register New Mandate
+                    Reinitiate NACH
                   </Button>
                 )}
               </div>
@@ -276,6 +286,27 @@ export default function EMandateSection({
         emiAmount={dailyEMI}
         tenure={tenureDays}
         loanNo={loanNo}
+        prefillData={mandateData ? {
+          bankName: mandateData.bank_name,
+          bankAccountNo: mandateData.bank_account_no,
+          ifsc: mandateData.ifsc_code,
+          accountType: mandateData.account_type,
+          accountHolderName: mandateData.account_holder_name,
+        } : undefined}
+      />
+
+      {/* Reinitiate Confirmation Dialog */}
+      <ConfirmDialog
+        open={showReinitiateConfirm}
+        onOpenChange={setShowReinitiateConfirm}
+        title="Reinitiate eMandate?"
+        description="The previous registration link will become invalid. The customer will need to complete authentication again with the new link."
+        onConfirm={() => {
+          setShowReinitiateConfirm(false);
+          setMandateDialogOpen(true);
+        }}
+        confirmText="Reinitiate"
+        variant="default"
       />
     </>
   );
