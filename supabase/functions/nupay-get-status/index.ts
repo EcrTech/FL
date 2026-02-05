@@ -142,9 +142,15 @@ serve(async (req) => {
 
     console.log(`[Nupay-Status] Response:`, JSON.stringify(statusData));
 
-    // Map Nupay status to our status
-    const nupayStatus = statusData.accptd || statusData.status || statusData.Status;
+    // Extract customer data from nested structure
+    // API returns: { StatusCode, data: { customer: { accptd, umrn, ... } } }
+    const customerData = statusData.data?.customer || statusData.Data?.customer || {};
+    
+    // Map Nupay status to our status (check nested first, then root level)
+    const nupayStatus = customerData.accptd || statusData.accptd || statusData.status || statusData.Status;
     let newStatus = mandate.status;
+    
+    console.log(`[Nupay-Status] Parsed status: ${nupayStatus}, customerData:`, JSON.stringify(customerData));
     
     if (nupayStatus === "accepted" || nupayStatus === "Accepted" || nupayStatus === "SUCCESS") {
       newStatus = "accepted";
@@ -154,12 +160,12 @@ serve(async (req) => {
       newStatus = "submitted";
     }
 
-    // Extract additional fields
-    const umrn = statusData.umrn || statusData.UMRN;
-    const npciRef = statusData.npci_ref || statusData.NpciRef;
-    const reasonCode = statusData.reason_code || statusData.ReasonCode;
-    const reasonDesc = statusData.reason_desc || statusData.ReasonDesc;
-    const rejectedBy = statusData.reject_by || statusData.RejectedBy;
+    // Extract additional fields from nested customer data (with fallback to root level)
+    const umrn = customerData.umrn || customerData.UMRN || statusData.umrn || statusData.UMRN;
+    const npciRef = customerData.npci_ref_no || customerData.npci_ref || statusData.npci_ref_no || statusData.npci_ref;
+    const reasonCode = customerData.reason_code || statusData.reason_code || statusData.ReasonCode;
+    const reasonDesc = customerData.reason_desc || statusData.reason_desc || statusData.ReasonDesc;
+    const rejectedBy = customerData.reject_by || statusData.reject_by || statusData.RejectedBy;
 
     // Update mandate record
     const updateData: Record<string, any> = {
