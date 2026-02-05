@@ -307,8 +307,9 @@ async function processForSign(
     throw new Error("No signer URL received from Nupay");
   }
 
-  const docketId = processData.docket_id || processData.data?.docket_id;
-  const documentId = processData.document_id || processData.data?.document_id;
+  // Nupay uses PascalCase "Data" in response
+  const docketId = processData.Data?.docket_id || processData.docket_id || processData.data?.docket_id;
+  const documentId = processData.Data?.document_id || processData.document_id || processData.data?.document_id;
 
   console.log(`[E-Sign] Process completed. Signer URL obtained.`);
   return { signerUrl, docketId, documentId };
