@@ -161,8 +161,8 @@ serve(async (req) => {
     const statusResponse = await fetch(statusEndpoint, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${token}`,
         "api-key": config.api_key,
+        "Token": token,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
