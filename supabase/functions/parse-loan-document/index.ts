@@ -32,15 +32,21 @@ Return ONLY valid JSON with these fields.`,
 - address: Full address as shown
 Return ONLY valid JSON with these fields.`,
 
-  bank_statement: `Extract the following from this bank statement. Do NOT include individual transactions.
-- account_number: Bank account number
-- account_holder_name: Account holder name exactly as shown
-- ifsc_code: IFSC code of the branch
-- bank_name: Name of the bank
-- branch_name: Branch name and address
+  bank_statement: `YOU MUST EXTRACT THE FOLLOWING ACCOUNT IDENTIFICATION DETAILS. THESE ARE THE MOST IMPORTANT FIELDS:
+
+=== HIGHEST PRIORITY - ACCOUNT DETAILS (extract from page header/top section) ===
+- account_number: The bank account number (CRITICAL - usually near top of first page, e.g. "1947828245")
+- ifsc_code: The IFSC code of the branch (CRITICAL - e.g. "KKBK0008083")
+- branch_name: The branch name and location (CRITICAL - e.g. "SMVIT BRANCH, BANGALORE")
+- account_holder_name: Account holder's full name exactly as printed
+- bank_name: Name of the bank (e.g. "Kotak Mahindra Bank")
 - account_type: Type of account (Savings/Current/etc)
+
+=== STATEMENT PERIOD ===
 - statement_period_from: Statement start date (YYYY-MM-DD)
 - statement_period_to: Statement end date (YYYY-MM-DD)
+
+=== SUMMARY BALANCES (from statement summary, NOT from transactions) ===
 - opening_balance: Opening balance (number only)
 - closing_balance: Closing balance (number only)
 - total_credits: Total credits/deposits (number only)
@@ -48,9 +54,12 @@ Return ONLY valid JSON with these fields.`,
 - average_monthly_balance: Average monthly balance if visible (number only)
 - salary_credits: Total salary/regular income credits (number only)
 - emi_debits: Total EMI/loan debits (number only)
-- bounce_count: Number of bounced transactions/insufficient fund instances (number only, 0 if none)
+- bounce_count: Number of bounced transactions (number only, 0 if none)
 - transaction_count: Total number of transactions visible (number only)
-Return ONLY a small valid JSON object with these fields. Do NOT return any transactions array. Use 0 or null for missing values.`,
+
+ABSOLUTE PROHIBITION: Do NOT include any "transactions" array. Do NOT list individual transactions. Do NOT include transaction dates, descriptions, amounts, or references. Return ONLY the summary fields above.
+
+Return ONLY a small valid JSON object with these fields. Use 0 or null for missing values.`,
 
   salary_slip_1: `Extract the following from this salary slip:
 - employee_name: Employee full name
@@ -500,6 +509,11 @@ serve(async (req) => {
     const hasMorePages = isPdf && isChunkable && actualTotalPages > 1 && nextPage <= actualTotalPages;
 
     if (hasMorePages) {
+      // Strip transactions from intermediate saves too
+      if (documentType === 'bank_statement' && mergedData.transactions) {
+        delete mergedData.transactions;
+      }
+
       // Update progress and save partial results
       const progress = calculateProgress(nextPage - 1, actualTotalPages, chunkConfig.pagesPerChunk);
       
@@ -553,6 +567,12 @@ serve(async (req) => {
     }
 
     // This is the final chunk or a single-page document
+    // Strip transactions array for bank statements (saves storage, not needed)
+    if (documentType === 'bank_statement' && mergedData.transactions) {
+      console.log(`[ParseDocument] Stripping transactions array (${mergedData.transactions.length} entries) from bank statement`);
+      delete mergedData.transactions;
+    }
+
     // Update the document with final parsed data
     const finalData: Record<string, any> = {
       ...mergedData,
