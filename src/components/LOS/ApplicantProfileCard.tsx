@@ -530,11 +530,18 @@ export function ApplicantProfileCard({
           <div className="flex items-center justify-center h-[75vh] overflow-auto">
             {viewerImage && (
               viewerImage.isPdf ? (
-                <iframe 
-                  src={viewerImage.url}
-                  title={viewerImage.name}
-                  className="w-full h-full border-0"
-                />
+                <object
+                  data={viewerImage.url}
+                  type="application/pdf"
+                  className="w-full h-full"
+                >
+                  <div className="flex flex-col items-center justify-center h-full gap-4">
+                    <p className="text-muted-foreground">PDF preview not supported in this browser.</p>
+                    <a href={viewerImage.url} download={viewerImage.name} className="text-primary underline">
+                      Download PDF
+                    </a>
+                  </div>
+                </object>
               ) : (
                 <img 
                   src={viewerImage.url} 

@@ -103,11 +103,18 @@ export function DocumentPreviewDialog({
                 />
               ) : isPdf && blobUrl ? (
                 <div className="w-full h-[60vh] border rounded-lg overflow-hidden">
-                  <iframe
-                    src={blobUrl}
-                    className="w-full h-full border-0"
-                    title={title}
-                  />
+                  <object
+                    data={blobUrl}
+                    type="application/pdf"
+                    className="w-full h-full"
+                  >
+                    <div className="flex flex-col items-center justify-center h-full gap-4">
+                      <p className="text-muted-foreground">PDF preview not supported.</p>
+                      <a href={signedUrl!} download={document?.file_name || "document"} className="text-primary underline">
+                        Download PDF
+                      </a>
+                    </div>
+                  </object>
                 </div>
               ) : isPdf ? (
                 <div className="flex flex-col items-center gap-4 p-8 text-center">
