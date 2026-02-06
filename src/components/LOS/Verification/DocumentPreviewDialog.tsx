@@ -16,6 +16,7 @@ interface DocumentPreviewDialogProps {
     file_path: string;
     file_name?: string;
     file_type?: string;
+    mime_type?: string;
   } | null;
   title: string;
 }
@@ -30,28 +31,38 @@ export function DocumentPreviewDialog({
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const isImage = document?.file_type?.startsWith("image/") || 
-    document?.file_path?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+  const mimeType = document?.mime_type || document?.file_type || "";
+  const filePath = document?.file_path || "";
 
-  const isPdf = document?.file_type === "application/pdf" || 
-    document?.file_path?.endsWith(".pdf");
+  const isImage = mimeType.startsWith("image/") || 
+    /\.(jpg|jpeg|png|gif|webp)$/i.test(filePath);
+
+  const isPdf = mimeType === "application/pdf" || 
+    filePath.endsWith(".pdf");
 
   useEffect(() => {
-    if (open && document?.file_path) {
+    let revoke: string | null = null;
+
+    if (open && filePath) {
       setLoading(true);
       setBlobUrl(null);
+      setSignedUrl(null);
+
+      const fileIsPdf = (document?.mime_type || document?.file_type || "") === "application/pdf" || 
+        filePath.endsWith(".pdf");
+
       supabase.storage
         .from("loan-documents")
-        .createSignedUrl(document.file_path, 3600)
+        .createSignedUrl(filePath, 3600)
         .then(async ({ data, error }) => {
           if (data && !error) {
             setSignedUrl(data.signedUrl);
-            // For PDFs, fetch as blob to avoid iframe/CORS issues
-            if (isPdf) {
+            if (fileIsPdf) {
               try {
                 const res = await fetch(data.signedUrl);
                 const blob = await res.blob();
                 const url = URL.createObjectURL(blob);
+                revoke = url;
                 setBlobUrl(url);
               } catch (e) {
                 console.error("Failed to fetch PDF blob:", e);
@@ -67,9 +78,9 @@ export function DocumentPreviewDialog({
     }
 
     return () => {
-      if (blobUrl) URL.revokeObjectURL(blobUrl);
+      if (revoke) URL.revokeObjectURL(revoke);
     };
-  }, [open, document?.file_path]);
+  }, [open, filePath]);
 
   return (
     <Dialog open={open} onOpenChange={() => onClose()}>
@@ -98,6 +109,11 @@ export function DocumentPreviewDialog({
                     className="w-full h-full border-0"
                     title={title}
                   />
+                </div>
+              ) : isPdf ? (
+                <div className="flex flex-col items-center gap-4 p-8 text-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  <p className="text-muted-foreground">Loading PDF...</p>
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-4 p-8 text-center">
