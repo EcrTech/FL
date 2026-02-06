@@ -461,7 +461,8 @@ export default function ApplicationDetail() {
       const { data, error } = await supabase
         .from("loan_documents")
         .select("*")
-        .eq("loan_application_id", id);
+        .eq("loan_application_id", id)
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
