@@ -110,6 +110,7 @@ export default function CombinedLoanPackCard({
   const allIndividualDocsGenerated = sanctionDoc && agreementDoc && scheduleDoc;
   const isCombinedGenerated = !!combinedDoc;
   const isCombinedSigned = combinedDoc?.customer_signed;
+  const needsRegeneration = combinedDoc && !combinedDoc.file_path;
 
   // Generate PDF, upload to storage, and create DB record
   const handleGenerateCombined = async () => {
@@ -137,10 +138,10 @@ export default function CombinedLoanPackCard({
       const docNumber = `COMBINEDLOANPACK-${Date.now().toString(36).toUpperCase()}`;
       const fileName = `${applicationId}/combined_loan_pack/${docNumber}.pdf`;
 
-      // Upload PDF to Supabase Storage
+      // Upload PDF to Supabase Storage (upsert to handle re-uploads)
       const { error: uploadError } = await supabase.storage
         .from("loan-documents")
-        .upload(fileName, pdfBlob, { contentType: 'application/pdf' });
+        .upload(fileName, pdfBlob, { contentType: 'application/pdf', upsert: true });
 
       if (uploadError) {
         console.error("PDF upload error:", uploadError);
@@ -149,22 +150,39 @@ export default function CombinedLoanPackCard({
 
       console.log("[CombinedLoanPackCard] PDF uploaded to storage:", fileName);
 
-      // Insert record with file_path
-      const { error: insertError } = await supabase
-        .from("loan_generated_documents")
-        .insert({
-          loan_application_id: applicationId,
-          sanction_id: sanction.id,
-          org_id: application.org_id,
-          document_type: "combined_loan_pack",
-          document_number: docNumber,
-          file_path: fileName,
-          status: "generated",
-        });
+      if (combinedDoc) {
+        // Update existing record with new file_path
+        const { error: updateError } = await supabase
+          .from("loan_generated_documents")
+          .update({
+            file_path: fileName,
+            document_number: docNumber,
+            status: "generated",
+          })
+          .eq("id", combinedDoc.id);
 
-      if (insertError) {
-        console.error("Document record insert error:", insertError);
-        throw new Error(`Failed to save document record: ${insertError.message}`);
+        if (updateError) {
+          console.error("Document record update error:", updateError);
+          throw new Error(`Failed to update document record: ${updateError.message}`);
+        }
+      } else {
+        // Insert new record with file_path
+        const { error: insertError } = await supabase
+          .from("loan_generated_documents")
+          .insert({
+            loan_application_id: applicationId,
+            sanction_id: sanction.id,
+            org_id: application.org_id,
+            document_type: "combined_loan_pack",
+            document_number: docNumber,
+            file_path: fileName,
+            status: "generated",
+          });
+
+        if (insertError) {
+          console.error("Document record insert error:", insertError);
+          throw new Error(`Failed to save document record: ${insertError.message}`);
+        }
       }
 
       toast.success("Combined Loan Pack generated and uploaded successfully");
@@ -276,9 +294,9 @@ export default function CombinedLoanPackCard({
           <div className="flex flex-wrap gap-2">
             {/* Generate Combined Button */}
             <Button
-              variant={isCombinedGenerated ? "outline" : "default"}
+              variant={isCombinedGenerated && !needsRegeneration ? "outline" : "default"}
               onClick={handleGenerateCombined}
-              disabled={isGenerating || isUploadingPdf || isCombinedGenerated || !allIndividualDocsGenerated}
+              disabled={isGenerating || isUploadingPdf || (isCombinedGenerated && !needsRegeneration) || !allIndividualDocsGenerated}
               className="gap-2"
             >
               {(isGenerating || isUploadingPdf) ? (
@@ -286,7 +304,7 @@ export default function CombinedLoanPackCard({
               ) : (
                 <Package className="h-4 w-4" />
               )}
-              {isCombinedGenerated ? "Generated" : isUploadingPdf ? "Uploading..." : "Generate Combined Pack"}
+              {isUploadingPdf ? "Uploading..." : needsRegeneration ? "Regenerate" : isCombinedGenerated ? "Regenerate" : "Generate Combined Pack"}
             </Button>
 
             {/* Download Button */}

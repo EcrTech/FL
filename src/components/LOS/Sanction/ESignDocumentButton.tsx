@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { FileSignature, RefreshCw, Loader2 } from "lucide-react";
+import { FileSignature, RefreshCw, Loader2, Send, RotateCcw } from "lucide-react";
 import ESignDocumentDialog from "./ESignDocumentDialog";
 import ESignStatusBadge from "./ESignStatusBadge";
 import { useESignRequests, useCheckESignStatus } from "@/hooks/useESignDocument";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import {
   Tooltip,
   TooltipContent,
@@ -39,6 +41,7 @@ export default function ESignDocumentButton({
   onSuccess,
 }: ESignDocumentButtonProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [isResendingLink, setIsResendingLink] = useState(false);
 
   const { data: esignRequests } = useESignRequests(applicationId);
   const checkStatusMutation = useCheckESignStatus();
@@ -63,6 +66,38 @@ export default function ESignDocumentButton({
     }
   };
 
+  const handleResendLink = async () => {
+    if (!latestRequest?.signer_url) {
+      toast.error("No signing URL available to resend");
+      return;
+    }
+
+    setIsResendingLink(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-esign-notifications", {
+        body: {
+          org_id: orgId,
+          application_id: applicationId,
+          signer_name: latestRequest.signer_name,
+          signer_email: latestRequest.signer_email,
+          signer_phone: latestRequest.signer_phone,
+          signer_url: latestRequest.signer_url,
+          document_type: documentType,
+        },
+      });
+
+      if (error) throw new Error(error.message);
+      if (!data?.success) throw new Error(data?.error || "Failed to resend notifications");
+
+      toast.success("Signing link resent via WhatsApp & Email");
+    } catch (err) {
+      console.error("Resend link error:", err);
+      toast.error(err instanceof Error ? err.message : "Failed to resend link");
+    } finally {
+      setIsResendingLink(false);
+    }
+  };
+
   if (isSigned) {
     return (
       <div className="flex items-center gap-2">
@@ -78,7 +113,7 @@ export default function ESignDocumentButton({
 
   if (hasActiveRequest) {
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <ESignStatusBadge
           status={latestRequest.status as "pending" | "sent" | "viewed"}
           viewedAt={latestRequest.viewed_at}
@@ -104,7 +139,61 @@ export default function ESignDocumentButton({
               <p>Check E-Sign status</p>
             </TooltipContent>
           </Tooltip>
+
+          {/* Resend Link Button */}
+          {latestRequest.signer_url && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleResendLink}
+                  disabled={isResendingLink}
+                >
+                  {isResendingLink ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Resend signing link via WhatsApp & Email</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
+
+          {/* Resend E-Sign Button */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setDialogOpen(true)}
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Create new E-Sign request</p>
+            </TooltipContent>
+          </Tooltip>
         </TooltipProvider>
+
+        <ESignDocumentDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          orgId={orgId}
+          applicationId={applicationId}
+          documentId={documentId}
+          documentType={documentType}
+          documentLabel={documentLabel}
+          defaultSignerName={signerName}
+          defaultSignerEmail={signerEmail}
+          defaultSignerMobile={signerMobile}
+          environment={environment}
+          onSuccess={onSuccess}
+        />
       </div>
     );
   }
