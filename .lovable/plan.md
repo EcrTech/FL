@@ -1,55 +1,43 @@
 
-
-# Fix CORS Headers Across All Edge Functions
+# Fix: Show Latest Uploaded Document in View Button
 
 ## Problem
 
-The e-sign flow fails with "Failed to send a request to the Edge Function" because `nupay-esign-request` and `send-esign-notifications` have the same outdated CORS headers that were already fixed in the OTP functions. In fact, **34 edge functions** still have this issue and will fail when called from the custom domain `ps.in-sync.co.in`.
+When there are multiple document records for the same type (e.g., duplicate `pan_card` entries), the queries fetching identity documents don't sort by date. JavaScript's `.find()` returns the first match, which may be an older/stale record rather than the latest upload.
+
+## Root Cause
+
+Three queries need fixing -- they all fetch from `loan_documents` without `.order("created_at", { ascending: false })`:
+
+1. **`VerificationDashboard.tsx`** (line 124-128) -- fetches identity docs for the PAN/Aadhaar cards
+2. **`ApplicantProfileCard.tsx`** (line 280-284) -- fetches identity/photo docs for the profile card
+3. **`DocumentUpload.tsx`** (line 80-83) -- fetches all documents for the upload section
 
 ## Fix
 
-Update all 34 edge functions with two changes each:
+Add `.order("created_at", { ascending: false })` to each of these three queries. Since `.find()` returns the first match, ordering newest-first ensures it always picks the latest upload.
 
-1. **Replace the CORS headers** from:
+### Technical Changes
+
+**1. `src/components/LOS/Verification/VerificationDashboard.tsx`**
+Add ordering to the identity documents query:
+```typescript
+.in("document_type", ["pan_card", "aadhaar_card", "aadhaar_front", "aadhaar_back"])
+.order("created_at", { ascending: false });
 ```
-"authorization, x-client-info, apikey, content-type"
+
+**2. `src/components/LOS/ApplicantProfileCard.tsx`**
+Add ordering to the documents fetch:
+```typescript
+.in('document_category', ['identity', 'photo'])
+.order('created_at', { ascending: false });
 ```
-to:
+
+**3. `src/components/LOS/DocumentUpload.tsx`**
+Add ordering to the documents query:
+```typescript
+.eq("loan_application_id", applicationId)
+.order("created_at", { ascending: false });
 ```
-"authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version"
-```
 
-2. **Replace OPTIONS handler** from `new Response(null, ...)` to `new Response('ok', ...)` wherever applicable.
-
-## Affected Functions (all 34)
-
-1. digilocker-callback
-2. send-otp
-3. send-application-confirmation
-4. nupay-collection-webhook
-5. videokyc-verify-token
-6. verify-otp
-7. referral-videokyc-upload
-8. nupay-create-upi-collection
-9. nupay-collection-authenticate
-10. nupay-get-status
-11. parse-loan-document
-12. verifiedu-aadhaar-details
-13. nupay-webhook-handler
-14. equifax-credit-report
-15. save-draft-application
-16. verifiedu-public-aadhaar-initiate
-17. verifiedu-bank-verify
-18. nupay-esign-request
-19. nupay-get-banks
-20. videokyc-upload-recording
-21. nupay-create-mandate
-22. verifiedu-aadhaar-initiate
-23. And remaining functions from the search results
-
-Each function gets the same two-line fix (CORS headers + OPTIONS body). Then all functions will be redeployed.
-
-## Expected Outcome
-
-All edge function calls from the custom domain will pass CORS preflight checks, preventing "Failed to send a request to the Edge Function" errors across the entire application -- not just for e-sign, but for all features.
-
+This is a minimal 3-line change (one line per file) that ensures the View button always shows the most recently uploaded file.
