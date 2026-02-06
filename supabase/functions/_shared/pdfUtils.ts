@@ -280,6 +280,9 @@ export function getChunkPrompt(
   isFirstChunk: boolean
 ): string {
   if (isFirstChunk || !previousData) {
+    if (documentType === 'bank_statement') {
+      return `${basePrompt}\n\nNote: This is pages ${startPage}-${endPage} of a ${totalPages}-page document. These first pages contain the ACCOUNT HEADER. Focus on extracting account identification details: account_number, ifsc_code, branch_name, account_holder_name, bank_name, account_type, and statement period. Do NOT extract any individual transactions.`;
+    }
     return `${basePrompt}\n\nNote: This is pages ${startPage}-${endPage} of a ${totalPages}-page document. Extract all visible information from these pages.`;
   }
   
