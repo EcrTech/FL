@@ -49,7 +49,8 @@ export function ApplicationSummary({ applicationId, orgId }: ApplicationSummaryP
       const { data, error } = await supabase
         .from("loan_verifications")
         .select("*")
-        .eq("loan_application_id", applicationId);
+        .eq("loan_application_id", applicationId)
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
