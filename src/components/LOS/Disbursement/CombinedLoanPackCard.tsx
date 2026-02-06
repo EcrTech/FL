@@ -136,7 +136,7 @@ export default function CombinedLoanPackCard({
 
       // Generate document number
       const docNumber = `COMBINEDLOANPACK-${Date.now().toString(36).toUpperCase()}`;
-      const fileName = `${applicationId}/combined_loan_pack/${docNumber}.pdf`;
+      const fileName = `${application.org_id}/${applicationId}/combined_loan_pack/${docNumber}.pdf`;
 
       // Upload PDF to Supabase Storage (upsert to handle re-uploads)
       const { error: uploadError } = await supabase.storage
