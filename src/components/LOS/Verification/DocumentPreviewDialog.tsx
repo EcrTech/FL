@@ -76,7 +76,7 @@ export function DocumentPreviewDialog({
               ) : isPdf ? (
                 <div className="w-full h-[60vh] border rounded-lg overflow-hidden">
                   <iframe
-                    src={signedUrl}
+                    src={`https://docs.google.com/gview?url=${encodeURIComponent(signedUrl)}&embedded=true`}
                     className="w-full h-full"
                     title={title}
                   />
