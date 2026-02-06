@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -60,6 +60,35 @@ export default function CreditBureauDialog({
     name_on_report: existingVerification?.response_data?.name_on_report || "",
     pan_on_report: existingVerification?.response_data?.pan_on_report || "",
   });
+
+  // Sync form data when existingVerification changes (async data load)
+  useEffect(() => {
+    if (existingVerification?.response_data) {
+      const rd = existingVerification.response_data;
+      setFormData({
+        bureau_type: rd.bureau_type || "cibil",
+        credit_score: rd.credit_score?.toString() || "",
+        active_accounts: rd.active_accounts?.toString() || "0",
+        total_outstanding: rd.total_outstanding?.toString() || "",
+        total_overdue: rd.total_overdue?.toString() || "",
+        enquiry_count_30d: rd.enquiry_count_30d?.toString() || "0",
+        enquiry_count_90d: rd.enquiry_count_90d?.toString() || "0",
+        dpd_history: rd.dpd_history || "",
+        status: existingVerification.status || "success",
+        remarks: existingVerification.remarks || "",
+        report_file_path: rd.report_file_path || "",
+        name_on_report: rd.name_on_report || "",
+        pan_on_report: rd.pan_on_report || "",
+      });
+      if (rd.quick_analysis) {
+        setQuickAnalysisData(rd.quick_analysis);
+      }
+      if (rd.is_live_fetch) {
+        setLiveReportData(rd);
+        setActiveTab("live");
+      }
+    }
+  }, [existingVerification]);
 
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
