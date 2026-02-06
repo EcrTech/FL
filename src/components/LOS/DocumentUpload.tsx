@@ -747,6 +747,28 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
         {/* Verify */}
         {getVerifyIcon(doc.type, document)}
 
+        {/* Re-parse */}
+        {doc.parseable && document && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7"
+                disabled={parsingDoc === doc.type || isParsingAll}
+                onClick={() => handleParse(doc.type, document.id, document.file_path)}
+              >
+                {parsingDoc === doc.type ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3.5 w-3.5" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Re-parse document</TooltipContent>
+          </Tooltip>
+        )}
+
         {/* Upload */}
         <label htmlFor={`file-${doc.type}`}>
           <Tooltip>
