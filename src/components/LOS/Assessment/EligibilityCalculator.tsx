@@ -264,12 +264,16 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
       details: `Net monthly income: ₹${netIncome.toLocaleString()}`
     };
 
-    // Employment stability
-    if (employment?.date_of_joining) {
-      const monthsInCompany = Math.floor((Date.now() - new Date(employment.date_of_joining as string).getTime()) / (1000 * 60 * 60 * 24 * 30));
+    // Employment stability - check employment record first, then fall back to salary slip OCR data
+    const dojFromEmployment = employment?.date_of_joining;
+    const dojFromSalarySlip = salaryDocs?.find((d: any) => (d.ocr_data as any)?.date_of_joining)?.ocr_data as any;
+    const dateOfJoining = dojFromEmployment || dojFromSalarySlip?.date_of_joining;
+    
+    if (dateOfJoining) {
+      const monthsInCompany = Math.floor((Date.now() - new Date(dateOfJoining as string).getTime()) / (1000 * 60 * 60 * 24 * 30));
       checks.employment = {
         passed: monthsInCompany >= 12,
-        details: `Months in current company: ${monthsInCompany}`
+        details: `Months in current company: ${monthsInCompany}${!dojFromEmployment ? ' (from salary slip)' : ''}`
       };
     } else {
       checks.employment = { passed: false, details: "Date of joining not available" };

@@ -643,7 +643,23 @@ serve(async (req) => {
             }
           }
         } else {
-          console.log(`[ParseDocument] No employment record found for applicant ${applicant.id}`);
+          // Create employment record with data from salary slip
+          const { error: empInsertError } = await supabase
+            .from("loan_employment_details")
+            .insert({
+              applicant_id: applicant.id,
+              employer_name: mergedData.employer_name || 'Unknown',
+              gross_monthly_salary: mergedData.gross_salary || 0,
+              net_monthly_salary: mergedData.net_salary || 0,
+              date_of_joining: mergedData.date_of_joining,
+              employee_id: mergedData.employee_id || null,
+            });
+          
+          if (empInsertError) {
+            console.warn(`[ParseDocument] Failed to create employment record:`, empInsertError);
+          } else {
+            console.log(`[ParseDocument] Created employment record with date_of_joining: ${mergedData.date_of_joining}`);
+          }
         }
       }
     }
