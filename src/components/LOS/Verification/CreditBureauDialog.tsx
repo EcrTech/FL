@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Upload, FileText, X, Loader2, Sparkles, CheckCircle, Zap, AlertCircle } from "lucide-react";
+import { Upload, FileText, X, Loader2, Sparkles, CheckCircle, Zap, AlertCircle, Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -577,13 +577,31 @@ export default function CreditBureauDialog({
                         </Badge>
                       )}
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={removeFile}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      {formData.report_file_path && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={async () => {
+                            const { data } = await supabase.storage
+                              .from("loan-documents")
+                              .createSignedUrl(formData.report_file_path, 300);
+                            if (data?.signedUrl) {
+                              window.open(data.signedUrl, "_blank");
+                            }
+                          }}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={removeFile}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                   
                   {uploadedFile && !parsedSuccessfully && (
