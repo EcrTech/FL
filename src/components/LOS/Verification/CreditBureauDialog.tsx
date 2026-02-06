@@ -587,49 +587,28 @@ export default function CreditBureauDialog({
                   </div>
                   
                   {uploadedFile && !parsedSuccessfully && (
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={uploadAndQuickAnalyze}
-                        disabled={isUploading || isParsing || isQuickAnalyzing}
-                        className="flex-1"
-                        variant="default"
-                      >
-                        {isUploading ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Uploading...
-                          </>
-                        ) : isQuickAnalyzing ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Analyzing...
-                          </>
-                        ) : (
-                          <>
-                            <FileText className="h-4 w-4 mr-2" />
-                            Quick Analysis
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        onClick={uploadAndParseFile}
-                        disabled={isUploading || isParsing || isQuickAnalyzing}
-                        className="flex-1"
-                        variant="outline"
-                      >
-                        {isParsing ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Parsing...
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="h-4 w-4 mr-2" />
-                            Full Parse
-                          </>
-                        )}
-                      </Button>
-                    </div>
+                    <Button
+                      onClick={uploadAndQuickAnalyze}
+                      disabled={isUploading || isQuickAnalyzing}
+                      className="w-full"
+                    >
+                      {isUploading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : isQuickAnalyzing ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          Upload & Analyze Report
+                        </>
+                      )}
+                    </Button>
                   )}
                 </div>
               )}
