@@ -76,11 +76,43 @@ export function IdentityDocumentUploadDialog({
         });
 
       if (insertError) throw insertError;
+
+      // Return filePath for auto-parsing
+      return filePath;
     },
-    onSuccess: () => {
+    onSuccess: async (filePath) => {
+      // Invalidate all related caches immediately to clear stale data
       queryClient.invalidateQueries({ queryKey: ["identity-documents", applicationId] });
+      queryClient.invalidateQueries({ queryKey: ["loan-documents", applicationId] });
+      queryClient.invalidateQueries({ queryKey: ["loan-application"] });
+      queryClient.invalidateQueries({ queryKey: ["loan-application-basic", applicationId] });
+
       toast({ title: `${documentLabel} uploaded successfully` });
       onClose();
+
+      // Auto-parse the newly uploaded document in background
+      try {
+        const { data: newDoc } = await supabase
+          .from("loan_documents")
+          .select("id, file_path")
+          .eq("loan_application_id", applicationId)
+          .eq("document_type", documentType)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+
+        if (newDoc) {
+          await supabase.functions.invoke("parse-loan-document", {
+            body: { documentId: newDoc.id, documentType, filePath: newDoc.file_path },
+          });
+          // Refresh again after parsing completes with fresh OCR data
+          queryClient.invalidateQueries({ queryKey: ["loan-documents", applicationId] });
+          queryClient.invalidateQueries({ queryKey: ["loan-application"] });
+          queryClient.invalidateQueries({ queryKey: ["loan-application-basic", applicationId] });
+        }
+      } catch (parseError) {
+        console.error("Auto-parse failed:", parseError);
+      }
     },
     onError: (error: any) => {
       toast({
