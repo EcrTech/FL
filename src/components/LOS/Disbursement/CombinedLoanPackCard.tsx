@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ interface CombinedLoanPackCardProps {
     id: string;
     document_type: string;
     document_number: string;
+    file_path?: string | null;
     customer_signed?: boolean;
     signed_document_path?: string;
   }>;
@@ -97,6 +99,8 @@ export default function CombinedLoanPackCard({
   defaultTerms,
   onUploadSigned,
 }: CombinedLoanPackCardProps) {
+  const [isUploadingPdf, setIsUploadingPdf] = useState(false);
+
   // Check if all individual documents are generated
   const sanctionDoc = generatedDocs.find(d => d.document_type === "sanction_letter");
   const agreementDoc = generatedDocs.find(d => d.document_type === "loan_agreement");
@@ -106,6 +110,72 @@ export default function CombinedLoanPackCard({
   const allIndividualDocsGenerated = sanctionDoc && agreementDoc && scheduleDoc;
   const isCombinedGenerated = !!combinedDoc;
   const isCombinedSigned = combinedDoc?.customer_signed;
+
+  // Generate PDF, upload to storage, and create DB record
+  const handleGenerateCombined = async () => {
+    const printElement = document.getElementById("combined-loan-pack-template");
+    if (!printElement) {
+      toast.error("Combined document template not available");
+      return;
+    }
+
+    setIsUploadingPdf(true);
+    try {
+      // Generate PDF blob using html2pdf
+      const worker = html2pdf()
+        .set({
+          margin: 10,
+          image: { type: 'jpeg' as const, quality: 0.98 },
+          html2canvas: { scale: 2 },
+          jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const },
+        })
+        .from(printElement);
+      
+      const pdfBlob = await worker.outputPdf('blob');
+
+      // Generate document number
+      const docNumber = `COMBINEDLOANPACK-${Date.now().toString(36).toUpperCase()}`;
+      const fileName = `${applicationId}/combined_loan_pack/${docNumber}.pdf`;
+
+      // Upload PDF to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from("loan-documents")
+        .upload(fileName, pdfBlob, { contentType: 'application/pdf' });
+
+      if (uploadError) {
+        console.error("PDF upload error:", uploadError);
+        throw new Error(`Failed to upload PDF: ${uploadError.message}`);
+      }
+
+      console.log("[CombinedLoanPackCard] PDF uploaded to storage:", fileName);
+
+      // Insert record with file_path
+      const { error: insertError } = await supabase
+        .from("loan_generated_documents")
+        .insert({
+          loan_application_id: applicationId,
+          sanction_id: sanction.id,
+          org_id: application.org_id,
+          document_type: "combined_loan_pack",
+          document_number: docNumber,
+          file_path: fileName,
+          status: "generated",
+        });
+
+      if (insertError) {
+        console.error("Document record insert error:", insertError);
+        throw new Error(`Failed to save document record: ${insertError.message}`);
+      }
+
+      toast.success("Combined Loan Pack generated and uploaded successfully");
+      onRefetch();
+    } catch (error) {
+      console.error("Generate combined pack error:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to generate combined pack");
+    } finally {
+      setIsUploadingPdf(false);
+    }
+  };
 
   const handleDownloadCombined = () => {
     const printElement = document.getElementById("combined-loan-pack-template");
@@ -207,16 +277,16 @@ export default function CombinedLoanPackCard({
             {/* Generate Combined Button */}
             <Button
               variant={isCombinedGenerated ? "outline" : "default"}
-              onClick={onGenerate}
-              disabled={isGenerating || isCombinedGenerated || !allIndividualDocsGenerated}
+              onClick={handleGenerateCombined}
+              disabled={isGenerating || isUploadingPdf || isCombinedGenerated || !allIndividualDocsGenerated}
               className="gap-2"
             >
-              {isGenerating ? (
+              {(isGenerating || isUploadingPdf) ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Package className="h-4 w-4" />
               )}
-              {isCombinedGenerated ? "Generated" : "Generate Combined Pack"}
+              {isCombinedGenerated ? "Generated" : isUploadingPdf ? "Uploading..." : "Generate Combined Pack"}
             </Button>
 
             {/* Download Button */}

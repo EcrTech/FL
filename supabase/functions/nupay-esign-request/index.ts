@@ -56,15 +56,60 @@ async function getNewToken(apiEndpoint: string, apiKey: string): Promise<string>
   return token;
 }
 
-// Helper to create a simple PDF from document data
+// Helper to fetch stored PDF from Supabase Storage
 // deno-lint-ignore no-explicit-any
-async function createPdfFromDocument(
+async function getPdfFromStorage(
+  supabase: SupabaseClient<any, any, any>,
+  documentId: string
+): Promise<Uint8Array> {
+  console.log(`[E-Sign] Fetching PDF from storage for document: ${documentId}`);
+
+  // Fetch the document record to get file_path
+  const { data: docRecord, error: docError } = await supabase
+    .from("loan_generated_documents")
+    .select("file_path, document_type, loan_application_id")
+    .eq("id", documentId)
+    .single();
+
+  if (docError || !docRecord) {
+    console.error("[E-Sign] Document not found:", docError);
+    throw new Error(`Document not found: ${documentId}`);
+  }
+
+  console.log(`[E-Sign] Document record:`, JSON.stringify(docRecord));
+
+  if (!docRecord.file_path) {
+    console.error("[E-Sign] Document has no file_path stored");
+    throw new Error("Document has no file stored. Please regenerate the document to upload the PDF.");
+  }
+
+  // Download the PDF from storage
+  const { data: fileData, error: downloadError } = await supabase.storage
+    .from("loan-documents")
+    .download(docRecord.file_path);
+
+  if (downloadError || !fileData) {
+    console.error("[E-Sign] Failed to download document:", downloadError);
+    throw new Error(`Failed to download document: ${downloadError?.message || "Unknown error"}`);
+  }
+
+  console.log(`[E-Sign] PDF downloaded successfully, size: ${fileData.size} bytes`);
+
+  // Convert Blob to Uint8Array
+  const arrayBuffer = await fileData.arrayBuffer();
+  return new Uint8Array(arrayBuffer);
+}
+
+// Fallback: Create a placeholder PDF if stored PDF not available
+// deno-lint-ignore no-explicit-any
+async function createFallbackPdf(
   supabase: SupabaseClient<any, any, any>,
   documentId: string,
   documentType: string,
   applicationId: string
 ): Promise<Uint8Array> {
-  // Fetch loan application and related data
+  console.warn("[E-Sign] WARNING: Creating fallback placeholder PDF - stored PDF not available");
+  
   const { data: application } = await supabase
     .from("loan_applications")
     .select("*, loan_sanctions(*)")
@@ -78,31 +123,23 @@ async function createPdfFromDocument(
   // deno-lint-ignore no-explicit-any
   const appData = application as any;
 
-  // Create PDF using pdf-lib
   const pdfDoc = await PDFDocument.create();
-  const page = pdfDoc.addPage([595.28, 841.89]); // A4 size
+  const page = pdfDoc.addPage([595.28, 841.89]);
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
   const { height } = page.getSize();
   let yPosition = height - 50;
 
-  // Add header
   const documentTitle = documentType === "sanction_letter" ? "SANCTION LETTER" :
     documentType === "loan_agreement" ? "LOAN AGREEMENT" :
     documentType === "combined_loan_pack" ? "COMBINED LOAN PACK" : "DAILY REPAYMENT SCHEDULE";
 
   page.drawText(documentTitle, {
-    x: 50,
-    y: yPosition,
-    size: 18,
-    font: boldFont,
-    color: rgb(0, 0, 0),
+    x: 50, y: yPosition, size: 18, font: boldFont, color: rgb(0, 0, 0),
   });
-
   yPosition -= 40;
 
-  // Add application details
   const sanction = appData.loan_sanctions?.[0];
   const lines = [
     `Application Number: ${appData.application_number || "N/A"}`,
@@ -112,28 +149,18 @@ async function createPdfFromDocument(
     `Interest Rate: ${sanction?.interest_rate || "N/A"}% p.a.`,
     `Tenure: ${sanction?.tenure_months || "N/A"} months`,
     "",
-    "This document is digitally generated and requires Aadhaar-based e-signature",
-    "for legal validity.",
-    "",
+    "NOTE: This is a placeholder document.",
+    "Please regenerate the Combined Loan Pack to get the full document.",
     "",
     "",
     "Signature: ___________________________",
-    "",
     "",
     "(This space is reserved for digital signature)",
   ];
 
   for (const line of lines) {
-    if (yPosition < 50) {
-      break;
-    }
-    page.drawText(line, {
-      x: 50,
-      y: yPosition,
-      size: 12,
-      font: font,
-      color: rgb(0, 0, 0),
-    });
+    if (yPosition < 50) break;
+    page.drawText(line, { x: 50, y: yPosition, size: 12, font: font, color: rgb(0, 0, 0) });
     yPosition -= 20;
   }
 
@@ -370,10 +397,17 @@ serve(async (req) => {
     console.log(`[E-Sign] Using API endpoint: ${apiEndpoint}`);
     console.log(`[E-Sign] Using ${configData.esign_api_key ? 'separate eSign API key' : 'shared API key'}`);
 
-    // Generate PDF
-    console.log("[E-Sign] Generating PDF document...");
-    const pdfBytes = await createPdfFromDocument(supabase, document_id, document_type, application_id);
-    console.log(`[E-Sign] PDF generated, size: ${pdfBytes.length} bytes`);
+    // Fetch stored PDF from storage (or create fallback if not available)
+    console.log("[E-Sign] Fetching PDF document from storage...");
+    let pdfBytes: Uint8Array;
+    try {
+      pdfBytes = await getPdfFromStorage(supabase, document_id);
+      console.log(`[E-Sign] PDF fetched from storage, size: ${pdfBytes.length} bytes`);
+    } catch (storageError) {
+      console.warn(`[E-Sign] Storage fetch failed: ${storageError}. Using fallback placeholder.`);
+      pdfBytes = await createFallbackPdf(supabase, document_id, document_type, application_id);
+      console.log(`[E-Sign] Fallback PDF created, size: ${pdfBytes.length} bytes`);
+    }
 
     // Generate reference number (max 20 chars for Nupay, alphanumeric only)
     const refNo = `ES${Date.now().toString(36).toUpperCase()}`;
