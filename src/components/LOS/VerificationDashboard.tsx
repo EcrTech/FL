@@ -125,7 +125,8 @@ export default function VerificationDashboard({ applicationId, orgId }: Verifica
         .from("loan_documents")
         .select("*")
         .eq("loan_application_id", applicationId)
-        .in("document_type", ["pan_card", "aadhaar_card", "aadhaar_front", "aadhaar_back"]);
+        .in("document_type", ["pan_card", "aadhaar_card", "aadhaar_front", "aadhaar_back"])
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
       return data;
