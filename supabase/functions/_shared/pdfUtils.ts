@@ -71,7 +71,7 @@ export async function extractPdfPages(
  * Chunk configuration by document type
  */
 export const CHUNK_CONFIG: Record<string, { pagesPerChunk: number; maxTokens: number }> = {
-  bank_statement: { pagesPerChunk: 5, maxTokens: 8000 },
+  bank_statement: { pagesPerChunk: 3, maxTokens: 4000 },
   cibil_report: { pagesPerChunk: 3, maxTokens: 6000 },
   credit_report: { pagesPerChunk: 3, maxTokens: 6000 },
   itr_year_1: { pagesPerChunk: 5, maxTokens: 6000 },
@@ -129,7 +129,12 @@ export function mergeOcrData(
 function mergeBankStatement(existing: Record<string, any>, newData: Record<string, any>): Record<string, any> {
   const merged = { ...existing };
   
-  // Concatenate transaction arrays
+  // Accumulate transaction count
+  if (typeof newData.transaction_count === 'number') {
+    merged.transaction_count = (existing.transaction_count || 0) + newData.transaction_count;
+  }
+  
+  // Concatenate transaction arrays if they exist (legacy support)
   if (newData.transactions && Array.isArray(newData.transactions)) {
     merged.transactions = [
       ...(existing.transactions || []),
@@ -154,9 +159,9 @@ function mergeBankStatement(existing: Record<string, any>, newData: Record<strin
     merged.opening_balance = newData.opening_balance;
   }
   
-  // Merge other fields
+  // Merge other fields (account details etc)
   for (const [key, value] of Object.entries(newData)) {
-    if (!summaryFields.includes(key) && key !== 'transactions' && value !== null && value !== undefined) {
+    if (!summaryFields.includes(key) && key !== 'transactions' && key !== 'transaction_count' && value !== null && value !== undefined) {
       if (!merged[key] || merged[key] === '' || merged[key] === 0) {
         merged[key] = value;
       }

@@ -32,12 +32,13 @@ Return ONLY valid JSON with these fields.`,
 - address: Full address as shown
 Return ONLY valid JSON with these fields.`,
 
-  bank_statement: `Extract the following from this bank statement:
+  bank_statement: `Extract the following from this bank statement. Do NOT include individual transactions.
 - account_number: Bank account number
 - account_holder_name: Account holder name exactly as shown
 - ifsc_code: IFSC code of the branch
 - bank_name: Name of the bank
 - branch_name: Branch name and address
+- account_type: Type of account (Savings/Current/etc)
 - statement_period_from: Statement start date (YYYY-MM-DD)
 - statement_period_to: Statement end date (YYYY-MM-DD)
 - opening_balance: Opening balance (number only)
@@ -48,8 +49,8 @@ Return ONLY valid JSON with these fields.`,
 - salary_credits: Total salary/regular income credits (number only)
 - emi_debits: Total EMI/loan debits (number only)
 - bounce_count: Number of bounced transactions/insufficient fund instances (number only, 0 if none)
-- transactions: Array of transactions with {date, description, debit, credit, balance}
-Return ONLY valid JSON with these fields. Use 0 or null for missing values.`,
+- transaction_count: Total number of transactions visible (number only)
+Return ONLY a small valid JSON object with these fields. Do NOT return any transactions array. Use 0 or null for missing values.`,
 
   salary_slip_1: `Extract the following from this salary slip:
 - employee_name: Employee full name
@@ -439,8 +440,42 @@ serve(async (req) => {
         }
       }
       
-      parsedData = JSON.parse(jsonStr);
-      console.log(`[ParseDocument] Parsed data:`, JSON.stringify(parsedData).substring(0, 500));
+      try {
+        parsedData = JSON.parse(jsonStr);
+      } catch (firstParseError) {
+        // Strategy 3: Try to repair truncated JSON by removing trailing incomplete entries
+        console.warn(`[ParseDocument] First parse failed, attempting JSON repair...`);
+        
+        // Remove any trailing incomplete array entries or properties
+        let repaired = jsonStr;
+        
+        // Remove truncated trailing content after last complete property
+        // Find the last complete "key": value pair
+        const lastCompleteComma = repaired.lastIndexOf(',\n');
+        if (lastCompleteComma > 0) {
+          const afterComma = repaired.substring(lastCompleteComma + 2).trim();
+          // If what's after the comma doesn't end with a proper closing, truncate there
+          if (!afterComma.endsWith('}')) {
+            repaired = repaired.substring(0, lastCompleteComma);
+            // Close any open arrays and objects
+            const openBrackets = (repaired.match(/\[/g) || []).length - (repaired.match(/\]/g) || []).length;
+            const openBraces = (repaired.match(/\{/g) || []).length - (repaired.match(/\}/g) || []).length;
+            for (let i = 0; i < openBrackets; i++) repaired += ']';
+            for (let i = 0; i < openBraces; i++) repaired += '}';
+          }
+        }
+        
+        try {
+          parsedData = JSON.parse(repaired);
+          console.log(`[ParseDocument] JSON repair successful`);
+        } catch (repairError) {
+          console.error(`[ParseDocument] JSON repair also failed:`, repairError);
+          console.error(`[ParseDocument] Raw content (first 500):`, content.substring(0, 500));
+          parsedData = { raw_text: content, parse_error: true };
+        }
+      }
+      
+      console.log(`[ParseDocument] Parsed data keys:`, Object.keys(parsedData).join(', '));
     } catch (parseError) {
       console.error(`[ParseDocument] JSON parse error:`, parseError);
       console.error(`[ParseDocument] Raw content (first 500):`, content.substring(0, 500));
