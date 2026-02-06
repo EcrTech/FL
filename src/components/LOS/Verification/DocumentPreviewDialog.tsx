@@ -27,31 +27,49 @@ export function DocumentPreviewDialog({
   title,
 }: DocumentPreviewDialogProps) {
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (open && document?.file_path) {
-      setLoading(true);
-      supabase.storage
-        .from("loan-documents")
-        .createSignedUrl(document.file_path, 3600)
-        .then(({ data, error }) => {
-          if (data && !error) {
-            setSignedUrl(data.signedUrl);
-          }
-          setLoading(false);
-        });
-    } else {
-      setSignedUrl(null);
-      setLoading(false);
-    }
-  }, [open, document?.file_path]);
 
   const isImage = document?.file_type?.startsWith("image/") || 
     document?.file_path?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
 
   const isPdf = document?.file_type === "application/pdf" || 
     document?.file_path?.endsWith(".pdf");
+
+  useEffect(() => {
+    if (open && document?.file_path) {
+      setLoading(true);
+      setBlobUrl(null);
+      supabase.storage
+        .from("loan-documents")
+        .createSignedUrl(document.file_path, 3600)
+        .then(async ({ data, error }) => {
+          if (data && !error) {
+            setSignedUrl(data.signedUrl);
+            // For PDFs, fetch as blob to avoid iframe/CORS issues
+            if (isPdf) {
+              try {
+                const res = await fetch(data.signedUrl);
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                setBlobUrl(url);
+              } catch (e) {
+                console.error("Failed to fetch PDF blob:", e);
+              }
+            }
+          }
+          setLoading(false);
+        });
+    } else {
+      setSignedUrl(null);
+      setBlobUrl(null);
+      setLoading(false);
+    }
+
+    return () => {
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+    };
+  }, [open, document?.file_path]);
 
   return (
     <Dialog open={open} onOpenChange={() => onClose()}>
@@ -73,11 +91,11 @@ export function DocumentPreviewDialog({
                   alt={title}
                   className="max-h-[60vh] object-contain rounded-lg border"
                 />
-              ) : isPdf ? (
+              ) : isPdf && blobUrl ? (
                 <div className="w-full h-[60vh] border rounded-lg overflow-hidden">
                   <iframe
-                    src={`https://docs.google.com/gview?url=${encodeURIComponent(signedUrl)}&embedded=true`}
-                    className="w-full h-full"
+                    src={blobUrl}
+                    className="w-full h-full border-0"
                     title={title}
                   />
                 </div>
