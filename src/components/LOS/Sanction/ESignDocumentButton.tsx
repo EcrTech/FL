@@ -80,9 +80,10 @@ export default function ESignDocumentButton({
           application_id: applicationId,
           signer_name: latestRequest.signer_name,
           signer_email: latestRequest.signer_email,
-          signer_phone: latestRequest.signer_phone,
+          signer_mobile: latestRequest.signer_phone,
           signer_url: latestRequest.signer_url,
           document_type: documentType,
+          channels: ["email", "whatsapp"],
         },
       });
 
