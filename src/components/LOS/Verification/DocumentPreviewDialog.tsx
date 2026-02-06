@@ -28,7 +28,6 @@ export function DocumentPreviewDialog({
   title,
 }: DocumentPreviewDialogProps) {
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const mimeType = document?.mime_type || document?.file_type || "";
@@ -41,44 +40,23 @@ export function DocumentPreviewDialog({
     filePath.endsWith(".pdf");
 
   useEffect(() => {
-    let revoke: string | null = null;
-
     if (open && filePath) {
       setLoading(true);
-      setBlobUrl(null);
       setSignedUrl(null);
-
-      const fileIsPdf = mimeType === "application/pdf" || filePath.endsWith(".pdf");
 
       supabase.storage
         .from("loan-documents")
         .createSignedUrl(filePath, 3600)
-        .then(async ({ data, error }) => {
+        .then(({ data, error }) => {
           if (data && !error) {
             setSignedUrl(data.signedUrl);
-            if (fileIsPdf) {
-              try {
-                const res = await fetch(data.signedUrl);
-                const blob = await res.blob();
-                const url = URL.createObjectURL(blob);
-                revoke = url;
-                setBlobUrl(url);
-              } catch (e) {
-                console.error("Failed to fetch PDF blob:", e);
-              }
-            }
           }
           setLoading(false);
         });
     } else {
       setSignedUrl(null);
-      setBlobUrl(null);
       setLoading(false);
     }
-
-    return () => {
-      if (revoke) URL.revokeObjectURL(revoke);
-    };
   }, [open, filePath]);
 
   return (
@@ -101,25 +79,13 @@ export function DocumentPreviewDialog({
                   alt={title}
                   className="max-h-[60vh] object-contain rounded-lg border"
                 />
-              ) : isPdf && blobUrl ? (
+              ) : isPdf ? (
                 <div className="w-full h-[60vh] border rounded-lg overflow-hidden">
-                  <object
-                    data={blobUrl}
+                  <embed
+                    src={signedUrl + "#toolbar=1&navpanes=0"}
                     type="application/pdf"
                     className="w-full h-full"
-                  >
-                    <div className="flex flex-col items-center justify-center h-full gap-4">
-                      <p className="text-muted-foreground">PDF preview not supported.</p>
-                      <a href={signedUrl!} download={document?.file_name || "document"} className="text-primary underline">
-                        Download PDF
-                      </a>
-                    </div>
-                  </object>
-                </div>
-              ) : isPdf ? (
-                <div className="flex flex-col items-center gap-4 p-8 text-center">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                  <p className="text-muted-foreground">Loading PDF...</p>
+                  />
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-4 p-8 text-center">
