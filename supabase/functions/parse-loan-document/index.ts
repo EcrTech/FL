@@ -66,6 +66,7 @@ Return ONLY a small valid JSON object with these fields. Use 0 or null for missi
 - employee_id: Employee ID if visible
 - employer_name: Company/employer name
 - month: Month and year (e.g., "January 2024")
+- date_of_joining: Date of joining/DOJ if visible (YYYY-MM-DD format, null if not found)
 - gross_salary: Total gross salary (number only)
 - basic_salary: Basic salary component (number only)
 - hra: HRA component (number only)
@@ -75,13 +76,14 @@ Return ONLY a small valid JSON object with these fields. Use 0 or null for missi
 - tds: TDS deducted (number only)
 - other_deductions: Sum of other deductions (number only)
 - net_salary: Net/take-home salary (number only)
-Return ONLY valid JSON with these fields. Use 0 for missing numeric values.`,
+Return ONLY valid JSON with these fields. Use 0 for missing numeric values, null for missing date_of_joining.`,
 
   salary_slip_2: `Extract the following from this salary slip:
 - employee_name: Employee full name
 - employee_id: Employee ID if visible
 - employer_name: Company/employer name
 - month: Month and year (e.g., "January 2024")
+- date_of_joining: Date of joining/DOJ if visible (YYYY-MM-DD format, null if not found)
 - gross_salary: Total gross salary (number only)
 - basic_salary: Basic salary component (number only)
 - hra: HRA component (number only)
@@ -91,13 +93,14 @@ Return ONLY valid JSON with these fields. Use 0 for missing numeric values.`,
 - tds: TDS deducted (number only)
 - other_deductions: Sum of other deductions (number only)
 - net_salary: Net/take-home salary (number only)
-Return ONLY valid JSON with these fields. Use 0 for missing numeric values.`,
+Return ONLY valid JSON with these fields. Use 0 for missing numeric values, null for missing date_of_joining.`,
 
   salary_slip_3: `Extract the following from this salary slip:
 - employee_name: Employee full name
 - employee_id: Employee ID if visible
 - employer_name: Company/employer name
 - month: Month and year (e.g., "January 2024")
+- date_of_joining: Date of joining/DOJ if visible (YYYY-MM-DD format, null if not found)
 - gross_salary: Total gross salary (number only)
 - basic_salary: Basic salary component (number only)
 - hra: HRA component (number only)
@@ -107,7 +110,7 @@ Return ONLY valid JSON with these fields. Use 0 for missing numeric values.`,
 - tds: TDS deducted (number only)
 - other_deductions: Sum of other deductions (number only)
 - net_salary: Net/take-home salary (number only)
-Return ONLY valid JSON with these fields. Use 0 for missing numeric values.`,
+Return ONLY valid JSON with these fields. Use 0 for missing numeric values, null for missing date_of_joining.`,
 
   form_16_year_1: `Extract the following from this Form 16:
 - employee_name: Employee full name
@@ -603,7 +606,49 @@ serve(async (req) => {
 
     console.log(`[ParseDocument] Successfully parsed and saved data for document ${documentId}`);
 
-    // === Sync OCR data to loan_applicants for Aadhaar/PAN ===
+    // === Sync date_of_joining from salary slips to loan_employment_details ===
+    const isSalarySlip = documentType.startsWith('salary_slip');
+    
+    if (isSalarySlip && !mergedData.parse_error && loanApplicationId && mergedData.date_of_joining) {
+      console.log(`[ParseDocument] Syncing date_of_joining from salary slip: ${mergedData.date_of_joining}`);
+      
+      // Find the primary applicant
+      const { data: applicant } = await supabase
+        .from("loan_applicants")
+        .select("id")
+        .eq("loan_application_id", loanApplicationId)
+        .eq("applicant_type", "primary")
+        .maybeSingle();
+      
+      if (applicant) {
+        // Find existing employment record
+        const { data: employment } = await supabase
+          .from("loan_employment_details")
+          .select("id, date_of_joining")
+          .eq("applicant_id", applicant.id)
+          .maybeSingle();
+        
+        if (employment) {
+          // Only update if currently null or different
+          if (!employment.date_of_joining || employment.date_of_joining !== mergedData.date_of_joining) {
+            const { error: empUpdateError } = await supabase
+              .from("loan_employment_details")
+              .update({ date_of_joining: mergedData.date_of_joining })
+              .eq("id", employment.id);
+            
+            if (empUpdateError) {
+              console.warn(`[ParseDocument] Failed to sync date_of_joining:`, empUpdateError);
+            } else {
+              console.log(`[ParseDocument] Updated date_of_joining: ${employment.date_of_joining} -> ${mergedData.date_of_joining}`);
+            }
+          }
+        } else {
+          console.log(`[ParseDocument] No employment record found for applicant ${applicant.id}`);
+        }
+      }
+    }
+
+
     const isAadhaarOrPan = documentType === 'aadhaar_card' || documentType === 'aadhar_card' || documentType === 'pan_card';
     
     if (isAadhaarOrPan && !mergedData.parse_error && loanApplicationId) {
