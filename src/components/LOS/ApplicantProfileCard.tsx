@@ -309,9 +309,24 @@ export function ApplicantProfileCard({
     fetchDocuments();
   }, [applicationId]);
 
-  const handleViewDocument = (url: string, name: string, isPdf: boolean = false) => {
-    setViewerImage({ url, name, isPdf });
-    setViewerOpen(true);
+  const handleViewDocument = async (url: string, name: string, isPdf: boolean = false) => {
+    if (isPdf) {
+      // Fetch PDF as blob to avoid cross-origin iframe issues
+      try {
+        const res = await fetch(url);
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        setViewerImage({ url: blobUrl, name, isPdf: true });
+        setViewerOpen(true);
+      } catch (e) {
+        console.error("Failed to fetch PDF blob:", e);
+        // Fallback: open in new tab
+        window.open(url, "_blank");
+      }
+    } else {
+      setViewerImage({ url, name, isPdf: false });
+      setViewerOpen(true);
+    }
   };
 
   const getVerification = (type: string) => {
@@ -502,7 +517,12 @@ export function ApplicantProfileCard({
       </Card>
 
       {/* Document Viewer Dialog */}
-      <Dialog open={viewerOpen} onOpenChange={setViewerOpen}>
+      <Dialog open={viewerOpen} onOpenChange={(open) => {
+        if (!open && viewerImage?.isPdf) {
+          URL.revokeObjectURL(viewerImage.url);
+        }
+        setViewerOpen(open);
+      }}>
         <DialogContent className="max-w-4xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>{viewerImage?.name}</DialogTitle>
