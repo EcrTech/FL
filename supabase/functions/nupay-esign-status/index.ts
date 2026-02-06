@@ -307,7 +307,7 @@ serve(async (req) => {
           // Get fresh token for download (Nupay invalidates tokens per request)
           const downloadToken = await getNewToken(esignApiEndpoint, config.api_key);
           
-          const downloadEndpoint = `${esignApiEndpoint}/api/SignDocument/downloadDocument`;
+          const downloadEndpoint = `${esignApiEndpoint}/api/SignDocument/downloadSignedDoc`;
           console.log("[E-Sign-Status] Calling download endpoint:", downloadEndpoint);
           
           const downloadResponse = await fetch(downloadEndpoint, {
