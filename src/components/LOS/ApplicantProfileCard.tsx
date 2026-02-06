@@ -281,7 +281,8 @@ export function ApplicantProfileCard({
         .from('loan_documents')
         .select('id, document_type, document_category, file_path, file_name, verification_status')
         .eq('loan_application_id', applicationId)
-        .in('document_category', ['identity', 'photo']);
+        .in('document_category', ['identity', 'photo'])
+        .order('created_at', { ascending: false });
 
       if (!docError && docData) {
         setDocuments(docData);
