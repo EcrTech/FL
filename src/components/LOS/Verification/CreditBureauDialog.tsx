@@ -179,7 +179,7 @@ export default function CreditBureauDialog({
     setIsUploading(true);
     try {
       const fileExt = uploadedFile.name.split('.').pop();
-      const fileName = `${applicationId}/cibil_report_${Date.now()}.${fileExt}`;
+      const fileName = `${orgId}/${applicationId}/cibil_report_${Date.now()}.${fileExt}`;
       
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from("loan-documents")
