@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CreditReportViewer } from "./CreditReportViewer";
+import { QuickCreditAnalysisView } from "./QuickCreditAnalysisView";
 
 interface CreditBureauDialogProps {
   open: boolean;
@@ -64,6 +65,10 @@ export default function CreditBureauDialog({
   const [isUploading, setIsUploading] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [parsedSuccessfully, setParsedSuccessfully] = useState(false);
+  const [isQuickAnalyzing, setIsQuickAnalyzing] = useState(false);
+  const [quickAnalysisData, setQuickAnalysisData] = useState<any>(
+    existingVerification?.response_data?.quick_analysis || null
+  );
 
   const applicantName = applicant ? 
     `${applicant.first_name || ''} ${applicant.middle_name || ''} ${applicant.last_name || ''}`.trim() : 
@@ -268,6 +273,83 @@ export default function CreditBureauDialog({
     }
   };
 
+  const uploadAndQuickAnalyze = async () => {
+    if (!uploadedFile) return null;
+
+    setIsUploading(true);
+    try {
+      const fileExt = uploadedFile.name.split('.').pop();
+      const fileName = `${orgId}/${applicationId}/cibil_report_${Date.now()}.${fileExt}`;
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("loan-documents")
+        .upload(fileName, uploadedFile, {
+          cacheControl: "3600",
+          upsert: true,
+        });
+
+      if (uploadError) throw uploadError;
+      
+      setIsUploading(false);
+      setIsQuickAnalyzing(true);
+
+      const { data: analysisResult, error: analysisError } = await supabase.functions
+        .invoke("quick-credit-analysis", {
+          body: { 
+            filePath: uploadData.path,
+            applicationId 
+          }
+        });
+
+      if (analysisError) {
+        console.error("Analysis error:", analysisError);
+        throw new Error("Failed to analyze credit report");
+      }
+
+      if (!analysisResult.success) {
+        throw new Error(analysisResult.error || "Failed to analyze report");
+      }
+
+      const analysis = analysisResult.data;
+      setQuickAnalysisData(analysis);
+      
+      // Auto-fill form fields from analysis
+      setFormData(prev => ({
+        ...prev,
+        bureau_type: analysis.bureau_type || prev.bureau_type,
+        credit_score: analysis.credit_score?.toString() || prev.credit_score,
+        active_accounts: analysis.summary_stats?.active_accounts?.toString() || prev.active_accounts,
+        total_outstanding: analysis.summary_stats?.total_outstanding?.toString() || prev.total_outstanding,
+        total_overdue: analysis.summary_stats?.total_overdue?.toString() || prev.total_overdue,
+        enquiry_count_30d: analysis.summary_stats?.enquiries_30d?.toString() || prev.enquiry_count_30d,
+        enquiry_count_90d: analysis.summary_stats?.enquiries_90d?.toString() || prev.enquiry_count_90d,
+        report_file_path: uploadData.path,
+        name_on_report: analysis.applicant_name || prev.name_on_report,
+        pan_on_report: analysis.pan || prev.pan_on_report,
+        status: "success",
+        remarks: analysis.recommendation || prev.remarks,
+      }));
+
+      setParsedSuccessfully(true);
+      toast({
+        title: "Quick analysis complete",
+        description: `Credit score: ${analysis.credit_score || "Not found"} (${analysis.score_rating || ""})`,
+      });
+
+      return uploadData.path;
+    } catch (error: any) {
+      toast({
+        title: "Error analyzing report",
+        description: error.message,
+        variant: "destructive",
+      });
+      return null;
+    } finally {
+      setIsUploading(false);
+      setIsQuickAnalyzing(false);
+    }
+  };
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       const verificationData = {
@@ -290,6 +372,7 @@ export default function CreditBureauDialog({
           name_on_report: formData.name_on_report,
           pan_on_report: formData.pan_on_report,
           is_live_fetch: activeTab === "live",
+          ...(quickAnalysisData ? { quick_analysis: quickAnalysisData } : {}),
           ...(liveReportData && activeTab === "live" ? {
             summary: liveReportData.summary,
             accounts: liveReportData.accounts,
@@ -331,6 +414,7 @@ export default function CreditBureauDialog({
   const removeFile = () => {
     setUploadedFile(null);
     setParsedSuccessfully(false);
+    setQuickAnalysisData(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -503,32 +587,64 @@ export default function CreditBureauDialog({
                   </div>
                   
                   {uploadedFile && !parsedSuccessfully && (
-                    <Button
-                      onClick={uploadAndParseFile}
-                      disabled={isUploading || isParsing}
-                      className="w-full"
-                    >
-                      {isUploading ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Uploading...
-                        </>
-                      ) : isParsing ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          AI Parsing Report...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="h-4 w-4 mr-2" />
-                          Parse with AI
-                        </>
-                      )}
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={uploadAndQuickAnalyze}
+                        disabled={isUploading || isParsing || isQuickAnalyzing}
+                        className="flex-1"
+                        variant="default"
+                      >
+                        {isUploading ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : isQuickAnalyzing ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Analyzing...
+                          </>
+                        ) : (
+                          <>
+                            <FileText className="h-4 w-4 mr-2" />
+                            Quick Analysis
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        onClick={uploadAndParseFile}
+                        disabled={isUploading || isParsing || isQuickAnalyzing}
+                        className="flex-1"
+                        variant="outline"
+                      >
+                        {isParsing ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Parsing...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-4 w-4 mr-2" />
+                            Full Parse
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   )}
                 </div>
               )}
             </div>
+
+            {/* Quick Analysis View */}
+            {quickAnalysisData && (
+              <div className="border rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  <span className="font-medium">Credit Analysis Summary</span>
+                </div>
+                <QuickCreditAnalysisView data={quickAnalysisData} />
+              </div>
+            )}
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
@@ -684,7 +800,7 @@ export default function CreditBureauDialog({
           </Button>
           <Button 
             onClick={() => saveMutation.mutate()} 
-            disabled={saveMutation.isPending || isUploading || isParsing || isFetchingLive}
+            disabled={saveMutation.isPending || isUploading || isParsing || isQuickAnalyzing || isFetchingLive}
           >
             {saveMutation.isPending ? (
               <>
