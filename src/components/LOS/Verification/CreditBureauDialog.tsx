@@ -331,8 +331,59 @@ export default function CreditBureauDialog({
       }));
 
       setParsedSuccessfully(true);
+
+      // Auto-save verification so data persists when dialog closes
+      const updatedFormData = {
+        bureau_type: analysis.bureau_type || formData.bureau_type,
+        credit_score: analysis.credit_score?.toString() || formData.credit_score,
+        active_accounts: analysis.summary_stats?.active_accounts?.toString() || formData.active_accounts,
+        total_outstanding: analysis.summary_stats?.total_outstanding?.toString() || formData.total_outstanding,
+        total_overdue: analysis.summary_stats?.total_overdue?.toString() || formData.total_overdue,
+        enquiry_count_30d: analysis.summary_stats?.enquiries_30d?.toString() || formData.enquiry_count_30d,
+        enquiry_count_90d: analysis.summary_stats?.enquiries_90d?.toString() || formData.enquiry_count_90d,
+        report_file_path: uploadData.path,
+        name_on_report: analysis.applicant_name || formData.name_on_report,
+        pan_on_report: analysis.pan || formData.pan_on_report,
+        status: "success",
+        remarks: analysis.recommendation || formData.remarks,
+        dpd_history: formData.dpd_history,
+      };
+
+      const verificationData = {
+        loan_application_id: applicationId,
+        applicant_id: applicant?.id,
+        verification_type: "credit_bureau",
+        verification_source: updatedFormData.bureau_type,
+        status: updatedFormData.status,
+        request_data: { bureau_type: updatedFormData.bureau_type },
+        response_data: {
+          bureau_type: updatedFormData.bureau_type,
+          credit_score: parseInt(updatedFormData.credit_score) || 0,
+          active_accounts: parseInt(updatedFormData.active_accounts) || 0,
+          total_outstanding: parseFloat(updatedFormData.total_outstanding) || 0,
+          total_overdue: parseFloat(updatedFormData.total_overdue) || 0,
+          enquiry_count_30d: parseInt(updatedFormData.enquiry_count_30d) || 0,
+          enquiry_count_90d: parseInt(updatedFormData.enquiry_count_90d) || 0,
+          dpd_history: updatedFormData.dpd_history,
+          report_file_path: updatedFormData.report_file_path,
+          name_on_report: updatedFormData.name_on_report,
+          pan_on_report: updatedFormData.pan_on_report,
+          is_live_fetch: false,
+          quick_analysis: analysis,
+        },
+        remarks: updatedFormData.remarks,
+        verified_at: new Date().toISOString(),
+      };
+
+      if (existingVerification) {
+        await supabase.from("loan_verifications").update(verificationData).eq("id", existingVerification.id);
+      } else {
+        await supabase.from("loan_verifications").insert(verificationData);
+      }
+      queryClient.invalidateQueries({ queryKey: ["loan-verifications", applicationId] });
+
       toast({
-        title: "Quick analysis complete",
+        title: "Credit analysis saved",
         description: `Credit score: ${analysis.credit_score || "Not found"} (${analysis.score_rating || ""})`,
       });
 
