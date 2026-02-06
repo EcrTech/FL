@@ -52,13 +52,12 @@ export function IdentityDocumentUploadDialog({
 
       if (uploadError) throw uploadError;
 
-      // If replacing, delete old record
-      if (existingDocumentId) {
-        await supabase
-          .from("loan_documents")
-          .delete()
-          .eq("id", existingDocumentId);
-      }
+      // Delete ALL old records of this document type to prevent stale data
+      await supabase
+        .from("loan_documents")
+        .delete()
+        .eq("loan_application_id", applicationId)
+        .eq("document_type", documentType);
 
       // Insert document record
       const { error: insertError } = await supabase

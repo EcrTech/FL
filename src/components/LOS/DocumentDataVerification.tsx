@@ -59,7 +59,8 @@ export default function DocumentDataVerification({ applicationId }: DocumentData
       const { data, error } = await supabase
         .from("loan_documents")
         .select("*")
-        .eq("loan_application_id", applicationId);
+        .eq("loan_application_id", applicationId)
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
