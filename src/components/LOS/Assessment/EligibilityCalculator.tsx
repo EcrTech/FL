@@ -275,11 +275,11 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
       checks.employment = { passed: false, details: "Date of joining not available" };
     }
 
-    // Credit score - hardcoded to 700 for testing
-    const creditScore = 700;
+    // Credit score from actual credit bureau verification
+    const creditScore = (creditBureau?.response_data as any)?.credit_score || 0;
     checks.credit_score = {
       passed: creditScore >= 650,
-      details: `CIBIL score: ${creditScore}`
+      details: creditScore > 0 ? `CIBIL score: ${creditScore}` : "Credit bureau report not available - please upload CIBIL report"
     };
 
     // FOIR check
