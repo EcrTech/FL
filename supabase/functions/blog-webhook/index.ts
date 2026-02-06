@@ -19,7 +19,7 @@ interface BlogPostPayload {
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   const requestId = `req_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
