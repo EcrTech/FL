@@ -321,7 +321,7 @@ serve(async (req) => {
     let aiResponse: Response;
 
     if (isPdf) {
-      console.log(`[ParseDocument] Using Gemini Pro for PDF parsing...`);
+      console.log(`[ParseDocument] Using Gemini Flash for PDF parsing...`);
       
       aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
@@ -330,8 +330,12 @@ serve(async (req) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-2.5-pro",
+          model: "google/gemini-2.5-flash",
           messages: [
+            {
+              role: "system",
+              content: "You are a document data extraction assistant. You MUST respond with ONLY valid JSON. No explanations, no reasoning, no markdown formatting, no code fences. Output raw JSON only.",
+            },
             {
               role: "user",
               content: [
@@ -344,7 +348,7 @@ serve(async (req) => {
                 },
                 {
                   type: "text",
-                  text: prompt,
+                  text: prompt + "\n\nCRITICAL: Respond with ONLY the JSON object. No text before or after. No markdown. No code fences. No explanation.",
                 },
               ],
             },
@@ -419,20 +423,41 @@ serve(async (req) => {
     // Parse the JSON from the response
     let parsedData: Record<string, any> = {};
     try {
-      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
-      const jsonStr = jsonMatch[1]?.trim() || content.trim();
+      // Try multiple extraction strategies
+      let jsonStr = content.trim();
+      
+      // Strategy 1: Extract from code fences
+      const codeFenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (codeFenceMatch) {
+        jsonStr = codeFenceMatch[1].trim();
+      } else {
+        // Strategy 2: Find the first { and last } to extract JSON object
+        const firstBrace = content.indexOf('{');
+        const lastBrace = content.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace > firstBrace) {
+          jsonStr = content.substring(firstBrace, lastBrace + 1);
+        }
+      }
+      
       parsedData = JSON.parse(jsonStr);
       console.log(`[ParseDocument] Parsed data:`, JSON.stringify(parsedData).substring(0, 500));
     } catch (parseError) {
       console.error(`[ParseDocument] JSON parse error:`, parseError);
+      console.error(`[ParseDocument] Raw content (first 500):`, content.substring(0, 500));
       parsedData = { raw_text: content, parse_error: true };
     }
 
     // Merge with accumulated data if this is a continuation
     let mergedData = parsedData;
-    if (accumulatedData && !parsedData.parse_error) {
-      mergedData = mergeOcrData(accumulatedData, parsedData, documentType);
-      console.log(`[ParseDocument] Merged data with previous chunks`);
+    if (accumulatedData) {
+      if (parsedData.parse_error) {
+        // Don't let a failed chunk wipe out good accumulated data
+        console.warn(`[ParseDocument] Chunk parse failed, keeping accumulated data`);
+        mergedData = accumulatedData;
+      } else {
+        mergedData = mergeOcrData(accumulatedData, parsedData, documentType);
+        console.log(`[ParseDocument] Merged data with previous chunks`);
+      }
     }
 
     // Determine if we need to continue with more chunks

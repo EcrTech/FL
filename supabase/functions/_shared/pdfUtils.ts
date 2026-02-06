@@ -71,14 +71,14 @@ export async function extractPdfPages(
  * Chunk configuration by document type
  */
 export const CHUNK_CONFIG: Record<string, { pagesPerChunk: number; maxTokens: number }> = {
-  bank_statement: { pagesPerChunk: 5, maxTokens: 4000 },
-  cibil_report: { pagesPerChunk: 3, maxTokens: 3000 },
-  credit_report: { pagesPerChunk: 3, maxTokens: 3000 },
-  itr_year_1: { pagesPerChunk: 5, maxTokens: 4000 },
-  itr_year_2: { pagesPerChunk: 5, maxTokens: 4000 },
-  form_16_year_1: { pagesPerChunk: 5, maxTokens: 4000 },
-  form_16_year_2: { pagesPerChunk: 5, maxTokens: 4000 },
-  default: { pagesPerChunk: 5, maxTokens: 4000 },
+  bank_statement: { pagesPerChunk: 5, maxTokens: 8000 },
+  cibil_report: { pagesPerChunk: 3, maxTokens: 6000 },
+  credit_report: { pagesPerChunk: 3, maxTokens: 6000 },
+  itr_year_1: { pagesPerChunk: 5, maxTokens: 6000 },
+  itr_year_2: { pagesPerChunk: 5, maxTokens: 6000 },
+  form_16_year_1: { pagesPerChunk: 5, maxTokens: 6000 },
+  form_16_year_2: { pagesPerChunk: 5, maxTokens: 6000 },
+  default: { pagesPerChunk: 5, maxTokens: 6000 },
 };
 
 /**
