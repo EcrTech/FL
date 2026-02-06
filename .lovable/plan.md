@@ -1,75 +1,86 @@
 
-# Fix: Bank Statement Parsing Not Capturing Account Details
+
+# Fix: PAN and Aadhaar Data Showing Stale/Old Information
 
 ## Problem
-The bank statement PDF is being parsed, but critical header fields are missing from the extracted data:
-- **Account Number** (1947828245) - NOT captured
-- **IFSC Code** (KKBK0008083) - NOT captured  
-- **Branch Name** (SMVIT BRANCH, BANGALORE) - NOT captured
+When PAN or Aadhaar documents are re-uploaded via the `IdentityDocumentUploadDialog`, the "Verified Document Data" section continues showing data from old/deleted documents. This happens every time documents are replaced, forcing users to repeatedly report the issue.
 
-Only `account_holder_name` (ANUPAM ROY) and `bank_name` (Kotak Mahindra Bank) were captured. Additionally, the AI model is still extracting individual transactions despite explicit instructions not to, wasting tokens and potentially causing truncation of header data.
+## Root Cause
 
-## Root Cause Analysis
+**Missing cache invalidation in `IdentityDocumentUploadDialog.tsx`**
 
-1. **Prompt not strict enough**: The bank statement prompt asks for `account_number`, `ifsc_code`, `branch_name` but the AI model appears to prioritize transaction data over header fields, especially for large PDFs where the first 3 pages contain mostly transactions after the header.
+When a document is replaced through this dialog (line 81), it only invalidates:
+```
+["identity-documents", applicationId]
+```
 
-2. **Transactions still being extracted**: Despite the prompt saying "Do NOT include individual transactions", the `ocr_data` in the database contains a massive `transactions` array, confirming the model ignores this instruction.
+But the "Verified Document Data" section in `ApplicationDetail.tsx` uses a completely different query key:
+```
+["loan-documents", id]
+```
 
-3. **Chunk prompt dilution**: The first chunk prompt appends "Extract all visible information from these pages" which may override the "no transactions" instruction.
+This means:
+1. User uploads new PAN/Aadhaar via the identity dialog
+2. Old document record is deleted, new one is created (without OCR data yet)
+3. The `ApplicationDetail` page never refetches because its cache (`loan-documents`) was never invalidated
+4. The page continues showing the old OCR data from the stale cache
 
-4. **Token budget consumed by transactions**: With 177 pages and transactions being extracted, the 8000 token budget is consumed by transaction data, leaving no room for or pushing out the header metadata.
+Additionally, the new document doesn't get auto-parsed, so even after a manual page refresh, the new document has no `ocr_data` and the old deleted document's data disappears entirely.
 
 ## Solution
 
-### 1. Strengthen the bank statement prompt (parse-loan-document/index.ts)
+### 1. Fix cache invalidation in `IdentityDocumentUploadDialog.tsx`
 
-Restructure the prompt to:
-- Make account details the TOP PRIORITY with explicit emphasis
-- List the header fields FIRST with stronger language ("MOST IMPORTANT")
-- Add a repeated, stronger prohibition on transactions
-- Reduce token limit since we only need summary data (not thousands of transaction rows)
+Add invalidation for ALL related query keys after upload:
+- `["loan-documents", applicationId]` - for the Verified Document Data section
+- `["loan-application"]` - for application-level data refresh
+- `["loan-application-basic", applicationId]` - for basic app data
 
-### 2. Add a dedicated first-chunk prompt for bank statements (pdfUtils.ts)
+### 2. Auto-trigger parsing after identity document upload
 
-For the first chunk (pages 1-3), use a specialized prompt that focuses ONLY on header/account information:
-- Account number, IFSC, branch, account holder name, bank name, account type
-- Statement period
-- Explicitly state: "These first pages contain the account header. Focus on extracting account identification details."
+After a successful upload of a PAN or Aadhaar document, automatically invoke the `parse-loan-document` edge function so the new document's OCR data is immediately available without requiring the user to manually navigate to the Documents section and click Parse.
 
-For subsequent chunks, use a summary-only prompt focusing on balances and totals.
+### 3. Invalidate cache again after parsing completes
 
-### 3. Fix the chunk prompt override (pdfUtils.ts - getChunkPrompt)
-
-Change the first chunk note from the generic "Extract all visible information" to "Focus on account identification details (account number, IFSC, branch) which are typically on the first page."
-
-### 4. Post-parse cleanup: Strip transactions from stored data (parse-loan-document/index.ts)
-
-Before saving `ocr_data`, explicitly delete the `transactions` array if present:
-```
-delete mergedData.transactions;
-```
-This prevents token-heavy transaction data from being stored unnecessarily.
-
-### 5. Reset existing parsed data
-
-Run a database update to clear the current incomplete `ocr_data` and reset `parsing_status` to `idle` for the affected document so the user can re-parse.
-
----
+Once auto-parsing finishes, invalidate `["loan-documents", applicationId]` again so the freshly parsed data appears in the UI immediately.
 
 ## Technical Details
 
-### Files to modify:
+### File: `src/components/LOS/Verification/IdentityDocumentUploadDialog.tsx`
 
-**supabase/functions/parse-loan-document/index.ts**
-- Update `DOCUMENT_PROMPTS.bank_statement` to prioritize header fields with stronger language
-- Add transaction stripping before saving to DB (around line 500+)
+**Change 1 - Expand cache invalidation (line 80-83):**
+Add these invalidations in `onSuccess`:
+```typescript
+queryClient.invalidateQueries({ queryKey: ["loan-documents", applicationId] });
+queryClient.invalidateQueries({ queryKey: ["loan-application"] });
+queryClient.invalidateQueries({ queryKey: ["loan-application-basic", applicationId] });
+```
 
-**supabase/functions/_shared/pdfUtils.ts**  
-- Update `getChunkPrompt()` to use bank-statement-specific first-chunk instructions
-- Optionally reduce `maxTokens` for bank_statement back to 4000 since we don't need transaction data
+**Change 2 - Auto-parse after upload:**
+After the document insert succeeds, call the parse function:
+```typescript
+// Get the newly inserted document ID
+const { data: newDoc } = await supabase
+  .from("loan_documents")
+  .select("id, file_path")
+  .eq("loan_application_id", applicationId)
+  .eq("document_type", documentType)
+  .order("created_at", { ascending: false })
+  .limit(1)
+  .single();
 
-### Database fix:
-- Reset `parsing_status` to `idle` and clear `ocr_data` for document `5e135623-491d-4c44-bee2-6f83a7d29e6b`
+if (newDoc) {
+  // Auto-parse in background
+  supabase.functions.invoke("parse-loan-document", {
+    body: { documentId: newDoc.id, documentType, filePath: newDoc.file_path },
+  }).then(() => {
+    queryClient.invalidateQueries({ queryKey: ["loan-documents", applicationId] });
+  });
+}
+```
 
-### No UI changes needed
-The `BankDetailsSection` component already correctly maps `ocr_data` fields (`account_number` -> `bank_account_number`, `ifsc_code` -> `bank_ifsc_code`, `branch_name` -> `bank_branch`). Once the parsing correctly extracts these fields, auto-fill will work automatically.
+This ensures that:
+- Cache is invalidated immediately after upload (removes stale data)
+- New document is auto-parsed (generates fresh OCR data)
+- Cache is invalidated again after parsing (shows new data)
+
