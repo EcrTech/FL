@@ -48,8 +48,7 @@ export function DocumentPreviewDialog({
       setBlobUrl(null);
       setSignedUrl(null);
 
-      const fileIsPdf = (document?.mime_type || document?.file_type || "") === "application/pdf" || 
-        filePath.endsWith(".pdf");
+      const fileIsPdf = mimeType === "application/pdf" || filePath.endsWith(".pdf");
 
       supabase.storage
         .from("loan-documents")
