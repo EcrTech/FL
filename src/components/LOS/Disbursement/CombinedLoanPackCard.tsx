@@ -112,6 +112,37 @@ export default function CombinedLoanPackCard({
   const isCombinedSigned = combinedDoc?.customer_signed;
   const needsRegeneration = combinedDoc && !combinedDoc.file_path;
 
+  // Auto-generate individual document records if missing
+  const ensureIndividualDocs = async () => {
+    const missingTypes: string[] = [];
+    if (!sanctionDoc) missingTypes.push("sanction_letter");
+    if (!agreementDoc) missingTypes.push("loan_agreement");
+    if (!scheduleDoc) missingTypes.push("daily_schedule");
+
+    if (missingTypes.length > 0) {
+      const inserts = missingTypes.map(docType => ({
+        loan_application_id: applicationId,
+        sanction_id: sanction.id,
+        org_id: application.org_id,
+        document_type: docType,
+        document_number: `${docType.toUpperCase().replace("_", "")}-${Date.now().toString(36).toUpperCase()}`,
+        status: "generated",
+      }));
+
+      const { error } = await supabase
+        .from("loan_generated_documents")
+        .insert(inserts);
+
+      if (error) {
+        console.error("Error auto-generating individual docs:", error);
+        throw new Error("Failed to create individual document records");
+      }
+
+      // Refetch so the combined template picks up doc numbers
+      await onRefetch();
+    }
+  };
+
   // Generate PDF, upload to storage, and create DB record
   const handleGenerateCombined = async () => {
     const printElement = document.getElementById("combined-loan-pack-template");
@@ -122,6 +153,8 @@ export default function CombinedLoanPackCard({
 
     setIsUploadingPdf(true);
     try {
+      // Auto-create individual doc records first
+      await ensureIndividualDocs();
       // Generate PDF blob using html2pdf
       const worker = html2pdf()
         .set({
@@ -285,18 +318,12 @@ export default function CombinedLoanPackCard({
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {!allIndividualDocsGenerated && (
-            <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
-              <p>⚠️ Generate all individual documents first (Sanction Letter, Loan Agreement, Daily Repayment Schedule) before creating the combined pack.</p>
-            </div>
-          )}
-
           <div className="flex flex-wrap gap-2">
             {/* Generate Combined Button */}
             <Button
               variant={isCombinedGenerated && !needsRegeneration ? "outline" : "default"}
               onClick={handleGenerateCombined}
-              disabled={isGenerating || isUploadingPdf || (isCombinedGenerated && !needsRegeneration) || !allIndividualDocsGenerated}
+              disabled={isGenerating || isUploadingPdf || (isCombinedGenerated && !needsRegeneration)}
               className="gap-2"
             >
               {(isGenerating || isUploadingPdf) ? (
