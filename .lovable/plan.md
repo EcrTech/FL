@@ -1,86 +1,48 @@
 
 
-# Fix: PAN and Aadhaar Data Showing Stale/Old Information
+# Fix: Permanent Login Flow Stability
 
-## Problem
-When PAN or Aadhaar documents are re-uploaded via the `IdentityDocumentUploadDialog`, the "Verified Document Data" section continues showing data from old/deleted documents. This happens every time documents are replaced, forcing users to repeatedly report the issue.
+## Problems Identified
 
-## Root Cause
+### Problem 1: Edge Function OTP Call Failure
+The error "Failed to send a request to the Edge Function" occurs when calling `send-public-otp`. There are zero logs for this function in the analytics, meaning requests aren't reaching it. This is likely caused by the auth state being in flux -- the user just signed out (line 118 of Login.tsx), and the Supabase client may briefly be in an inconsistent state when `supabase.functions.invoke()` is called immediately after `signOut()`.
 
-**Missing cache invalidation in `IdentityDocumentUploadDialog.tsx`**
-
-When a document is replaced through this dialog (line 81), it only invalidates:
-```
-["identity-documents", applicationId]
-```
-
-But the "Verified Document Data" section in `ApplicationDetail.tsx` uses a completely different query key:
-```
-["loan-documents", id]
-```
-
-This means:
-1. User uploads new PAN/Aadhaar via the identity dialog
-2. Old document record is deleted, new one is created (without OCR data yet)
-3. The `ApplicationDetail` page never refetches because its cache (`loan-documents`) was never invalidated
-4. The page continues showing the old OCR data from the stale cache
-
-Additionally, the new document doesn't get auto-parsed, so even after a manual page refresh, the new document has no `ocr_data` and the old deleted document's data disappears entirely.
+### Problem 2: Auth Listener Race Condition (Recurring)
+The `setTimeout` in AuthContext.tsx (line 292) defers user data fetching, causing ProtectedRoute to see `isInitialized=true` but `profile=null`, redirecting users back to login. Additionally, the `pendingOtpVerification` state in the useEffect dependency array (Login.tsx line 68) causes the auth subscription to be torn down and recreated during the 2FA flow, potentially missing events.
 
 ## Solution
 
-### 1. Fix cache invalidation in `IdentityDocumentUploadDialog.tsx`
+### 1. Login.tsx -- Stabilize OTP flow and auth listener
 
-Add invalidation for ALL related query keys after upload:
-- `["loan-documents", applicationId]` - for the Verified Document Data section
-- `["loan-application"]` - for application-level data refresh
-- `["loan-application-basic", applicationId]` - for basic app data
+- **Add a small delay after signOut before sending OTP**: Give the Supabase client time to complete the sign-out before invoking the edge function. This prevents the "Failed to send request" error.
+- **Use a `useRef` for `pendingOtpVerification`**: Remove it from the useEffect dependency array so the auth listener is created once and never recreated during the 2FA flow.
+- **Add retry logic for OTP sending**: If the edge function call fails, retry once after a short delay.
 
-### 2. Auto-trigger parsing after identity document upload
+### 2. AuthContext.tsx -- Remove setTimeout race condition
 
-After a successful upload of a PAN or Aadhaar document, automatically invoke the `parse-loan-document` edge function so the new document's OCR data is immediately available without requiring the user to manually navigate to the Documents section and click Parse.
+- **Remove the `setTimeout` wrapper** around `fetchUserData` in the `SIGNED_IN` handler (lines 292-307).
+- **Call `fetchUserData` directly**: The Supabase deadlock warning only applies to calling `supabase.auth.*` methods inside the callback. Fetching from database tables (`profiles`, etc.) is safe to await.
+- **Remove `setIsLoading` toggling** inside the SIGNED_IN handler to prevent loading flickers.
 
-### 3. Invalidate cache again after parsing completes
+## Technical Changes
 
-Once auto-parsing finishes, invalidate `["loan-documents", applicationId]` again so the freshly parsed data appears in the UI immediately.
+### File: `src/pages/Login.tsx`
 
-## Technical Details
+- Add `useRef` for pendingOtpVerification tracking
+- Remove `pendingOtpVerification` from useEffect dependency array (line 68)
+- Use `pendingOtpRef.current` inside the auth listener instead of the state variable
+- Add a ~500ms delay after `signOut()` before calling `sendOtp()` to let the client stabilize
+- Add retry logic in `sendOtp()` function with one automatic retry on failure
 
-### File: `src/components/LOS/Verification/IdentityDocumentUploadDialog.tsx`
+### File: `src/contexts/AuthContext.tsx`
 
-**Change 1 - Expand cache invalidation (line 80-83):**
-Add these invalidations in `onSuccess`:
-```typescript
-queryClient.invalidateQueries({ queryKey: ["loan-documents", applicationId] });
-queryClient.invalidateQueries({ queryKey: ["loan-application"] });
-queryClient.invalidateQueries({ queryKey: ["loan-application-basic", applicationId] });
-```
+- Replace the `setTimeout(async () => {...}, 0)` block (lines 292-307) with a direct `await fetchUserData()` call
+- Remove `setIsLoading(true/false)` from the SIGNED_IN handler -- initial load already handles loading state
+- Keep the `fetchInProgressRef` guard to prevent duplicate fetches
 
-**Change 2 - Auto-parse after upload:**
-After the document insert succeeds, call the parse function:
-```typescript
-// Get the newly inserted document ID
-const { data: newDoc } = await supabase
-  .from("loan_documents")
-  .select("id, file_path")
-  .eq("loan_application_id", applicationId)
-  .eq("document_type", documentType)
-  .order("created_at", { ascending: false })
-  .limit(1)
-  .single();
+## Expected Outcome
 
-if (newDoc) {
-  // Auto-parse in background
-  supabase.functions.invoke("parse-loan-document", {
-    body: { documentId: newDoc.id, documentType, filePath: newDoc.file_path },
-  }).then(() => {
-    queryClient.invalidateQueries({ queryKey: ["loan-documents", applicationId] });
-  });
-}
-```
-
-This ensures that:
-- Cache is invalidated immediately after upload (removes stale data)
-- New document is auto-parsed (generates fresh OCR data)
-- Cache is invalidated again after parsing (shows new data)
-
+- OTP sending will be more reliable since the client state is stable before the call
+- Auth listener in Login.tsx won't be recreated during the 2FA flow
+- AuthContext won't defer user data fetching, eliminating the redirect race condition
+- The login flow will be permanently stable across sessions
