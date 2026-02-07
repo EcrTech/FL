@@ -1,48 +1,53 @@
 
 
-# Fix: Permanent Login Flow Stability
+# Fix: Address Save Hanging (Supabase Client Deadlock)
 
-## Problems Identified
+## Root Cause
 
-### Problem 1: Edge Function OTP Call Failure
-The error "Failed to send a request to the Edge Function" occurs when calling `send-public-otp`. There are zero logs for this function in the analytics, meaning requests aren't reaching it. This is likely caused by the auth state being in flux -- the user just signed out (line 118 of Login.tsx), and the Supabase client may briefly be in an inconsistent state when `supabase.functions.invoke()` is called immediately after `signOut()`.
+The previous login fix removed `setTimeout` from the `onAuthStateChange` callback in `AuthContext.tsx` (line 294) and replaced it with a direct `await fetchUserData()`. This causes a **Supabase client deadlock**.
 
-### Problem 2: Auth Listener Race Condition (Recurring)
-The `setTimeout` in AuthContext.tsx (line 292) defers user data fetching, causing ProtectedRoute to see `isInitialized=true` but `profile=null`, redirecting users back to login. Additionally, the `pendingOtpVerification` state in the useEffect dependency array (Login.tsx line 68) causes the auth subscription to be torn down and recreated during the 2FA flow, potentially missing events.
+The Supabase documentation warns: *"You can easily create a dead-lock by using `await` on a call to another method of the Supabase library"* inside `onAuthStateChange`. This applies to ALL Supabase methods, including database queries -- not just `supabase.auth.*` methods.
 
-## Solution
+`fetchUserData` makes 4 sequential/parallel Supabase database calls (`profiles`, `user_roles`, `organizations`, `designation_feature_access`). When these are awaited inside `onAuthStateChange`, the Supabase client's internal lock is held, blocking all other operations. This is why the `loan_applicants` update hangs indefinitely -- it's waiting for the client lock that's held by the auth callback.
 
-### 1. Login.tsx -- Stabilize OTP flow and auth listener
+## Why the Login Fix Created This Problem
 
-- **Add a small delay after signOut before sending OTP**: Give the Supabase client time to complete the sign-out before invoking the edge function. This prevents the "Failed to send request" error.
-- **Use a `useRef` for `pendingOtpVerification`**: Remove it from the useEffect dependency array so the auth listener is created once and never recreated during the 2FA flow.
-- **Add retry logic for OTP sending**: If the edge function call fails, retry once after a short delay.
+```text
+Previous code (with setTimeout):
+  onAuthStateChange -> setTimeout -> fetchUserData
+  Result: Login race condition (profile loads too late)
 
-### 2. AuthContext.tsx -- Remove setTimeout race condition
+Current code (direct await):
+  onAuthStateChange -> await fetchUserData (holds client lock)
+  Result: ALL subsequent DB calls hang (address save, etc.)
+```
 
-- **Remove the `setTimeout` wrapper** around `fetchUserData` in the `SIGNED_IN` handler (lines 292-307).
-- **Call `fetchUserData` directly**: The Supabase deadlock warning only applies to calling `supabase.auth.*` methods inside the callback. Fetching from database tables (`profiles`, etc.) is safe to await.
-- **Remove `setIsLoading` toggling** inside the SIGNED_IN handler to prevent loading flickers.
+## Solution: Event-Driven Fetch with useEffect
+
+Instead of calling `fetchUserData` inside the callback OR deferring it with `setTimeout`, use a **React state flag** to trigger a `useEffect` that runs the fetch outside the callback context.
+
+```text
+onAuthStateChange -> set pendingUser state (no await, no Supabase calls)
+useEffect [pendingUser] -> await fetchUserData (runs outside callback)
+```
+
+This approach:
+- Breaks out of the `onAuthStateChange` callback immediately (no deadlock)
+- Triggers synchronously via React state (no `setTimeout` delay)
+- Fetches user data before `isInitialized` is set (no race condition with ProtectedRoute)
 
 ## Technical Changes
 
-### File: `src/pages/Login.tsx`
-
-- Add `useRef` for pendingOtpVerification tracking
-- Remove `pendingOtpVerification` from useEffect dependency array (line 68)
-- Use `pendingOtpRef.current` inside the auth listener instead of the state variable
-- Add a ~500ms delay after `signOut()` before calling `sendOtp()` to let the client stabilize
-- Add retry logic in `sendOtp()` function with one automatic retry on failure
-
 ### File: `src/contexts/AuthContext.tsx`
 
-- Replace the `setTimeout(async () => {...}, 0)` block (lines 292-307) with a direct `await fetchUserData()` call
-- Remove `setIsLoading(true/false)` from the SIGNED_IN handler -- initial load already handles loading state
-- Keep the `fetchInProgressRef` guard to prevent duplicate fetches
+1. Add a new state: `pendingSignInUser` to hold the user object when SIGNED_IN fires
+2. In the `onAuthStateChange` SIGNED_IN handler: Instead of `await fetchUserData()`, just set `setPendingSignInUser(currentSession.user)` -- no Supabase calls inside the callback
+3. Add a new `useEffect` that watches `pendingSignInUser`: When it changes, call `await fetchUserData(pendingSignInUser)` and then clear it
+4. Keep `initAuth` unchanged -- it runs outside the callback and works correctly
+5. Keep `isInitializingRef` guard to prevent double-fetching during initial load
 
-## Expected Outcome
+### No changes needed to:
+- `Login.tsx` (the ref-based listener fix is still correct)
+- `ProtectedRoute.tsx` (already waits for `isInitialized` and `isLoading`)
+- `ApplicationDetail.tsx` (the save mutation code is correct; it just hangs due to the deadlock)
 
-- OTP sending will be more reliable since the client state is stable before the call
-- Auth listener in Login.tsx won't be recreated during the 2FA flow
-- AuthContext won't defer user data fetching, eliminating the redirect race condition
-- The login flow will be permanently stable across sessions
