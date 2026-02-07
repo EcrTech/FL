@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthLayout } from "@/components/Auth/AuthLayout";
@@ -34,9 +34,15 @@ export default function Login() {
   const [resendCooldown, setResendCooldown] = useState(0);
   const [userPhone, setUserPhone] = useState<string | null>(null);
   const [pendingOtpVerification, setPendingOtpVerification] = useState(false);
+  const pendingOtpRef = useRef(false);
+
+  // Keep ref in sync with state so the auth listener always reads the latest value
+  useEffect(() => {
+    pendingOtpRef.current = pendingOtpVerification;
+  }, [pendingOtpVerification]);
 
   useEffect(() => {
-    console.log('[Login] useEffect - setting up auth listener...');
+    console.log('[Login] useEffect - setting up auth listener (stable, created once)...');
     let mounted = true;
 
     // Listen for auth changes and redirect on successful login
@@ -44,7 +50,7 @@ export default function Login() {
       if (!mounted) return;
       console.log("[Login] Auth state change:", event, session ? "Session exists" : "No session");
       // Don't redirect if we're in the middle of 2FA flow (will sign out shortly)
-      if (event === 'SIGNED_IN' && session && !pendingOtpVerification) {
+      if (event === 'SIGNED_IN' && session && !pendingOtpRef.current) {
         console.log("[Login] User signed in, redirecting to LOS dashboard");
         navigate("/los/dashboard", { replace: true });
       }
@@ -65,7 +71,7 @@ export default function Login() {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [navigate, pendingOtpVerification]);
+  }, [navigate]); // Removed pendingOtpVerification - using ref instead
 
   // Resend cooldown timer
   useEffect(() => {
@@ -119,8 +125,12 @@ export default function Login() {
 
       setUserPhone(profile.phone);
       
-      // Send OTP via WhatsApp
-      await sendOtp(profile.phone);
+      // Add delay after signOut to let the Supabase client stabilize
+      // before invoking the edge function
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Send OTP via WhatsApp with retry logic
+      await sendOtpWithRetry(profile.phone);
       
       setStep('otp');
       notify.success("Credentials verified", "Please enter the OTP sent to your phone");
@@ -159,6 +169,16 @@ export default function Login() {
       throw error;
     } finally {
       setSendingOtp(false);
+    }
+  };
+
+  const sendOtpWithRetry = async (phone: string) => {
+    try {
+      await sendOtp(phone);
+    } catch (firstError) {
+      console.log('[Login] First OTP attempt failed, retrying after delay...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      await sendOtp(phone); // If this also fails, error propagates to caller
     }
   };
 
