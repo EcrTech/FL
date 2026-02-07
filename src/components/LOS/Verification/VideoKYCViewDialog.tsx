@@ -44,6 +44,8 @@ export function VideoKYCViewDialog({
             <video
               src={recordingUrl}
               controls
+              playsInline
+              preload="auto"
               className="w-full h-full object-contain"
               autoPlay={false}
             >

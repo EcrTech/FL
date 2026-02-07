@@ -337,41 +337,29 @@ export function ApplicantProfileCard({
 
   // Handle Video KYC card click - show view dialog if completed, otherwise show retry link dialog
   const handleVideoKYCClick = async () => {
-    // Check if there's a pending retry recording — if so, show retry dialog regardless of old verification
-    const { data: pendingRecording } = await supabase
-      .from('videokyc_recordings')
-      .select('id, status')
-      .eq('application_id', applicationId)
-      .eq('status', 'pending')
-      .limit(1)
-      .maybeSingle();
-
-    if (pendingRecording) {
-      setShowRetryLinkDialog(true);
-      return;
-    }
-
-    // First check response_data in loan_verifications
+    // First try to find any completed recording URL
     let recordingUrl = (videoKycVerification?.response_data as any)?.recording_url;
     
-    // If not in loan_verifications, fetch from videokyc_recordings table
-    if (!recordingUrl && videoKycVerification?.status === 'success') {
-      const { data: videoKycRecording } = await supabase
+    // If not in loan_verifications response_data, fetch from videokyc_recordings table
+    if (!recordingUrl) {
+      const { data: completedRecording } = await supabase
         .from('videokyc_recordings')
         .select('recording_url')
         .eq('application_id', applicationId)
         .eq('status', 'completed')
-        .order('completed_at', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
       
-      recordingUrl = videoKycRecording?.recording_url;
+      recordingUrl = completedRecording?.recording_url;
     }
     
-    if (videoKycVerification?.status === 'success' && recordingUrl) {
+    // If we have a recording URL, show the video viewer
+    if (recordingUrl) {
       setVideoKYCRecordingUrl(recordingUrl);
       setVideoKYCViewOpen(true);
     } else {
+      // No completed recording exists — show retry link dialog
       setShowRetryLinkDialog(true);
     }
   };
