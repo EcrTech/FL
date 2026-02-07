@@ -59,6 +59,24 @@ serve(async (req) => {
       console.error("Error deleting old recordings:", deleteError);
     }
 
+    // Invalidate the existing loan_verifications record for video_kyc
+    // so the UI correctly shows "pending" until the applicant completes the new recording
+    const { error: verificationUpdateError } = await supabase
+      .from("loan_verifications")
+      .update({
+        status: "pending",
+        verified_at: null,
+        remarks: "Retry requested by loan officer",
+      })
+      .eq("loan_application_id", application_id)
+      .eq("verification_type", "video_kyc");
+
+    if (verificationUpdateError) {
+      console.error("Error updating loan_verifications:", verificationUpdateError);
+    } else {
+      console.log("Invalidated previous video_kyc verification for retry");
+    }
+
     // Generate a secure access token
     const accessToken = crypto.randomUUID() + "-" + crypto.randomUUID();
     

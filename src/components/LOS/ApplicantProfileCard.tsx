@@ -337,6 +337,20 @@ export function ApplicantProfileCard({
 
   // Handle Video KYC card click - show view dialog if completed, otherwise show retry link dialog
   const handleVideoKYCClick = async () => {
+    // Check if there's a pending retry recording — if so, show retry dialog regardless of old verification
+    const { data: pendingRecording } = await supabase
+      .from('videokyc_recordings')
+      .select('id, status')
+      .eq('application_id', applicationId)
+      .eq('status', 'pending')
+      .limit(1)
+      .maybeSingle();
+
+    if (pendingRecording) {
+      setShowRetryLinkDialog(true);
+      return;
+    }
+
     // First check response_data in loan_verifications
     let recordingUrl = (videoKycVerification?.response_data as any)?.recording_url;
     
