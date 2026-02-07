@@ -11,7 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
+// Checkbox removed - no longer needed for CUC toggle
 import {
   Select,
   SelectContent,
@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { format, addMonths } from "date-fns";
+import { format, addDays } from "date-fns";
 import { ArrowLeft, ArrowRight, Loader2, ExternalLink, QrCode } from "lucide-react";
 import BankSelector from "./BankSelector";
 import { QRCodeSVG } from "qrcode.react";
@@ -78,13 +78,12 @@ export default function CreateMandateDialog({
   const [bankAccountNoConfirm, setBankAccountNoConfirm] = useState("");
   const [ifscCode, setIfscCode] = useState("");
   const [accountType, setAccountType] = useState<"Savings" | "Current">("Savings");
-  const [collectionAmount, setCollectionAmount] = useState(emiAmount);
-  const [frequency, setFrequency] = useState<"MNTH" | "QURT" | "MIAN" | "YEAR">("MNTH");
+  // Total repayment = principal + interest for bullet payment
+  const totalRepayment = loanAmount + (loanAmount * 0.01 * tenure);
+  const [collectionAmount, setCollectionAmount] = useState(totalRepayment);
   const [firstCollectionDate, setFirstCollectionDate] = useState(
-    format(addMonths(new Date(), 1), "yyyy-MM-dd")
+    format(addDays(new Date(), tenure), "yyyy-MM-dd")
   );
-  const [collectionUntilCancel, setCollectionUntilCancel] = useState(true);
-  const [finalCollectionDate, setFinalCollectionDate] = useState("");
   const [loanNo, setLoanNo] = useState(existingLoanNo || `LOAN-${Date.now()}`);
 
   // Notification override fields (for testing or different account holder)
@@ -142,14 +141,14 @@ export default function CreateMandateDialog({
           loan_application_id: loanApplicationId,
           contact_id: contactId,
           loan_no: loanNo,
-          seq_type: "RCUR",
-          frequency,
+          seq_type: "OOFF",
+          frequency: "ADHO",
           category_id: 7,
           collection_amount: collectionAmount,
           debit_type: false,
           first_collection_date: firstCollectionDate,
-          final_collection_date: collectionUntilCancel ? undefined : finalCollectionDate,
-          collection_until_cancel: collectionUntilCancel,
+          final_collection_date: firstCollectionDate,
+          collection_until_cancel: false,
           account_holder_name: accountHolderName,
           bank_account_no: bankAccountNo,
           bank_account_no_confirmation: bankAccountNoConfirm,
@@ -203,17 +202,14 @@ export default function CreateMandateDialog({
         setIfscCode("");
         setAccountType("Savings");
       }
-      setCollectionAmount(emiAmount);
-      setFrequency("MNTH");
-      setFirstCollectionDate(format(addMonths(new Date(), 1), "yyyy-MM-dd"));
-      setCollectionUntilCancel(true);
-      setFinalCollectionDate("");
+      setCollectionAmount(loanAmount + (loanAmount * 0.01 * tenure));
+      setFirstCollectionDate(format(addDays(new Date(), tenure), "yyyy-MM-dd"));
       setNotificationPhone(applicantPhone);
       setNotificationEmail(applicantEmail || "");
       setRegistrationUrl(null);
       setShowQR(false);
     }
-  }, [open, applicantName, emiAmount, prefillData]);
+  }, [open, applicantName, loanAmount, tenure, prefillData]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
@@ -232,8 +228,7 @@ export default function CreateMandateDialog({
     isIfscValid;
   const canProceedFromMandate = 
     collectionAmount > 0 &&
-    firstCollectionDate !== "" &&
-    (collectionUntilCancel || finalCollectionDate !== "");
+    firstCollectionDate !== "";
 
   const handleNext = () => {
     if (step === "bank" && canProceedFromBank) setStep("account");
@@ -275,7 +270,7 @@ export default function CreateMandateDialog({
           <DialogDescription>
             {step !== "success" && (
               <>
-                {loanNo} | EMI: {formatCurrency(emiAmount)}/month
+                {loanNo} | Bullet Payment: {formatCurrency(totalRepayment)}
               </>
             )}
           </DialogDescription>
@@ -387,8 +382,12 @@ export default function CreateMandateDialog({
         {/* Step 3: Mandate Details */}
         {step === "mandate" && (
           <div className="space-y-4">
+            <div className="bg-muted p-3 rounded-lg space-y-1">
+              <p className="text-xs text-muted-foreground">Payment Type</p>
+              <p className="font-medium text-sm">One-Time Bullet Payment (NACH OOFF / Adhoc)</p>
+            </div>
             <div>
-              <Label htmlFor="amount">Collection Amount</Label>
+              <Label htmlFor="amount">Collection Amount (Total Repayment)</Label>
               <Input
                 id="amount"
                 type="number"
@@ -396,25 +395,11 @@ export default function CreateMandateDialog({
                 onChange={(e) => setCollectionAmount(Number(e.target.value))}
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Maximum amount that can be debited per cycle
+                Total amount to be debited on the maturity date (Principal + Interest)
               </p>
             </div>
             <div>
-              <Label>Frequency</Label>
-              <Select value={frequency} onValueChange={(v) => setFrequency(v as typeof frequency)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="MNTH">Monthly</SelectItem>
-                  <SelectItem value="QURT">Quarterly</SelectItem>
-                  <SelectItem value="MIAN">Half-Yearly</SelectItem>
-                  <SelectItem value="YEAR">Yearly</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="firstDate">First Collection Date</Label>
+              <Label htmlFor="firstDate">Collection Date (Loan Maturity)</Label>
               <Input
                 id="firstDate"
                 type="date"
@@ -422,29 +407,10 @@ export default function CreateMandateDialog({
                 onChange={(e) => setFirstCollectionDate(e.target.value)}
                 min={format(new Date(), "yyyy-MM-dd")}
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                The date when the bullet payment will be collected
+              </p>
             </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="untilCancel"
-                checked={collectionUntilCancel}
-                onCheckedChange={(checked) => setCollectionUntilCancel(checked as boolean)}
-              />
-              <Label htmlFor="untilCancel" className="cursor-pointer">
-                Continue until cancelled
-              </Label>
-            </div>
-            {!collectionUntilCancel && (
-              <div>
-                <Label htmlFor="finalDate">Final Collection Date</Label>
-                <Input
-                  id="finalDate"
-                  type="date"
-                  value={finalCollectionDate}
-                  onChange={(e) => setFinalCollectionDate(e.target.value)}
-                  min={firstCollectionDate}
-                />
-              </div>
-            )}
           </div>
         )}
 
@@ -476,20 +442,12 @@ export default function CreateMandateDialog({
                 <span className="font-medium">{formatCurrency(collectionAmount)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Frequency</span>
-                <span className="font-medium">
-                  {frequency === "MNTH" ? "Monthly" : frequency === "QURT" ? "Quarterly" : frequency === "MIAN" ? "Half-Yearly" : "Yearly"}
-                </span>
+                <span className="text-muted-foreground">Type</span>
+                <span className="font-medium">One-Time Bullet Payment</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">First Debit</span>
+                <span className="text-muted-foreground">Collection Date</span>
                 <span className="font-medium">{format(new Date(firstCollectionDate), "dd MMM yyyy")}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Duration</span>
-                <span className="font-medium">
-                  {collectionUntilCancel ? "Until Cancelled" : `Until ${format(new Date(finalCollectionDate), "dd MMM yyyy")}`}
-                </span>
               </div>
               <hr />
               <div className="flex justify-between">

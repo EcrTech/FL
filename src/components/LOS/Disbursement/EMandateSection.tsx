@@ -193,10 +193,12 @@ export default function EMandateSection({
                 <div className="p-3 rounded-lg bg-muted/50">
                   <p className="text-xs text-muted-foreground">Amount</p>
                   <p className="font-medium text-sm">
-                    {formatCurrency(mandateData.collection_amount || dailyEMI)} / 
-                    {mandateData.frequency === "MNTH" ? "month" : 
-                     mandateData.frequency === "DAIL" ? "day" : 
-                     mandateData.frequency || "month"}
+                    {formatCurrency(mandateData.collection_amount || dailyEMI)}
+                    {mandateData.frequency === "ADHO" || mandateData.seq_type === "OOFF" 
+                      ? " (One-time)" 
+                      : ` / ${mandateData.frequency === "MNTH" ? "month" : 
+                           mandateData.frequency === "DAIL" ? "day" : 
+                           mandateData.frequency || "month"}`}
                   </p>
                 </div>
               </div>
