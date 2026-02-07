@@ -323,7 +323,7 @@ export default function CombinedLoanPackCard({
             <Button
               variant={isCombinedGenerated && !needsRegeneration ? "outline" : "default"}
               onClick={handleGenerateCombined}
-              disabled={isGenerating || isUploadingPdf || (isCombinedGenerated && !needsRegeneration)}
+              disabled={isGenerating || isUploadingPdf}
               className="gap-2"
             >
               {(isGenerating || isUploadingPdf) ? (
