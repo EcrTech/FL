@@ -186,12 +186,14 @@ const VerificationCard = ({
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const isVerified = verification?.status === 'success';
+  const hasRecording = !!(verification?.response_data as any)?.recording_url;
+  const isViewable = isVerified || hasRecording;
 
   return (
     <div 
       className={cn(
         "relative flex-1 h-32 rounded-lg overflow-hidden cursor-pointer transition-all duration-200 border-2",
-        isVerified 
+        isViewable 
           ? "border-green-500 shadow-[0_0_8px_rgba(34,197,94,0.3)]" 
           : "border-border hover:border-muted-foreground/50"
       )}
@@ -201,12 +203,12 @@ const VerificationCard = ({
     >
       {/* Card Content */}
       <div className="w-full h-full bg-muted flex flex-col items-center justify-center gap-2">
-        <Icon className={cn("h-10 w-10", isVerified ? "text-green-500" : "text-muted-foreground")} />
+        <Icon className={cn("h-10 w-10", isViewable ? "text-green-500" : "text-muted-foreground")} />
         <span className="text-xs text-muted-foreground">{label}</span>
       </div>
 
       {/* Verified Checkmark */}
-      {isVerified && (
+      {isViewable && (
         <div className="absolute top-2 right-2 bg-green-500 rounded-full p-1">
           <CheckCircle className="h-4 w-4 text-white" />
         </div>
@@ -222,7 +224,7 @@ const VerificationCard = ({
         <div className="absolute inset-0 bg-black/50 flex items-center justify-center transition-opacity">
           <div className="flex items-center gap-1.5 text-white bg-white/20 px-3 py-1.5 rounded-full backdrop-blur-sm">
             <Eye className="h-4 w-4" />
-            <span className="text-sm font-medium">{isVerified ? 'View' : 'Start'}</span>
+            <span className="text-sm font-medium">{isViewable ? 'View' : 'Start'}</span>
           </div>
         </div>
       )}
