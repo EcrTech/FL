@@ -284,27 +284,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
         
         if (event === 'SIGNED_IN' && currentSession?.user) {
-          console.log('[AuthProvider] SIGNED_IN event');
+          console.log('[AuthProvider] SIGNED_IN event - fetching user data directly');
           
-          // CRITICAL: Use setTimeout to break out of synchronous onAuthStateChange callback
-          // This prevents Supabase client deadlock - see https://supabase.com/docs/reference/javascript/auth-onauthstatechange
-          // "You can easily create a dead-lock by using await on a call to another method of the Supabase library."
-          setTimeout(async () => {
-            const shouldShowLoading = !profileRef.current;
-            
-            if (!fetchInProgressRef.current) {
-              console.log('[AuthProvider] Starting user data fetch...');
-              if (shouldShowLoading) {
-                setIsLoading(true);
-              }
-              await fetchUserData(currentSession.user);
-              if (shouldShowLoading) {
-                setIsLoading(false);
-              }
-            } else {
-              console.log('[AuthProvider] Fetch already in progress, waiting for initAuth to complete');
-            }
-          }, 0);
+          // Call fetchUserData directly - no setTimeout needed.
+          // The Supabase "deadlock" warning only applies to calling supabase.auth.* methods
+          // inside the callback. Fetching from database tables (profiles, etc.) is safe.
+          if (!fetchInProgressRef.current) {
+            console.log('[AuthProvider] Starting user data fetch...');
+            await fetchUserData(currentSession.user);
+          } else {
+            console.log('[AuthProvider] Fetch already in progress, skipping');
+          }
         } else if (event === 'SIGNED_OUT') {
           console.log('[AuthProvider] SIGNED_OUT event, clearing state');
           setProfile(null);
