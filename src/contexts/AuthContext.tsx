@@ -84,6 +84,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [pendingSignInUser, setPendingSignInUser] = useState<User | null>(null);
 
   // Refs to properly guard async operations across renders
   const isInitializingRef = useRef(true);
@@ -284,17 +285,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
         
         if (event === 'SIGNED_IN' && currentSession?.user) {
-          console.log('[AuthProvider] SIGNED_IN event - fetching user data directly');
-          
-          // Call fetchUserData directly - no setTimeout needed.
-          // The Supabase "deadlock" warning only applies to calling supabase.auth.* methods
-          // inside the callback. Fetching from database tables (profiles, etc.) is safe.
-          if (!fetchInProgressRef.current) {
-            console.log('[AuthProvider] Starting user data fetch...');
-            await fetchUserData(currentSession.user);
-          } else {
-            console.log('[AuthProvider] Fetch already in progress, skipping');
-          }
+          console.log('[AuthProvider] SIGNED_IN event - deferring fetch via state to avoid client deadlock');
+          // Set state to trigger useEffect — no Supabase calls inside onAuthStateChange
+          setPendingSignInUser(currentSession.user);
         } else if (event === 'SIGNED_OUT') {
           console.log('[AuthProvider] SIGNED_OUT event, clearing state');
           setProfile(null);
@@ -312,6 +305,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
       subscription.unsubscribe();
     };
   }, [fetchUserData]);
+
+  // Process pending sign-in outside onAuthStateChange to avoid Supabase client deadlock
+  useEffect(() => {
+    if (!pendingSignInUser) return;
+    
+    const processPendingSignIn = async () => {
+      console.log('[AuthProvider] Processing pending sign-in for user:', pendingSignInUser.id);
+      if (!fetchInProgressRef.current) {
+        await fetchUserData(pendingSignInUser);
+      } else {
+        console.log('[AuthProvider] Fetch already in progress, skipping pending sign-in');
+      }
+      setPendingSignInUser(null);
+    };
+    
+    processPendingSignIn();
+  }, [pendingSignInUser, fetchUserData]);
 
   const signOut = useCallback(async () => {
     console.log('[AuthProvider] signOut called');
