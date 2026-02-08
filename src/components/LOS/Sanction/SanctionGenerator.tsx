@@ -52,6 +52,10 @@ export default function SanctionGenerator({ applicationId, orgId }: SanctionGene
       const tenureDays = application.tenure_days || 0;
       const rate = application.interest_rate || 0;
 
+      const processingFee = Math.round(approvedAmount * 0.10);
+      const gstOnPf = Math.round(processingFee * 0.18);
+      const netDisbursement = approvedAmount - processingFee - gstOnPf;
+
       const { error } = await supabase.from("loan_sanctions").insert([{
         loan_application_id: applicationId,
         sanction_number: sanctionNumber,
@@ -59,8 +63,8 @@ export default function SanctionGenerator({ applicationId, orgId }: SanctionGene
         sanctioned_amount: approvedAmount,
         sanctioned_rate: rate,
         sanctioned_tenure_days: tenureDays,
-        processing_fee: 0,
-        net_disbursement_amount: approvedAmount,
+        processing_fee: processingFee,
+        net_disbursement_amount: netDisbursement,
         conditions: {},
         validity_date: validUntil.toISOString(),
         status: "active",

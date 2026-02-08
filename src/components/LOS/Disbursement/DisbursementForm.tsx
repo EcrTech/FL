@@ -126,9 +126,10 @@ export default function DisbursementForm({ applicationId }: DisbursementFormProp
     );
   }
 
-  const pf = sanction?.processing_fee || 0;
+  const approvedAmount = application?.approved_amount || 0;
+  const pf = sanction?.processing_fee || Math.round(approvedAmount * 0.10);
   const gstOnPf = Math.round(pf * 0.18);
-  const netDisbursementAmount = (application?.approved_amount || 0) - pf - gstOnPf;
+  const netDisbursementAmount = approvedAmount - pf - gstOnPf;
 
   // If disbursement completed, show summary
   if (existingDisbursement && existingDisbursement.status === "completed") {
