@@ -279,6 +279,10 @@ export function ApplicationSummary({ applicationId, orgId }: ApplicationSummaryP
                   <p className="text-sm">{formatCurrency(sanction.processing_fee)}</p>
                 </div>
                 <div>
+                  <label className="text-xs text-muted-foreground">GST on Processing Fee (18%)</label>
+                  <p className="text-sm">{formatCurrency(Math.round(sanction.processing_fee * 0.18))}</p>
+                </div>
+                <div>
                   <label className="text-xs text-muted-foreground">Valid Until</label>
                   <p className="text-sm">
                     {sanction.validity_date ? format(new Date(sanction.validity_date), "MMM dd, yyyy") : "N/A"}

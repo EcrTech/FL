@@ -126,7 +126,9 @@ export default function DisbursementForm({ applicationId }: DisbursementFormProp
     );
   }
 
-  const netDisbursementAmount = (application?.approved_amount || 0) - (sanction?.processing_fee || 0);
+  const pf = sanction?.processing_fee || 0;
+  const gstOnPf = Math.round(pf * 0.18);
+  const netDisbursementAmount = (application?.approved_amount || 0) - pf - gstOnPf;
 
   // If disbursement completed, show summary
   if (existingDisbursement && existingDisbursement.status === "completed") {
@@ -217,7 +219,8 @@ export default function DisbursementForm({ applicationId }: DisbursementFormProp
             </div>
             <div className="text-xs text-muted-foreground mt-1">
               Approved: {formatCurrency(application?.approved_amount || 0)} - 
-              Processing Fee: {formatCurrency(sanction?.processing_fee || 0)}
+              Processing Fee: {formatCurrency(pf)} - 
+              GST: {formatCurrency(gstOnPf)}
             </div>
           </div>
 
