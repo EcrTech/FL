@@ -1,16 +1,16 @@
-import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useEMISchedule } from "@/hooks/useEMISchedule";
 import { Calendar, Calculator } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { calculateLoanDetails, formatCurrency } from "@/utils/loanCalculations";
 
 interface EMIScheduleGeneratorProps {
   applicationId: string;
   // Single source of truth: loan details from loan_applications
   application: {
     approved_amount: number;
-    interest_rate: number;
+    interest_rate: number; // Daily interest rate (e.g., 1 for 1%)
     tenure_days: number;
   };
   sanction: {
@@ -28,31 +28,13 @@ export default function EMIScheduleGenerator({
   disbursement,
 }: EMIScheduleGeneratorProps) {
   const { schedule, generateSchedule, isGenerating } = useEMISchedule(applicationId);
-  const [emiAmount, setEmiAmount] = useState<number>(0);
 
-  // Calculate tenure in months from days
-  const tenureMonths = Math.round(application.tenure_days / 30);
-
-  useEffect(() => {
-    // Calculate EMI preview using values from loan_applications (single source of truth)
-    if (application.interest_rate > 0 && tenureMonths > 0) {
-      const monthlyRate = application.interest_rate / 12 / 100;
-      const emi =
-        (application.approved_amount *
-          monthlyRate *
-          Math.pow(1 + monthlyRate, tenureMonths)) /
-        (Math.pow(1 + monthlyRate, tenureMonths) - 1);
-      setEmiAmount(Math.round(emi * 100) / 100);
-    }
-  }, [application, tenureMonths]);
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
+  // Use shared calculation utility (daily flat rate model)
+  const loanDetails = calculateLoanDetails(
+    application.approved_amount,
+    application.interest_rate,
+    application.tenure_days
+  );
 
   if (schedule && schedule.length > 0) {
     return (
@@ -70,7 +52,7 @@ export default function EMIScheduleGenerator({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Calculator className="h-5 w-5" />
-          Generate EMI Schedule
+          Generate Daily Repayment Schedule
         </CardTitle>
         <CardDescription>
           Create a repayment schedule based on the approved loan terms
@@ -87,30 +69,26 @@ export default function EMIScheduleGenerator({
 
           <div className="space-y-1">
             <div className="text-sm text-muted-foreground">Interest Rate</div>
-            <div className="text-lg font-semibold">{application.interest_rate}% p.a.</div>
+            <div className="text-lg font-semibold">{application.interest_rate}% per day</div>
           </div>
 
           <div className="space-y-1">
             <div className="text-sm text-muted-foreground">Tenure</div>
-            <div className="text-lg font-semibold">{tenureMonths} months</div>
+            <div className="text-lg font-semibold">{application.tenure_days} days</div>
           </div>
 
           <div className="space-y-1">
-            <div className="text-sm text-muted-foreground">Monthly EMI</div>
+            <div className="text-sm text-muted-foreground">Daily EMI</div>
             <div className="text-lg font-semibold text-primary">
-              {formatCurrency(emiAmount)}
+              {formatCurrency(loanDetails.dailyEMI)}
             </div>
           </div>
 
           <div className="space-y-1 md:col-span-2">
-            <div className="text-sm text-muted-foreground">First EMI Date</div>
+            <div className="text-sm text-muted-foreground">Disbursement Date</div>
             <div className="text-lg font-semibold flex items-center gap-2">
               <Calendar className="h-4 w-4" />
-              {new Date(
-                new Date(disbursement.disbursement_date).setMonth(
-                  new Date(disbursement.disbursement_date).getMonth() + 1
-                )
-              ).toLocaleDateString("en-IN", {
+              {new Date(disbursement.disbursement_date).toLocaleDateString("en-IN", {
                 day: "numeric",
                 month: "long",
                 year: "numeric",
@@ -122,13 +100,10 @@ export default function EMIScheduleGenerator({
         <div className="p-4 bg-muted rounded-lg space-y-2">
           <div className="text-sm font-medium">Total Repayment</div>
           <div className="text-2xl font-bold">
-            {formatCurrency(emiAmount * tenureMonths)}
+            {formatCurrency(loanDetails.totalRepayment)}
           </div>
           <div className="text-xs text-muted-foreground">
-            Interest:{" "}
-            {formatCurrency(
-              emiAmount * tenureMonths - application.approved_amount
-            )}
+            Total Interest: {formatCurrency(loanDetails.totalInterest)}
           </div>
         </div>
 
@@ -139,14 +114,14 @@ export default function EMIScheduleGenerator({
               sanctionId: sanction.id,
               loanAmount: application.approved_amount,
               interestRate: application.interest_rate,
-              tenureMonths: tenureMonths,
+              tenureDays: application.tenure_days,
               disbursementDate: disbursement.disbursement_date,
             })
           }
           disabled={isGenerating}
           className="w-full"
         >
-          {isGenerating ? "Generating..." : "Generate EMI Schedule"}
+          {isGenerating ? "Generating..." : "Generate Repayment Schedule"}
         </Button>
       </CardContent>
     </Card>

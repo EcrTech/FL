@@ -133,7 +133,7 @@ export default function Disbursals() {
             const ocrData = bankStatement?.ocr_data as Record<string, unknown> | null;
             const sanction = Array.isArray(app.loan_sanctions) ? app.loan_sanctions[0] : app.loan_sanctions;
             const approvedAmount = Number(app.approved_amount) || 0;
-            const processingFee = Number(sanction?.processing_fee) || 0;
+            const processingFee = Number(sanction?.processing_fee) || Math.round(approvedAmount * 0.10);
             const gstOnPf = Math.round(processingFee * 0.18);
             const netAmount = approvedAmount - processingFee - gstOnPf;
 

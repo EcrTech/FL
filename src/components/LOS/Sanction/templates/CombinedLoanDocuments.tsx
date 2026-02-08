@@ -116,9 +116,9 @@ export default function CombinedLoanDocuments(props: CombinedLoanDocumentsProps)
         gstOnProcessingFee={props.gstOnProcessingFee}
         netDisbursal={props.netDisbursal}
         dueDate={props.dueDate}
-        foreclosureRate={props.foreclosureRate || 4}
-        bounceCharges={props.bounceCharges || 500}
-        penalInterest={props.penalInterest || 24}
+        foreclosureRate={props.foreclosureRate}
+        bounceCharges={props.bounceCharges}
+        penalInterest={props.penalInterest}
         bankName={props.bankName}
         accountNumber={props.accountNumber}
         ifscCode={props.ifscCode}
@@ -171,9 +171,9 @@ export default function CombinedLoanDocuments(props: CombinedLoanDocumentsProps)
         netDisbursal={props.netDisbursal}
         dueDate={props.dueDate}
         disbursementDate={props.disbursementDate}
-        foreclosureRate={props.foreclosureRate || 4}
-        bounceCharges={props.bounceCharges || 500}
-        penalInterest={props.penalInterest || 24}
+        foreclosureRate={props.foreclosureRate}
+        bounceCharges={props.bounceCharges}
+        penalInterest={props.penalInterest}
         grievanceEmail={props.grievanceEmail}
         grievancePhone={props.grievancePhone}
       />
