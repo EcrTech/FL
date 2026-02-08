@@ -241,7 +241,7 @@ export default function AssessmentDashboard({ applicationId, orgId }: Assessment
                 <div>
                   <Label className="text-sm text-muted-foreground">Interest Rate</Label>
                   <div className="text-xl font-bold">
-                    {eligibility.recommended_interest_rate || "N/A"}% p.a.
+                    {eligibility.recommended_interest_rate || "N/A"}% per day
                   </div>
                 </div>
               </div>

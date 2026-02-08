@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrgContext } from "./useOrgContext";
 import { useToast } from "./use-toast";
+import { calculateLoanDetails } from "@/utils/loanCalculations";
 
 export interface EMIScheduleItem {
   id: string;
@@ -49,33 +50,37 @@ export function useEMISchedule(applicationId?: string) {
     mutationFn: async ({
       applicationId,
       sanctionId,
-      loanAmount,      // From loan_applications.approved_amount (single source of truth)
-      interestRate,    // From loan_applications.interest_rate (single source of truth)
-      tenureMonths,    // Calculated from loan_applications.tenure_days (single source of truth)
+      loanAmount,
+      interestRate,    // Daily interest rate (e.g., 1 for 1%)
+      tenureDays,
       disbursementDate,
     }: {
       applicationId: string;
       sanctionId: string;
       loanAmount: number;
       interestRate: number;
-      tenureMonths: number;
+      tenureDays: number;
       disbursementDate: string;
     }) => {
-      // Calculate EMI using reducing balance method
-      const monthlyRate = interestRate / 12 / 100;
-      const emi = (loanAmount * monthlyRate * Math.pow(1 + monthlyRate, tenureMonths)) / 
-                  (Math.pow(1 + monthlyRate, tenureMonths) - 1);
+      // Use shared calculation utility for daily flat rate model
+      const { totalInterest, totalRepayment, dailyEMI } = calculateLoanDetails(
+        loanAmount,
+        interestRate,
+        tenureDays
+      );
 
+      const dailyInterest = loanAmount * (interestRate / 100);
+      const dailyPrincipal = dailyEMI - dailyInterest;
       let outstandingPrincipal = loanAmount;
       const scheduleItems = [];
 
-      for (let i = 1; i <= tenureMonths; i++) {
-        const interestAmount = outstandingPrincipal * monthlyRate;
-        const principalAmount = emi - interestAmount;
+      for (let i = 1; i <= tenureDays; i++) {
+        const interestAmount = Math.round(dailyInterest * 100) / 100;
+        const principalAmount = Math.round((dailyEMI - interestAmount) * 100) / 100;
         outstandingPrincipal -= principalAmount;
 
         const dueDate = new Date(disbursementDate);
-        dueDate.setMonth(dueDate.getMonth() + i);
+        dueDate.setDate(dueDate.getDate() + i);
 
         scheduleItems.push({
           loan_application_id: applicationId,
@@ -83,9 +88,9 @@ export function useEMISchedule(applicationId?: string) {
           org_id: orgId!,
           emi_number: i,
           due_date: dueDate.toISOString().split("T")[0],
-          principal_amount: Math.round(principalAmount * 100) / 100,
-          interest_amount: Math.round(interestAmount * 100) / 100,
-          total_emi: Math.round(emi * 100) / 100,
+          principal_amount: principalAmount,
+          interest_amount: interestAmount,
+          total_emi: dailyEMI,
           outstanding_principal: Math.max(0, Math.round(outstandingPrincipal * 100) / 100),
           status: "pending",
           amount_paid: 0,
@@ -101,7 +106,7 @@ export function useEMISchedule(applicationId?: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["emi-schedule"] });
-      toast({ title: "EMI schedule generated successfully" });
+      toast({ title: "Repayment schedule generated successfully" });
     },
     onError: (error: Error) => {
       toast({

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Download, FileText } from "lucide-react";
 import { format } from "date-fns";
+import { calculateLoanDetails, formatCurrency } from "@/utils/loanCalculations";
 
 interface SanctionViewerProps {
   applicationId: string;
@@ -42,23 +43,13 @@ export default function SanctionViewer({ applicationId }: SanctionViewerProps) {
   }
 
   const primaryApplicant = application?.loan_applicants?.[0];
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
 
-  // Use single source of truth from loan_applications
-  const calculateEMI = () => {
-    const P = application?.approved_amount || 0;
-    const r = (application?.interest_rate || 0) / 12 / 100;
-    const n = Math.round((application?.tenure_days || 0) / 30); // Convert days to months
-    if (r === 0 || n === 0) return 0;
-    const emi = (P * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
-    return emi;
-  };
+  // Use shared calculation utility (daily flat rate model)
+  const loanDetails = calculateLoanDetails(
+    application?.approved_amount || 0,
+    application?.interest_rate || 0,
+    application?.tenure_days || 0
+  );
 
   return (
     <div className="space-y-6">
@@ -122,7 +113,7 @@ export default function SanctionViewer({ applicationId }: SanctionViewerProps) {
                 </div>
                 <div className="p-4 bg-muted rounded-lg">
                   <div className="text-sm text-muted-foreground">Interest Rate</div>
-                  <div className="text-2xl font-bold">{application?.interest_rate || 0}% p.a.</div>
+                  <div className="text-2xl font-bold">{application?.interest_rate || 0}% per day</div>
                 </div>
                 <div className="p-4 bg-muted rounded-lg">
                   <div className="text-sm text-muted-foreground">Tenure</div>
@@ -133,10 +124,14 @@ export default function SanctionViewer({ applicationId }: SanctionViewerProps) {
 
             <div>
               <h4 className="font-medium mb-3">Payment Details</h4>
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-3">
                 <div className="p-4 border rounded-lg">
-                  <div className="text-sm text-muted-foreground">Monthly EMI</div>
-                  <div className="text-xl font-bold">{formatCurrency(calculateEMI())}</div>
+                  <div className="text-sm text-muted-foreground">Daily EMI</div>
+                  <div className="text-xl font-bold">{formatCurrency(loanDetails.dailyEMI)}</div>
+                </div>
+                <div className="p-4 border rounded-lg">
+                  <div className="text-sm text-muted-foreground">Total Repayment</div>
+                  <div className="text-xl font-bold">{formatCurrency(loanDetails.totalRepayment)}</div>
                 </div>
                 <div className="p-4 border rounded-lg">
                   <div className="text-sm text-muted-foreground">Processing Fee</div>
