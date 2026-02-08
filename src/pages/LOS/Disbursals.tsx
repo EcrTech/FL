@@ -134,7 +134,8 @@ export default function Disbursals() {
             const sanction = Array.isArray(app.loan_sanctions) ? app.loan_sanctions[0] : app.loan_sanctions;
             const approvedAmount = Number(app.approved_amount) || 0;
             const processingFee = Number(sanction?.processing_fee) || 0;
-            const netAmount = approvedAmount - processingFee;
+            const gstOnPf = Math.round(processingFee * 0.18);
+            const netAmount = approvedAmount - processingFee - gstOnPf;
 
             unified.push({
               id: app.id,

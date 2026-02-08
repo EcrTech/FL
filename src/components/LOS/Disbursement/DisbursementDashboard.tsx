@@ -321,9 +321,10 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
   
   // Processing fee is 10% of loan amount (standard)
   const processingFeeRate = 10;
+  const gstRate = orgSettings?.gst_on_processing_fee || 18;
   const processingFee = sanction?.processing_fee || Math.round(loanAmount * (processingFeeRate / 100));
-  const gstOnProcessingFee = processingFee * ((orgSettings?.gst_on_processing_fee || 18) / 100);
-  const netDisbursal = loanAmount - processingFee;
+  const gstOnProcessingFee = Math.round(processingFee * (gstRate / 100));
+  const netDisbursal = loanAmount - processingFee - gstOnProcessingFee;
   const dueDate = addDays(new Date(), tenureDays);
 
   const borrowerName = applicant ? `${applicant.first_name} ${applicant.last_name || ""}`.trim() : "";
@@ -398,10 +399,12 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
             <div className="p-4 rounded-lg bg-muted/50 space-y-1">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Calculator className="h-4 w-4" />
-                <span className="text-sm">Processing Fee</span>
+                <span className="text-sm">Processing Fee + GST</span>
               </div>
-              <p className="text-2xl font-bold">{formatCurrency(processingFee)}</p>
-              <p className="text-xs text-muted-foreground">@ {processingFeeRate}% of loan</p>
+              <p className="text-2xl font-bold">{formatCurrency(processingFee + gstOnProcessingFee)}</p>
+              <p className="text-xs text-muted-foreground">
+                {formatCurrency(processingFee)} + {gstRate}% GST ({formatCurrency(gstOnProcessingFee)})
+              </p>
             </div>
             
             <div className="p-4 rounded-lg bg-primary/10 space-y-1 border border-primary/20">
@@ -410,7 +413,7 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
                 <span className="text-sm font-medium">Net Disbursal</span>
               </div>
               <p className="text-2xl font-bold text-primary">{formatCurrency(netDisbursal)}</p>
-              <p className="text-xs text-muted-foreground">After deductions</p>
+              <p className="text-xs text-muted-foreground">After fee + GST deduction</p>
             </div>
             
             <div className="p-4 rounded-lg bg-muted/50 space-y-1">
