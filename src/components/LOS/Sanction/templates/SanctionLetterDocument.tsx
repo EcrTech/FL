@@ -13,11 +13,14 @@ interface SanctionLetterDocumentProps {
   borrowerAddress: string;
   // Loan Details
   loanAmount: number;
-  tenure: number;
+  tenureDays: number;
   interestRate: number;
-  emi: number;
+  totalInterest: number;
+  totalRepayment: number;
   processingFee: number;
   gstOnProcessingFee: number;
+  netDisbursal: number;
+  dueDate: Date;
   // Validity
   validUntil: Date;
   // Terms
@@ -28,11 +31,9 @@ interface SanctionLetterDocumentProps {
 }
 
 const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
+  return `Rs.${new Intl.NumberFormat("en-IN", {
     maximumFractionDigits: 0,
-  }).format(amount);
+  }).format(amount)}`;
 };
 
 const numberToWords = (num: number): string => {
@@ -106,21 +107,35 @@ export default function SanctionLetterDocument(props: SanctionLetterDocumentProp
               </tr>
               <tr className="border-b border-border">
                 <td className="p-3 bg-muted font-medium">Rate of Interest</td>
-                <td className="p-3">{props.interestRate}% p.a. (Reducing Balance)</td>
+                <td className="p-3">{props.interestRate}% per day (Flat)</td>
               </tr>
               <tr className="border-b border-border">
                 <td className="p-3 bg-muted font-medium">Loan Tenure</td>
-                <td className="p-3">{props.tenure} Months</td>
+                <td className="p-3">{props.tenureDays} Days</td>
               </tr>
               <tr className="border-b border-border">
-                <td className="p-3 bg-muted font-medium">EMI Amount</td>
-                <td className="p-3 font-bold">{formatCurrency(props.emi)}</td>
+                <td className="p-3 bg-muted font-medium">Total Interest</td>
+                <td className="p-3">{formatCurrency(props.totalInterest)}</td>
+              </tr>
+              <tr className="border-b border-border">
+                <td className="p-3 bg-muted font-medium">Total Repayment Amount</td>
+                <td className="p-3 font-bold">{formatCurrency(props.totalRepayment)}</td>
+              </tr>
+              <tr className="border-b border-border">
+                <td className="p-3 bg-muted font-medium">Due Date</td>
+                <td className="p-3 font-medium">{format(props.dueDate, "dd MMMM yyyy")}</td>
               </tr>
               <tr className="border-b border-border">
                 <td className="p-3 bg-muted font-medium">Processing Fee</td>
-                <td className="p-3">
-                  {formatCurrency(props.processingFee)} + GST ({formatCurrency(props.gstOnProcessingFee)})
-                </td>
+                <td className="p-3">{formatCurrency(props.processingFee)}</td>
+              </tr>
+              <tr className="border-b border-border">
+                <td className="p-3 bg-muted font-medium">GST on Processing Fee</td>
+                <td className="p-3">{formatCurrency(props.gstOnProcessingFee)}</td>
+              </tr>
+              <tr className="border-b border-border">
+                <td className="p-3 bg-muted font-medium">Net Disbursal Amount</td>
+                <td className="p-3 font-bold text-primary">{formatCurrency(props.netDisbursal)}</td>
               </tr>
               <tr>
                 <td className="p-3 bg-muted font-medium">Sanction Validity</td>
@@ -147,7 +162,7 @@ export default function SanctionLetterDocument(props: SanctionLetterDocumentProp
         {/* Important Notice */}
         <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4">
           <p className="text-sm text-destructive font-medium">
-            ⚠️ This sanction is valid until {format(props.validUntil, "dd MMMM yyyy")}. 
+            This sanction is valid until {format(props.validUntil, "dd MMMM yyyy")}. 
             Post this date, you will need to re-apply for the loan. Please complete the 
             documentation and disbursement formalities before the expiry date.
           </p>
@@ -161,7 +176,7 @@ export default function SanctionLetterDocument(props: SanctionLetterDocumentProp
           <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
             <li>Accept this sanction letter by signing below</li>
             <li>Complete KYC documentation if not already done</li>
-            <li>Set up EMI auto-debit (NACH mandate)</li>
+            <li>Set up NACH mandate for repayment on the due date</li>
             <li>Provide bank account details for disbursement</li>
             <li>Sign the Loan Agreement and related documents</li>
           </ol>
