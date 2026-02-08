@@ -1,67 +1,70 @@
 
 
-## Fix: Replace Hardcoded Financial Values with Dynamic Variables
+## Cleanup: Fix Remaining Stale Logic Across the System
 
-### Problem Found
+The investigation found **5 remaining issues** from recent changes that were not fully propagated.
 
-Two financial values in the Combined Loan Pack documents are **hardcoded as static numbers** instead of being sourced from organization settings:
+---
 
-| Value | Current | Should Be |
+### Issues Found
+
+| # | File | Problem |
 |---|---|---|
-| Bounce/Return Charges | Hardcoded `500` | From `organization_loan_settings` |
-| Penal Interest Rate | Hardcoded `24` (% p.a.) | From `organization_loan_settings` |
+| 1 | `SanctionGenerator.tsx` | Stores `processing_fee: 0` and `net_disbursement_amount: approvedAmount` at sanction creation -- no 10% fee or GST deduction |
+| 2 | `AssessmentDashboard.tsx` | Displays tenure as "X months" (`days / 30`) instead of "X days" |
+| 3 | `FeatureHighlights.tsx` | Marketing text shows "12.65% p.a." -- stale annual rate model |
+| 4 | `ApplicationSummary.tsx` | GST on processing fee has no fallback for legacy records where `processing_fee = 0` |
+| 5 | `DisbursementForm.tsx` | Uses `processing_fee || 0` -- no fallback to 10% for legacy records |
 
-These appear in 3 places:
-- `DisbursementDashboard.tsx` lines 539, 540
-- `CombinedLoanPackCard.tsx` lines 435, 436
-- `CombinedLoanDocuments.tsx` lines 119-122 (fallback defaults)
+---
 
 ### Plan
 
-#### Step 1: Add columns to `organization_loan_settings` table
+#### 1. Fix `SanctionGenerator.tsx` -- Store correct processing fee at creation
 
-Add two new columns via database migration:
-- `bounce_charges` (integer, default 500)
-- `penal_interest_rate` (numeric, default 24)
+This is the **root cause** of all legacy data issues. When a sanction is created, it should store the correct processing fee and net disbursal upfront.
 
-#### Step 2: Update `DisbursementDashboard.tsx`
+Change:
+- `processing_fee: Math.round(approvedAmount * 0.10)`
+- `net_disbursement_amount: approvedAmount - processingFee - Math.round(processingFee * 0.18)`
 
-Replace the hardcoded values:
+This prevents future records from having stale `0` values.
+
+#### 2. Fix `AssessmentDashboard.tsx` -- Show days not months
+
+Replace:
 ```
-// Before
-bounceCharges={500}
-penalInterest={24}
-
-// After
-bounceCharges={orgSettings?.bounce_charges || 500}
-penalInterest={orgSettings?.penal_interest_rate || 24}
+{Math.round(eligibility.recommended_tenure_days / 30)} months
+```
+With:
+```
+{eligibility.recommended_tenure_days} days
 ```
 
-Apply to both the standalone `LoanAgreementDocument` (line 539-540) and the `CombinedLoanPackCard` props.
+#### 3. Fix `FeatureHighlights.tsx` -- Update marketing text
 
-#### Step 3: Update `CombinedLoanPackCard.tsx`
+Change "Starting from 12.65% p.a." to "1% per day" (or whatever the standard daily rate is) to match the actual product model.
 
-- Add `bounceCharges` and `penalInterest` to the component's props interface (sourced from `orgSettings` in the parent).
-- Pass them through to `CombinedLoanDocuments` instead of hardcoded values.
+#### 4. Fix `ApplicationSummary.tsx` -- Add processing fee fallback for legacy records
 
-Alternatively (simpler): pass `orgSettings` to `CombinedLoanPackCard` already (it's already a prop), and have `CombinedLoanPackCard` read `orgSettings.bounce_charges` and `orgSettings.penal_interest_rate` when passing to `CombinedLoanDocuments`.
+The sanction details section shows GST as `sanction.processing_fee * 0.18`. For legacy records where `processing_fee = 0`, this shows Rs.0. Add the same 10% fallback used elsewhere:
+```
+const pf = sanction.processing_fee || Math.round(sanction.sanctioned_amount * 0.10);
+```
 
-#### Step 4: Update `CombinedLoanDocuments.tsx` and its sub-documents
+#### 5. Fix `DisbursementForm.tsx` -- Add processing fee fallback
 
-- Add `bounceCharges` and `penalInterest` to the `CombinedLoanDocumentsProps` interface.
-- Pass them to `LoanAgreementDocument` and `KeyFactStatementDocument` instead of the current hardcoded fallback of `500` and `24`.
+Same pattern: replace `sanction?.processing_fee || 0` with `sanction?.processing_fee || Math.round(approvedAmount * 0.10)`.
+
+---
 
 ### Files Changed
 
 | File | Change |
 |---|---|
-| Database migration | Add `bounce_charges` and `penal_interest_rate` columns to `organization_loan_settings` |
-| `src/components/LOS/Disbursement/DisbursementDashboard.tsx` | Use `orgSettings` values instead of `500` and `24` |
-| `src/components/LOS/Disbursement/CombinedLoanPackCard.tsx` | Add props for bounce charges and penal interest; pass to template |
-| `src/components/LOS/Sanction/templates/CombinedLoanDocuments.tsx` | Add props, pass through to sub-documents |
+| `src/components/LOS/Sanction/SanctionGenerator.tsx` | Calculate and store 10% processing fee + GST-adjusted net disbursal |
+| `src/components/LOS/Assessment/AssessmentDashboard.tsx` | Display tenure as days instead of months |
+| `src/components/ReferralApplication/FeatureHighlights.tsx` | Update interest rate text to daily model |
+| `src/components/LOS/ApplicationSummary.tsx` | Add 10% fallback for legacy processing fee |
+| `src/components/LOS/Disbursement/DisbursementForm.tsx` | Add 10% fallback for legacy processing fee |
 
-### Note on Anupam Roy's Data
-
-Anupam Roy's processing fee is stored as `0` in `loan_sanctions`. This means the sanction was created before the 10% processing fee logic was implemented. The current code correctly falls back to calculating `Math.round(loanAmount * 0.10) = 900` when `sanction.processing_fee` is falsy. So his documents should show the correct ₹900 processing fee. If his sanction record needs correction, that's a separate data fix.
-
-Include changes across timeline for all past and future calculations and document production. 
