@@ -536,8 +536,8 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
                 netDisbursal={netDisbursal}
                 dueDate={dueDate}
                 foreclosureRate={orgSettings?.foreclosure_rate || 4}
-                bounceCharges={500}
-                penalInterest={24}
+                bounceCharges={(orgSettings as any)?.bounce_charges || 500}
+                penalInterest={(orgSettings as any)?.penal_interest_rate || 24}
                 bankName={bankDetails?.bank_name}
                 accountNumber={bankDetails?.account_number}
                 ifscCode={bankDetails?.ifsc_code}

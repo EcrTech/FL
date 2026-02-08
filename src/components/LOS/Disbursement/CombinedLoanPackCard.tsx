@@ -432,8 +432,8 @@ export default function CombinedLoanPackCard({
             accountNumber={bankDetails?.account_number}
             ifscCode={bankDetails?.ifsc_code}
             foreclosureRate={orgSettings?.foreclosure_rate || 4}
-            bounceCharges={500}
-            penalInterest={24}
+            bounceCharges={(orgSettings as any)?.bounce_charges || 500}
+            penalInterest={(orgSettings as any)?.penal_interest_rate || 24}
             grievanceEmail={orgSettings?.grievance_email}
             grievancePhone={orgSettings?.grievance_phone}
             termsAndConditions={conditionsArray || defaultTerms}
