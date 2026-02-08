@@ -53,13 +53,14 @@ interface CombinedLoanPackCardProps {
     ifsc_code?: string;
   } | null;
   loanAmount: number;
-  tenureMonths: number;
   tenureDays: number;
   interestRate: number;
-  monthlyEMI: number;
+  totalInterest: number;
+  totalRepayment: number;
   processingFee: number;
   gstOnProcessingFee: number;
-  firstEmiDate: Date;
+  netDisbursal: number;
+  dueDate: Date;
   borrowerName: string;
   borrowerAddress: string;
   borrowerPhone: string;
@@ -81,13 +82,14 @@ export default function CombinedLoanPackCard({
   orgSettings,
   bankDetails,
   loanAmount,
-  tenureMonths,
   tenureDays,
   interestRate,
-  monthlyEMI,
+  totalInterest,
+  totalRepayment,
   processingFee,
   gstOnProcessingFee,
-  firstEmiDate,
+  netDisbursal,
+  dueDate,
   borrowerName,
   borrowerAddress,
   borrowerPhone,
@@ -105,9 +107,9 @@ export default function CombinedLoanPackCard({
   const sanctionDoc = generatedDocs.find(d => d.document_type === "sanction_letter");
   const agreementDoc = generatedDocs.find(d => d.document_type === "loan_agreement");
   const scheduleDoc = generatedDocs.find(d => d.document_type === "daily_schedule");
+  const kfsDoc = generatedDocs.find(d => d.document_type === "key_fact_statement");
   const combinedDoc = generatedDocs.find(d => d.document_type === "combined_loan_pack");
 
-  const allIndividualDocsGenerated = sanctionDoc && agreementDoc && scheduleDoc;
   const isCombinedGenerated = !!combinedDoc;
   const isCombinedSigned = combinedDoc?.customer_signed;
   const needsRegeneration = combinedDoc && !combinedDoc.file_path;
@@ -118,6 +120,7 @@ export default function CombinedLoanPackCard({
     if (!sanctionDoc) missingTypes.push("sanction_letter");
     if (!agreementDoc) missingTypes.push("loan_agreement");
     if (!scheduleDoc) missingTypes.push("daily_schedule");
+    if (!kfsDoc) missingTypes.push("key_fact_statement");
 
     if (missingTypes.length > 0) {
       const inserts = missingTypes.map(docType => ({
@@ -125,7 +128,7 @@ export default function CombinedLoanPackCard({
         sanction_id: sanction.id,
         org_id: application.org_id,
         document_type: docType,
-        document_number: `${docType.toUpperCase().replace("_", "")}-${Date.now().toString(36).toUpperCase()}`,
+        document_number: `${docType.toUpperCase().replace(/_/g, "")}-${Date.now().toString(36).toUpperCase()}`,
         status: "generated",
       }));
 
@@ -138,7 +141,6 @@ export default function CombinedLoanPackCard({
         throw new Error("Failed to create individual document records");
       }
 
-      // Refetch so the combined template picks up doc numbers
       await onRefetch();
     }
   };
@@ -153,9 +155,7 @@ export default function CombinedLoanPackCard({
 
     setIsUploadingPdf(true);
     try {
-      // Auto-create individual doc records first
       await ensureIndividualDocs();
-      // Generate PDF blob using html2pdf
       const worker = html2pdf()
         .set({
           margin: 10,
@@ -167,11 +167,9 @@ export default function CombinedLoanPackCard({
       
       const pdfBlob = await worker.outputPdf('blob');
 
-      // Generate document number
       const docNumber = `COMBINEDLOANPACK-${Date.now().toString(36).toUpperCase()}`;
       const fileName = `${application.org_id}/${applicationId}/combined_loan_pack/${docNumber}.pdf`;
 
-      // Upload PDF to Supabase Storage (upsert to handle re-uploads)
       const { error: uploadError } = await supabase.storage
         .from("loan-documents")
         .upload(fileName, pdfBlob, { contentType: 'application/pdf', upsert: true });
@@ -181,10 +179,7 @@ export default function CombinedLoanPackCard({
         throw new Error(`Failed to upload PDF: ${uploadError.message}`);
       }
 
-      console.log("[CombinedLoanPackCard] PDF uploaded to storage:", fileName);
-
       if (combinedDoc) {
-        // Update existing record with new file_path
         const { error: updateError } = await supabase
           .from("loan_generated_documents")
           .update({
@@ -194,12 +189,8 @@ export default function CombinedLoanPackCard({
           })
           .eq("id", combinedDoc.id);
 
-        if (updateError) {
-          console.error("Document record update error:", updateError);
-          throw new Error(`Failed to update document record: ${updateError.message}`);
-        }
+        if (updateError) throw new Error(`Failed to update document record: ${updateError.message}`);
       } else {
-        // Insert new record with file_path
         const { error: insertError } = await supabase
           .from("loan_generated_documents")
           .insert({
@@ -212,10 +203,7 @@ export default function CombinedLoanPackCard({
             status: "generated",
           });
 
-        if (insertError) {
-          console.error("Document record insert error:", insertError);
-          throw new Error(`Failed to save document record: ${insertError.message}`);
-        }
+        if (insertError) throw new Error(`Failed to save document record: ${insertError.message}`);
       }
 
       toast.success("Combined Loan Pack generated and uploaded successfully");
@@ -319,7 +307,6 @@ export default function CombinedLoanPackCard({
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-2">
-            {/* Generate Combined Button */}
             <Button
               variant={isCombinedGenerated && !needsRegeneration ? "outline" : "default"}
               onClick={handleGenerateCombined}
@@ -334,7 +321,6 @@ export default function CombinedLoanPackCard({
               {isUploadingPdf ? "Uploading..." : needsRegeneration ? "Regenerate" : isCombinedGenerated ? "Regenerate" : "Generate Combined Pack"}
             </Button>
 
-            {/* Download Button */}
             <Button
               variant="outline"
               onClick={handleDownloadCombined}
@@ -345,7 +331,6 @@ export default function CombinedLoanPackCard({
               Download
             </Button>
 
-            {/* Print Button */}
             <Button
               variant="outline"
               onClick={handlePrintCombined}
@@ -356,7 +341,6 @@ export default function CombinedLoanPackCard({
               Print
             </Button>
 
-            {/* E-Sign Button */}
             {isCombinedGenerated && !isCombinedSigned && combinedDoc && (
               <ESignDocumentButton
                 orgId={application.org_id}
@@ -371,7 +355,6 @@ export default function CombinedLoanPackCard({
               />
             )}
 
-            {/* Upload Signed Button */}
             {isCombinedGenerated && (!isCombinedSigned || (isCombinedSigned && !combinedDoc?.signed_document_path)) && onUploadSigned && (
               <Button
                 variant="outline"
@@ -383,7 +366,6 @@ export default function CombinedLoanPackCard({
               </Button>
             )}
 
-            {/* View Signed Document Button */}
             {isCombinedSigned && combinedDoc?.signed_document_path && (
               <Button
                 variant="outline"
@@ -408,6 +390,9 @@ export default function CombinedLoanPackCard({
             <Badge variant={scheduleDoc ? "default" : "outline"} className="text-xs">
               {scheduleDoc ? "✓" : "○"} Daily Schedule
             </Badge>
+            <Badge variant={kfsDoc ? "default" : "outline"} className="text-xs">
+              {kfsDoc ? "✓" : "○"} Key Fact Statement
+            </Badge>
           </div>
         </CardContent>
       </Card>
@@ -424,6 +409,7 @@ export default function CombinedLoanPackCard({
             sanctionDocNumber={sanctionDoc?.document_number || "SL-DRAFT"}
             agreementDocNumber={agreementDoc?.document_number || "LA-DRAFT"}
             scheduleDocNumber={scheduleDoc?.document_number || "DRS-DRAFT"}
+            kfsDocNumber={kfsDoc?.document_number || "KFS-DRAFT"}
             documentDate={new Date()}
             borrowerName={borrowerName || "N/A"}
             borrowerAddress={borrowerAddress || "N/A"}
@@ -431,15 +417,16 @@ export default function CombinedLoanPackCard({
             borrowerPAN={applicant?.pan_number}
             borrowerAadhaar={applicant?.aadhaar_number}
             loanAmount={loanAmount}
-            tenure={tenureMonths}
             tenureDays={tenureDays}
             interestRate={interestRate}
-            monthlyEMI={monthlyEMI}
-            dailyInterestRate={interestRate / 365}
+            dailyInterestRate={interestRate}
+            totalInterest={totalInterest}
+            totalRepayment={totalRepayment}
             processingFee={processingFee}
             gstOnProcessingFee={gstOnProcessingFee}
+            netDisbursal={netDisbursal}
             validUntil={new Date(sanction.validity_date)}
-            firstEmiDate={firstEmiDate}
+            dueDate={dueDate}
             disbursementDate={new Date()}
             bankName={bankDetails?.bank_name}
             accountNumber={bankDetails?.account_number}

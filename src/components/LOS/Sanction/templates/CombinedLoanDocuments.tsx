@@ -1,6 +1,7 @@
 import SanctionLetterDocument from "./SanctionLetterDocument";
 import LoanAgreementDocument from "./LoanAgreementDocument";
 import DailyRepaymentScheduleDocument from "./DailyRepaymentScheduleDocument";
+import KeyFactStatementDocument from "./KeyFactStatementDocument";
 
 export interface CombinedLoanDocumentsProps {
   // Company Details
@@ -15,6 +16,7 @@ export interface CombinedLoanDocumentsProps {
   sanctionDocNumber: string;
   agreementDocNumber: string;
   scheduleDocNumber: string;
+  kfsDocNumber: string;
   documentDate: Date;
   
   // Borrower Details
@@ -26,17 +28,18 @@ export interface CombinedLoanDocumentsProps {
   
   // Loan Details
   loanAmount: number;
-  tenure: number; // in months
   tenureDays: number;
-  interestRate: number;
-  monthlyEMI: number;
-  dailyInterestRate: number;
+  interestRate: number; // daily rate, e.g. 1 for 1%
+  dailyInterestRate: number; // same as interestRate (1% daily)
+  totalInterest: number;
+  totalRepayment: number;
   processingFee: number;
   gstOnProcessingFee: number;
+  netDisbursal: number;
   
   // Dates
   validUntil: Date;
-  firstEmiDate: Date;
+  dueDate: Date;
   disbursementDate: Date;
   
   // Bank Details
@@ -73,11 +76,14 @@ export default function CombinedLoanDocuments(props: CombinedLoanDocumentsProps)
         borrowerName={props.borrowerName}
         borrowerAddress={props.borrowerAddress}
         loanAmount={props.loanAmount}
-        tenure={props.tenure}
+        tenureDays={props.tenureDays}
         interestRate={props.interestRate}
-        emi={props.monthlyEMI}
+        totalInterest={props.totalInterest}
+        totalRepayment={props.totalRepayment}
         processingFee={props.processingFee}
         gstOnProcessingFee={props.gstOnProcessingFee}
+        netDisbursal={props.netDisbursal}
+        dueDate={props.dueDate}
         validUntil={props.validUntil}
         termsAndConditions={props.termsAndConditions}
         signatoryName={props.signatoryName}
@@ -102,11 +108,14 @@ export default function CombinedLoanDocuments(props: CombinedLoanDocumentsProps)
         borrowerPAN={props.borrowerPAN}
         borrowerAadhaar={props.borrowerAadhaar}
         loanAmount={props.loanAmount}
-        tenure={props.tenure}
+        tenureDays={props.tenureDays}
         interestRate={props.interestRate}
-        emi={props.monthlyEMI}
-        firstEmiDate={props.firstEmiDate}
+        totalInterest={props.totalInterest}
+        totalRepayment={props.totalRepayment}
         processingFee={props.processingFee}
+        gstOnProcessingFee={props.gstOnProcessingFee}
+        netDisbursal={props.netDisbursal}
+        dueDate={props.dueDate}
         foreclosureRate={props.foreclosureRate || 4}
         bounceCharges={props.bounceCharges || 500}
         penalInterest={props.penalInterest || 24}
@@ -134,6 +143,37 @@ export default function CombinedLoanDocuments(props: CombinedLoanDocumentsProps)
         disbursementDate={props.disbursementDate}
         bankName={props.bankName}
         accountNumber={props.accountNumber}
+        grievanceEmail={props.grievanceEmail}
+        grievancePhone={props.grievancePhone}
+      />
+
+      {/* Page break for print/PDF */}
+      <div className="break-before-page print:break-before-page" style={{ pageBreakBefore: 'always' }} />
+
+      {/* Key Fact Statement */}
+      <KeyFactStatementDocument
+        companyName={props.companyName}
+        companyAddress={props.companyAddress}
+        companyCIN={props.companyCIN}
+        logoUrl={props.logoUrl}
+        documentNumber={props.kfsDocNumber}
+        documentDate={props.documentDate}
+        borrowerName={props.borrowerName}
+        borrowerAddress={props.borrowerAddress}
+        borrowerPhone={props.borrowerPhone}
+        loanAmount={props.loanAmount}
+        tenureDays={props.tenureDays}
+        interestRate={props.interestRate}
+        totalInterest={props.totalInterest}
+        totalRepayment={props.totalRepayment}
+        processingFee={props.processingFee}
+        gstOnProcessingFee={props.gstOnProcessingFee}
+        netDisbursal={props.netDisbursal}
+        dueDate={props.dueDate}
+        disbursementDate={props.disbursementDate}
+        foreclosureRate={props.foreclosureRate || 4}
+        bounceCharges={props.bounceCharges || 500}
+        penalInterest={props.penalInterest || 24}
         grievanceEmail={props.grievanceEmail}
         grievancePhone={props.grievancePhone}
       />

@@ -10,7 +10,7 @@ import {
   TrendingUp, Banknote, Calculator, Calendar, Upload, FileCheck,
   Package, Eye
 } from "lucide-react";
-import { addMonths } from "date-fns";
+import { addDays } from "date-fns";
 import html2pdf from "html2pdf.js";
 
 // Document template imports
@@ -42,42 +42,6 @@ const formatCurrency = (amount: number) => {
     currency: "INR",
     maximumFractionDigits: 0,
   }).format(amount);
-};
-
-const calculateEMI = (principal: number, rate: number, tenure: number) => {
-  const monthlyRate = rate / 12 / 100;
-  const emi = (principal * monthlyRate * Math.pow(1 + monthlyRate, tenure)) / 
-    (Math.pow(1 + monthlyRate, tenure) - 1);
-  return Math.round(emi);
-};
-
-const generateEMISchedule = (
-  principal: number, 
-  rate: number, 
-  tenure: number, 
-  startDate: Date
-) => {
-  const monthlyRate = rate / 12 / 100;
-  const emi = calculateEMI(principal, rate, tenure);
-  let balance = principal;
-  const schedule = [];
-
-  for (let i = 1; i <= tenure; i++) {
-    const interest = Math.round(balance * monthlyRate);
-    const principalPart = emi - interest;
-    balance = Math.max(0, balance - principalPart);
-
-    schedule.push({
-      emiNumber: i,
-      dueDate: addMonths(startDate, i),
-      principal: principalPart,
-      interest: interest,
-      emi: emi,
-      balance: Math.round(balance),
-    });
-  }
-
-  return schedule;
 };
 
 const formatAddress = (addressJson: unknown): string => {
@@ -147,7 +111,6 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
       try {
         const session = await supabase.auth.getSession();
         const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/loan_applicants?loan_application_id=eq.${applicationId}&applicant_type=eq.primary&select=first_name,last_name,mobile,alternate_mobile,email,current_address,pan_number,aadhaar_number`;
-        console.log("Fetching applicant from:", url);
         const result = await fetch(
           url,
           {
@@ -158,7 +121,6 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
           }
         );
         const jsonData = await result.json();
-        console.log("Applicant data response:", jsonData);
         return jsonData?.[0] || null;
       } catch (error) {
         console.error("Error fetching applicant:", error);
@@ -278,7 +240,6 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
     const printRef = printRefs.current[docType];
     if (!printRef) {
       toast.error("Document template not available. Please ensure applicant and sanction data are loaded.");
-      console.error("Print ref not found for:", docType, "applicant:", !!applicant, "sanction:", !!sanction);
       return;
     }
     
@@ -349,7 +310,6 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
   const loanAmount = sanction?.sanctioned_amount || application.approved_amount || eligibility?.eligible_loan_amount || application.requested_amount || 0;
   const interestRate = sanction?.sanctioned_rate || application.interest_rate || eligibility?.recommended_interest_rate || 0;
   const tenureDays = sanction?.sanctioned_tenure_days || application.tenure_days || eligibility?.recommended_tenure_days || 30;
-  const tenureMonths = application.tenure_months || Math.round(tenureDays / 30);
   
   // Use stored values from eligibility (single source of truth), with fallback calculation
   const calculatedInterest = loanAmount * (interestRate / 100) * tenureDays;
@@ -359,39 +319,31 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
   const totalRepayment = eligibility?.total_repayment ?? Math.round(calculatedRepayment * 100) / 100;
   const dailyEMI = eligibility?.daily_emi ?? Math.round(calculatedRepayment / tenureDays);
   
-  // For monthly EMI documents
   // Processing fee is 10% of loan amount (standard)
-  const processingFeeRate = 10; // 10%
+  const processingFeeRate = 10;
   const processingFee = sanction?.processing_fee || Math.round(loanAmount * (processingFeeRate / 100));
   const gstOnProcessingFee = processingFee * ((orgSettings?.gst_on_processing_fee || 18) / 100);
   const netDisbursal = loanAmount - processingFee;
-  const monthlyEMI = calculateEMI(loanAmount, interestRate, tenureMonths);
-  const totalMonthlyRepayment = monthlyEMI * tenureMonths;
-  const totalInterest = totalMonthlyRepayment - loanAmount;
-  const firstEmiDate = addMonths(new Date(), 1);
-  const emiSchedule = generateEMISchedule(loanAmount, interestRate, tenureMonths, new Date());
+  const dueDate = addDays(new Date(), tenureDays);
 
   const borrowerName = applicant ? `${applicant.first_name} ${applicant.last_name || ""}`.trim() : "";
   const borrowerAddress = applicant ? formatAddress(applicant.current_address) : "";
   const borrowerPhone = applicant?.mobile || applicant?.alternate_mobile || "";
 
-  // Parse conditions - handle string, array, or empty object
+  // Parse conditions
   const parseConditions = (): string[] | null => {
     if (!sanction?.conditions) return null;
     
-    // If it's a string, split by newlines
     if (typeof sanction.conditions === 'string') {
       const lines = sanction.conditions.split("\n").filter(Boolean);
       return lines.length > 0 ? lines : null;
     }
     
-    // If it's an array, use it directly (cast to string[])
     if (Array.isArray(sanction.conditions)) {
       const stringArray = sanction.conditions.map(item => String(item)).filter(Boolean);
       return stringArray.length > 0 ? stringArray : null;
     }
     
-    // If it's an empty object or object with no meaningful content, return null
     if (typeof sanction.conditions === 'object') {
       const keys = Object.keys(sanction.conditions);
       if (keys.length === 0) return null;
@@ -404,7 +356,7 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
 
   const defaultTerms = [
     "The loan is granted subject to satisfactory completion of all documentation.",
-    "The borrower must maintain the repayment schedule as agreed.",
+    "The borrower must repay the full amount on the due date.",
     "Any change in contact details must be immediately informed to the lender.",
     "The lender reserves the right to recall the loan in case of default.",
     "All terms and conditions of the loan agreement shall apply.",
@@ -493,13 +445,14 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
           orgSettings={orgSettings}
           bankDetails={bankDetails}
           loanAmount={loanAmount}
-          tenureMonths={tenureMonths}
           tenureDays={tenureDays}
           interestRate={interestRate}
-          monthlyEMI={monthlyEMI}
+          totalInterest={interestAmount}
+          totalRepayment={totalRepayment}
           processingFee={processingFee}
           gstOnProcessingFee={gstOnProcessingFee}
-          firstEmiDate={firstEmiDate}
+          netDisbursal={netDisbursal}
+          dueDate={dueDate}
           borrowerName={borrowerName}
           borrowerAddress={borrowerAddress}
           borrowerPhone={borrowerPhone}
@@ -515,8 +468,6 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
           }}
         />
       )}
-
-      {/* Individual Documents section removed - using Combined Loan Pack only */}
 
       {/* eMandate Registration Section */}
       <EMandateSection
@@ -545,11 +496,14 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
                 borrowerName={borrowerName || "N/A"}
                 borrowerAddress={borrowerAddress || "N/A"}
                 loanAmount={loanAmount}
-                tenure={tenureMonths}
+                tenureDays={tenureDays}
                 interestRate={interestRate}
-                emi={monthlyEMI}
+                totalInterest={interestAmount}
+                totalRepayment={totalRepayment}
                 processingFee={processingFee}
                 gstOnProcessingFee={gstOnProcessingFee}
+                netDisbursal={netDisbursal}
+                dueDate={dueDate}
                 validUntil={new Date(sanction.validity_date)}
                 termsAndConditions={conditionsArray || defaultTerms}
               />
@@ -570,11 +524,14 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
                 borrowerPAN={applicant?.pan_number}
                 borrowerAadhaar={applicant?.aadhaar_number}
                 loanAmount={loanAmount}
-                tenure={tenureMonths}
+                tenureDays={tenureDays}
                 interestRate={interestRate}
-                emi={monthlyEMI}
-                firstEmiDate={firstEmiDate}
+                totalInterest={interestAmount}
+                totalRepayment={totalRepayment}
                 processingFee={processingFee}
+                gstOnProcessingFee={gstOnProcessingFee}
+                netDisbursal={netDisbursal}
+                dueDate={dueDate}
                 foreclosureRate={orgSettings?.foreclosure_rate || 4}
                 bounceCharges={500}
                 penalInterest={24}
@@ -595,7 +552,7 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
                 borrowerAddress={borrowerAddress || "N/A"}
                 borrowerPhone={borrowerPhone || "N/A"}
                 loanAmount={loanAmount}
-                dailyInterestRate={interestRate / 365}
+                dailyInterestRate={interestRate}
                 tenureDays={tenureDays}
                 disbursementDate={new Date()}
                 bankName={bankDetails?.bank_name}
