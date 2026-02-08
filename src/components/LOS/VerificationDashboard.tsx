@@ -84,7 +84,7 @@ export default function VerificationDashboard({ applicationId, orgId }: Verifica
   const [detailsVerification, setDetailsVerification] = useState<{ verification: any; type: typeof VERIFICATION_TYPES[0] } | null>(null);
   const [videoKYCViewOpen, setVideoKYCViewOpen] = useState(false);
   const [videoKYCRecordingUrl, setVideoKYCRecordingUrl] = useState<string | null>(null);
-  const [uploadDocType, setUploadDocType] = useState<"pan_card" | "aadhaar_card" | null>(null);
+  const [uploadDocType, setUploadDocType] = useState<"pan_card" | "aadhaar_front" | "aadhaar_back" | null>(null);
   const [previewDoc, setPreviewDoc] = useState<{ document: any; title: string } | null>(null);
 
   const { data: verifications = [], isLoading } = useQuery({
@@ -135,9 +135,10 @@ export default function VerificationDashboard({ applicationId, orgId }: Verifica
   });
 
   const getPanDocument = () => identityDocuments.find(d => d.document_type === "pan_card");
-  const getAadhaarDocument = () => identityDocuments.find(d => 
+  const getAadhaarFrontDocument = () => identityDocuments.find(d => 
     d.document_type === "aadhaar_card" || d.document_type === "aadhaar_front"
   );
+  const getAadhaarBackDocument = () => identityDocuments.find(d => d.document_type === "aadhaar_back");
 
   const updateStageMutation = useMutation({
     mutationFn: async (newStage: string) => {
@@ -509,16 +510,28 @@ export default function VerificationDashboard({ applicationId, orgId }: Verifica
                         />
                       )}
                       {verificationType.type === "aadhaar" && (
-                        <IdentityDocumentCard
-                          type="aadhaar_card"
-                          label="Aadhaar Card"
-                          document={getAadhaarDocument()}
-                          onUpload={() => setUploadDocType("aadhaar_card")}
-                          onView={() => {
-                            const doc = getAadhaarDocument();
-                            if (doc) setPreviewDoc({ document: doc, title: "Aadhaar Card" });
-                          }}
-                        />
+                        <>
+                          <IdentityDocumentCard
+                            type="aadhaar_front"
+                            label="Aadhaar Front"
+                            document={getAadhaarFrontDocument()}
+                            onUpload={() => setUploadDocType("aadhaar_front")}
+                            onView={() => {
+                              const doc = getAadhaarFrontDocument();
+                              if (doc) setPreviewDoc({ document: doc, title: "Aadhaar Card (Front)" });
+                            }}
+                          />
+                          <IdentityDocumentCard
+                            type="aadhaar_back"
+                            label="Aadhaar Back"
+                            document={getAadhaarBackDocument()}
+                            onUpload={() => setUploadDocType("aadhaar_back")}
+                            onView={() => {
+                              const doc = getAadhaarBackDocument();
+                              if (doc) setPreviewDoc({ document: doc, title: "Aadhaar Card (Back)" });
+                            }}
+                          />
+                        </>
                       )}
                     </div>
                   </div>
@@ -631,7 +644,9 @@ export default function VerificationDashboard({ applicationId, orgId }: Verifica
           existingDocumentId={
             uploadDocType === "pan_card" 
               ? getPanDocument()?.id 
-              : getAadhaarDocument()?.id
+              : uploadDocType === "aadhaar_front"
+                ? getAadhaarFrontDocument()?.id
+                : getAadhaarBackDocument()?.id
           }
         />
       )}

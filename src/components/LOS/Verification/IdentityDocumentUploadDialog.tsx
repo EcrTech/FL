@@ -19,7 +19,7 @@ interface IdentityDocumentUploadDialogProps {
   onClose: () => void;
   applicationId: string;
   orgId: string;
-  documentType: "pan_card" | "aadhaar_card";
+  documentType: "pan_card" | "aadhaar_card" | "aadhaar_front" | "aadhaar_back";
   existingDocumentId?: string;
 }
 
@@ -37,7 +37,13 @@ export function IdentityDocumentUploadDialog({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
 
-  const documentLabel = documentType === "pan_card" ? "PAN Card" : "Aadhaar Card";
+  const documentLabel = documentType === "pan_card" 
+    ? "PAN Card" 
+    : documentType === "aadhaar_front" 
+      ? "Aadhaar Card (Front)" 
+      : documentType === "aadhaar_back" 
+        ? "Aadhaar Card (Back)" 
+        : "Aadhaar Card";
 
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
