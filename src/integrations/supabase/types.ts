@@ -5996,6 +5996,7 @@ export type Database = {
       }
       organization_loan_settings: {
         Row: {
+          bounce_charges: number
           company_address: string | null
           company_cin: string | null
           company_name: string | null
@@ -6010,10 +6011,12 @@ export type Database = {
           jurisdiction: string | null
           logo_url: string | null
           org_id: string
+          penal_interest_rate: number
           registered_office_address: string | null
           updated_at: string | null
         }
         Insert: {
+          bounce_charges?: number
           company_address?: string | null
           company_cin?: string | null
           company_name?: string | null
@@ -6028,10 +6031,12 @@ export type Database = {
           jurisdiction?: string | null
           logo_url?: string | null
           org_id: string
+          penal_interest_rate?: number
           registered_office_address?: string | null
           updated_at?: string | null
         }
         Update: {
+          bounce_charges?: number
           company_address?: string | null
           company_cin?: string | null
           company_name?: string | null
@@ -6046,6 +6051,7 @@ export type Database = {
           jurisdiction?: string | null
           logo_url?: string | null
           org_id?: string
+          penal_interest_rate?: number
           registered_office_address?: string | null
           updated_at?: string | null
         }
