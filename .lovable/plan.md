@@ -1,77 +1,67 @@
 
 
-## Unify Loan Detail Pages Across All Stages
+## Fix: Replace Hardcoded Financial Values with Dynamic Variables
 
-The investigation found significant inconsistencies between `ApplicationDetail` and `SanctionDetail`. The `SanctionDashboard` component is also stale and unused. This plan brings all detail pages into alignment.
+### Problem Found
 
----
+Two financial values in the Combined Loan Pack documents are **hardcoded as static numbers** instead of being sourced from organization settings:
 
-### Discrepancies Found
-
-| Section | ApplicationDetail | SanctionDetail |
+| Value | Current | Should Be |
 |---|---|---|
-| Quick Stats (Amount, Tenure, Applicant, Assigned To, Location, Case History) | Yes | Missing |
-| ApplicantProfileCard | Yes (with applicantId) | Yes (without applicantId) |
-| Applicant Details (editable) | Yes, with edit/save, OCR auto-create, referrals | Read-only, no referrals |
-| Bank Details | Yes | Missing |
-| Verified Document Data (PAN/Aadhaar OCR) | Yes | Missing |
-| Document Upload | Yes | Missing |
-| Document Data Verification | Yes | Missing |
-| Approval History | Yes (conditional) | Missing |
-| Application Summary | Yes (conditional) | Missing |
-| Case History | Yes | Missing |
-| GST on Processing Fee | Shown in ApplicationSummary | Not shown |
-| Interest Rate label | N/A | Shows "% p.a." (wrong -- should be "% per day") |
+| Bounce/Return Charges | Hardcoded `500` | From `organization_loan_settings` |
+| Penal Interest Rate | Hardcoded `24` (% p.a.) | From `organization_loan_settings` |
 
-Additionally, `SanctionDashboard.tsx` is an orphaned component -- not rendered anywhere -- and still uses the old "% p.a." model.
-
----
+These appear in 3 places:
+- `DisbursementDashboard.tsx` lines 539, 540
+- `CombinedLoanPackCard.tsx` lines 435, 436
+- `CombinedLoanDocuments.tsx` lines 119-122 (fallback defaults)
 
 ### Plan
 
-#### 1. Delete `SanctionDashboard.tsx` (orphaned component)
+#### Step 1: Add columns to `organization_loan_settings` table
 
-This component is not imported or rendered anywhere. Remove it to avoid confusion.
+Add two new columns via database migration:
+- `bounce_charges` (integer, default 500)
+- `penal_interest_rate` (numeric, default 24)
 
-#### 2. Update `SanctionDetail.tsx` to match `ApplicationDetail.tsx` sections
+#### Step 2: Update `DisbursementDashboard.tsx`
 
-Add the missing sections to `SanctionDetail` so the page shows identical information cards:
+Replace the hardcoded values:
+```
+// Before
+bounceCharges={500}
+penalInterest={24}
 
-- **Quick Stats grid**: Requested Amount, Tenure, Applicant, Assigned To (with AssignmentDialog), Location, Case History (with CaseHistoryDialog)
-- **Applicant Details Card**: Use the same editable card with Gender, Marital Status, Religion, PAN, Mobile, Address fields + edit/save capability
-- **Referrals Section**: Add the same ReferralsSection component (professional + personal refs, additional referrals)
-- **Bank Details**: Add `BankDetailsSection`
-- **Verified Document Data**: Add the PAN + Aadhaar OCR data card
-- **Document Data Verification**: Add `DocumentDataVerification`
-- **Document Upload**: Add `DocumentUpload`
-- **Approval History**: Add `ApprovalHistory`
-- **Application Summary**: Add `ApplicationSummary`
+// After
+bounceCharges={orgSettings?.bounce_charges || 500}
+penalInterest={orgSettings?.penal_interest_rate || 24}
+```
 
-This requires:
-- Expanding the Supabase query in SanctionDetail to fetch `loan_verifications`, `contacts`, `assigned_profile`, and `loan_documents`
-- Adding state management for editing applicant details and referrals
-- Importing all the missing components
+Apply to both the standalone `LoanAgreementDocument` (line 539-540) and the `CombinedLoanPackCard` props.
 
-#### 3. Fix interest rate display
+#### Step 3: Update `CombinedLoanPackCard.tsx`
 
-- Update any remaining references showing "% p.a." to "% per day" to match the daily rate model
+- Add `bounceCharges` and `penalInterest` to the component's props interface (sourced from `orgSettings` in the parent).
+- Pass them through to `CombinedLoanDocuments` instead of hardcoded values.
 
-#### 4. Ensure GST on Processing Fee is consistent
+Alternatively (simpler): pass `orgSettings` to `CombinedLoanPackCard` already (it's already a prop), and have `CombinedLoanPackCard` read `orgSettings.bounce_charges` and `orgSettings.penal_interest_rate` when passing to `CombinedLoanDocuments`.
 
-- Already fixed in `ApplicationSummary` -- will be inherited by SanctionDetail once ApplicationSummary is added there
+#### Step 4: Update `CombinedLoanDocuments.tsx` and its sub-documents
 
----
+- Add `bounceCharges` and `penalInterest` to the `CombinedLoanDocumentsProps` interface.
+- Pass them to `LoanAgreementDocument` and `KeyFactStatementDocument` instead of the current hardcoded fallback of `500` and `24`.
 
 ### Files Changed
 
 | File | Change |
 |---|---|
-| `src/components/LOS/Sanction/SanctionDashboard.tsx` | Delete (orphaned) |
-| `src/pages/LOS/SanctionDetail.tsx` | Major update: add Quick Stats, editable Applicant Details with Referrals, Bank Details, Verified Document Data, Document Upload, Document Data Verification, Approval History, Application Summary, Case History, Assignment Dialog |
+| Database migration | Add `bounce_charges` and `penal_interest_rate` columns to `organization_loan_settings` |
+| `src/components/LOS/Disbursement/DisbursementDashboard.tsx` | Use `orgSettings` values instead of `500` and `24` |
+| `src/components/LOS/Disbursement/CombinedLoanPackCard.tsx` | Add props for bounce charges and penal interest; pass to template |
+| `src/components/LOS/Sanction/templates/CombinedLoanDocuments.tsx` | Add props, pass through to sub-documents |
 
-### Technical Notes
+### Note on Anupam Roy's Data
 
-- The `ReferralsSection` component is currently defined inline in `ApplicationDetail.tsx`. To reuse it in SanctionDetail, it will either be extracted to a shared file or duplicated. Extracting is preferred for maintainability.
-- The SanctionDetail-specific content (SanctionGenerator button, Upload Signed Document, DisbursementDashboard) remains unchanged at the bottom of the page.
-- The ApplicantProfileCard call will be updated to include the `applicantId` prop for consistency.
+Anupam Roy's processing fee is stored as `0` in `loan_sanctions`. This means the sanction was created before the 10% processing fee logic was implemented. The current code correctly falls back to calculating `Math.round(loanAmount * 0.10) = 900` when `sanction.processing_fee` is falsy. So his documents should show the correct ₹900 processing fee. If his sanction record needs correction, that's a separate data fix.
 
+Include changes across timeline for all past and future calculations and document production. 
