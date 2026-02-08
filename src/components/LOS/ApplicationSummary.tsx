@@ -276,11 +276,11 @@ export function ApplicationSummary({ applicationId, orgId }: ApplicationSummaryP
                 </div>
                 <div>
                   <label className="text-xs text-muted-foreground">Processing Fee</label>
-                  <p className="text-sm">{formatCurrency(sanction.processing_fee)}</p>
+                  <p className="text-sm">{formatCurrency(sanction.processing_fee || Math.round(sanction.sanctioned_amount * 0.10))}</p>
                 </div>
                 <div>
                   <label className="text-xs text-muted-foreground">GST on Processing Fee (18%)</label>
-                  <p className="text-sm">{formatCurrency(Math.round(sanction.processing_fee * 0.18))}</p>
+                  <p className="text-sm">{formatCurrency(Math.round((sanction.processing_fee || Math.round(sanction.sanctioned_amount * 0.10)) * 0.18))}</p>
                 </div>
                 <div>
                   <label className="text-xs text-muted-foreground">Valid Until</label>

@@ -4,7 +4,7 @@ export function FeatureHighlights() {
   const features = [
     {
       icon: Percent,
-      text: "Starting from 12.65% p.a.",
+      text: "1% per day flat rate",
     },
     {
       icon: IndianRupee,
