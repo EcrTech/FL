@@ -1,31 +1,77 @@
 
 
-## Aadhaar Card: Multi-File Upload (Front and Back)
+## Unify Loan Detail Pages Across All Stages
 
-### What Changes
+The investigation found significant inconsistencies between `ApplicationDetail` and `SanctionDetail`. The `SanctionDashboard` component is also stale and unused. This plan brings all detail pages into alignment.
 
-Instead of a single Aadhaar card upload, the Aadhaar section will show **two separate cards** -- "Aadhaar Front" and "Aadhaar Back" -- each with its own upload, view, and replace actions.
+---
 
-### File Changes
+### Discrepancies Found
 
-#### 1. `src/components/LOS/VerificationDashboard.tsx`
+| Section | ApplicationDetail | SanctionDetail |
+|---|---|---|
+| Quick Stats (Amount, Tenure, Applicant, Assigned To, Location, Case History) | Yes | Missing |
+| ApplicantProfileCard | Yes (with applicantId) | Yes (without applicantId) |
+| Applicant Details (editable) | Yes, with edit/save, OCR auto-create, referrals | Read-only, no referrals |
+| Bank Details | Yes | Missing |
+| Verified Document Data (PAN/Aadhaar OCR) | Yes | Missing |
+| Document Upload | Yes | Missing |
+| Document Data Verification | Yes | Missing |
+| Approval History | Yes (conditional) | Missing |
+| Application Summary | Yes (conditional) | Missing |
+| Case History | Yes | Missing |
+| GST on Processing Fee | Shown in ApplicationSummary | Not shown |
+| Interest Rate label | N/A | Shows "% p.a." (wrong -- should be "% per day") |
 
-- Add a `getAadhaarBackDocument()` helper (similar to existing `getAadhaarDocument()` which finds front)
-- Replace the single `IdentityDocumentCard` for Aadhaar with **two cards** side by side:
-  - "Aadhaar Front" using document type `aadhaar_front`
-  - "Aadhaar Back" using document type `aadhaar_back`
-- Update `uploadDocType` state type to include `"aadhaar_front"` and `"aadhaar_back"` (replacing `"aadhaar_card"`)
-- Update the `existingDocumentId` logic in the upload dialog to map front/back correctly
+Additionally, `SanctionDashboard.tsx` is an orphaned component -- not rendered anywhere -- and still uses the old "% p.a." model.
 
-#### 2. `src/components/LOS/Verification/IdentityDocumentUploadDialog.tsx`
+---
 
-- Expand the `documentType` prop type from `"pan_card" | "aadhaar_card"` to `"pan_card" | "aadhaar_card" | "aadhaar_front" | "aadhaar_back"`
-- Update `documentLabel` logic to show "Aadhaar Card (Front)" or "Aadhaar Card (Back)" for the new types
+### Plan
 
-#### 3. `src/components/LOS/Verification/IdentityDocumentCard.tsx`
+#### 1. Delete `SanctionDashboard.tsx` (orphaned component)
 
-- No structural changes needed -- it already accepts any `type` string and `label` prop
+This component is not imported or rendered anywhere. Remove it to avoid confusion.
 
-### Result
+#### 2. Update `SanctionDetail.tsx` to match `ApplicationDetail.tsx` sections
 
-The Aadhaar verification section will display two document slots side by side (Front + Back), each independently uploadable, viewable, and replaceable. Both are stored as separate records (`aadhaar_front`, `aadhaar_back`) in the `loan_documents` table, which is already supported by the existing query and public application form.
+Add the missing sections to `SanctionDetail` so the page shows identical information cards:
+
+- **Quick Stats grid**: Requested Amount, Tenure, Applicant, Assigned To (with AssignmentDialog), Location, Case History (with CaseHistoryDialog)
+- **Applicant Details Card**: Use the same editable card with Gender, Marital Status, Religion, PAN, Mobile, Address fields + edit/save capability
+- **Referrals Section**: Add the same ReferralsSection component (professional + personal refs, additional referrals)
+- **Bank Details**: Add `BankDetailsSection`
+- **Verified Document Data**: Add the PAN + Aadhaar OCR data card
+- **Document Data Verification**: Add `DocumentDataVerification`
+- **Document Upload**: Add `DocumentUpload`
+- **Approval History**: Add `ApprovalHistory`
+- **Application Summary**: Add `ApplicationSummary`
+
+This requires:
+- Expanding the Supabase query in SanctionDetail to fetch `loan_verifications`, `contacts`, `assigned_profile`, and `loan_documents`
+- Adding state management for editing applicant details and referrals
+- Importing all the missing components
+
+#### 3. Fix interest rate display
+
+- Update any remaining references showing "% p.a." to "% per day" to match the daily rate model
+
+#### 4. Ensure GST on Processing Fee is consistent
+
+- Already fixed in `ApplicationSummary` -- will be inherited by SanctionDetail once ApplicationSummary is added there
+
+---
+
+### Files Changed
+
+| File | Change |
+|---|---|
+| `src/components/LOS/Sanction/SanctionDashboard.tsx` | Delete (orphaned) |
+| `src/pages/LOS/SanctionDetail.tsx` | Major update: add Quick Stats, editable Applicant Details with Referrals, Bank Details, Verified Document Data, Document Upload, Document Data Verification, Approval History, Application Summary, Case History, Assignment Dialog |
+
+### Technical Notes
+
+- The `ReferralsSection` component is currently defined inline in `ApplicationDetail.tsx`. To reuse it in SanctionDetail, it will either be extracted to a shared file or duplicated. Extracting is preferred for maintainability.
+- The SanctionDetail-specific content (SanctionGenerator button, Upload Signed Document, DisbursementDashboard) remains unchanged at the bottom of the page.
+- The ApplicantProfileCard call will be updated to include the `applicantId` prop for consistency.
+
