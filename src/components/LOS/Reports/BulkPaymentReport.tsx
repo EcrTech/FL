@@ -72,7 +72,7 @@ export default function BulkPaymentReport() {
         .lte("created_at", `${toDate}T23:59:59`);
 
       if (stageFilter === "all") {
-        query = query.in("current_stage", ["disbursement_pending", "disbursed"]);
+        query = query.in("current_stage", ["sanctioned", "disbursement_pending", "disbursed"]);
       } else {
         query = query.eq("current_stage", stageFilter);
       }
@@ -163,9 +163,10 @@ export default function BulkPaymentReport() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All (Pending + Disbursed)</SelectItem>
-                    <SelectItem value="disbursement_pending">Disbursement Pending</SelectItem>
-                    <SelectItem value="disbursed">Disbursed</SelectItem>
+                     <SelectItem value="all">All (Sanctioned + Pending + Disbursed)</SelectItem>
+                     <SelectItem value="sanctioned">Sanctioned</SelectItem>
+                     <SelectItem value="disbursement_pending">Disbursement Pending</SelectItem>
+                     <SelectItem value="disbursed">Disbursed</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
