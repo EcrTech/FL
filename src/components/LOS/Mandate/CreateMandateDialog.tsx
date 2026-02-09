@@ -184,10 +184,26 @@ export default function CreateMandateDialog({
   // Reset form when dialog opens
   useEffect(() => {
     if (open) {
-      setStep("bank");
       setSelectedBankId(null);
       setSelectedBankName("");
       setAuthType("Aadhaar");
+
+      // Auto-match bank from prefill data
+      let autoMatchedBank = false;
+      if (banksData?.banks && prefillData?.bankName) {
+        const match = banksData.banks.find((b: any) =>
+          b.name.toLowerCase().includes(prefillData.bankName!.toLowerCase()) ||
+          prefillData.bankName!.toLowerCase().includes(b.name.toLowerCase())
+        );
+        if (match) {
+          setSelectedBankId(match.bank_id);
+          setSelectedBankName(match.name);
+          autoMatchedBank = true;
+        }
+      }
+
+      setStep(autoMatchedBank ? "account" : "bank");
+
       // Prefill from previous mandate if provided
       if (prefillData) {
         setAccountHolderName(prefillData.accountHolderName || applicantName);
@@ -209,22 +225,7 @@ export default function CreateMandateDialog({
       setRegistrationUrl(null);
       setShowQR(false);
     }
-  }, [open, applicantName, loanAmount, tenure, prefillData]);
-
-  // Auto-select bank from prefill data when banks load
-  useEffect(() => {
-    if (banksData?.banks && prefillData?.bankName && !selectedBankId) {
-      const match = banksData.banks.find((b: any) =>
-        b.name.toLowerCase().includes(prefillData.bankName!.toLowerCase()) ||
-        prefillData.bankName!.toLowerCase().includes(b.name.toLowerCase())
-      );
-      if (match) {
-      setSelectedBankId(match.bank_id);
-        setSelectedBankName(match.name);
-        setStep("account");
-      }
-    }
-  }, [banksData, prefillData, selectedBankId]);
+  }, [open, applicantName, loanAmount, tenure, prefillData, banksData]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
