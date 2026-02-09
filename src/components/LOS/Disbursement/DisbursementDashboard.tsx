@@ -129,26 +129,22 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
     },
   });
 
-  // Fetch bank details
+  // Fetch bank details from loan applicant
   const { data: bankDetails } = useQuery({
     queryKey: ["loan-bank-details", applicationId],
     queryFn: async (): Promise<{ bank_name?: string; account_number?: string; ifsc_code?: string } | null> => {
-      try {
-        const session = await supabase.auth.getSession();
-        const result = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/loan_bank_details?loan_application_id=eq.${applicationId}&is_primary=eq.true&select=*`,
-          {
-            headers: {
-              'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-              'Authorization': `Bearer ${session.data.session?.access_token}`,
-            },
-          }
-        );
-        const jsonData = await result.json();
-        return jsonData?.[0] || null;
-      } catch {
-        return null;
-      }
+      const { data } = await supabase
+        .from("loan_applicants")
+        .select("bank_name, bank_account_number, bank_ifsc_code")
+        .eq("loan_application_id", applicationId)
+        .eq("applicant_type", "primary")
+        .maybeSingle();
+      if (!data) return null;
+      return {
+        bank_name: data.bank_name ?? undefined,
+        account_number: data.bank_account_number ?? undefined,
+        ifsc_code: data.bank_ifsc_code ?? undefined,
+      };
     },
   });
 
