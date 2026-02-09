@@ -21,6 +21,11 @@ interface EMandateSectionProps {
   loanAmount: number;
   tenureDays: number;
   loanNo: string;
+  bankDetails?: {
+    bank_name?: string;
+    account_number?: string;
+    ifsc_code?: string;
+  };
 }
 
 const formatCurrency = (amount: number) => {
@@ -41,6 +46,7 @@ export default function EMandateSection({
   loanAmount,
   tenureDays,
   loanNo,
+  bankDetails,
 }: EMandateSectionProps) {
   const [mandateDialogOpen, setMandateDialogOpen] = useState(false);
   const [showQR, setShowQR] = useState(false);
@@ -314,6 +320,11 @@ export default function EMandateSection({
           ifsc: mandateData.ifsc_code,
           accountType: mandateData.account_type,
           accountHolderName: mandateData.account_holder_name,
+        } : bankDetails ? {
+          bankName: bankDetails.bank_name,
+          bankAccountNo: bankDetails.account_number,
+          ifsc: bankDetails.ifsc_code,
+          accountHolderName: borrowerName,
         } : undefined}
       />
 

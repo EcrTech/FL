@@ -483,6 +483,7 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
         loanAmount={loanAmount}
         tenureDays={tenureDays}
         loanNo={application.application_number || `LOAN-${applicationId.slice(0, 8)}`}
+        bankDetails={bankDetails}
       />
 
       {/* Hidden document templates for printing */}
