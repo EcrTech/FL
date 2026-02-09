@@ -1,61 +1,53 @@
 
 
-## Autofill Bank Details in eMandate Dialog
+## Auto-Select Bank and Default to Aadhaar in eMandate Dialog
 
 ### Problem
 
-When opening the "Register eMandate" dialog for the first time (no previous mandate), the bank account fields are empty even though bank details already exist on the application (from verification or manual entry).
+When opening the eMandate dialog, the user must manually search and select a bank even though bank details are already known from the application. The auth type also defaults to empty instead of Aadhaar.
 
 ### Fix
 
-Pass the application's bank details from `DisbursementDashboard` down to `EMandateSection`, which will then use them as `prefillData` for `CreateMandateDialog` when no previous mandate exists.
+**File: `src/components/LOS/Mandate/CreateMandateDialog.tsx`**
+
+1. Default `authType` to `"Aadhaar"` instead of `""` when the dialog opens
+2. When `prefillData` includes a bank name, auto-match it against the fetched banks list and pre-select it -- this way the bank step shows the bank already highlighted and auth type set to Aadhaar, so the user can just click "Next"
+
+**File: `src/components/LOS/Mandate/BankSelector.tsx`**
+
+No changes needed -- it already visually highlights `selectedBankId`.
+
+### Technical Details
+
+In `CreateMandateDialog.tsx`:
+
+1. Change the `useEffect` reset logic (line ~188) to set `authType` to `"Aadhaar"` instead of `""`
+2. Add another `useEffect` that runs when `banksData` loads: if `prefillData.bankName` exists, find the matching bank in the list (case-insensitive partial match) and call `setSelectedBankId` / `setSelectedBankName`
+
+```typescript
+// Default auth type
+setAuthType("Aadhaar");
+
+// Auto-select bank from prefill data when banks load
+useEffect(() => {
+  if (banksData?.banks && prefillData?.bankName && !selectedBankId) {
+    const match = banksData.banks.find(b => 
+      b.name.toLowerCase().includes(prefillData.bankName.toLowerCase()) ||
+      prefillData.bankName.toLowerCase().includes(b.name.toLowerCase())
+    );
+    if (match) {
+      setSelectedBankId(match.bank_id);
+      setSelectedBankName(match.name);
+    }
+  }
+}, [banksData, prefillData]);
+```
 
 ### Changes
 
 | File | Change |
 |---|---|
-| `DisbursementDashboard.tsx` | Pass `bankDetails` as a new prop to `EMandateSection` |
-| `EMandateSection.tsx` | Accept new `bankDetails` prop; use it as fallback `prefillData` when there's no existing mandate |
-
-### Technical Details
-
-**1. `EMandateSection.tsx`** - Add optional `bankDetails` prop to the interface:
-
-```typescript
-interface EMandateSectionProps {
-  // ...existing props
-  bankDetails?: {
-    bank_name?: string;
-    account_number?: string;
-    ifsc_code?: string;
-  };
-}
-```
-
-Update the `prefillData` passed to `CreateMandateDialog`: if there's an existing mandate, use its data (current behavior); otherwise, fall back to the application's bank details:
-
-```typescript
-prefillData={mandateData ? {
-  bankName: mandateData.bank_name,
-  bankAccountNo: mandateData.bank_account_no,
-  ifsc: mandateData.ifsc_code,
-  accountType: mandateData.account_type,
-  accountHolderName: mandateData.account_holder_name,
-} : bankDetails ? {
-  bankName: bankDetails.bank_name,
-  bankAccountNo: bankDetails.account_number,
-  ifsc: bankDetails.ifsc_code,
-  accountHolderName: borrowerName,
-} : undefined}
-```
-
-**2. `DisbursementDashboard.tsx`** - Pass the already-fetched `bankDetails` to `EMandateSection`:
-
-```typescript
-<EMandateSection
-  // ...existing props
-  bankDetails={bankDetails}
-/>
-```
+| `CreateMandateDialog.tsx` | Default authType to "Aadhaar"; auto-select bank from prefill data when bank list loads |
 
 No database changes needed.
+
