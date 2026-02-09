@@ -131,8 +131,11 @@ export default function CreateMandateDialog({
   // Create mandate mutation
   const createMandateMutation = useMutation({
     mutationFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
+      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
+      if (sessionError || !session) {
+        await supabase.auth.signOut();
+        throw new Error("Session expired. Please log in again.");
+      }
 
       const response = await supabase.functions.invoke("nupay-create-mandate", {
         body: {
@@ -177,7 +180,11 @@ export default function CreateMandateDialog({
       }
     },
     onError: (error: Error) => {
-      toast.error("Failed to create mandate", { description: error.message });
+      if (error.message?.includes("Session expired")) {
+        toast.error("Session expired", { description: "Please log in again to continue." });
+      } else {
+        toast.error("Failed to create mandate", { description: error.message });
+      }
     },
   });
 
