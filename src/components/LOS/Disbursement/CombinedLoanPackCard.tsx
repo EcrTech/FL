@@ -162,7 +162,8 @@ export default function CombinedLoanPackCard({
           image: { type: 'jpeg' as const, quality: 0.98 },
           html2canvas: { scale: 2 },
           jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const },
-        })
+          pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
+        } as any)
         .from(printElement);
       
       const pdfBlob = await worker.outputPdf('blob');
@@ -254,8 +255,12 @@ export default function CombinedLoanPackCard({
                 body { margin: 0; padding: 20px; font-family: system-ui, sans-serif; }
                 .no-print { display: none; }
                 .break-before-page { page-break-before: always; }
+                h2, h3, h4 { page-break-after: avoid; break-after: avoid; }
+                table, .mb-6 { page-break-inside: avoid; break-inside: avoid; }
               }
               body { margin: 0; padding: 20px; font-family: system-ui, sans-serif; }
+              h2, h3, h4 { page-break-after: avoid; break-after: avoid; }
+              table, .mb-6 { page-break-inside: avoid; break-inside: avoid; }
             </style>
           </head>
           <body>${printContent}</body>

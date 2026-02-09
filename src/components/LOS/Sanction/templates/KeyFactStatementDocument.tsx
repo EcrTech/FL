@@ -62,7 +62,7 @@ export default function KeyFactStatementDocument(props: KeyFactStatementDocument
       </p>
 
       {/* ANNEX A - Part 1: Interest Rate and Fees */}
-      <div className="mb-6">
+      <div className="mb-6" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
         <h3 className="text-base font-bold text-primary border-b border-primary pb-1 mb-3">
           ANNEX A – PART 1: INTEREST RATE AND FEES/CHARGES
         </h3>
@@ -169,7 +169,7 @@ export default function KeyFactStatementDocument(props: KeyFactStatementDocument
       </div>
 
       {/* ANNEX B: APR Computation */}
-      <div className="mb-6">
+      <div className="mb-6" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
         <h3 className="text-base font-bold text-primary border-b border-primary pb-1 mb-3">
           ANNEX B: APR COMPUTATION
         </h3>
@@ -218,7 +218,7 @@ export default function KeyFactStatementDocument(props: KeyFactStatementDocument
       </div>
 
       {/* ANNEX C: Repayment Schedule */}
-      <div className="mb-6">
+      <div className="mb-6" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
         <h3 className="text-base font-bold text-primary border-b border-primary pb-1 mb-3">
           ANNEX C: REPAYMENT SCHEDULE
         </h3>
@@ -255,7 +255,7 @@ export default function KeyFactStatementDocument(props: KeyFactStatementDocument
       </div>
 
       {/* Borrower Declaration */}
-      <div className="border-t-2 border-primary pt-6 mt-8">
+      <div className="border-t-2 border-primary pt-6 mt-8" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
         <h3 className="text-base font-bold mb-4">BORROWER DECLARATION</h3>
         <div className="space-y-4 text-sm text-muted-foreground">
           <p>
