@@ -1,63 +1,32 @@
 
 
-## Rebuild Leads Page as CRM Table + Lead Detail Page
+## Fix NACH Mandate Category Code Conflict
 
-The current `/calling/upload-leads` page is still using the old spread-out card layout with separate sections for manual entry, CSV upload, and preview. It needs to be completely rebuilt into a compact CRM-style interface (like the reference screenshots), plus a new Lead Detail page.
+### Problem
+The eMandate creation is failing because of an invalid parameter combination sent to the Nupay API:
+- `frequency: "ADHO"` (Ad-hoc / one-time)
+- `category_id: 7` (Loan Installment Payment)
 
----
+Nupay does not allow ADHO frequency with Category 7. Per their documentation, ADHO must use **Category 15 (Others)**.
 
-### Page 1: Leads Table (`/calling/upload-leads`)
+### Root Cause
+Three locations set the `category_id`, and they are inconsistent:
 
-**Layout (matching the Pipeline Board reference):**
-- **Header**: "Leads" title with two action buttons top-right: "+ Add Lead" and "Upload CSV"
-- **"+ Add Lead"** opens a compact dialog/modal with Name + Phone fields
-- **"Upload CSV"** triggers a file picker (same CSV parsing logic)
-- **Search bar** below header to filter leads by name or phone
-- **CRM Table** showing all `calling_upload` leads from the database (not just session-uploaded ones), with columns:
-  - Name
-  - Phone
-  - Source
-  - Created (date)
-  - Actions: Call icon (tel: link), WhatsApp icon (opens WhatsAppChatDialog), View button (navigates to detail page)
-- Data fetched via `useQuery` from `contacts` table filtered by `source = 'calling_upload'` and current org
+| Location | Current Value | Should Be |
+|---|---|---|
+| `CreateMandateDialog.tsx` (frontend, line 149) | `7` | `15` |
+| Edge function payload builder (line 149) | `13` (default fallback) | `15` |
+| Edge function DB insert (line 245) | `7` (default fallback) | `15` |
 
-**Key changes from current:**
-- Remove the 3 separate Card sections (manual entry, CSV upload, preview)
-- Fetch existing leads from DB on page load instead of only showing session-uploaded leads
-- Compact inline action buttons per row
+### Changes
 
----
+**File 1: `src/components/LOS/Mandate/CreateMandateDialog.tsx`**
+- Line 149: Change `category_id: 7` to `category_id: 15`
 
-### Page 2: Lead Detail (`/calling/leads/:id` - new file)
+**File 2: `supabase/functions/nupay-create-mandate/index.ts`**
+- Line 149: Change default `category_id` from `13` to `15` in the Nupay API payload
+- Line 245: Change default `category_id` from `7` to `15` in the database insert fallback
 
-**Layout (matching the Lead Detail reference):**
-- **Back button** + Lead name as page title
-- **Left sidebar card**: Contact Information
-  - Phone, email (if any), company, city, source, created date, assigned to
-- **Right content area**: "Activities & Notes" with tabs
-  - **Journey tab**: Chronological timeline aggregating `call_logs`, `whatsapp_messages`, and `email_conversations` for this contact
-  - **Notes tab**: Display and add notes (from `contacts.notes` field)
-- **Action buttons** in header: Call, WhatsApp icons
-
----
-
-### Technical Details
-
-**Files to modify:**
-1. **`src/pages/CallingUploadLeads.tsx`** - Complete rewrite into CRM table view
-   - Use `useQuery` to fetch contacts where `source = 'calling_upload'` and `org_id` matches
-   - Add Lead dialog using existing Dialog component
-   - Search filter (client-side on name/phone)
-   - Row actions: Call (tel: link), WhatsApp (WhatsAppChatDialog), View (navigate to detail)
-
-2. **`src/pages/CallingLeadDetail.tsx`** - New file
-   - Fetch single contact by ID
-   - Left panel: contact info card
-   - Right panel: tabbed timeline (Journey, Notes)
-   - Journey aggregates from `call_logs`, `whatsapp_messages`, `email_conversations` joined on `contact_id`
-   - Notes section with ability to update `contacts.notes`
-
-3. **`src/App.tsx`** - Add route `/calling/leads/:id` for the detail page
-
-**No database changes needed** - all data already exists in the `contacts`, `call_logs`, `whatsapp_messages`, and `email_conversations` tables.
+### Summary
+A one-line fix in the frontend and two default-value corrections in the edge function. No database migration needed since the `category_id` column already accepts any integer.
 
