@@ -1,7 +1,7 @@
 project_id = "xopuasvbypkiszcqgdwm"
 
 [functions.parse-loan-document]
-verify_jwt = true
+verify_jwt = false
 
 [functions.save-draft-application]
 verify_jwt = false
@@ -22,13 +22,13 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.send-sanction-documents]
-verify_jwt = true
+verify_jwt = false
 
 [functions.whatsapp-webhook]
 verify_jwt = false
 
 [functions.videokyc-create-retry-link]
-verify_jwt = true
+verify_jwt = false
 
 [functions.videokyc-verify-token]
 verify_jwt = false
@@ -64,19 +64,19 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.equifax-credit-report]
-verify_jwt = true
+verify_jwt = false
 
 [functions.nupay-authenticate]
-verify_jwt = true
+verify_jwt = false
 
 [functions.nupay-get-banks]
-verify_jwt = true
+verify_jwt = false
 
 [functions.nupay-create-mandate]
-verify_jwt = true
+verify_jwt = false
 
 [functions.nupay-get-status]
-verify_jwt = true
+verify_jwt = false
 
 [functions.nupay-webhook-handler]
 verify_jwt = false
@@ -85,10 +85,10 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.nupay-collection-authenticate]
-verify_jwt = true
+verify_jwt = false
 
 [functions.nupay-create-upi-collection]
-verify_jwt = true
+verify_jwt = false
 
 [functions.nupay-collection-status]
 verify_jwt = false
