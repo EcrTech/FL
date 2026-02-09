@@ -91,7 +91,7 @@ export default function CreateMandateDialog({
   const [notificationEmail, setNotificationEmail] = useState(applicantEmail || "");
 
   // Determine environment based on config
-  const [environment, setEnvironment] = useState<"uat" | "production">("uat");
+  const [environment, setEnvironment] = useState<"uat" | "production">("production");
 
   // Fetch active Nupay config
   const { data: config } = useQuery({
@@ -140,7 +140,7 @@ export default function CreateMandateDialog({
       const response = await supabase.functions.invoke("nupay-create-mandate", {
         body: {
           org_id: orgId,
-          environment,
+          environment: config?.environment || environment,
           loan_application_id: loanApplicationId,
           contact_id: contactId,
           loan_no: loanNo,

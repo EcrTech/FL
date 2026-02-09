@@ -124,6 +124,7 @@ Deno.serve(async (req) => {
     const { token } = await tokenResponse.json();
 
     // Fetch Nupay config
+    console.log(`[Nupay-CreateMandate] Looking up config for org_id=${requestData.org_id}, environment=${requestData.environment}`);
     const { data: config } = await supabase
       .from("nupay_config")
       .select("*")
