@@ -191,10 +191,12 @@ export default function CreateMandateDialog({
       // Auto-match bank from prefill data
       let autoMatchedBank = false;
       if (banksData?.banks && prefillData?.bankName) {
-        const match = banksData.banks.find((b: any) =>
-          b.name.toLowerCase().includes(prefillData.bankName!.toLowerCase()) ||
-          prefillData.bankName!.toLowerCase().includes(b.name.toLowerCase())
-        );
+        const normalize = (s: string) => s.toLowerCase().replace(/\b(ltd|limited|bank)\b/g, '').replace(/\s+/g, ' ').trim();
+        const prefillNorm = normalize(prefillData.bankName);
+        const match = banksData.banks.find((b: any) => {
+          const bankNorm = normalize(b.name);
+          return bankNorm.includes(prefillNorm) || prefillNorm.includes(bankNorm);
+        });
         if (match) {
           setSelectedBankId(match.bank_id);
           setSelectedBankName(match.name);
