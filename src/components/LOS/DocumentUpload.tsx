@@ -39,7 +39,7 @@ const DOCUMENT_CATEGORIES = {
 const REQUIRED_DOCUMENTS = [
   { type: "pan_card", name: "PAN Card", category: "identity", mandatory: true, verifiable: false, parseable: true },
   { type: "aadhaar_front", name: "Aadhaar Card (Front)", category: "identity", mandatory: true, verifiable: false, parseable: true },
-  { type: "aadhaar_back", name: "Aadhaar Card (Back)", category: "identity", mandatory: true, verifiable: false, parseable: true },
+  { type: "aadhaar_back", name: "Aadhaar Card (Back)", category: "identity", mandatory: false, verifiable: false, parseable: true },
   { type: "photo", name: "Passport Photo", category: "identity", mandatory: true, verifiable: false, parseable: false },
   { type: "rental_agreement", name: "Rental Agreement", category: "address", mandatory: true, verifiable: false, parseable: true },
   { type: "utility_bill", name: "Utility Bill", category: "address", mandatory: true, verifiable: false, parseable: true },
