@@ -101,7 +101,7 @@ export default function DailyRepaymentScheduleDocument(props: DailyRepaymentSche
       </div>
 
       {/* Section 1: Borrower Information */}
-      <div className="mb-6">
+      <div className="mb-6" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
         <h3 className="text-base font-bold text-primary border-b border-primary pb-1 mb-3">
           1. BORROWER INFORMATION
         </h3>
@@ -231,7 +231,7 @@ export default function DailyRepaymentScheduleDocument(props: DailyRepaymentSche
       </div>
 
       {/* Section 5: Important Information */}
-      <div className="mb-6">
+      <div className="mb-6" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
         <h3 className="text-base font-bold text-primary border-b border-primary pb-1 mb-3">
           {props.bankName ? "5" : "4"}. IMPORTANT INFORMATION
         </h3>

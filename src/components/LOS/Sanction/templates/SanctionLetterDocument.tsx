@@ -148,7 +148,7 @@ export default function SanctionLetterDocument(props: SanctionLetterDocumentProp
         </div>
 
         {/* Terms and Conditions */}
-        <div className="mb-6">
+        <div className="mb-6" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
           <h3 className="text-base font-bold text-primary border-b border-primary pb-1 mb-3">
             TERMS AND CONDITIONS
           </h3>
@@ -169,7 +169,7 @@ export default function SanctionLetterDocument(props: SanctionLetterDocumentProp
         </div>
 
         {/* Next Steps */}
-        <div className="mt-6">
+        <div className="mt-6" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
           <h3 className="text-base font-bold text-primary border-b border-primary pb-1 mb-3">
             NEXT STEPS
           </h3>

@@ -80,7 +80,7 @@ export default function LoanAgreementDocument(props: LoanAgreementDocumentProps)
       </div>
 
       {/* Witnesseth */}
-      <div className="mb-6">
+      <div className="mb-6" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
         <h3 className="text-base font-bold mb-3">Witnesseth</h3>
         <div className="text-sm space-y-3">
           <p>
@@ -113,7 +113,7 @@ export default function LoanAgreementDocument(props: LoanAgreementDocumentProps)
       </div>
 
       {/* Borrower Acknowledgements */}
-      <div className="mb-6">
+      <div className="mb-6" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
         <h3 className="text-base font-bold mb-3">Borrower Acknowledgements and Confirmation:</h3>
         <p className="text-sm mb-2">Borrower hereby acknowledges and confirms following;</p>
         <ol className="list-decimal list-inside space-y-2 text-sm">
@@ -125,7 +125,7 @@ export default function LoanAgreementDocument(props: LoanAgreementDocumentProps)
       </div>
 
       {/* Borrower Undertaking */}
-      <div className="mb-6">
+      <div className="mb-6" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
         <h3 className="text-base font-bold mb-3">Borrower Undertaking</h3>
         <div className="text-sm space-y-3">
           <p>
@@ -171,7 +171,7 @@ export default function LoanAgreementDocument(props: LoanAgreementDocumentProps)
       </div>
 
       {/* Representations and Warranties */}
-      <div className="mb-6">
+      <div className="mb-6" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
         <h3 className="text-base font-bold mb-3">Representations and Warranties of the Parties</h3>
         <p className="text-sm mb-2">Each party to the agreement makes the following representations and warranties with respect to itself, and confirms that they are, true, correct and valid:</p>
         <ul className="list-disc list-inside space-y-2 text-sm">
@@ -182,7 +182,7 @@ export default function LoanAgreementDocument(props: LoanAgreementDocumentProps)
       </div>
 
       {/* Disbursement */}
-      <div className="mb-6">
+      <div className="mb-6" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
         <h3 className="text-base font-bold mb-3">Disbursement of the Loan</h3>
         <p className="text-sm">
           The Lender will disburse the loan by online means into the bank account of the borrower as specified by the borrower in its loan application filled on the App after the acceptance of this agreement by the Borrower within 2 working days.
@@ -190,7 +190,7 @@ export default function LoanAgreementDocument(props: LoanAgreementDocumentProps)
       </div>
 
       {/* Repayment */}
-      <div className="mb-6">
+      <div className="mb-6" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
         <h3 className="text-base font-bold mb-3">Repayment of the Loan</h3>
         <div className="text-sm space-y-3">
           <p>
@@ -216,7 +216,7 @@ export default function LoanAgreementDocument(props: LoanAgreementDocumentProps)
       </div>
 
       {/* Consequence of Default */}
-      <div className="mb-6">
+      <div className="mb-6" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
         <h3 className="text-base font-bold mb-3">Consequence of default</h3>
         <div className="text-sm space-y-3">
           <p>
@@ -232,7 +232,7 @@ export default function LoanAgreementDocument(props: LoanAgreementDocumentProps)
       </div>
 
       {/* Notices */}
-      <div className="mb-6">
+      <div className="mb-6" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
         <h3 className="text-base font-bold mb-3">Notices</h3>
         <p className="text-sm">
           All correspondence shall be addressed to the address as mentioned in the description of parties appearing in the preamble to this agreement and the registered email addresses of the parties.
@@ -240,7 +240,7 @@ export default function LoanAgreementDocument(props: LoanAgreementDocumentProps)
       </div>
 
       {/* Severability */}
-      <div className="mb-6">
+      <div className="mb-6" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
         <h3 className="text-base font-bold mb-3">Severability</h3>
         <p className="text-sm">
           If any provision of this agreement is found to be invalid or unenforceable, then the invalid or unenforceable provision will be deemed superseded by a valid enforceable provision that most closely matches the intent of the original provision and the remainder of the agreement shall continue in effect.
@@ -264,7 +264,7 @@ export default function LoanAgreementDocument(props: LoanAgreementDocumentProps)
       </div>
 
       {/* Binding Effect */}
-      <div className="mb-6">
+      <div className="mb-6" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
         <h3 className="text-base font-bold mb-3">Binding Effect</h3>
         <p className="text-sm">
           All warranties, undertakings and agreements given herein by the parties shall be binding upon the parties and upon its legal representatives and estates. This agreement (together with any amendments or modifications thereof) supersedes all prior discussions and agreements (whether oral or written) between the parties with respect to the transaction.
@@ -272,7 +272,7 @@ export default function LoanAgreementDocument(props: LoanAgreementDocumentProps)
       </div>
 
       {/* Entire Agreement */}
-      <div className="mb-6">
+      <div className="mb-6" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
         <h3 className="text-base font-bold mb-3">Entire Agreement</h3>
         <p className="text-sm">
           This agreement, along with the terms and conditions and the SCHEDULE OF LOAN DETAILS AND TERMS represents the entire agreement.
@@ -280,7 +280,7 @@ export default function LoanAgreementDocument(props: LoanAgreementDocumentProps)
       </div>
 
       {/* Miscellaneous */}
-      <div className="mb-6">
+      <div className="mb-6" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
         <h3 className="text-base font-bold mb-3">Miscellaneous</h3>
         <div className="text-sm space-y-3">
           <p><span className="font-bold">Language:</span> English shall be used in all correspondence and communications between the Parties.</p>
@@ -293,7 +293,7 @@ export default function LoanAgreementDocument(props: LoanAgreementDocumentProps)
       </div>
 
       {/* Acceptance */}
-      <div className="mb-6">
+      <div className="mb-6" style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
         <h3 className="text-base font-bold mb-3">Acceptance</h3>
         <div className="text-sm space-y-2">
           <p>The parties hereby declares as follows:</p>
