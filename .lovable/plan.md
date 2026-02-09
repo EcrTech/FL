@@ -1,53 +1,45 @@
 
 
-## Auto-Select Bank and Default to Aadhaar in eMandate Dialog
+## Skip Bank Selection Step When Bank is Auto-Matched
 
 ### Problem
 
-When opening the eMandate dialog, the user must manually search and select a bank even though bank details are already known from the application. The auth type also defaults to empty instead of Aadhaar.
+Even though we now auto-select the bank and default to Aadhaar, the user still sees the bank selection step and has to click "Next" for no reason. This step adds zero value when everything is already filled.
 
 ### Fix
 
 **File: `src/components/LOS/Mandate/CreateMandateDialog.tsx`**
 
-1. Default `authType` to `"Aadhaar"` instead of `""` when the dialog opens
-2. When `prefillData` includes a bank name, auto-match it against the fetched banks list and pre-select it -- this way the bank step shows the bank already highlighted and auth type set to Aadhaar, so the user can just click "Next"
+In the existing auto-select `useEffect` (the one that matches `prefillData.bankName` against `banksData`), after successfully setting the bank ID and name, also advance the step directly to `"account"` -- skipping the bank selection screen entirely.
 
-**File: `src/components/LOS/Mandate/BankSelector.tsx`**
-
-No changes needed -- it already visually highlights `selectedBankId`.
+Additionally, update the initial `useEffect` (dialog open reset) so that when `prefillData` is provided with a bank name, we don't hardcode step to `"bank"` -- instead we leave it for the auto-select effect to handle.
 
 ### Technical Details
 
-In `CreateMandateDialog.tsx`:
-
-1. Change the `useEffect` reset logic (line ~188) to set `authType` to `"Aadhaar"` instead of `""`
-2. Add another `useEffect` that runs when `banksData` loads: if `prefillData.bankName` exists, find the matching bank in the list (case-insensitive partial match) and call `setSelectedBankId` / `setSelectedBankName`
+Update the auto-select bank `useEffect` to also skip the step:
 
 ```typescript
-// Default auth type
-setAuthType("Aadhaar");
-
-// Auto-select bank from prefill data when banks load
 useEffect(() => {
   if (banksData?.banks && prefillData?.bankName && !selectedBankId) {
-    const match = banksData.banks.find(b => 
-      b.name.toLowerCase().includes(prefillData.bankName.toLowerCase()) ||
-      prefillData.bankName.toLowerCase().includes(b.name.toLowerCase())
+    const match = banksData.banks.find((b: any) =>
+      b.name.toLowerCase().includes(prefillData.bankName!.toLowerCase()) ||
+      prefillData.bankName!.toLowerCase().includes(b.name.toLowerCase())
     );
     if (match) {
       setSelectedBankId(match.bank_id);
       setSelectedBankName(match.name);
+      setStep("account"); // Skip bank step entirely
     }
   }
-}, [banksData, prefillData]);
+}, [banksData, prefillData, selectedBankId]);
 ```
+
+The "Back" button on the account step still navigates to the bank step (`setStep("bank")`), so if the user wants to change the bank, they can still go back.
 
 ### Changes
 
 | File | Change |
 |---|---|
-| `CreateMandateDialog.tsx` | Default authType to "Aadhaar"; auto-select bank from prefill data when bank list loads |
+| `CreateMandateDialog.tsx` | Add `setStep("account")` inside the auto-select bank effect when a match is found |
 
 No database changes needed.
-
