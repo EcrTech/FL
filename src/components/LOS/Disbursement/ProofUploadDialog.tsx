@@ -167,11 +167,23 @@ export default function ProofUploadDialog({
 
       if (updateError) throw updateError;
 
+      // Update loan application stage to "disbursed"
+      const { error: stageError } = await supabase
+        .from("loan_applications")
+        .update({
+          current_stage: "disbursed",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", applicationId);
+
+      if (stageError) throw stageError;
+
       return { extractedUtr, extractedDate };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["loan-disbursements"] });
       queryClient.invalidateQueries({ queryKey: ["unified-disbursals"] });
+      queryClient.invalidateQueries({ queryKey: ["loan-applications"] });
       
       if (data.extractedUtr) {
         toast.success(`Disbursement completed! UTR: ${data.extractedUtr}`);
