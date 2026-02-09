@@ -213,7 +213,7 @@ export default function BulkPaymentReport() {
                       <TableHead>Beneficiary Name</TableHead>
                       <TableHead>Account No</TableHead>
                       <TableHead>IFSC</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead className="text-right">Net Disbursal</TableHead>
                       <TableHead>Loan ID</TableHead>
                       <TableHead>Mobile</TableHead>
                     </TableRow>
