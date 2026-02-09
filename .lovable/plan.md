@@ -1,62 +1,69 @@
 
 
-## Bulk Payment (BLKPAY) Excel Report Generator
+## Fix: Signed Document Not Viewable
 
-### Overview
-Add a "Bulk Payment Report" feature to the LOS Dashboard that generates an Excel file in the standard Indian bank NEFT/RTGS bulk payment format (BLKPAY_YYYYMMDD.xlsx). This report will pull data from disbursement-pending and disbursed loan applications and format it for direct upload to banking portals.
+### Root Cause
 
-### Standard BLKPAY Format Columns
-Based on the standard Indian bank bulk payment file format, the report will include:
+The e-sign edge function (`nupay-esign-status`) stores signed documents at:
+```
+signed/{application_id}/combined_loan_pack_signed_xxx.pdf
+```
 
-| Column | Description | Data Source |
-|---|---|---|
-| Sr No | Serial number | Auto-generated |
-| Transaction Type | NEFT / RTGS / IMPS | `loan_disbursements.payment_mode` |
-| Beneficiary Name | Account holder name | `loan_applicants.bank_account_holder_name` |
-| Beneficiary Account No | Bank account number | `loan_applicants.bank_account_number` |
-| IFSC Code | Bank IFSC code | `loan_applicants.bank_ifsc_code` |
-| Amount | Net disbursement amount | `loan_sanctions.net_disbursement_amount` |
-| Loan ID | Loan reference number | `loan_applications.loan_id` or `application_number` |
-| Email | Borrower email (optional) | `loan_applicants.email` |
-| Mobile | Borrower mobile | `loan_applicants.mobile` |
-| Remarks | Payment narration | Auto-generated (e.g., "LOAN DISB {application_number}") |
+But the storage security policy for viewing files in the `loan-documents` bucket requires the **first folder** in the path to match the user's **org_id**:
+```
+(storage.foldername(name))[1] must match profiles.org_id
+```
 
-### Implementation
+So the signed document exists in storage but the app cannot read it because the path `signed/...` does not start with the org_id.
 
-#### 1. Install `xlsx` package
-The project currently only supports CSV export. To generate proper `.xlsx` files, we need the `xlsx` (SheetJS) library.
+For comparison, the manual upload dialog correctly uses:
+```
+{orgId}/{applicationId}/signed/{file}
+```
 
-#### 2. Create `src/utils/bulkPaymentExport.ts`
-A utility function that:
-- Accepts an array of loan application data (with applicant, sanction, and disbursement details)
-- Maps the data into the BLKPAY column format
-- Generates an `.xlsx` file with the filename `BLKPAY_YYYYMMDD.xlsx` (using current date)
-- Triggers a browser download
+### Fix (Two Parts)
 
-#### 3. Create `src/components/LOS/Reports/BulkPaymentReport.tsx`
-A new component (accessible from the LOS Dashboard or a Reports section) that:
-- Shows a date filter to select disbursement date range
-- Queries `loan_applications` joined with `loan_applicants`, `loan_sanctions`, and `loan_disbursements` for applications in `disbursement_pending` or `disbursed` stage
-- Displays a preview table of the data
-- Has a "Download BLKPAY Report" button that generates and downloads the Excel file
-- Includes status filter (e.g., only pending disbursements, or all)
+#### 1. Fix the edge function path (prevent future issues)
 
-#### 4. Add route and navigation
-- Add a route at `/los/bulk-payment-report`
-- Add a quick action button on the LOS Dashboard or in the sidebar navigation to access this report
+Update `supabase/functions/nupay-esign-status/index.ts` to include the org_id as the first folder in the signed document path, matching the pattern used by the manual upload:
+
+```
+Before: signed/{application_id}/{document_type}_signed_{timestamp}.pdf
+After:  {org_id}/{application_id}/signed/{document_type}_signed_{timestamp}.pdf
+```
+
+This requires fetching the `org_id` from the `loan_applications` table (or from the `document_esign_requests` record).
+
+#### 2. Fix the existing Anupam Roy record (fix current data)
+
+Run a storage move or update the `signed_document_path` in the `loan_generated_documents` table after moving the file to the correct org-prefixed path. Alternatively, add a storage policy that also allows access to the `signed/` prefix for authenticated users.
+
+**Recommended approach**: Add a supplementary storage SELECT policy that allows authenticated users to also access files under the `signed/` prefix. This immediately fixes Anupam Roy's record and any other legacy signed docs, while also updating the edge function for future correctness.
 
 ### Technical Details
 
-**File changes:**
-| File | Action |
+| File | Change |
 |---|---|
-| `package.json` | Add `xlsx` dependency |
-| `src/utils/bulkPaymentExport.ts` | New -- Excel generation utility |
-| `src/components/LOS/Reports/BulkPaymentReport.tsx` | New -- Report UI with filters and preview |
-| `src/pages/LOS/Dashboard.tsx` | Add quick action link to bulk payment report |
-| Router config file | Add `/los/bulk-payment-report` route |
+| `supabase/functions/nupay-esign-status/index.ts` | Update signed document upload path to include org_id as first folder |
+| Database migration | Add storage policy: allow authenticated users to SELECT from `loan-documents` where path starts with `signed/` |
 
-**Data query:** The report will join `loan_applications`, `loan_applicants` (primary), `loan_sanctions`, and `loan_disbursements` to gather all required fields in a single query.
+### Storage Policy SQL
 
-**Note:** Since I could not read the uploaded Excel file directly, the column structure is based on the standard Indian bank bulk payment format. If your bank requires different or additional columns, we can adjust after you review the first output.
+```sql
+CREATE POLICY "Authenticated users can view signed loan documents"
+ON storage.objects FOR SELECT
+TO authenticated
+USING (
+  bucket_id = 'loan-documents' 
+  AND (storage.foldername(name))[1] = 'signed'
+);
+```
 
+### Edge Function Path Fix
+
+Both upload locations in the edge function (around lines 279 and 371) will be updated to:
+```typescript
+const fileName = `${orgId}/${esignRecord.application_id}/signed/${esignRecord.document_type}_signed_${Date.now()}.pdf`;
+```
+
+The `org_id` will be fetched from the `loan_applications` table using the `application_id` already available in the e-sign record.
