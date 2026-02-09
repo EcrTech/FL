@@ -438,6 +438,14 @@ export default function LOSDashboard() {
                   <span>All Applications</span>
                 </Button>
               )}
+              <Button
+                variant="outline"
+                className="h-auto py-4 flex-col gap-2"
+                onClick={() => navigate("/los/bulk-payment-report")}
+              >
+                <FileText className="h-6 w-6" />
+                <span>Bulk Payment Report</span>
+              </Button>
             </div>
           </CardContent>
         </Card>
