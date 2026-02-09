@@ -1,23 +1,22 @@
 
 
-## Fix: Bulk Payment Report Showing No Records
+## Fix: Remove Non-Existent Column from SELECT
 
 ### Root Cause
-The query in `BulkPaymentReport.tsx` filters on `.eq("loan_applicants.is_primary", true)` (line 70), but the `loan_applicants` table has no `is_primary` column. The correct column is `applicant_type` with the value `"primary"`.
-
-Because the join uses `!inner`, this mismatch causes **all rows to be filtered out**, which is why the report is completely empty -- not just missing Anupam Roy.
+The previous fix corrected the `.eq()` filter to use `applicant_type`, but the `select()` statement on line 59 still includes `is_primary` -- a column that does not exist in the `loan_applicants` table. This causes the query to error out silently, returning no records.
 
 ### Fix
 
-**File: `src/components/LOS/Reports/BulkPaymentReport.tsx` (line 70)**
+**File: `src/components/LOS/Reports/BulkPaymentReport.tsx` (line 59)**
 
-Change:
+Remove `is_primary` from the select clause (or replace it with `applicant_type` if needed elsewhere):
+
 ```typescript
-.eq("loan_applicants.is_primary", true)
-```
-To:
-```typescript
-.eq("loan_applicants.applicant_type", "primary")
+// Line 59 - Change:
+is_primary
+
+// To:
+applicant_type
 ```
 
 Single line change. No database modifications needed.
