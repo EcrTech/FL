@@ -169,12 +169,11 @@ export default function CreateMandateDialog({
     },
     onSuccess: (data) => {
       toast.success("eMandate registration initiated");
-      queryClient.invalidateQueries({ queryKey: ["nupay-mandates"] });
-      
       if (data.registration_url) {
         setRegistrationUrl(data.registration_url);
         setStep("success");
       } else {
+        queryClient.invalidateQueries({ queryKey: ["nupay-mandates"] });
         onOpenChange(false);
       }
     },
@@ -189,32 +188,34 @@ export default function CreateMandateDialog({
 
   // Reset form when dialog opens
   useEffect(() => {
-    if (open) {
-      setSelectedBankId(null);
-      setSelectedBankName("");
-      setAuthType("Aadhaar");
-      setStep("bank");
-
-      // Prefill from previous mandate if provided
-      if (prefillData) {
-        setAccountHolderName(prefillData.accountHolderName || applicantName);
-        setBankAccountNo(prefillData.bankAccountNo || "");
-        setBankAccountNoConfirm(prefillData.bankAccountNo || "");
-        setIfscCode(prefillData.ifsc || "");
-        setAccountType((prefillData.accountType as "Savings" | "Current") || "Savings");
-      } else {
-        setAccountHolderName(applicantName);
-        setBankAccountNo("");
-        setBankAccountNoConfirm("");
-        setIfscCode("");
-        setAccountType("Savings");
-      }
-      setNotificationPhone(applicantPhone);
-      setNotificationEmail(applicantEmail);
-      setRegistrationUrl(null);
-      setShowQR(false);
+    if (!open) {
+      queryClient.invalidateQueries({ queryKey: ["nupay-mandates"] });
+      return;
     }
-  }, [open, applicantName, loanAmount, tenure, prefillData]);
+    setSelectedBankId(null);
+    setSelectedBankName("");
+    setAuthType("Aadhaar");
+    setStep("bank");
+
+    // Prefill from previous mandate if provided
+    if (prefillData) {
+      setAccountHolderName(prefillData.accountHolderName || applicantName);
+      setBankAccountNo(prefillData.bankAccountNo || "");
+      setBankAccountNoConfirm(prefillData.bankAccountNo || "");
+      setIfscCode(prefillData.ifsc || "");
+      setAccountType((prefillData.accountType as "Savings" | "Current") || "Savings");
+    } else {
+      setAccountHolderName(applicantName);
+      setBankAccountNo("");
+      setBankAccountNoConfirm("");
+      setIfscCode("");
+      setAccountType("Savings");
+    }
+    setNotificationPhone(applicantPhone);
+    setNotificationEmail(applicantEmail);
+    setRegistrationUrl(null);
+    setShowQR(false);
+  }, [open, applicantName, loanAmount, tenure, prefillData, queryClient]);
 
   // Auto-match bank from prefill data once banks are loaded
   useEffect(() => {
