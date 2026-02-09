@@ -1,17 +1,28 @@
 
 
-## Change Mandate Sequence Type from OOFF to RCUR
+## Auto-Transition to "Disbursed" Stage After Proof Upload
 
-Per Nupay's recommendation, the mandate sequence type needs to be changed from `OOFF` (One-Off) to `RCUR` (Recurring) to resolve the frequency validation error.
+### Problem
+After uploading the disbursement UTR proof, the `loan_disbursements` record is marked as `completed`, but the parent `loan_applications.current_stage` remains at `disbursement_pending`. The application never moves to `disbursed`.
 
-### Changes
+### Fix
 
-**File 1: `src/components/LOS/Mandate/CreateMandateDialog.tsx`**
-- Line 147: Change `seq_type: "OOFF"` to `seq_type: "RCUR"`
+**File: `src/components/LOS/Disbursement/ProofUploadDialog.tsx`**
 
-**File 2: `supabase/functions/nupay-create-mandate/index.ts`**
-- The edge function already passes through `requestData.seq_type` directly, so no change needed there -- the frontend value flows through automatically.
+After the disbursement record is updated to `status: "completed"` (around line 163-168), add a follow-up query to update the loan application's stage:
+
+```typescript
+// Update loan application stage to "disbursed"
+await supabase
+  .from("loan_applications")
+  .update({
+    current_stage: "disbursed",
+    updated_at: new Date().toISOString(),
+  })
+  .eq("id", applicationId);
+```
+
+This mirrors the same pattern used in `SanctionGenerator.tsx` (which updates the stage to `disbursement_pending` after creating a sanction).
 
 ### Summary
-A single-line change in the frontend component. The edge function maps `seq_type` to `seq_tp` in the Nupay payload and passes it through as-is, so only the source value needs updating.
-
+A single addition (~6 lines) in ProofUploadDialog.tsx to transition the loan application to the `disbursed` stage once the UTR proof is uploaded and the disbursement is marked complete. No database migration needed.
