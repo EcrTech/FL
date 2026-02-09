@@ -1,69 +1,63 @@
 
 
-## Fix: Signed Document Not Viewable
+## Rebuild Leads Page as CRM Table + Lead Detail Page
 
-### Root Cause
+The current `/calling/upload-leads` page is still using the old spread-out card layout with separate sections for manual entry, CSV upload, and preview. It needs to be completely rebuilt into a compact CRM-style interface (like the reference screenshots), plus a new Lead Detail page.
 
-The e-sign edge function (`nupay-esign-status`) stores signed documents at:
-```
-signed/{application_id}/combined_loan_pack_signed_xxx.pdf
-```
+---
 
-But the storage security policy for viewing files in the `loan-documents` bucket requires the **first folder** in the path to match the user's **org_id**:
-```
-(storage.foldername(name))[1] must match profiles.org_id
-```
+### Page 1: Leads Table (`/calling/upload-leads`)
 
-So the signed document exists in storage but the app cannot read it because the path `signed/...` does not start with the org_id.
+**Layout (matching the Pipeline Board reference):**
+- **Header**: "Leads" title with two action buttons top-right: "+ Add Lead" and "Upload CSV"
+- **"+ Add Lead"** opens a compact dialog/modal with Name + Phone fields
+- **"Upload CSV"** triggers a file picker (same CSV parsing logic)
+- **Search bar** below header to filter leads by name or phone
+- **CRM Table** showing all `calling_upload` leads from the database (not just session-uploaded ones), with columns:
+  - Name
+  - Phone
+  - Source
+  - Created (date)
+  - Actions: Call icon (tel: link), WhatsApp icon (opens WhatsAppChatDialog), View button (navigates to detail page)
+- Data fetched via `useQuery` from `contacts` table filtered by `source = 'calling_upload'` and current org
 
-For comparison, the manual upload dialog correctly uses:
-```
-{orgId}/{applicationId}/signed/{file}
-```
+**Key changes from current:**
+- Remove the 3 separate Card sections (manual entry, CSV upload, preview)
+- Fetch existing leads from DB on page load instead of only showing session-uploaded leads
+- Compact inline action buttons per row
 
-### Fix (Two Parts)
+---
 
-#### 1. Fix the edge function path (prevent future issues)
+### Page 2: Lead Detail (`/calling/leads/:id` - new file)
 
-Update `supabase/functions/nupay-esign-status/index.ts` to include the org_id as the first folder in the signed document path, matching the pattern used by the manual upload:
+**Layout (matching the Lead Detail reference):**
+- **Back button** + Lead name as page title
+- **Left sidebar card**: Contact Information
+  - Phone, email (if any), company, city, source, created date, assigned to
+- **Right content area**: "Activities & Notes" with tabs
+  - **Journey tab**: Chronological timeline aggregating `call_logs`, `whatsapp_messages`, and `email_conversations` for this contact
+  - **Notes tab**: Display and add notes (from `contacts.notes` field)
+- **Action buttons** in header: Call, WhatsApp icons
 
-```
-Before: signed/{application_id}/{document_type}_signed_{timestamp}.pdf
-After:  {org_id}/{application_id}/signed/{document_type}_signed_{timestamp}.pdf
-```
-
-This requires fetching the `org_id` from the `loan_applications` table (or from the `document_esign_requests` record).
-
-#### 2. Fix the existing Anupam Roy record (fix current data)
-
-Run a storage move or update the `signed_document_path` in the `loan_generated_documents` table after moving the file to the correct org-prefixed path. Alternatively, add a storage policy that also allows access to the `signed/` prefix for authenticated users.
-
-**Recommended approach**: Add a supplementary storage SELECT policy that allows authenticated users to also access files under the `signed/` prefix. This immediately fixes Anupam Roy's record and any other legacy signed docs, while also updating the edge function for future correctness.
+---
 
 ### Technical Details
 
-| File | Change |
-|---|---|
-| `supabase/functions/nupay-esign-status/index.ts` | Update signed document upload path to include org_id as first folder |
-| Database migration | Add storage policy: allow authenticated users to SELECT from `loan-documents` where path starts with `signed/` |
+**Files to modify:**
+1. **`src/pages/CallingUploadLeads.tsx`** - Complete rewrite into CRM table view
+   - Use `useQuery` to fetch contacts where `source = 'calling_upload'` and `org_id` matches
+   - Add Lead dialog using existing Dialog component
+   - Search filter (client-side on name/phone)
+   - Row actions: Call (tel: link), WhatsApp (WhatsAppChatDialog), View (navigate to detail)
 
-### Storage Policy SQL
+2. **`src/pages/CallingLeadDetail.tsx`** - New file
+   - Fetch single contact by ID
+   - Left panel: contact info card
+   - Right panel: tabbed timeline (Journey, Notes)
+   - Journey aggregates from `call_logs`, `whatsapp_messages`, `email_conversations` joined on `contact_id`
+   - Notes section with ability to update `contacts.notes`
 
-```sql
-CREATE POLICY "Authenticated users can view signed loan documents"
-ON storage.objects FOR SELECT
-TO authenticated
-USING (
-  bucket_id = 'loan-documents' 
-  AND (storage.foldername(name))[1] = 'signed'
-);
-```
+3. **`src/App.tsx`** - Add route `/calling/leads/:id` for the detail page
 
-### Edge Function Path Fix
+**No database changes needed** - all data already exists in the `contacts`, `call_logs`, `whatsapp_messages`, and `email_conversations` tables.
 
-Both upload locations in the edge function (around lines 279 and 371) will be updated to:
-```typescript
-const fileName = `${orgId}/${esignRecord.application_id}/signed/${esignRecord.document_type}_signed_${Date.now()}.pdf`;
-```
-
-The `org_id` will be fetched from the `loan_applications` table using the `application_id` already available in the e-sign record.
