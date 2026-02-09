@@ -107,7 +107,7 @@ export default function CombinedLoanPackCard({
   const sanctionDoc = generatedDocs.find(d => d.document_type === "sanction_letter");
   const agreementDoc = generatedDocs.find(d => d.document_type === "loan_agreement");
   const scheduleDoc = generatedDocs.find(d => d.document_type === "daily_schedule");
-  const kfsDoc = generatedDocs.find(d => d.document_type === "key_fact_statement");
+  const kfsDoc = generatedDocs.find(d => d.document_type === "kfs");
   const combinedDoc = generatedDocs.find(d => d.document_type === "combined_loan_pack");
 
   const isCombinedGenerated = !!combinedDoc;
@@ -120,7 +120,7 @@ export default function CombinedLoanPackCard({
     if (!sanctionDoc) missingTypes.push("sanction_letter");
     if (!agreementDoc) missingTypes.push("loan_agreement");
     if (!scheduleDoc) missingTypes.push("daily_schedule");
-    if (!kfsDoc) missingTypes.push("key_fact_statement");
+    if (!kfsDoc) missingTypes.push("kfs");
 
     if (missingTypes.length > 0) {
       const inserts = missingTypes.map(docType => ({
