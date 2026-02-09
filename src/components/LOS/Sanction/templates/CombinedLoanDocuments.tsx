@@ -25,6 +25,7 @@ export interface CombinedLoanDocumentsProps {
   borrowerPhone: string;
   borrowerPAN?: string;
   borrowerAadhaar?: string;
+  borrowerEmail?: string;
   
   // Loan Details
   loanAmount: number;
@@ -107,6 +108,7 @@ export default function CombinedLoanDocuments(props: CombinedLoanDocumentsProps)
         borrowerPhone={props.borrowerPhone}
         borrowerPAN={props.borrowerPAN}
         borrowerAadhaar={props.borrowerAadhaar}
+        borrowerEmail={props.borrowerEmail}
         loanAmount={props.loanAmount}
         tenureDays={props.tenureDays}
         interestRate={props.interestRate}
