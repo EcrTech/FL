@@ -1,28 +1,38 @@
 
-
-## Auto-Transition to "Disbursed" Stage After Proof Upload
+## Fix Disbursals Page to Show Cases Ready for Disbursal
 
 ### Problem
-After uploading the disbursement UTR proof, the `loan_disbursements` record is marked as `completed`, but the parent `loan_applications.current_stage` remains at `disbursement_pending`. The application never moves to `disbursed`.
+The Disbursals page shows "No disbursals found" because the code checks if `sanction_letter` AND `loan_agreement` are individually signed (`customer_signed = true`). However, in your actual workflow, the customer signs the **combined_loan_pack** document, not the individual documents. So the signing check never passes.
+
+For Anupam Roy's case:
+- Stage is correctly `disbursement_pending`
+- eMandate is `accepted` (signed)
+- `combined_loan_pack` is signed -- but `sanction_letter` and `loan_agreement` individually are not
+- Result: the case is filtered out and never shown
 
 ### Fix
 
-**File: `src/components/LOS/Disbursement/ProofUploadDialog.tsx`**
+**File: `src/pages/LOS/Disbursals.tsx` (lines 103-113)**
 
-After the disbursement record is updated to `status: "completed"` (around line 163-168), add a follow-up query to update the loan application's stage:
+Update the document signing check to accept the `combined_loan_pack` being signed as sufficient (since that's the actual workflow), while still accepting individual signatures as a fallback:
 
 ```typescript
-// Update loan application stage to "disbursed"
-await supabase
-  .from("loan_applications")
-  .update({
-    current_stage: "disbursed",
-    updated_at: new Date().toISOString(),
-  })
-  .eq("id", applicationId);
+// Current (broken):
+const sanctionSigned = docs?.find(d => d.document_type === "sanction_letter")?.customer_signed;
+const agreementSigned = docs?.find(d => d.document_type === "loan_agreement")?.customer_signed;
+if (sanctionSigned && agreementSigned && !existingDisbursement) {
+
+// Fixed:
+const combinedSigned = docs?.find(d => d.document_type === "combined_loan_pack")?.customer_signed;
+const sanctionSigned = docs?.find(d => d.document_type === "sanction_letter")?.customer_signed;
+const agreementSigned = docs?.find(d => d.document_type === "loan_agreement")?.customer_signed;
+const documentsReady = combinedSigned || (sanctionSigned && agreementSigned);
+if (documentsReady && !existingDisbursement) {
 ```
 
-This mirrors the same pattern used in `SanctionGenerator.tsx` (which updates the stage to `disbursement_pending` after creating a sanction).
+This means a case is ready for disbursal if either:
+1. The combined loan pack is signed, OR
+2. Both individual documents (sanction letter + loan agreement) are signed
 
 ### Summary
-A single addition (~6 lines) in ProofUploadDialog.tsx to transition the loan application to the `disbursed` stage once the UTR proof is uploaded and the disbursement is marked complete. No database migration needed.
+A single condition change in `Disbursals.tsx`. No database changes needed.
