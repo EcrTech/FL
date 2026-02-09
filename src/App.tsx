@@ -61,6 +61,7 @@ import Disbursals from "./pages/LOS/Disbursals";
 import NupaySettings from "./pages/LOS/NupaySettings";
 import ReferralLoanApplication from "./pages/ReferralLoanApplication";
 import NegativePinCodes from "./pages/NegativePinCodes";
+import BulkPaymentReport from "./components/LOS/Reports/BulkPaymentReport";
 import Profile from "./pages/Profile";
 
 import VideoKYC from "./pages/VideoKYC";
@@ -375,6 +376,12 @@ const App = () => {
             <Route path="/los/negative-pincodes" element={
               <ProtectedRoute requiredRole="admin">
                 <NegativePinCodes />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/los/bulk-payment-report" element={
+              <ProtectedRoute>
+                <BulkPaymentReport />
               </ProtectedRoute>
             } />
             
