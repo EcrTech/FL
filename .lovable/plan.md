@@ -1,63 +1,26 @@
 
 
-## Merge Bank Auto-Select into Reset Effect
+## Fix: Redeploy nupay-create-mandate Edge Function
 
-### Problem
-Two competing `useEffect` hooks cause a race condition. The reset effect always sets `step = "bank"`, and the separate auto-select effect never re-fires because its dependency (`selectedBankId`) doesn't actually change (it was already `null`).
+### Root Cause
 
-### Fix
+The `verify_jwt = false` change in `supabase/config.toml` was saved correctly, but the edge function gateway hasn't picked up the updated configuration. The function needs to be explicitly redeployed so the gateway applies the new `verify_jwt = false` setting.
 
-**File: `src/components/LOS/Mandate/CreateMandateDialog.tsx`**
+The logs confirm this: the function boots but no request-level logs appear, meaning the gateway is rejecting the request **before** it reaches your code.
 
-1. Move the bank-matching logic into the existing reset `useEffect` (lines 185-212), right after resetting state. If a match is found, set the bank ID/name and set step to `"account"` instead of `"bank"`.
-2. Delete the separate auto-select `useEffect` (lines 214-227) entirely.
-3. Add `banksData` to the reset effect's dependency array.
+### Plan
 
-### Technical Details
+1. **Redeploy the `nupay-create-mandate` function** -- This is the only action needed. No code changes required. The existing code and config are correct; the deployment just needs to be refreshed so the gateway stops enforcing JWT verification at the gateway level.
 
-The reset effect becomes:
+2. **Verify the fix** -- After redeployment, test the mandate creation flow again from the sanctions page.
 
-```typescript
-useEffect(() => {
-  if (open) {
-    setSelectedBankId(null);
-    setSelectedBankName("");
-    setAuthType("Aadhaar");
+### Technical Detail
 
-    // Auto-match bank from prefill data
-    let autoMatchedBank = false;
-    if (banksData?.banks && prefillData?.bankName) {
-      const match = banksData.banks.find((b: any) =>
-        b.name.toLowerCase().includes(prefillData.bankName!.toLowerCase()) ||
-        prefillData.bankName!.toLowerCase().includes(b.name.toLowerCase())
-      );
-      if (match) {
-        setSelectedBankId(match.bank_id);
-        setSelectedBankName(match.name);
-        autoMatchedBank = true;
-      }
-    }
-
-    setStep(autoMatchedBank ? "account" : "bank");
-
-    // Prefill account fields (unchanged)
-    if (prefillData) {
-      setAccountHolderName(prefillData.accountHolderName || applicantName);
-      // ... rest unchanged
-    } else {
-      // ... rest unchanged
-    }
-    // ... rest unchanged
-  }
-}, [open, applicantName, loanAmount, tenure, prefillData, banksData]);
-```
-
-Delete lines 214-227 (the separate auto-select `useEffect`).
-
-### Changes
-
-| File | Change |
+| Item | Status |
 |---|---|
-| `CreateMandateDialog.tsx` | Merge bank matching into reset effect; remove separate auto-select hook; add `banksData` to deps |
+| `config.toml` `verify_jwt = false` | Already correct |
+| Edge function code (in-code auth via `getUser`) | Already correct |
+| Function deployment | Needs refresh |
 
-No database changes needed.
+No file changes are needed -- only a redeployment of the function.
+
