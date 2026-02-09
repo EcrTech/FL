@@ -22,6 +22,7 @@ import Connectors from "./pages/Connectors";
 import CallingDashboard from "./pages/CallingDashboard";
 import CallLogs from "./pages/CallLogs";
 import CallingUploadLeads from "./pages/CallingUploadLeads";
+import CallingLeadDetail from "./pages/CallingLeadDetail";
 import ExotelSettings from "./pages/ExotelSettings";
 import PublicForm from "./pages/PublicForm";
 import PublicLoanApplication from "./pages/PublicLoanApplication";
@@ -142,6 +143,12 @@ const App = () => {
             <Route path="/calling/upload-leads" element={
               <ProtectedRoute>
                 <CallingUploadLeads />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/calling/leads/:id" element={
+              <ProtectedRoute>
+                <CallingLeadDetail />
               </ProtectedRoute>
             } />
             
