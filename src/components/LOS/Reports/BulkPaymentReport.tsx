@@ -35,6 +35,7 @@ export default function BulkPaymentReport() {
   const [fromDate, setFromDate] = useState(format(subDays(new Date(), 30), "yyyy-MM-dd"));
   const [toDate, setToDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [stageFilter, setStageFilter] = useState<string>("all");
+  const [debitAccountNumber, setDebitAccountNumber] = useState("");
 
   const { data: records = [], isLoading } = useQuery({
     queryKey: ["bulk-payment-report", orgId, fromDate, toDate, stageFilter],
@@ -106,7 +107,7 @@ export default function BulkPaymentReport() {
       toast.error("No records to export");
       return;
     }
-    generateBulkPaymentExcel(mappedRows);
+    generateBulkPaymentExcel(mappedRows, debitAccountNumber);
     toast.success(`Downloaded BLKPAY report with ${mappedRows.length} records`);
   };
 
@@ -169,6 +170,16 @@ export default function BulkPaymentReport() {
                      <SelectItem value="disbursed">Disbursed</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Debit Account Number</Label>
+                <Input
+                  type="text"
+                  placeholder="Company bank A/C"
+                  value={debitAccountNumber}
+                  onChange={(e) => setDebitAccountNumber(e.target.value)}
+                  className="w-48"
+                />
               </div>
               <Button onClick={handleDownload} disabled={mappedRows.length === 0}>
                 <Download className="h-4 w-4 mr-2" />
