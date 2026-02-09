@@ -219,8 +219,9 @@ export default function CreateMandateDialog({
         prefillData.bankName!.toLowerCase().includes(b.name.toLowerCase())
       );
       if (match) {
-        setSelectedBankId(match.bank_id);
+      setSelectedBankId(match.bank_id);
         setSelectedBankName(match.name);
+        setStep("account");
       }
     }
   }, [banksData, prefillData, selectedBankId]);
