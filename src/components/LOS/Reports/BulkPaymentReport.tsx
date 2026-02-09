@@ -67,7 +67,7 @@ export default function BulkPaymentReport() {
           )
         `)
         .eq("org_id", orgId)
-        .eq("loan_applicants.is_primary", true)
+        .eq("loan_applicants.applicant_type", "primary")
         .gte("created_at", `${fromDate}T00:00:00`)
         .lte("created_at", `${toDate}T23:59:59`);
 
