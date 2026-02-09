@@ -275,8 +275,8 @@ serve(async (req) => {
             throw new Error("No signed document data available");
           }
 
-          // Upload to Supabase Storage
-          const fileName = `signed/${esignRecord.application_id}/${esignRecord.document_type}_signed_${Date.now()}.pdf`;
+          // Upload to Supabase Storage with org_id prefix for RLS compliance
+          const fileName = `${org_id}/${esignRecord.application_id}/signed/${esignRecord.document_type}_signed_${Date.now()}.pdf`;
           console.log("[E-Sign-Status] Uploading signed PDF to storage:", fileName);
 
           const { error: uploadError } = await supabase.storage
@@ -367,8 +367,8 @@ serve(async (req) => {
             }
 
             if (pdfBuffer && pdfBuffer.length > 0) {
-              // Upload to Supabase Storage
-              const fileName = `signed/${esignRecord.application_id}/${esignRecord.document_type}_signed_${Date.now()}.pdf`;
+              // Upload to Supabase Storage with org_id prefix for RLS compliance
+              const fileName = `${org_id}/${esignRecord.application_id}/signed/${esignRecord.document_type}_signed_${Date.now()}.pdf`;
               console.log("[E-Sign-Status] Uploading signed PDF to storage:", fileName);
 
               const { error: uploadError } = await supabase.storage
