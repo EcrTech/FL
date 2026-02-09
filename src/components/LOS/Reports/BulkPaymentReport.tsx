@@ -60,6 +60,8 @@ export default function BulkPaymentReport() {
             applicant_type
           ),
           loan_sanctions (
+            sanctioned_amount,
+            processing_fee,
             net_disbursement_amount
           ),
           loan_disbursements (
@@ -95,7 +97,12 @@ export default function BulkPaymentReport() {
       beneficiaryName: applicant?.bank_account_holder_name || `${applicant?.first_name || ""} ${applicant?.last_name || ""}`.trim(),
       accountNumber: applicant?.bank_account_number || "",
       ifscCode: applicant?.bank_ifsc_code || "",
-      amount: sanction?.net_disbursement_amount || 0,
+      amount: (() => {
+        const sanctionedAmt = sanction?.sanctioned_amount || 0;
+        const procFee = sanction?.processing_fee || Math.round(sanctionedAmt * 0.10);
+        const gst = Math.round(procFee * 0.18);
+        return sanctionedAmt - procFee - gst;
+      })(),
       paymentMode: disbursement?.payment_mode || "NEFT",
       email: applicant?.email || "",
       mobile: applicant?.mobile || "",
