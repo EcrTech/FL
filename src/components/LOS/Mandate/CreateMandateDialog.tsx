@@ -407,7 +407,7 @@ export default function CreateMandateDialog({
           <div className="space-y-4">
             <div className="bg-muted p-3 rounded-lg space-y-1">
               <p className="text-xs text-muted-foreground">Payment Type</p>
-              <p className="font-medium text-sm">One-Time Bullet Payment (NACH OOFF / Adhoc)</p>
+              <p className="font-medium text-sm">Recurring Bullet Payment (NACH RCUR / Adhoc)</p>
             </div>
             <div>
               <Label htmlFor="amount">Collection Amount (Total Repayment)</Label>
