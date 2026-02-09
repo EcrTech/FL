@@ -187,7 +187,7 @@ export default function CreateMandateDialog({
       setStep("bank");
       setSelectedBankId(null);
       setSelectedBankName("");
-      setAuthType("");
+      setAuthType("Aadhaar");
       // Prefill from previous mandate if provided
       if (prefillData) {
         setAccountHolderName(prefillData.accountHolderName || applicantName);
@@ -210,6 +210,20 @@ export default function CreateMandateDialog({
       setShowQR(false);
     }
   }, [open, applicantName, loanAmount, tenure, prefillData]);
+
+  // Auto-select bank from prefill data when banks load
+  useEffect(() => {
+    if (banksData?.banks && prefillData?.bankName && !selectedBankId) {
+      const match = banksData.banks.find((b: any) =>
+        b.name.toLowerCase().includes(prefillData.bankName!.toLowerCase()) ||
+        prefillData.bankName!.toLowerCase().includes(b.name.toLowerCase())
+      );
+      if (match) {
+        setSelectedBankId(match.bank_id);
+        setSelectedBankName(match.name);
+      }
+    }
+  }, [banksData, prefillData, selectedBankId]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
