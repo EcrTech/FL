@@ -68,8 +68,9 @@ Deno.serve(async (req) => {
     );
 
     if (userError || !user) {
+      console.error("[Nupay-CreateMandate] Auth error:", userError?.message);
       return new Response(
-        JSON.stringify({ error: "Invalid authorization token" }),
+        JSON.stringify({ error: "Session expired or invalid. Please log in again.", code: "SESSION_EXPIRED" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
