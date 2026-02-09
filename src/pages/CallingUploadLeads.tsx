@@ -5,13 +5,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Upload, Plus, Trash2, FileSpreadsheet, UserPlus, Loader2 } from "lucide-react";
+import { Upload, Plus, Trash2, FileSpreadsheet, UserPlus, Loader2, MessageCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useOrgContext } from "@/hooks/useOrgContext";
 import { useNotification } from "@/hooks/useNotification";
+import { WhatsAppChatDialog } from "@/components/LOS/Relationships/WhatsAppChatDialog";
 import Papa from "papaparse";
 
 interface LeadEntry {
+  name: string;
+  phone: string;
+}
+
+interface UploadedLead {
+  id: string;
   name: string;
   phone: string;
 }
@@ -24,7 +31,17 @@ export default function CallingUploadLeads() {
   const [manualName, setManualName] = useState("");
   const [manualPhone, setManualPhone] = useState("");
   const [leads, setLeads] = useState<LeadEntry[]>([]);
+  const [uploadedLeads, setUploadedLeads] = useState<UploadedLead[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+
+  // WhatsApp chat state
+  const [whatsappOpen, setWhatsappOpen] = useState(false);
+  const [whatsappContact, setWhatsappContact] = useState<{ id: string; name: string; phone: string } | null>(null);
+
+  const openWhatsApp = (lead: UploadedLead) => {
+    setWhatsappContact({ id: lead.id, name: lead.name, phone: lead.phone });
+    setWhatsappOpen(true);
+  };
 
   const addManualLead = () => {
     if (!manualName.trim() || !manualPhone.trim()) {
@@ -75,7 +92,6 @@ export default function CallingUploadLeads() {
       },
     });
 
-    // Reset file input
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -101,9 +117,16 @@ export default function CallingUploadLeads() {
         created_by: user?.id || null,
       }));
 
-      const { error } = await supabase.from("contacts").insert(rows);
+      const { data, error } = await supabase.from("contacts").insert(rows).select("id, first_name, phone");
       if (error) throw error;
 
+      const newUploaded: UploadedLead[] = (data || []).map((c) => ({
+        id: c.id,
+        name: c.first_name,
+        phone: c.phone,
+      }));
+
+      setUploadedLeads((prev) => [...newUploaded, ...prev]);
       notify.success("Uploaded", `${leads.length} leads uploaded successfully`);
       setLeads([]);
     } catch (err: any) {
@@ -186,7 +209,7 @@ export default function CallingUploadLeads() {
           </CardContent>
         </Card>
 
-        {/* Leads Preview Table */}
+        {/* Leads Preview Table (before upload) */}
         {leads.length > 0 && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
@@ -232,7 +255,65 @@ export default function CallingUploadLeads() {
             </CardContent>
           </Card>
         )}
+
+        {/* Uploaded Leads with WhatsApp action */}
+        {uploadedLeads.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageCircle className="h-5 w-5 text-green-600" />
+                Uploaded Leads ({uploadedLeads.length})
+              </CardTitle>
+              <CardDescription>Click the WhatsApp icon to start a conversation</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border max-h-96 overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">#</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Phone</TableHead>
+                      <TableHead className="w-16 text-center">WhatsApp</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {uploadedLeads.map((lead, i) => (
+                      <TableRow key={lead.id}>
+                        <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                        <TableCell>{lead.name}</TableCell>
+                        <TableCell>{lead.phone}</TableCell>
+                        <TableCell className="text-center">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                            onClick={() => openWhatsApp(lead)}
+                            title="Open WhatsApp Chat"
+                          >
+                            <MessageCircle className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
+
+      {/* WhatsApp Chat Dialog */}
+      {whatsappContact && (
+        <WhatsAppChatDialog
+          open={whatsappOpen}
+          onOpenChange={setWhatsappOpen}
+          contactId={whatsappContact.id}
+          contactName={whatsappContact.name}
+          phoneNumber={whatsappContact.phone}
+        />
+      )}
     </DashboardLayout>
   );
 }
