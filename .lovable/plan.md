@@ -1,33 +1,52 @@
 
 
-## Fix: Storage Bucket File Size Limit
+## Fix: Headers Breaking Across Pages in PDF
 
 ### Problem
 
-The `loan-documents` storage bucket has a **5MB file size limit**. The Combined Loan Pack PDF (which now includes the full verbatim legal agreement text) exceeds this limit, causing a "413 Payload too large" error.
+Section headers (like "DAILY INTEREST ACCRUAL SCHEDULE", "ANNEX A - PART 2") are being split across PDF pages. The header text appears at the bottom of one page and its content starts on the next page.
+
+### Root Cause
+
+1. The **generate (upload) function** is missing the `pagebreak` configuration that the download function already has
+2. The CSS `break-before-page` class forces page breaks before sections, but there's no `break-inside: avoid` to prevent html2pdf from splitting a header and its immediately following content across pages
 
 ### Fix
 
-**Database migration** to increase the file size limit on the `loan-documents` bucket from 5MB to 20MB:
+**File: `src/components/LOS/Disbursement/CombinedLoanPackCard.tsx`**
 
-```sql
-UPDATE storage.buckets 
-SET file_size_limit = 20971520  -- 20MB
-WHERE id = 'loan-documents';
+1. Add `pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }` to the generate/upload `html2pdf` options (line ~160) to match the download function
+2. Add inline CSS in the print styles to prevent headers from being orphaned at page bottoms:
+
+```css
+h2, h3, h4 { 
+  page-break-after: avoid; 
+  break-after: avoid; 
+}
+table, .mb-6 { 
+  page-break-inside: avoid; 
+  break-inside: avoid; 
+}
 ```
 
-### Why 20MB?
+**Files: Document templates** (4 files)
 
-- The Combined Loan Pack includes 4 documents: Sanction Letter, Loan Agreement (now longer with verbatim legal text), Daily Repayment Schedule, and Key Fact Statement
-- 20MB provides comfortable headroom for all current and future document sizes
-- This is still well within the platform's upload limits
+Add `break-inside: avoid` styling to section wrapper divs to keep headers together with their content:
+- `SanctionLetterDocument.tsx`
+- `LoanAgreementDocument.tsx`
+- `DailyRepaymentScheduleDocument.tsx`
+- `KeyFactStatementDocument.tsx`
 
-### What Changes
+Each section `div` that contains a heading followed by content will get a style attribute `style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}` to ensure the header stays with at least the first paragraph of its content.
 
-| Change | Detail |
+### Files Changed
+
+| File | Change |
 |---|---|
-| Database migration | Increase `loan-documents` bucket `file_size_limit` from 5MB to 20MB |
-| Code changes | None |
+| `CombinedLoanPackCard.tsx` | Add `pagebreak` config to generate function; add CSS rules to prevent header orphaning |
+| `SanctionLetterDocument.tsx` | Add `breakInside: avoid` to section wrappers |
+| `LoanAgreementDocument.tsx` | Add `breakInside: avoid` to section wrappers |
+| `DailyRepaymentScheduleDocument.tsx` | Add `breakInside: avoid` to section wrappers |
+| `KeyFactStatementDocument.tsx` | Add `breakInside: avoid` to section wrappers |
 
-No code changes are needed -- the PDF generation and upload logic remains the same. Only the storage bucket configuration needs updating.
-
+No database changes needed.
