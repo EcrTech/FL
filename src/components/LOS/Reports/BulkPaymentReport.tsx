@@ -8,6 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { parse } from "date-fns";
 import {
   Select,
   SelectContent,
@@ -32,8 +37,10 @@ import { toast } from "sonner";
 export default function BulkPaymentReport() {
   const { orgId } = useOrgContext();
   const navigate = useNavigate();
-  const [fromDate, setFromDate] = useState(format(subDays(new Date(), 30), "yyyy-MM-dd"));
-  const [toDate, setToDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [fromDateObj, setFromDateObj] = useState<Date>(subDays(new Date(), 30));
+  const [toDateObj, setToDateObj] = useState<Date>(new Date());
+  const fromDate = format(fromDateObj, "yyyy-MM-dd");
+  const toDate = format(toDateObj, "yyyy-MM-dd");
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [debitAccountNumber, setDebitAccountNumber] = useState("");
 
@@ -148,21 +155,31 @@ export default function BulkPaymentReport() {
             <div className="flex flex-wrap gap-4 items-end">
               <div className="space-y-1">
                 <Label className="text-xs">From Date</Label>
-                <Input
-                  type="date"
-                  value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)}
-                  className="w-40"
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className={cn("w-40 justify-start text-left font-normal", !fromDateObj && "text-muted-foreground")}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {format(fromDateObj, "dd-MM-yyyy")}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={fromDateObj} onSelect={(d) => d && setFromDateObj(d)} initialFocus className="p-3 pointer-events-auto" />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">To Date</Label>
-                <Input
-                  type="date"
-                  value={toDate}
-                  onChange={(e) => setToDate(e.target.value)}
-                  className="w-40"
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className={cn("w-40 justify-start text-left font-normal", !toDateObj && "text-muted-foreground")}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {format(toDateObj, "dd-MM-yyyy")}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={toDateObj} onSelect={(d) => d && setToDateObj(d)} initialFocus className="p-3 pointer-events-auto" />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Stage</Label>
