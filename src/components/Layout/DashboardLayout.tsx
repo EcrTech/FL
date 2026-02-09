@@ -41,6 +41,7 @@ import {
   Sparkles,
   MapPinOff,
   IndianRupee,
+  Upload,
 } from "lucide-react";
 import { useNotification } from "@/hooks/useNotification";
 import { OnboardingDialog } from "@/components/Onboarding/OnboardingDialog";
@@ -280,6 +281,17 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                 >
                   <MessageSquare size={18} />
                   <span>Communications</span>
+                </Link>
+              )}
+
+              {canAccessFeature("calling") && (
+                <Link
+                  to="/calling/upload-leads"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <Upload size={18} />
+                  <span>Upload Leads</span>
                 </Link>
               )}
 
