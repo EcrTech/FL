@@ -302,18 +302,20 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
     );
   }
 
-  // Calculate loan summary values - use stored eligibility values (single source of truth)
+  // Calculate loan summary values
   const loanAmount = sanction?.sanctioned_amount || application.approved_amount || eligibility?.eligible_loan_amount || application.requested_amount || 0;
   const interestRate = sanction?.sanctioned_rate || application.interest_rate || eligibility?.recommended_interest_rate || 0;
   const tenureDays = sanction?.sanctioned_tenure_days || application.tenure_days || eligibility?.recommended_tenure_days || 30;
   
-  // Use stored values from eligibility (single source of truth), with fallback calculation
+  // Only use stored eligibility values if the loan amount matches what eligibility was calculated on
+  const eligibilityMatchesLoan = eligibility && Number(eligibility.eligible_loan_amount) === loanAmount;
+  
   const calculatedInterest = loanAmount * (interestRate / 100) * tenureDays;
   const calculatedRepayment = loanAmount + calculatedInterest;
   
-  const interestAmount = eligibility?.total_interest ?? Math.round(calculatedInterest * 100) / 100;
-  const totalRepayment = eligibility?.total_repayment ?? Math.round(calculatedRepayment * 100) / 100;
-  const dailyEMI = eligibility?.daily_emi ?? Math.round(calculatedRepayment / tenureDays);
+  const interestAmount = eligibilityMatchesLoan ? (eligibility.total_interest ?? Math.round(calculatedInterest * 100) / 100) : Math.round(calculatedInterest * 100) / 100;
+  const totalRepayment = eligibilityMatchesLoan ? (eligibility.total_repayment ?? Math.round(calculatedRepayment * 100) / 100) : Math.round(calculatedRepayment * 100) / 100;
+  const dailyEMI = eligibilityMatchesLoan ? (eligibility.daily_emi ?? Math.round(calculatedRepayment / tenureDays)) : Math.round(calculatedRepayment / tenureDays);
   
   // Processing fee is 10% of loan amount (standard)
   const processingFeeRate = 10;
