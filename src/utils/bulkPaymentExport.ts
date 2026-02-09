@@ -12,34 +12,45 @@ export interface BulkPaymentRow {
   mobile: string;
 }
 
-export function generateBulkPaymentExcel(data: BulkPaymentRow[]) {
-  const rows = data.map((row, index) => ({
-    "Sr No": index + 1,
-    "Transaction Type": (row.paymentMode || "NEFT").toUpperCase(),
+export function generateBulkPaymentExcel(data: BulkPaymentRow[], debitAccountNumber: string = "") {
+  const txnDate = format(new Date(), "dd/MM/yyyy");
+
+  const rows = data.map((row) => ({
     "Beneficiary Name": row.beneficiaryName || "",
-    "Beneficiary Account No": row.accountNumber || "",
-    "IFSC Code": row.ifscCode || "",
+    "Beneficiary Account Number": row.accountNumber || "",
+    "IFSC": row.ifscCode || "",
+    "Transaction Type": (row.paymentMode || "NEFT").toUpperCase(),
+    "Debit Account Number": debitAccountNumber,
+    "Transaction Date": txnDate,
     "Amount": row.amount || 0,
-    "Loan ID": row.applicationNumber || "",
-    "Email": row.email || "",
-    "Mobile": row.mobile || "",
+    "Currency": "INR",
+    "Beneficiary Email ID": row.email || "",
     "Remarks": `LOAN DISB ${row.applicationNumber}`,
+    "Custom Header - 1": row.applicationNumber || "",
+    "Custom Header - 2": "",
+    "Custom Header - 3": "",
+    "Custom Header - 4": "",
+    "Custom Header - 5": "",
   }));
 
   const ws = XLSX.utils.json_to_sheet(rows);
 
-  // Set column widths
   ws["!cols"] = [
-    { wch: 6 },   // Sr No
-    { wch: 18 },  // Transaction Type
     { wch: 30 },  // Beneficiary Name
-    { wch: 22 },  // Account No
+    { wch: 22 },  // Beneficiary Account Number
     { wch: 14 },  // IFSC
+    { wch: 18 },  // Transaction Type
+    { wch: 22 },  // Debit Account Number
+    { wch: 14 },  // Transaction Date
     { wch: 14 },  // Amount
-    { wch: 18 },  // Loan ID
-    { wch: 25 },  // Email
-    { wch: 14 },  // Mobile
+    { wch: 8 },   // Currency
+    { wch: 25 },  // Beneficiary Email ID
     { wch: 30 },  // Remarks
+    { wch: 18 },  // Custom Header - 1
+    { wch: 16 },  // Custom Header - 2
+    { wch: 16 },  // Custom Header - 3
+    { wch: 16 },  // Custom Header - 4
+    { wch: 16 },  // Custom Header - 5
   ];
 
   const wb = XLSX.utils.book_new();
