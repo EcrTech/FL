@@ -526,6 +526,7 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
                 borrowerPhone={borrowerPhone || "N/A"}
                 borrowerPAN={applicant?.pan_number}
                 borrowerAadhaar={applicant?.aadhaar_number}
+                borrowerEmail={applicant?.email}
                 loanAmount={loanAmount}
                 tenureDays={tenureDays}
                 interestRate={interestRate}
