@@ -1,55 +1,39 @@
 
 
-## Fix: "Nupay configuration not found" Error
+## Fix: Set Mandate to "Until Cancelled" to Resolve Date Validation Error
 
 ### Root Cause
 
-The `CreateMandateDialog` defaults the `environment` state to `"uat"`. It tries to fetch the active Nupay config from the database to determine the correct environment, but if that query fails silently (e.g., due to RLS/timing), the environment stays as `"uat"`.
-
-Your database has:
-- UAT config: `is_active = false`
-- Production config: `is_active = true`
-
-So the edge function receives `environment = "uat"` and queries for a config where `environment = "uat" AND is_active = true` -- which returns nothing, causing the 404.
+Nupay's API rejects the mandate because `final_collection_date` equals `first_collection_date`, and "until cancelled" is `false`. The API requires end date > start date unless "until cancelled" is selected.
 
 ### Fix
 
-**1. Change the default environment to match the active config**
+**File: `src/components/LOS/Mandate/CreateMandateDialog.tsx`**
 
-In `CreateMandateDialog.tsx` (line 94), change the default from `"uat"` to `"production"` as a safer fallback. But more importantly:
+Two changes on the mutation body (around line 147-154):
 
-**2. Don't rely on the default -- derive environment from the fetched config**
-
-Update the mutation to use the config's environment directly rather than the state variable, ensuring we never send a stale/default value:
+1. Set `collection_until_cancel` to `true` (instead of `false`)
+2. Remove `final_collection_date` from the payload (not needed when "until cancelled" is enabled)
 
 ```
-// In the mutation, get the environment from the config query result, not state
-const activeEnv = config?.environment || environment;
+// BEFORE:
+seq_type: "OOFF",
+frequency: "ADHO",
+...
+first_collection_date: firstCollectionDate,
+final_collection_date: firstCollectionDate,
+collection_until_cancel: false,
+
+// AFTER:
+seq_type: "OOFF",
+frequency: "ADHO",
+...
+first_collection_date: firstCollectionDate,
+collection_until_cancel: true,
 ```
 
-**3. Add error logging in the edge function**
-
-Add a `console.log` before the config query in `nupay-create-mandate/index.ts` to log `org_id` and `environment` values being queried, so future issues are easier to debug.
-
-**4. Fix the NupaySettings `configs?.find is not a function` error**
-
-The `useOrgData` hook or another mechanism may be returning the configs in an unexpected format. Add a safety check to ensure `configs` is always treated as an array.
-
-### Files to Modify
+No edge function changes needed -- the edge function already handles the absent `final_collection_date` and passes `colltn_until_cncl` through to Nupay.
 
 | File | Change |
 |---|---|
-| `src/components/LOS/Mandate/CreateMandateDialog.tsx` | Use `config?.environment` directly in the mutation body instead of relying on the `environment` state variable; change default to `"production"` |
-| `supabase/functions/nupay-create-mandate/index.ts` | Add `console.log` for debugging the `org_id` and `environment` values before the config query |
-
-### Technical Detail
-
-The key change in `CreateMandateDialog.tsx`:
-
-```typescript
-// Line 143: Instead of sending the state variable
-environment: config?.environment || environment,
-```
-
-This ensures that even if the state hasn't updated from the query result, the actual config's environment is sent.
-
+| `src/components/LOS/Mandate/CreateMandateDialog.tsx` | Set `collection_until_cancel: true`, remove `final_collection_date` line |
