@@ -42,6 +42,7 @@ import {
   MapPinOff,
   IndianRupee,
   Upload,
+  Shield,
 } from "lucide-react";
 import { useNotification } from "@/hooks/useNotification";
 import { OnboardingDialog } from "@/components/Onboarding/OnboardingDialog";
@@ -159,14 +160,16 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
               )}
               
               {/* LOS Dashboard */}
-              <Link
-                to="/los/dashboard"
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
-                onClick={() => setSidebarOpen(false)}
-              >
-                <Activity size={18} />
-                <span>LOS Dashboard</span>
-              </Link>
+              {canAccessFeature("los_dashboard") && (
+                <Link
+                  to="/los/dashboard"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <Activity size={18} />
+                  <span>LOS Dashboard</span>
+                </Link>
+              )}
 
               {/* Sales & Operations Section */}
               {showOperationsSection && (
@@ -188,61 +191,73 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                 </Link>
               )}
 
-              <Link
-                to="/los/applications"
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
-                onClick={() => setSidebarOpen(false)}
-              >
-                <FileText size={18} />
-                <span>Loan Applications</span>
-              </Link>
+              {canAccessFeature("loan_applications") && (
+                <Link
+                  to="/los/applications"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <FileText size={18} />
+                  <span>Loan Applications</span>
+                </Link>
+              )}
 
-              <Link
-                to="/los/approval-queue"
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
-                onClick={() => setSidebarOpen(false)}
-              >
-                <List size={18} />
-                <span>Approvals</span>
-              </Link>
+              {canAccessFeature("approvals") && (
+                <Link
+                  to="/los/approval-queue"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <List size={18} />
+                  <span>Approvals</span>
+                </Link>
+              )}
 
-              <Link
-                to="/los/sanctions"
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
-                onClick={() => setSidebarOpen(false)}
-              >
-                <FileText size={18} />
-                <span>Sanctions</span>
-              </Link>
+              {canAccessFeature("sanctions") && (
+                <Link
+                  to="/los/sanctions"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <FileText size={18} />
+                  <span>Sanctions</span>
+                </Link>
+              )}
 
-              <Link
-                to="/los/disbursals"
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
-                onClick={() => setSidebarOpen(false)}
-              >
-                <CreditCard size={18} />
-                <span>Disbursals</span>
-              </Link>
+              {canAccessFeature("disbursals") && (
+                <Link
+                  to="/los/disbursals"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <CreditCard size={18} />
+                  <span>Disbursals</span>
+                </Link>
+              )}
 
-              <Link
-                to="/los/collections"
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
-                onClick={() => setSidebarOpen(false)}
-              >
-                <IndianRupee size={18} />
-                <span>Collections</span>
-              </Link>
+              {canAccessFeature("collections") && (
+                <Link
+                  to="/los/collections"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <IndianRupee size={18} />
+                  <span>Collections</span>
+                </Link>
+              )}
 
-              <Link
-                to="/los/relationships"
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
-                onClick={() => setSidebarOpen(false)}
-              >
-                <Users size={18} />
-                <span>Reports</span>
-              </Link>
+              {canAccessFeature("los_reports") && (
+                <Link
+                  to="/los/relationships"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <Users size={18} />
+                  <span>Reports</span>
+                </Link>
+              )}
 
-              {isAdmin && (
+              {isAdmin && canAccessFeature("emandate_settings") && (
                 <Link
                   to="/los/settings/nupay"
                   className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
@@ -253,7 +268,7 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                 </Link>
               )}
 
-              {isAdmin && (
+              {isAdmin && canAccessFeature("negative_pincodes") && (
                 <Link
                   to="/los/negative-pincodes"
                   className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
@@ -264,14 +279,16 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                 </Link>
               )}
 
-              <Link
-                to="/tasks"
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
-                onClick={() => setSidebarOpen(false)}
-              >
-                <CheckSquare size={18} />
-                <span>Tasks</span>
-              </Link>
+              {canAccessFeature("tasks") && (
+                <Link
+                  to="/tasks"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <CheckSquare size={18} />
+                  <span>Tasks</span>
+                </Link>
+              )}
 
               {canAccessFeature("communications") && (
                 <Link
@@ -354,6 +371,14 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                       <span>Designations</span>
                     </Link>
                   )}
+                  <Link
+                    to="/admin/access-management"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
+                    onClick={() => setSidebarOpen(false)}
+                  >
+                    <Shield size={18} />
+                    <span>Access Management</span>
+                  </Link>
                 </>
               )}
 
@@ -390,14 +415,16 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                     </Link>
                   )}
                   
-                  <Link
-                    to="/exotel-settings"
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
-                    onClick={() => setSidebarOpen(false)}
-                  >
-                    <Phone size={18} />
-                    <span>Exotel Settings</span>
-                  </Link>
+                  {canAccessFeature("exotel_settings") && (
+                    <Link
+                      to="/exotel-settings"
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
+                      onClick={() => setSidebarOpen(false)}
+                    >
+                      <Phone size={18} />
+                      <span>Exotel Settings</span>
+                    </Link>
+                  )}
                   
                 </>
               )}
