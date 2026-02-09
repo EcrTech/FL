@@ -146,7 +146,7 @@ Deno.serve(async (req) => {
       loan_no: requestData.loan_no,
       seq_tp: requestData.seq_type,
       frqcy: requestData.frequency,
-      category_id: requestData.category_id || 13, // Default category as per sample
+      category_id: requestData.category_id || 15, // Category 15 (Others) required for ADHO frequency
       colltn_amt: requestData.collection_amount,
       debit_type: requestData.debit_type || false,
       frst_colltn_dt: requestData.first_collection_date,
@@ -242,7 +242,7 @@ Deno.serve(async (req) => {
         status: mandateResponse.ok ? "submitted" : "pending",
         seq_type: requestData.seq_type,
         frequency: requestData.frequency,
-        category_id: requestData.category_id || 7,
+        category_id: requestData.category_id || 15,
         collection_amount: requestData.collection_amount,
         debit_type: requestData.debit_type || false,
         first_collection_date: requestData.first_collection_date,

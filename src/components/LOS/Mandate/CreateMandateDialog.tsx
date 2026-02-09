@@ -146,7 +146,7 @@ export default function CreateMandateDialog({
           loan_no: loanNo,
           seq_type: "OOFF",
           frequency: "ADHO",
-          category_id: 7,
+          category_id: 15,
           collection_amount: collectionAmount,
           debit_type: false,
           first_collection_date: firstCollectionDate,
