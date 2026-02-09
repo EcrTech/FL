@@ -144,7 +144,7 @@ export default function CreateMandateDialog({
           loan_application_id: loanApplicationId,
           contact_id: contactId,
           loan_no: loanNo,
-          seq_type: "OOFF",
+          seq_type: "RCUR",
           frequency: "ADHO",
           category_id: 15,
           collection_amount: collectionAmount,
