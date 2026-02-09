@@ -187,24 +187,7 @@ export default function CreateMandateDialog({
       setSelectedBankId(null);
       setSelectedBankName("");
       setAuthType("Aadhaar");
-
-      // Auto-match bank from prefill data
-      let autoMatchedBank = false;
-      if (banksData?.banks && prefillData?.bankName) {
-        const normalize = (s: string) => s.toLowerCase().replace(/\b(ltd|limited|bank)\b/g, '').replace(/\s+/g, ' ').trim();
-        const prefillNorm = normalize(prefillData.bankName);
-        const match = banksData.banks.find((b: any) => {
-          const bankNorm = normalize(b.name);
-          return bankNorm.includes(prefillNorm) || prefillNorm.includes(bankNorm);
-        });
-        if (match) {
-          setSelectedBankId(match.bank_id);
-          setSelectedBankName(match.name);
-          autoMatchedBank = true;
-        }
-      }
-
-      setStep(autoMatchedBank ? "account" : "bank");
+      setStep("bank");
 
       // Prefill from previous mandate if provided
       if (prefillData) {
@@ -220,14 +203,29 @@ export default function CreateMandateDialog({
         setIfscCode("");
         setAccountType("Savings");
       }
-      setCollectionAmount(loanAmount + (loanAmount * 0.01 * tenure));
-      setFirstCollectionDate(format(addDays(new Date(), tenure), "yyyy-MM-dd"));
       setNotificationPhone(applicantPhone);
-      setNotificationEmail(applicantEmail || "");
+      setNotificationEmail(applicantEmail);
       setRegistrationUrl(null);
       setShowQR(false);
     }
-  }, [open, applicantName, loanAmount, tenure, prefillData, banksData]);
+  }, [open, applicantName, loanAmount, tenure, prefillData]);
+
+  // Auto-match bank from prefill data once banks are loaded
+  useEffect(() => {
+    if (open && banksData?.banks && prefillData?.bankName && !selectedBankId) {
+      const normalize = (s: string) => s.toLowerCase().replace(/\b(ltd|limited|bank)\b/g, '').replace(/\s+/g, ' ').trim();
+      const prefillNorm = normalize(prefillData.bankName);
+      const match = banksData.banks.find((b: any) => {
+        const bankNorm = normalize(b.name);
+        return bankNorm.includes(prefillNorm) || prefillNorm.includes(bankNorm);
+      });
+      if (match) {
+        setSelectedBankId(match.bank_id);
+        setSelectedBankName(match.name);
+        setStep("account");
+      }
+    }
+  }, [open, banksData, prefillData, selectedBankId]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
