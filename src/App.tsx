@@ -63,6 +63,7 @@ import Disbursals from "./pages/LOS/Disbursals";
 import NupaySettings from "./pages/LOS/NupaySettings";
 import ReferralLoanApplication from "./pages/ReferralLoanApplication";
 import NegativePinCodes from "./pages/NegativePinCodes";
+import AccessManagement from "./pages/AccessManagement";
 import BulkPaymentReport from "./components/LOS/Reports/BulkPaymentReport";
 import Profile from "./pages/Profile";
 
@@ -390,6 +391,12 @@ const App = () => {
             <Route path="/los/negative-pincodes" element={
               <ProtectedRoute requiredRole="admin">
                 <NegativePinCodes />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/admin/access-management" element={
+              <ProtectedRoute requiredRole="admin">
+                <AccessManagement />
               </ProtectedRoute>
             } />
             
