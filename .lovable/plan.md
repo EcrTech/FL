@@ -1,45 +1,62 @@
 
 
-## Delete All Loan Applications Created On or Before January 31, 2026
+## Bulk Payment (BLKPAY) Excel Report Generator
 
-### What will happen
+### Overview
+Add a "Bulk Payment Report" feature to the LOS Dashboard that generates an Excel file in the standard Indian bank NEFT/RTGS bulk payment format (BLKPAY_YYYYMMDD.xlsx). This report will pull data from disbursement-pending and disbursed loan applications and format it for direct upload to banking portals.
 
-A database migration will permanently delete **157 loan applications** created on or before January 31, 2026, along with all their related data.
+### Standard BLKPAY Format Columns
+Based on the standard Indian bank bulk payment file format, the report will include:
 
-### Related data that will be auto-deleted (via CASCADE)
+| Column | Description | Data Source |
+|---|---|---|
+| Sr No | Serial number | Auto-generated |
+| Transaction Type | NEFT / RTGS / IMPS | `loan_disbursements.payment_mode` |
+| Beneficiary Name | Account holder name | `loan_applicants.bank_account_holder_name` |
+| Beneficiary Account No | Bank account number | `loan_applicants.bank_account_number` |
+| IFSC Code | Bank IFSC code | `loan_applicants.bank_ifsc_code` |
+| Amount | Net disbursement amount | `loan_sanctions.net_disbursement_amount` |
+| Loan ID | Loan reference number | `loan_applications.loan_id` or `application_number` |
+| Email | Borrower email (optional) | `loan_applicants.email` |
+| Mobile | Borrower mobile | `loan_applicants.mobile` |
+| Remarks | Payment narration | Auto-generated (e.g., "LOAN DISB {application_number}") |
 
-The following child records linked to these applications will also be removed automatically:
+### Implementation
 
-- Loan applicants
-- Loan documents
-- Loan verifications
-- Loan eligibility records
-- Loan approvals
-- Loan deviations
-- Loan sanctions
-- Loan disbursements
-- Loan stage history
-- Loan audit logs
-- Loan repayment schedules
-- Loan payments
-- Loan income summaries
-- Generated documents
-- Document e-sign requests
-- NuPay UPI transactions
-- NuPay mandates
-- Loan referrals
+#### 1. Install `xlsx` package
+The project currently only supports CSV export. To generate proper `.xlsx` files, we need the `xlsx` (SheetJS) library.
 
-A few tables (SMS messages, SMS automation executions, call logs) will have their `loan_application_id` set to NULL (not deleted), and video KYC recordings will retain their reference as-is.
+#### 2. Create `src/utils/bulkPaymentExport.ts`
+A utility function that:
+- Accepts an array of loan application data (with applicant, sanction, and disbursement details)
+- Maps the data into the BLKPAY column format
+- Generates an `.xlsx` file with the filename `BLKPAY_YYYYMMDD.xlsx` (using current date)
+- Triggers a browser download
+
+#### 3. Create `src/components/LOS/Reports/BulkPaymentReport.tsx`
+A new component (accessible from the LOS Dashboard or a Reports section) that:
+- Shows a date filter to select disbursement date range
+- Queries `loan_applications` joined with `loan_applicants`, `loan_sanctions`, and `loan_disbursements` for applications in `disbursement_pending` or `disbursed` stage
+- Displays a preview table of the data
+- Has a "Download BLKPAY Report" button that generates and downloads the Excel file
+- Includes status filter (e.g., only pending disbursements, or all)
+
+#### 4. Add route and navigation
+- Add a route at `/los/bulk-payment-report`
+- Add a quick action button on the LOS Dashboard or in the sidebar navigation to access this report
 
 ### Technical Details
 
-| Item | Detail |
+**File changes:**
+| File | Action |
 |---|---|
-| Migration SQL | `DELETE FROM public.loan_applications WHERE created_at <= '2026-01-31 23:59:59+00';` |
-| Records affected | 157 loan applications + all cascaded child records |
-| Irreversible | Yes -- this cannot be undone |
+| `package.json` | Add `xlsx` dependency |
+| `src/utils/bulkPaymentExport.ts` | New -- Excel generation utility |
+| `src/components/LOS/Reports/BulkPaymentReport.tsx` | New -- Report UI with filters and preview |
+| `src/pages/LOS/Dashboard.tsx` | Add quick action link to bulk payment report |
+| Router config file | Add `/los/bulk-payment-report` route |
 
-### Important: Live Environment
+**Data query:** The report will join `loan_applications`, `loan_applicants` (primary), `loan_sanctions`, and `loan_disbursements` to gather all required fields in a single query.
 
-This migration will run against the **test** database. If you also need this applied to the **live/production** database, you will need to run the same SQL in the Cloud View with Live selected after publishing.
+**Note:** Since I could not read the uploaded Excel file directly, the column structure is based on the standard Indian bank bulk payment format. If your bank requires different or additional columns, we can adjust after you review the first output.
 
