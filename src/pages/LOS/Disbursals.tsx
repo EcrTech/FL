@@ -100,8 +100,10 @@ export default function Disbursals() {
             .select("document_type, customer_signed")
             .eq("loan_application_id", app.id);
 
+          const combinedSigned = docs?.find(d => d.document_type === "combined_loan_pack")?.customer_signed;
           const sanctionSigned = docs?.find(d => d.document_type === "sanction_letter")?.customer_signed;
           const agreementSigned = docs?.find(d => d.document_type === "loan_agreement")?.customer_signed;
+          const documentsReady = combinedSigned || (sanctionSigned && agreementSigned);
 
           // Check if disbursement already exists
           const { data: existingDisbursement } = await supabase
@@ -110,7 +112,7 @@ export default function Disbursals() {
             .eq("loan_application_id", app.id)
             .maybeSingle();
 
-          if (sanctionSigned && agreementSigned && !existingDisbursement) {
+          if (documentsReady && !existingDisbursement) {
             // Fetch applicant name
             const { data: applicant } = await supabase
               .from("loan_applicants")
