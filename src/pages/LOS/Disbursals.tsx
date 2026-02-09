@@ -319,7 +319,11 @@ export default function Disbursals() {
                   </TableHeader>
                   <TableBody>
                     {filteredDisbursals.map((item) => (
-                      <TableRow key={item.id}>
+                      <TableRow
+                        key={item.id}
+                        className="cursor-pointer"
+                        onClick={() => navigate(`/los/applications/${item.application_id}?tab=disbursement`)}
+                      >
                         <TableCell className="font-mono text-sm text-primary">{item.loan_id || "-"}</TableCell>
                         <TableCell className="font-mono text-sm">{item.application_number}</TableCell>
                         <TableCell>{item.applicant_name}</TableCell>
@@ -348,7 +352,7 @@ export default function Disbursals() {
                           {item.status === "ready" ? (
                             <Button
                               size="sm"
-                              onClick={() => setUploadDialogItem(item)}
+                              onClick={(e) => { e.stopPropagation(); setUploadDialogItem(item); }}
                             >
                               <Upload className="h-4 w-4 mr-2" />
                               Complete
@@ -357,7 +361,7 @@ export default function Disbursals() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => navigate(`/los/applications/${item.application_id}?tab=disbursement`)}
+                              onClick={(e) => { e.stopPropagation(); navigate(`/los/applications/${item.application_id}?tab=disbursement`); }}
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
