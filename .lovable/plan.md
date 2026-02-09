@@ -1,45 +1,63 @@
 
 
-## Skip Bank Selection Step When Bank is Auto-Matched
+## Merge Bank Auto-Select into Reset Effect
 
 ### Problem
-
-Even though we now auto-select the bank and default to Aadhaar, the user still sees the bank selection step and has to click "Next" for no reason. This step adds zero value when everything is already filled.
+Two competing `useEffect` hooks cause a race condition. The reset effect always sets `step = "bank"`, and the separate auto-select effect never re-fires because its dependency (`selectedBankId`) doesn't actually change (it was already `null`).
 
 ### Fix
 
 **File: `src/components/LOS/Mandate/CreateMandateDialog.tsx`**
 
-In the existing auto-select `useEffect` (the one that matches `prefillData.bankName` against `banksData`), after successfully setting the bank ID and name, also advance the step directly to `"account"` -- skipping the bank selection screen entirely.
-
-Additionally, update the initial `useEffect` (dialog open reset) so that when `prefillData` is provided with a bank name, we don't hardcode step to `"bank"` -- instead we leave it for the auto-select effect to handle.
+1. Move the bank-matching logic into the existing reset `useEffect` (lines 185-212), right after resetting state. If a match is found, set the bank ID/name and set step to `"account"` instead of `"bank"`.
+2. Delete the separate auto-select `useEffect` (lines 214-227) entirely.
+3. Add `banksData` to the reset effect's dependency array.
 
 ### Technical Details
 
-Update the auto-select bank `useEffect` to also skip the step:
+The reset effect becomes:
 
 ```typescript
 useEffect(() => {
-  if (banksData?.banks && prefillData?.bankName && !selectedBankId) {
-    const match = banksData.banks.find((b: any) =>
-      b.name.toLowerCase().includes(prefillData.bankName!.toLowerCase()) ||
-      prefillData.bankName!.toLowerCase().includes(b.name.toLowerCase())
-    );
-    if (match) {
-      setSelectedBankId(match.bank_id);
-      setSelectedBankName(match.name);
-      setStep("account"); // Skip bank step entirely
+  if (open) {
+    setSelectedBankId(null);
+    setSelectedBankName("");
+    setAuthType("Aadhaar");
+
+    // Auto-match bank from prefill data
+    let autoMatchedBank = false;
+    if (banksData?.banks && prefillData?.bankName) {
+      const match = banksData.banks.find((b: any) =>
+        b.name.toLowerCase().includes(prefillData.bankName!.toLowerCase()) ||
+        prefillData.bankName!.toLowerCase().includes(b.name.toLowerCase())
+      );
+      if (match) {
+        setSelectedBankId(match.bank_id);
+        setSelectedBankName(match.name);
+        autoMatchedBank = true;
+      }
     }
+
+    setStep(autoMatchedBank ? "account" : "bank");
+
+    // Prefill account fields (unchanged)
+    if (prefillData) {
+      setAccountHolderName(prefillData.accountHolderName || applicantName);
+      // ... rest unchanged
+    } else {
+      // ... rest unchanged
+    }
+    // ... rest unchanged
   }
-}, [banksData, prefillData, selectedBankId]);
+}, [open, applicantName, loanAmount, tenure, prefillData, banksData]);
 ```
 
-The "Back" button on the account step still navigates to the bank step (`setStep("bank")`), so if the user wants to change the bank, they can still go back.
+Delete lines 214-227 (the separate auto-select `useEffect`).
 
 ### Changes
 
 | File | Change |
 |---|---|
-| `CreateMandateDialog.tsx` | Add `setStep("account")` inside the auto-select bank effect when a match is found |
+| `CreateMandateDialog.tsx` | Merge bank matching into reset effect; remove separate auto-select hook; add `banksData` to deps |
 
 No database changes needed.
