@@ -1,71 +1,52 @@
 
-## Access Management (View Controller) Page
+
+## Restrict Leads Visibility to Assigned User and Hierarchy
 
 ### What This Does
-A new admin-only page where you can control which menu items and features each designation (e.g., Business Manager, Credit Manager, Project Manager) can see and access. This uses the existing `designation_feature_access` and `feature_permissions` tables that are already in your database but currently empty.
+Leads across all views (Pipeline Board, Contacts, Calling Leads) will only be visible to:
+- The **assigned user** themselves
+- **Managers above** in the reporting hierarchy (e.g., a CEO sees everything, a Project Manager sees their own + Credit Manager's leads)
+- **Admins and Super Admins** always see all leads (full access)
+- Unassigned leads remain visible to all users in the org
 
-### How It Works
-1. Select a designation from a dropdown
-2. See a matrix/grid of all features (menu items) with toggle switches for View, Create, Edit, Delete permissions
-3. Save changes -- they take effect immediately for all users with that designation
+### How Hierarchy Works
 
-### Features Covered
-All sidebar menu items will be controllable:
-- LOS Dashboard, Leads, Loan Applications, Approvals, Sanctions, Disbursals, Collections, Reports
-- Tasks, Communications, Upload Leads, Data Repository, Inventory
-- Users, Teams, Designations
-- Webhook Connectors, Outbound Webhooks, eMandate Settings, Negative Pin Codes, Exotel Settings
+```text
+CEO (sees all)
+├── Credit Head (sees own leads)
+├── Business Manager (sees own leads)
+└── Project Manager (sees own + Credit Manager's leads)
+    └── Credit Manager (sees own leads only)
+```
+
+A manager can see leads assigned to anyone with a subordinate designation in the reporting hierarchy.
 
 ### Technical Details
 
-**Step 1: Seed `feature_permissions` table**
-Run a database migration to insert all feature keys into the `feature_permissions` table so the UI has a master list of features to display. Categories will group them (e.g., "LOS", "Sales & Operations", "Management", "Integration").
+**Step 1: Create a database function `get_visible_user_ids()`**
 
-Features to seed:
-| Feature Key | Display Name | Category |
-|---|---|---|
-| los_dashboard | LOS Dashboard | LOS |
-| pipeline_stages | Leads | Sales & Operations |
-| loan_applications | Loan Applications | LOS |
-| approvals | Approvals | LOS |
-| sanctions | Sanctions | LOS |
-| disbursals | Disbursals | LOS |
-| collections | Collections | LOS |
-| los_reports | Reports | LOS |
-| tasks | Tasks | Operations |
-| communications | Communications | Operations |
-| calling | Upload Leads | Operations |
-| redefine_data_repository | Data Repository | Operations |
-| inventory | Inventory | Operations |
-| users | Users | Management |
-| teams | Teams | Management |
-| designations | Designations | Management |
-| connectors | Webhooks & Connectors | Integration |
-| emandate_settings | eMandate Settings | Integration |
-| negative_pincodes | Negative Pin Codes | Integration |
-| exotel_settings | Exotel Settings | Integration |
+A new `SECURITY DEFINER` function that, given a user ID:
+1. Looks up the user's designation from `profiles`
+2. Uses the existing `get_subordinates()` function to find all subordinate designation IDs
+3. Returns all user IDs (from `profiles`) whose designation matches either the user's own designation or any subordinate designation
+4. Returns NULL for admins/super_admins (signaling "see all")
 
-**Step 2: Create `AccessManagement` page** (`src/pages/AccessManagement.tsx`)
-- Admin-only page
-- Dropdown to select a designation
-- Grid showing all features grouped by category
-- Toggle switches (checkboxes) for can_view, can_create, can_edit, can_delete per feature
-- Save button that upserts into `designation_feature_access`
-- Uses existing `useOrgData` hook pattern
+**Step 2: Update RLS policy on `contacts` table**
 
-**Step 3: Add route in `App.tsx`**
-- Route: `/admin/access-management`
-- Protected with `requiredRole="admin"`
+Replace the current SELECT policy ("Users can view contacts in their org") with a new one that checks:
+- User is admin/super_admin → see all in org
+- Contact has no `assigned_to` → visible to all in org  
+- Contact's `assigned_to` is in the user's visible user IDs list (self + subordinates)
 
-**Step 4: Add sidebar link in `DashboardLayout.tsx`**
-- Add "Access Management" link under the Management section (visible to admins only)
-- Icon: `Shield` from lucide-react
+**Step 3: Update RLS policy on `loan_applications` table**
 
-**Step 5: Update `DashboardLayout.tsx` sidebar guards**
-- Wrap currently unguarded menu items (LOS Dashboard, Loan Applications, Approvals, Sanctions, Disbursals, Collections, Reports, Tasks, eMandate Settings, Negative Pin Codes, Exotel Settings) with `canAccessFeature()` checks using matching feature keys
-- This ensures the access management settings actually hide/show menu items
+Replace the current SELECT policy ("Users can view loan applications in their org") with the same hierarchy-based logic using `assigned_to`.
 
-**Step 6: Update `canAccessFeature` logic**
-- Currently returns `true` if no permission entry exists (default allow)
-- This behavior is correct -- admins only need to add restrictions, not enable everything
-- No change needed to AuthContext logic
+**Step 4: No frontend code changes needed**
+
+Since this is enforced at the database (RLS) level, all existing queries in PipelineBoard, Contacts, CallingLeads, and any other page automatically respect the restriction. Admin users continue to see everything.
+
+### Important Notes
+- This affects the **test environment** only. You'll need to publish to apply it to production.
+- Leads with no `assigned_to` value remain visible to everyone in the org (so they can be claimed/assigned).
+- The existing `get_subordinates()` database function is reused -- no duplication.
