@@ -56,7 +56,7 @@ export default function BulkPaymentReport() {
             bank_ifsc_code,
             email,
             mobile,
-            is_primary
+            applicant_type
           ),
           loan_sanctions (
             net_disbursement_amount
