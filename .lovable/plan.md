@@ -1,23 +1,29 @@
 
-## Update Amount Column Label to "Net Disbursal"
 
-### What's Happening
-The data is already correct -- `net_disbursement_amount` from the database is being used (as confirmed by Anupam Roy's record showing the right value). No fallback logic exists in the current code, so nothing to remove.
+## Remove 4 Marked Loan Applications
 
-The only change needed is a label update in the preview table for clarity.
+### Cases to Delete
 
-### Change
+| Loan ID | Applicant | Stage | Related Records |
+|---------|-----------|-------|-----------------|
+| LOAN-202602-00367 | Aman Kharbanda | Disbursement Pending | 1 applicant, 1 sanction, 1 eligibility, 7 documents |
+| LOAN-202602-00356 | Aman Kharbanda | Application Login | 1 applicant |
+| LOAN-202602-00354 | ZEBA | Application Login | 1 applicant, 2 documents |
+| LOAN-202602-00352 | shivam kumar | Disbursement Pending | 1 applicant, 1 sanction, 1 eligibility, 1 referral, 17 documents |
 
-**File: `src/components/LOS/Reports/BulkPaymentReport.tsx` (line 216)**
+### Action
 
-Rename the preview table header from "Amount" to "Net Disbursal":
+Run a database migration that deletes all child records first (due to foreign key constraints), then the parent loan applications:
 
-```
-// Before
-<TableHead className="text-right">Amount</TableHead>
+1. Delete from `loan_documents`
+2. Delete from `loan_referrals`
+3. Delete from `loan_eligibility`
+4. Delete from `loan_sanctions`
+5. Delete from `loan_applicants`
+6. Delete from `loan_applications`
 
-// After
-<TableHead className="text-right">Net Disbursal</TableHead>
-```
+All deletes filtered by the 4 application IDs. No code changes needed -- this is a data-only operation.
 
-Single line change. No database or logic modifications needed.
+### Important Note
+
+This deletion is permanent and affects the **test environment**. If these records also exist in the live/production environment, you would need to run the same SQL there separately.
