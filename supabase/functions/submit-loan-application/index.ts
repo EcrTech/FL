@@ -53,12 +53,23 @@ function validateEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email || '');
 }
 
-function generateApplicationNumber(): string {
+async function generateApplicationNumber(supabase: any): Promise<string> {
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, '0');
-  const random = String(Math.floor(Math.random() * 99999)).padStart(5, '0');
-  return `LA-${year}${month}-${random}`;
+  
+  // Use database sequence for guaranteed uniqueness
+  const { data, error } = await supabase.rpc('nextval_text', { seq_name: 'loan_application_number_seq' }).maybeSingle();
+  
+  if (error || !data) {
+    // Fallback: use timestamp + random for uniqueness
+    const ts = Date.now().toString(36);
+    const random = String(Math.floor(Math.random() * 999)).padStart(3, '0');
+    return `LA-${year}${month}-${ts}${random}`;
+  }
+  
+  const seqNum = String(data).padStart(5, '0');
+  return `LA-${year}${month}-${seqNum}`;
 }
 
 Deno.serve(async (req) => {
@@ -219,7 +230,7 @@ Deno.serve(async (req) => {
 
         if (!draftError && existingDraft) {
           // Update the existing draft instead of creating new application
-          applicationNumber = generateApplicationNumber();
+          applicationNumber = await generateApplicationNumber(supabase);
           console.log(`[submit-loan-application] Updating draft ${draftApplicationId} to application: ${applicationNumber}`);
 
           const { data: updatedApp, error: updateError } = await supabase
@@ -279,7 +290,7 @@ Deno.serve(async (req) => {
 
       // Create new application if no draft was found/updated
       if (!application) {
-        applicationNumber = generateApplicationNumber();
+        applicationNumber = await generateApplicationNumber(supabase);
         console.log(`[submit-loan-application] Creating new referral application: ${applicationNumber}`);
 
         const { data: newApp, error: appError } = await supabase
@@ -541,7 +552,7 @@ Deno.serve(async (req) => {
     // Check if we have an existing draft to update
     const draftId = body.draftId;
     let application: any;
-    let applicationNumber: string = generateApplicationNumber();
+    let applicationNumber: string = await generateApplicationNumber(supabase);
 
     if (draftId) {
       // Update existing draft application

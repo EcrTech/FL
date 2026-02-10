@@ -4270,7 +4270,7 @@ export type Database = {
           {
             foreignKeyName: "loan_disbursements_loan_application_id_fkey"
             columns: ["loan_application_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "loan_applications"
             referencedColumns: ["id"]
           },
@@ -5244,7 +5244,7 @@ export type Database = {
           {
             foreignKeyName: "loan_sanctions_loan_application_id_fkey"
             columns: ["loan_application_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "loan_applications"
             referencedColumns: ["id"]
           },
@@ -8771,9 +8771,34 @@ export type Database = {
         }
         Returns: undefined
       }
+      nextval_text: { Args: { seq_name: string }; Returns: string }
       process_time_based_triggers: { Args: never; Returns: undefined }
+      record_emi_payment_atomic: {
+        Args: {
+          p_payment_amount: number
+          p_payment_date: string
+          p_schedule_id: string
+        }
+        Returns: {
+          new_amount_paid: number
+          new_status: string
+        }[]
+      }
       refresh_contacts_with_stages: { Args: never; Returns: undefined }
       sync_platform_email_list: { Args: never; Returns: undefined }
+      transition_loan_stage: {
+        Args: {
+          p_application_id: string
+          p_approved_amount?: number
+          p_approved_by?: string
+          p_expected_current_stage: string
+          p_interest_rate?: number
+          p_new_stage: string
+          p_new_status?: string
+          p_tenure_days?: number
+        }
+        Returns: boolean
+      }
       trigger_retry_failed_whatsapp: { Args: never; Returns: undefined }
       update_lead_score: {
         Args: {

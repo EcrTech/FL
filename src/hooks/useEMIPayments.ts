@@ -82,38 +82,15 @@ export function useEMIPayments(applicationId?: string) {
 
       if (paymentError) throw paymentError;
 
-      // Update schedule status
-      const { data: scheduleItem } = await supabase
-        .from("loan_repayment_schedule")
-        .select("total_emi, amount_paid")
-        .eq("id", payment.scheduleId)
-        .single();
+      // Atomic schedule update - prevents race conditions
+      const { error: updateError } = await supabase
+        .rpc("record_emi_payment_atomic", {
+          p_schedule_id: payment.scheduleId,
+          p_payment_amount: payment.paymentAmount,
+          p_payment_date: payment.paymentDate,
+        });
 
-      if (scheduleItem) {
-        const newAmountPaid = (scheduleItem.amount_paid || 0) + payment.paymentAmount;
-        const newStatus =
-          newAmountPaid >= scheduleItem.total_emi
-            ? "paid"
-            : newAmountPaid > 0
-            ? "partially_paid"
-            : "pending";
-
-        const updateData: any = {
-          amount_paid: newAmountPaid,
-          status: newStatus,
-        };
-
-        if (newStatus === "paid") {
-          updateData.payment_date = payment.paymentDate;
-        }
-
-        const { error: updateError } = await supabase
-          .from("loan_repayment_schedule")
-          .update(updateData)
-          .eq("id", payment.scheduleId);
-
-        if (updateError) throw updateError;
-      }
+      if (updateError) throw updateError;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["emi-payments"] });

@@ -72,13 +72,15 @@ export default function SanctionGenerator({ applicationId, orgId }: SanctionGene
 
       if (error) throw error;
 
-      await supabase
-        .from("loan_applications")
-        .update({
-          current_stage: "disbursement_pending",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", applicationId);
+      const { data: transitioned, error: stageError } = await supabase
+        .rpc("transition_loan_stage", {
+          p_application_id: applicationId,
+          p_expected_current_stage: "sanctioned",
+          p_new_stage: "disbursement_pending",
+        });
+      
+      if (stageError) throw stageError;
+      if (!transitioned) throw new Error("Application stage has changed. Please refresh.");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["loan-sanction", applicationId] });

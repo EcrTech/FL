@@ -85,23 +85,23 @@ export default function ApprovalActionDialog({
 
       if (approvalError) throw approvalError;
 
-      // Update application - use eligibility data for approved values
+      // Update application - guarded stage transition
       const newStage = action === "approve" ? "sanctioned" : "rejected";
       const newStatus = action === "approve" ? "approved" : "rejected";
-      const { error: updateError } = await supabase
-        .from("loan_applications")
-        .update({
-          current_stage: newStage,
-          status: newStatus,
-          approved_amount: approvedAmount,
-          tenure_days: tenureDays,
-          interest_rate: interestRate,
-          approved_by: action === "approve" ? userId : null,
-          updated_at: now,
-        })
-        .eq("id", applicationId);
+      const { data: transitionResult, error: updateError } = await supabase
+        .rpc("transition_loan_stage", {
+          p_application_id: applicationId,
+          p_expected_current_stage: "approval_pending",
+          p_new_stage: newStage,
+          p_new_status: newStatus,
+          p_approved_by: action === "approve" ? userId : null,
+          p_approved_amount: approvedAmount,
+          p_tenure_days: tenureDays,
+          p_interest_rate: interestRate,
+        });
 
       if (updateError) throw updateError;
+      if (!transitionResult) throw new Error("Application stage has changed. Please refresh and try again.");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["loan-application-basic", applicationId] });

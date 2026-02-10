@@ -405,20 +405,20 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
       // Get the recommended interest rate
       const interestRate = parseFloat(formData.recommended_interest_rate) || null;
       
-      // Update application with approved values - single source of truth
-      const { error } = await supabase
-        .from("loan_applications")
-        .update({
-          current_stage: "approval_pending",
-          status: "in_progress",
-          approved_amount: approvedAmount,
-          tenure_days: tenureDays,
-          interest_rate: interestRate,
-        })
-        .eq("id", applicationId)
-        .eq("org_id", orgId);
+      // Update application with approved values - guarded stage transition
+      const { data: transitionResult, error } = await supabase
+        .rpc("transition_loan_stage", {
+          p_application_id: applicationId,
+          p_expected_current_stage: "credit_assessment",
+          p_new_stage: "approval_pending",
+          p_new_status: "in_progress",
+          p_approved_amount: approvedAmount,
+          p_tenure_days: tenureDays,
+          p_interest_rate: interestRate,
+        });
       
       if (error) throw error;
+      if (!transitionResult) throw new Error("Application stage has changed. Please refresh and try again.");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["loan-application", applicationId, orgId] });
@@ -441,18 +441,17 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       
-      // Then update application status
-      const { error } = await supabase
-        .from("loan_applications")
-        .update({
-          current_stage: "rejected",
-          status: "rejected",
-          approved_by: user?.id,
-        })
-        .eq("id", applicationId)
-        .eq("org_id", orgId);
+      // Then update application status - guarded stage transition
+      const { data: transitionResult, error } = await supabase
+        .rpc("transition_loan_stage", {
+          p_application_id: applicationId,
+          p_expected_current_stage: "credit_assessment",
+          p_new_stage: "rejected",
+          p_new_status: "rejected",
+        });
       
       if (error) throw error;
+      if (!transitionResult) throw new Error("Application stage has changed. Please refresh and try again.");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["loan-application", applicationId, orgId] });

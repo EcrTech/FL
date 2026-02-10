@@ -167,16 +167,16 @@ export default function ProofUploadDialog({
 
       if (updateError) throw updateError;
 
-      // Update loan application stage to "disbursed"
-      const { error: stageError } = await supabase
-        .from("loan_applications")
-        .update({
-          current_stage: "disbursed",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", applicationId);
+      // Update loan application stage - guarded transition
+      const { data: transitioned, error: stageError } = await supabase
+        .rpc("transition_loan_stage", {
+          p_application_id: applicationId,
+          p_expected_current_stage: "disbursement_pending",
+          p_new_stage: "disbursed",
+        });
 
       if (stageError) throw stageError;
+      if (!transitioned) throw new Error("Application stage has changed. Please refresh.");
 
       return { extractedUtr, extractedDate };
     },

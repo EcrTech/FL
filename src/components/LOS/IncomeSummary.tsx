@@ -232,26 +232,10 @@ export default function IncomeSummary({ applicationId, orgId }: IncomeSummaryPro
         source_documents: documents.filter((d) => d.ocr_data).map((d) => d.id),
       };
 
-      // Check if record exists
-      const { data: existing } = await supabase
+      // Upsert to prevent race condition on duplicate inserts
+      const { error } = await supabase
         .from("loan_income_summaries")
-        .select("id")
-        .eq("loan_application_id", applicationId)
-        .maybeSingle();
-
-      let error;
-      if (existing) {
-        const result = await supabase
-          .from("loan_income_summaries")
-          .update(summaryData as any)
-          .eq("loan_application_id", applicationId);
-        error = result.error;
-      } else {
-        const result = await supabase
-          .from("loan_income_summaries")
-          .insert(summaryData as any);
-        error = result.error;
-      }
+        .upsert(summaryData as any, { onConflict: "loan_application_id" });
 
       if (error) throw error;
     },
