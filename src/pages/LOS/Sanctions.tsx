@@ -106,109 +106,54 @@ export default function Sanctions() {
 
   const sanctionMutation = useMutation({
     mutationFn: async (app: SanctionApplication) => {
-      if (!app.applicant_email) {
-        throw new Error("Customer email not found. Please update applicant details.");
+      // If sanction already exists, skip creation
+      if (app.sanction_id) {
+        return { sanctionId: app.sanction_id };
       }
 
-      // Calculate loan details
-      const loanCalc = calculateLoanDetails(
-        app.approved_amount,
-        app.interest_rate || 1,
-        app.tenure_days
-      );
-      
       const processingFee = Math.round(app.approved_amount * 0.1);
       const netDisbursement = app.approved_amount - processingFee;
+      const sanctionNumber = `SAN-${Date.now().toString(36).toUpperCase()}`;
 
-      // Create or get sanction record
-      let sanctionId = app.sanction_id;
-      let sanctionNumber = app.sanction_number;
+      const { data: newSanction, error: sanctionError } = await supabase
+        .from("loan_sanctions")
+        .insert({
+          loan_application_id: app.id,
+          sanction_number: sanctionNumber,
+          sanction_date: new Date().toISOString().split('T')[0],
+          sanctioned_amount: app.approved_amount,
+          sanctioned_tenure_days: app.tenure_days,
+          sanctioned_rate: app.interest_rate || 1,
+          processing_fee: processingFee,
+          gst_amount: Math.round(processingFee * 0.18),
+          net_disbursement_amount: netDisbursement,
+          validity_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          status: 'pending'
+        })
+        .select()
+        .single();
 
-      if (!sanctionId) {
-        // Create sanction record
-        sanctionNumber = `SAN-${Date.now().toString(36).toUpperCase()}`;
-        const { data: newSanction, error: sanctionError } = await supabase
-          .from("loan_sanctions")
-          .insert({
-            loan_application_id: app.id,
-            sanction_number: sanctionNumber,
-            sanction_date: new Date().toISOString().split('T')[0],
-            sanctioned_amount: app.approved_amount,
-            sanctioned_tenure_days: app.tenure_days,
-            sanctioned_rate: app.interest_rate || 1,
-            processing_fee: processingFee,
-            gst_amount: Math.round(processingFee * 0.18),
-            net_disbursement_amount: netDisbursement,
-            validity_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            status: 'pending'
-          })
-          .select()
-          .single();
+      if (sanctionError) throw sanctionError;
 
-        if (sanctionError) throw sanctionError;
-        sanctionId = newSanction.id;
-      }
+      // Update application stage
+      await supabase
+        .from("loan_applications")
+        .update({
+          current_stage: "disbursement_pending",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", app.id);
 
-      // Generate document HTML
-      const sanctionLetterHtml = generateSanctionLetterHtml({
-        sanctionNumber: sanctionNumber!,
-        customerName: app.applicant_name,
-        applicationNumber: app.application_number,
-        approvedAmount: app.approved_amount,
-        tenure: app.tenure_days,
-        interestRate: app.interest_rate || 1,
-        processingFee,
-        netDisbursement,
-        totalInterest: loanCalc.totalInterest,
-        totalRepayment: loanCalc.totalRepayment,
-        dailyEMI: loanCalc.dailyEMI,
-      });
-
-      const loanAgreementHtml = generateLoanAgreementHtml({
-        sanctionNumber: sanctionNumber!,
-        customerName: app.applicant_name,
-        applicationNumber: app.application_number,
-        approvedAmount: app.approved_amount,
-        tenure: app.tenure_days,
-        interestRate: app.interest_rate || 1,
-        processingFee,
-        netDisbursement,
-        totalInterest: loanCalc.totalInterest,
-        totalRepayment: loanCalc.totalRepayment,
-        dailyEMI: loanCalc.dailyEMI,
-      });
-
-      // Send email via edge function
-      const { data, error } = await supabase.functions.invoke('send-sanction-documents', {
-        body: {
-          applicationId: app.id,
-          sanctionId,
-          customerEmail: app.applicant_email,
-          customerName: app.applicant_name,
-          sanctionLetterHtml,
-          loanAgreementHtml,
-          loanDetails: {
-            applicationNumber: app.application_number,
-            sanctionNumber: sanctionNumber!,
-            approvedAmount: app.approved_amount,
-            tenure: app.tenure_days,
-            interestRate: app.interest_rate || 1,
-            processingFee,
-            netDisbursement,
-          }
-        }
-      });
-
-      if (error) throw error;
-      return data;
+      return { sanctionId: newSanction.id };
     },
     onSuccess: () => {
-      toast.success("Sanction documents sent successfully!");
+      toast.success("Sanction created successfully!");
       queryClient.invalidateQueries({ queryKey: ["approved-applications-with-sanctions"] });
+      queryClient.invalidateQueries({ queryKey: ["loan-applications"] });
       setSanctioningId(null);
     },
     onError: (error: any) => {
-      toast.error(error.message || "Failed to send sanction documents");
+      toast.error(error.message || "Failed to create sanction");
       setSanctioningId(null);
     }
   });
