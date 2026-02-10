@@ -76,6 +76,7 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
   const [isParsingAll, setIsParsingAll] = useState(false);
   const [thumbnailUrls, setThumbnailUrls] = useState<Record<string, string>>({});
   const [isRunningFraudCheck, setIsRunningFraudCheck] = useState(false);
+  const [fraudProgress, setFraudProgress] = useState<{ processed: number; total: number; current: string } | null>(null);
 
   const { data: documents = [] } = useQuery({
     queryKey: ["loan-documents", applicationId],
@@ -830,21 +831,64 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
             variant="outline"
             onClick={async () => {
               setIsRunningFraudCheck(true);
+              setFraudProgress(null);
               try {
                 const { data, error } = await supabase.functions.invoke("detect-document-fraud", {
                   body: { applicationId },
                 });
                 if (error) throw error;
                 if (data?.error) throw new Error(data.error);
-                queryClient.invalidateQueries({ queryKey: ["loan-verifications", applicationId] });
-                toast({
-                  title: "Fraud check complete",
-                  description: `Risk: ${data.overall_risk?.toUpperCase()} — ${data.documents_analyzed} documents analyzed`,
-                });
+
+                // Start polling for progress
+                const pollInterval = setInterval(async () => {
+                  try {
+                    const { data: verData } = await supabase
+                      .from("loan_verifications")
+                      .select("response_data, status")
+                      .eq("loan_application_id", applicationId)
+                      .eq("verification_type", "document_fraud_check")
+                      .order("created_at", { ascending: false })
+                      .limit(1)
+                      .single();
+
+                    const rd = verData?.response_data as any;
+                    if (rd) {
+                      setFraudProgress({
+                        processed: rd.processed || 0,
+                        total: rd.total_documents || 0,
+                        current: rd.current_document || "",
+                      });
+
+                      if (rd.status === "completed") {
+                        clearInterval(pollInterval);
+                        setIsRunningFraudCheck(false);
+                        setFraudProgress(null);
+                        queryClient.invalidateQueries({ queryKey: ["loan-verifications", applicationId] });
+                        toast({
+                          title: "Fraud check complete",
+                          description: `Risk: ${rd.overall_risk?.toUpperCase()} — ${rd.documents_analyzed} documents analyzed`,
+                        });
+                      }
+                    }
+                  } catch (pollErr) {
+                    console.error("Polling error:", pollErr);
+                  }
+                }, 3000);
+
+                // Safety timeout: 5 minutes
+                setTimeout(() => {
+                  clearInterval(pollInterval);
+                  if (isRunningFraudCheck) {
+                    setIsRunningFraudCheck(false);
+                    setFraudProgress(null);
+                    queryClient.invalidateQueries({ queryKey: ["loan-verifications", applicationId] });
+                    toast({ title: "Fraud check timed out", description: "Please check results later", variant: "destructive" });
+                  }
+                }, 5 * 60 * 1000);
               } catch (err: any) {
                 toast({ title: "Fraud check failed", description: err.message, variant: "destructive" });
-              } finally {
                 setIsRunningFraudCheck(false);
+                setFraudProgress(null);
               }
             }}
             disabled={isRunningFraudCheck || documents.length === 0}
@@ -855,7 +899,11 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
             ) : (
               <ShieldAlert className="h-4 w-4" />
             )}
-            {isRunningFraudCheck ? "Analyzing..." : "Fraud Check"}
+            {isRunningFraudCheck
+              ? fraudProgress
+                ? `Analyzing ${fraudProgress.processed}/${fraudProgress.total}...`
+                : "Starting..."
+              : "Fraud Check"}
           </Button>
           <Button
             size="sm"
