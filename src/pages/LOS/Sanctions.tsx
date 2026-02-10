@@ -113,7 +113,7 @@ export default function Sanctions() {
 
       const processingFee = Math.round(app.approved_amount * 0.1);
       const netDisbursement = app.approved_amount - processingFee;
-      const sanctionNumber = `SAN-${Date.now().toString(36).toUpperCase()}`;
+      const sanctionNumber = `SAN-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 5)}`;
 
       const { data: newSanction, error: sanctionError } = await supabase
         .from("loan_sanctions")
@@ -135,14 +135,16 @@ export default function Sanctions() {
 
       if (sanctionError) throw sanctionError;
 
-      // Update application stage
-      await supabase
-        .from("loan_applications")
-        .update({
-          current_stage: "disbursement_pending",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", app.id);
+      // Update application stage - guarded transition
+      const { data: transitioned, error: stageError } = await supabase
+        .rpc("transition_loan_stage", {
+          p_application_id: app.id,
+          p_expected_current_stage: "sanctioned",
+          p_new_stage: "disbursement_pending",
+        });
+      
+      if (stageError) throw stageError;
+      if (!transitioned) throw new Error("Application stage has changed. Please refresh and try again.");
 
       return { sanctionId: newSanction.id };
     },

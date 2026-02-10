@@ -50,12 +50,12 @@ export default function LOSDashboard() {
           .select("*", { count: "exact", head: true })
           .eq("org_id", orgId),
         
-        // Pending approval (applications that are approved but awaiting disbursement)
+        // Pending approval (applications awaiting approval or disbursement)
         supabase
           .from("loan_applications")
           .select("*", { count: "exact", head: true })
           .eq("org_id", orgId)
-          .in("current_stage", ["approved", "disbursement_pending"]),
+          .in("current_stage", ["approval_pending", "sanctioned", "disbursement_pending"]),
         
         // Disbursed
         supabase
