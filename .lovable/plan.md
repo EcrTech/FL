@@ -1,45 +1,48 @@
 
 
-## Fix: Admins Can View All Data
+## Fix: Allow Admins to Create Users
 
 ### The Problem
-The `get_visible_user_ids()` database function checks `profiles.role` to detect admins, but the `profiles` table has no `role` column. Roles are stored in the separate `user_roles` table. This means admin/super_admin users are never recognized, and they get the same restricted view as regular users.
+The `profiles` table has an INSERT policy that only allows users to insert their own profile (`id = auth.uid()`). When an admin creates a new user, the inserted profile has a different `id`, so the INSERT is blocked by Row-Level Security.
 
 ### The Fix
-Update the `get_visible_user_ids()` function to check the `user_roles` table instead of a non-existent `profiles.role` column.
+Add a new INSERT policy on the `profiles` table that allows authenticated users with `admin` or `super_admin` roles to insert profiles for any user.
 
 ### Technical Details
 
-**Single migration** to replace the function:
+**Single database migration** to add the policy:
 
-Change this logic:
 ```sql
--- BROKEN: profiles has no 'role' column
-SELECT p.org_id, p.role, p.designation_id
-INTO _org_id, _role, _designation_id
-FROM profiles p WHERE p.id = _user_id;
-
-IF _role IN ('admin', 'super_admin') THEN
-  RETURN NULL;
-END IF;
+CREATE POLICY "Admins can create users"
+ON public.profiles FOR INSERT
+TO authenticated
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM user_roles
+    WHERE user_id = auth.uid()
+      AND role IN ('admin', 'super_admin')
+  )
+);
 ```
 
-To this:
-```sql
--- FIXED: check user_roles table
-SELECT p.org_id, p.designation_id
-INTO _org_id, _designation_id
-FROM profiles p WHERE p.id = _user_id;
+Additionally, add an UPDATE policy so admins can also edit other users' profiles:
 
--- Check admin status from user_roles table
-IF EXISTS (
-  SELECT 1 FROM user_roles
-  WHERE user_id = _user_id
-    AND role IN ('admin', 'super_admin')
-) THEN
-  RETURN NULL;
-END IF;
+```sql
+CREATE POLICY "Admins can update all profiles"
+ON public.profiles FOR UPDATE
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM user_roles
+    WHERE user_id = auth.uid()
+      AND role IN ('admin', 'super_admin')
+  )
+);
 ```
 
-No frontend changes needed. The existing RLS policies already handle `NULL` as "see all" -- once the function correctly identifies admins, they will see all data automatically.
+### What Changes
+- Admins and Super Admins will be able to create new user profiles
+- Admins and Super Admins will be able to update any user's profile
+- Regular users retain existing permissions (can only insert/update their own profile)
+- No frontend code changes needed
 
