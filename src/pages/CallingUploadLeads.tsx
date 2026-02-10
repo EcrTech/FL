@@ -130,9 +130,6 @@ export default function CallingUploadLeads() {
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">Leads</h1>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
-              <Upload className="h-4 w-4 mr-1" /> Upload CSV
-            </Button>
             <Button size="sm" onClick={() => setAddOpen(true)}>
               <Plus className="h-4 w-4 mr-1" /> Add Lead
             </Button>

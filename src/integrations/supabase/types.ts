@@ -3712,6 +3712,7 @@ export type Database = {
           loan_id: string | null
           longitude: number | null
           org_id: string
+          parent_application_id: string | null
           previous_stage: string | null
           product_type: string
           referred_by: string | null
@@ -3740,6 +3741,7 @@ export type Database = {
           loan_id?: string | null
           longitude?: number | null
           org_id: string
+          parent_application_id?: string | null
           previous_stage?: string | null
           product_type?: string
           referred_by?: string | null
@@ -3768,6 +3770,7 @@ export type Database = {
           loan_id?: string | null
           longitude?: number | null
           org_id?: string
+          parent_application_id?: string | null
           previous_stage?: string | null
           product_type?: string
           referred_by?: string | null
@@ -3827,6 +3830,13 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_applications_parent_application_id_fkey"
+            columns: ["parent_application_id"]
+            isOneToOne: false
+            referencedRelation: "loan_applications"
             referencedColumns: ["id"]
           },
         ]

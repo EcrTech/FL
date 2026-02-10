@@ -10,6 +10,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -17,12 +18,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { IndianRupee, Search, Eye, Filter, Smartphone } from "lucide-react";
+import { IndianRupee, Search, Eye, Filter, Smartphone, ArrowUpDown, CalendarIcon } from "lucide-react";
 import { CollectionRecord } from "@/hooks/useCollections";
 import { useNavigate } from "react-router-dom";
 import { ClickToCall } from "@/components/Contact/ClickToCall";
 import { UPICollectionDialog } from "./UPICollectionDialog";
 import { useUPICollection } from "@/hooks/useUPICollection";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 
 interface CollectionsTableProps {
   collections: CollectionRecord[];
@@ -33,6 +38,9 @@ export function CollectionsTable({ collections, onRecordPayment }: CollectionsTa
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [dueDateFrom, setDueDateFrom] = useState<Date | undefined>(undefined);
+  const [dueDateTo, setDueDateTo] = useState<Date | undefined>(undefined);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [currentPage, setCurrentPage] = useState(1);
   const [upiDialogOpen, setUpiDialogOpen] = useState(false);
   const [selectedUpiRecord, setSelectedUpiRecord] = useState<CollectionRecord | null>(null);
@@ -98,8 +106,24 @@ export function CollectionsTable({ collections, onRecordPayment }: CollectionsTa
       });
     }
 
+    // Due date range filter
+    if (dueDateFrom) {
+      const fromStr = format(dueDateFrom, "yyyy-MM-dd");
+      filtered = filtered.filter((c) => c.due_date >= fromStr);
+    }
+    if (dueDateTo) {
+      const toStr = format(dueDateTo, "yyyy-MM-dd");
+      filtered = filtered.filter((c) => c.due_date <= toStr);
+    }
+
+    // Sort by due date
+    filtered = [...filtered].sort((a, b) => {
+      const cmp = a.due_date.localeCompare(b.due_date);
+      return sortDirection === "desc" ? -cmp : cmp;
+    });
+
     return filtered;
-  }, [collections, searchTerm, statusFilter]);
+  }, [collections, searchTerm, statusFilter, dueDateFrom, dueDateTo, sortDirection]);
 
   const paginatedCollections = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
@@ -119,10 +143,16 @@ export function CollectionsTable({ collections, onRecordPayment }: CollectionsTa
     };
   }, [filteredCollections]);
 
+  const clearDateFilters = () => {
+    setDueDateFrom(undefined);
+    setDueDateTo(undefined);
+    setCurrentPage(1);
+  };
+
   return (
     <div className="space-y-3">
       {/* Compact Filters */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-end gap-3">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -148,6 +178,35 @@ export function CollectionsTable({ collections, onRecordPayment }: CollectionsTa
             <SelectItem value="partially_paid">Partial</SelectItem>
           </SelectContent>
         </Select>
+
+        {/* Due Date Range Filters */}
+        <div className="flex items-center gap-1.5">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className={cn("h-9 w-[130px] justify-start text-left text-xs", !dueDateFrom && "text-muted-foreground")}>
+                <CalendarIcon className="h-3.5 w-3.5 mr-1.5" />
+                {dueDateFrom ? format(dueDateFrom, "dd MMM yy") : "Due From"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar mode="single" selected={dueDateFrom} onSelect={(d) => { setDueDateFrom(d); setCurrentPage(1); }} initialFocus className="p-3 pointer-events-auto" />
+            </PopoverContent>
+          </Popover>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className={cn("h-9 w-[130px] justify-start text-left text-xs", !dueDateTo && "text-muted-foreground")}>
+                <CalendarIcon className="h-3.5 w-3.5 mr-1.5" />
+                {dueDateTo ? format(dueDateTo, "dd MMM yy") : "Due To"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar mode="single" selected={dueDateTo} onSelect={(d) => { setDueDateTo(d); setCurrentPage(1); }} initialFocus className="p-3 pointer-events-auto" />
+            </PopoverContent>
+          </Popover>
+          {(dueDateFrom || dueDateTo) && (
+            <Button variant="ghost" size="sm" className="h-9 text-xs" onClick={clearDateFilters}>Clear</Button>
+          )}
+        </div>
 
         {/* Quick Stats */}
         <div className="flex items-center gap-4 text-xs ml-auto">
@@ -176,7 +235,12 @@ export function CollectionsTable({ collections, onRecordPayment }: CollectionsTa
                 <TableHead className="py-2 text-xs font-semibold">App #</TableHead>
                 <TableHead className="py-2 text-xs font-semibold">Applicant</TableHead>
                 <TableHead className="py-2 text-xs font-semibold">EMI #</TableHead>
-                <TableHead className="py-2 text-xs font-semibold">Due Date</TableHead>
+                <TableHead className="py-2 text-xs font-semibold cursor-pointer" onClick={() => setSortDirection(d => d === "asc" ? "desc" : "asc")}>
+                  <div className="flex items-center gap-1">
+                    Due Date
+                    <ArrowUpDown className="h-3 w-3" />
+                  </div>
+                </TableHead>
                 <TableHead className="py-2 text-xs font-semibold text-right">EMI Amt</TableHead>
                 <TableHead className="py-2 text-xs font-semibold text-right">Paid</TableHead>
                 <TableHead className="py-2 text-xs font-semibold text-right">Balance</TableHead>
