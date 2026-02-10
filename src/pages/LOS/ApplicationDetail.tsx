@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, User, FileText, Calculator, FileCheck, XCircle, CreditCard, CheckCircle, MapPin, Edit2, Save, X, RefreshCw, Loader2, Sparkles, Plus, Pencil, Trash2, History } from "lucide-react";
+import { ArrowLeft, User, FileText, Calculator, FileCheck, XCircle, CreditCard, CheckCircle, MapPin, Edit2, Save, X, RefreshCw, Loader2, Sparkles, Plus, Pencil, Trash2, History, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { LoadingState } from "@/components/common/LoadingState";
 import { format } from "date-fns";
@@ -28,6 +28,8 @@ import { ReferralsSection } from "@/components/LOS/ReferralsSection";
 import { ApplicationSummary } from "@/components/LOS/ApplicationSummary";
 import { AssignmentDialog } from "@/components/LOS/AssignmentDialog";
 import { CaseHistoryDialog } from "@/components/LOS/CaseHistoryDialog";
+import { MandateStatusCard } from "@/components/LOS/Mandate/MandateStatusCard";
+import { RepeatLoanDialog } from "@/components/LOS/RepeatLoanDialog";
 
 const STAGE_LABELS: Record<string, string> = {
   application_login: "Application Login",
@@ -63,6 +65,7 @@ export default function ApplicationDetail() {
   const [isCaseHistoryOpen, setIsCaseHistoryOpen] = useState(false);
   const [isEditingReferrals, setIsEditingReferrals] = useState(false);
   const [isEditingApplicant, setIsEditingApplicant] = useState(false);
+  const [showRepeatLoanDialog, setShowRepeatLoanDialog] = useState(false);
   const [applicantData, setApplicantData] = useState({
     gender: "",
     marital_status: "",
@@ -440,6 +443,9 @@ export default function ApplicationDetail() {
     primaryApplicant?.mobile
   ]);
 
+  // Determine if application is locked (disbursed without active repeat loan)
+  const isLocked = application?.current_stage === "disbursed";
+
   if (isLoading || isOrgLoading) {
     return (
       <DashboardLayout>
@@ -464,7 +470,7 @@ export default function ApplicationDetail() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/los/applications")}>
+            <Button variant="ghost" size="icon" onClick={() => window.history.length > 1 ? navigate(-1) : navigate("/los/applications")}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
@@ -478,6 +484,12 @@ export default function ApplicationDetail() {
                 <Badge variant="outline">
                   {STAGE_LABELS[application.current_stage] || application.current_stage}
                 </Badge>
+                {isLocked && (
+                  <Badge variant="secondary" className="gap-1">
+                    <Lock className="h-3 w-3" />
+                    Locked
+                  </Badge>
+                )}
               </div>
               <p className="text-muted-foreground mt-1">
                 {application.loan_id && (
@@ -487,6 +499,13 @@ export default function ApplicationDetail() {
               </p>
             </div>
           </div>
+          {/* Repeat Loan Button - visible only for disbursed applications */}
+          {application.current_stage === "disbursed" && application.contact_id && (
+            <Button variant="outline" onClick={() => setShowRepeatLoanDialog(true)}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Repeat Loan
+            </Button>
+          )}
         </div>
 
         {/* Quick Stats */}
@@ -578,7 +597,7 @@ export default function ApplicationDetail() {
                   <User className="h-4 w-4" />
                   Applicant Details
                 </CardTitle>
-                {primaryApplicant && (
+                {primaryApplicant && !isLocked && (
                   <div className="flex gap-2">
                     {isEditingApplicant ? (
                       <>
@@ -1011,6 +1030,11 @@ export default function ApplicationDetail() {
           {application.current_stage === "disbursed" && (
             <DisbursementStatus applicationId={id!} />
           )}
+
+          {/* NACH / eMandate Status - visible for disbursement_pending and disbursed */}
+          {["disbursement_pending", "disbursed"].includes(application.current_stage) && (
+            <MandateStatusCard applicationId={id!} />
+          )}
         </div>
       </div>
 
@@ -1049,6 +1073,19 @@ export default function ApplicationDetail() {
           applicantName={`${primaryApplicant.first_name} ${primaryApplicant.middle_name || ''} ${primaryApplicant.last_name || ''}`.trim()}
           applicantPhone={primaryApplicant.mobile as string}
           applicantEmail={primaryApplicant.email as string}
+        />
+      )}
+
+      {/* Repeat Loan Dialog */}
+      {application.contact_id && (
+        <RepeatLoanDialog
+          open={showRepeatLoanDialog}
+          onOpenChange={setShowRepeatLoanDialog}
+          applicationId={id!}
+          orgId={orgId!}
+          contactId={application.contact_id}
+          previousAmount={application.requested_amount || 0}
+          previousTenure={application.tenure_days || 30}
         />
       )}
     </DashboardLayout>

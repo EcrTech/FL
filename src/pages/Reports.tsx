@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, CalendarIcon, Phone, Target, TrendingUp } from "lucide-react";
+import { Download, CalendarIcon, Phone, Target, TrendingUp, AlertTriangle, Users } from "lucide-react";
 import { useNotification } from "@/hooks/useNotification";
 import { useNavigate } from "react-router-dom";
 import { useOrgContext } from "@/hooks/useOrgContext";
@@ -13,6 +13,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import CampaignAnalyticsTab from "@/components/Reports/Analytics/CampaignAnalyticsTab";
 import CallingDashboardTab from "@/components/Reports/CallingDashboard/CallingDashboardTab";
+import OverdueBucketReport from "@/components/LOS/Reports/OverdueBucketReport";
+import StaffPerformanceDashboard from "@/components/LOS/Reports/StaffPerformanceDashboard";
 import { format, subDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -59,41 +61,37 @@ export default function Reports() {
     window.location.hash = activeTab;
   }, [activeTab]);
 
-  // Optimized sales reports query - single database call instead of N+1
+  // Optimized sales reports query
   const { data: salesReports = [], isLoading: salesLoading } = useQuery({
     queryKey: ['sales-reports', fromDate, toDate, orgId],
     queryFn: async () => {
       if (!orgId) return [];
-      
       const { data, error } = await supabase.rpc('get_sales_performance_report', {
         p_org_id: orgId,
         p_start_date: fromDate.toISOString(),
       });
-
       if (error) throw error;
       return data || [];
     },
     enabled: !!orgId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 
-  // Optimized pipeline reports query - single database call instead of N+1
+  // Optimized pipeline reports query
   const { data: pipelineReports = [], isLoading: pipelineLoading } = useQuery({
     queryKey: ['pipeline-reports', orgId],
     queryFn: async () => {
       if (!orgId) return [];
-      
       const { data, error } = await supabase.rpc('get_pipeline_performance_report', {
         p_org_id: orgId,
       });
-
       if (error) throw error;
       return data || [];
     },
     enabled: !!orgId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 
   const exportToCSV = (data: any[], filename: string) => {
@@ -101,11 +99,9 @@ export default function Reports() {
       notify.error("No data", "There is no data to export");
       return;
     }
-
     const headers = Object.keys(data[0]).join(",");
     const rows = data.map(row => Object.values(row).join(","));
     const csv = [headers, ...rows].join("\n");
-
     const blob = new Blob([csv], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -113,7 +109,6 @@ export default function Reports() {
     a.download = `${filename}_${format(fromDate, 'yyyy-MM-dd')}_to_${format(toDate, 'yyyy-MM-dd')}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
-
     notify.success("Export successful", `Report exported as ${filename}.csv`);
   };
 
@@ -179,18 +174,26 @@ export default function Reports() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="sales">
               <Target className="h-4 w-4 mr-2" />
-              Sales Performance
+              Sales
             </TabsTrigger>
             <TabsTrigger value="campaigns">
               <TrendingUp className="h-4 w-4 mr-2" />
-              Campaign Analytics
+              Campaigns
             </TabsTrigger>
             <TabsTrigger value="calling">
               <Phone className="h-4 w-4 mr-2" />
-              Calls Performance
+              Calls
+            </TabsTrigger>
+            <TabsTrigger value="od-buckets">
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              OD Buckets
+            </TabsTrigger>
+            <TabsTrigger value="staff-performance">
+              <Users className="h-4 w-4 mr-2" />
+              Staff
             </TabsTrigger>
           </TabsList>
 
@@ -409,7 +412,23 @@ export default function Reports() {
           <TabsContent value="calling" className="space-y-4">
             <CallingDashboardTab />
           </TabsContent>
-  </Tabs>
+
+          <TabsContent value="od-buckets" className="space-y-4">
+            <div>
+              <h2 className="text-2xl font-bold">OD Bucket Report</h2>
+              <p className="text-muted-foreground">Overdue EMIs categorized by aging — 30, 60, 90+ days</p>
+            </div>
+            <OverdueBucketReport />
+          </TabsContent>
+
+          <TabsContent value="staff-performance" className="space-y-4">
+            <div>
+              <h2 className="text-2xl font-bold">Staff Performance</h2>
+              <p className="text-muted-foreground">Staff-wise metrics from leads to disbursement and collections</p>
+            </div>
+            <StaffPerformanceDashboard fromDate={fromDate} toDate={toDate} />
+          </TabsContent>
+        </Tabs>
       </div>
     </DashboardLayout>
   );

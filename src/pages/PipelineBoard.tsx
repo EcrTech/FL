@@ -86,6 +86,9 @@ const SOURCE_OPTIONS = [
   { value: "fb", label: "Facebook" },
   { value: "direct", label: "Direct" },
   { value: "referral_link", label: "Referral" },
+  { value: "google_ads", label: "Google Ads" },
+  { value: "meta_ads", label: "Meta Ads" },
+  { value: "repeat_loan", label: "Repeat Loan" },
   { value: "others", label: "Others" },
 ];
 
@@ -96,6 +99,9 @@ const SOURCE_DISPLAY: Record<string, string> = {
   fb: "Facebook",
   direct: "Direct",
   referral_link: "Referral",
+  google_ads: "Google Ads",
+  meta_ads: "Meta Ads",
+  repeat_loan: "Repeat Loan",
   others: "Others",
 };
 
