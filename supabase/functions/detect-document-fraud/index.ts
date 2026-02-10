@@ -297,7 +297,7 @@ serve(async (req) => {
 
 // ========== Analyze a single document ==========
 async function analyzeDocument(supabase: any, doc: any, apiKey: string): Promise<any> {
-  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+  const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB
 
   // Download from storage
   const { data: fileData, error: dlError } = await supabase.storage
@@ -322,7 +322,7 @@ async function analyzeDocument(supabase: any, doc: any, apiKey: string): Promise
       document_type: doc.document_type,
       risk_level: "unknown",
       confidence: 0,
-      issues: ["File too large for visual fraud analysis (>5MB). Manual review recommended."],
+      issues: ["File too large for visual fraud analysis (>15MB). Manual review recommended."],
       details: `File size: ${(arrayBuffer.byteLength / (1024 * 1024)).toFixed(1)}MB`,
     };
   }
