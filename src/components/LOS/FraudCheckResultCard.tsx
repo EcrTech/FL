@@ -93,7 +93,10 @@ export default function FraudCheckResultCard({ result }: FraudCheckResultCardPro
     }
   };
 
-  const flaggedFindings = result.findings.filter(
+  const findings = result.findings || [];
+  const crossChecks = result.cross_document_checks || [];
+
+  const flaggedFindings = findings.filter(
     (f) => f.risk_level === "high" || f.risk_level === "medium"
   );
 
@@ -136,13 +139,13 @@ export default function FraudCheckResultCard({ result }: FraudCheckResultCardPro
         </div>
 
         {/* Cross-document checks */}
-        {result.cross_document_checks.length > 0 && (
+        {crossChecks.length > 0 && (
           <div className="space-y-1.5">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
               Cross-Document Checks
             </span>
             <div className="space-y-1">
-              {result.cross_document_checks.map((check, i) => (
+              {crossChecks.map((check, i) => (
                 <div key={i} className="flex items-center gap-2 text-sm">
                   {getCheckStatusIcon(check.status)}
                   <span className="font-medium">{check.check}:</span>
@@ -189,7 +192,7 @@ export default function FraudCheckResultCard({ result }: FraudCheckResultCardPro
           </Accordion>
         )}
 
-        {flaggedFindings.length === 0 && result.cross_document_checks.every((c) => c.status === "pass") && (
+        {flaggedFindings.length === 0 && crossChecks.every((c) => c.status === "pass") && (
           <div className="flex items-center gap-2 text-sm text-green-600">
             <ShieldCheck className="h-4 w-4" />
             No issues detected. All documents appear authentic.
