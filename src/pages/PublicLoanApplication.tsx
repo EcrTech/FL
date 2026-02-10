@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "react-router-dom";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -276,6 +277,13 @@ export default function PublicLoanApplication() {
   };
 
   const nextStep = async () => {
+    // Guard: block step progression if location is not captured
+    if (!geolocation) {
+      toast.error("Please enable location access to continue");
+      captureGeolocation();
+      return;
+    }
+
     if (currentStep < STEPS.length) {
       // Track step progression
       const stepNames = ['loan_details', 'personal_info', 'address', 'employment', 'documents', 'review', 'consent'];

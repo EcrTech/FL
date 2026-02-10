@@ -401,8 +401,23 @@ export default function ReferralLoanApplication() {
     }
   };
 
+  // Guard: block step progression if location is not captured
+  const requireLocation = (callback: () => void) => {
+    if (!geolocation) {
+      toast.error("Please enable location access to continue");
+      captureGeolocation();
+      return;
+    }
+    callback();
+  };
+
   // Handle entering Video KYC step
   const handleEnterVideoStep = async () => {
+    if (!geolocation) {
+      toast.error("Please enable location access to continue");
+      captureGeolocation();
+      return;
+    }
     // Track step 4 - Video KYC
     trackStep(4, 'video_kyc', 'referral');
     
@@ -610,7 +625,7 @@ export default function ReferralLoanApplication() {
                   onConsentChange={handleConsentChange}
                   verificationStatus={{ phoneVerified: verificationStatus.phoneVerified }}
                   onVerificationComplete={() => handleVerificationComplete('phone')}
-                  onContinue={() => setBasicInfoSubStep(2)}
+                  onContinue={() => requireLocation(() => setBasicInfoSubStep(2))}
                 />
               </div>
             )}
@@ -629,7 +644,7 @@ export default function ReferralLoanApplication() {
                     officeEmailVerified: verificationStatus.officeEmailVerified,
                   }}
                   onVerificationComplete={handleVerificationComplete}
-                  onContinue={() => setCurrentStep(2)}
+                  onContinue={() => requireLocation(() => setCurrentStep(2))}
                 />
               </div>
             )}
