@@ -1,37 +1,37 @@
 
 
-## Fix: Broken `get_visible_user_ids` Function Crashing for Non-Admin Users
+## Change: Restrict Unassigned Leads to Admins Only
 
-### The Problem
-There are two issues preventing Shivam from seeing leads:
+### Current Behavior
+The SELECT policy on the `contacts` table shows unassigned leads (`assigned_to IS NULL`) to **all** users in the organization.
 
-**1. Bug in `get_visible_user_ids()` (critical)**
-The function calls `SELECT array_agg(id) FROM get_subordinates(...)`, but `get_subordinates()` returns columns named `designation_id` and `level` -- there is no `id` column. This causes a runtime error for every non-admin user, which makes the RLS policy on `contacts` fail silently and return zero rows.
-
-**2. No leads are assigned to Shivam**
-All 169 contacts in the organization have `assigned_to = NULL`. However, the RLS policy is designed to show unassigned leads to everyone (`assigned_to IS NULL` passes the check), so they *should* be visible -- but the crashing function prevents this.
-
-### The Fix
-Update `get_visible_user_ids()` to reference the correct column name (`designation_id` instead of `id`) from the `get_subordinates()` function.
+### Desired Behavior
+- **Admins/Super Admins**: Can see all leads (assigned and unassigned)
+- **Other users**: Can only see leads assigned to themselves or their subordinates
 
 ### Technical Details
 
-**Single database migration** to replace the function, fixing line 28:
+**Single database migration** to replace the existing SELECT policy on `contacts`.
 
-Change:
-```sql
-SELECT array_agg(id) INTO _subordinate_ids
-FROM get_subordinates(_designation_id);
+The current condition:
+```
+(assigned_to IS NULL) OR (assigned_to = ANY(get_visible_user_ids(...)))
 ```
 
-To:
-```sql
-SELECT array_agg(designation_id) INTO _subordinate_ids
-FROM get_subordinates(_designation_id);
+Will be updated to:
+```
+-- Admins see everything (already handled by get_visible_user_ids returning all org users)
+-- Non-admins: remove the "assigned_to IS NULL" fallback
+(assigned_to = ANY(get_visible_user_ids(auth.uid())))
+OR
+(assigned_to IS NULL AND EXISTS (
+  SELECT 1 FROM user_roles
+  WHERE user_id = auth.uid()
+    AND role IN ('admin', 'super_admin')
+))
 ```
 
-The full function will be re-created with `CREATE OR REPLACE FUNCTION` containing this fix. No other changes are needed -- once the function stops crashing, the existing RLS policy will correctly show Shivam:
-- All unassigned leads (169 currently)
-- Any leads assigned to him or his subordinates in the future
+This moves the `assigned_to IS NULL` check behind an admin role gate. The `get_visible_user_ids` function already returns all org user IDs for admins, so assigned leads remain fully visible to them. For non-admins, only leads assigned to them or their subordinates will appear.
 
 No frontend changes required.
+
