@@ -74,9 +74,16 @@ serve(async (req) => {
         continue;
       }
 
-      // Convert to base64
+      // Convert to base64 (chunked to avoid stack overflow on large files)
       const arrayBuffer = await fileData.arrayBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = "";
+      const chunkSize = 8192;
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        const chunk = bytes.subarray(i, i + chunkSize);
+        binary += String.fromCharCode(...chunk);
+      }
+      const base64 = btoa(binary);
       const mimeType = doc.mime_type || "image/jpeg";
 
       // 3. Send to Gemini for fraud analysis
