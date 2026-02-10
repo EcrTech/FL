@@ -7,11 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Upload, CheckCircle, XCircle, Eye, Shield, Loader2, Wand2, ChevronDown, ChevronRight, Sparkles, FileText } from "lucide-react";
+import { Upload, CheckCircle, XCircle, Eye, Shield, Loader2, Wand2, ChevronDown, ChevronRight, Sparkles, FileText, ShieldAlert } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import FraudCheckResultCard from "./FraudCheckResultCard";
 
 interface Applicant {
   id?: string;
@@ -74,6 +75,7 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [isParsingAll, setIsParsingAll] = useState(false);
   const [thumbnailUrls, setThumbnailUrls] = useState<Record<string, string>>({});
+  const [isRunningFraudCheck, setIsRunningFraudCheck] = useState(false);
 
   const { data: documents = [] } = useQuery({
     queryKey: ["loan-documents", applicationId],
@@ -821,8 +823,40 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
   return (
     <TooltipProvider>
       <div className="space-y-3">
-        {/* Parse All Documents button */}
-        <div className="flex justify-end">
+        {/* Parse All & Fraud Check buttons */}
+        <div className="flex justify-end gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={async () => {
+              setIsRunningFraudCheck(true);
+              try {
+                const { data, error } = await supabase.functions.invoke("detect-document-fraud", {
+                  body: { applicationId },
+                });
+                if (error) throw error;
+                if (data?.error) throw new Error(data.error);
+                queryClient.invalidateQueries({ queryKey: ["loan-verifications", applicationId] });
+                toast({
+                  title: "Fraud check complete",
+                  description: `Risk: ${data.overall_risk?.toUpperCase()} — ${data.documents_analyzed} documents analyzed`,
+                });
+              } catch (err: any) {
+                toast({ title: "Fraud check failed", description: err.message, variant: "destructive" });
+              } finally {
+                setIsRunningFraudCheck(false);
+              }
+            }}
+            disabled={isRunningFraudCheck || documents.length === 0}
+            className="gap-2"
+          >
+            {isRunningFraudCheck ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <ShieldAlert className="h-4 w-4" />
+            )}
+            {isRunningFraudCheck ? "Analyzing..." : "Fraud Check"}
+          </Button>
           <Button
             size="sm"
             variant="outline"
@@ -843,6 +877,13 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
             )}
           </Button>
         </div>
+
+        {/* Fraud Check Result Card */}
+        {(() => {
+          const fraudVerification = verifications.find((v) => v.verification_type === "document_fraud_check");
+          if (!fraudVerification?.response_data) return null;
+          return <FraudCheckResultCard result={fraudVerification.response_data as any} />;
+        })()}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Left column: Identity + Income */}
