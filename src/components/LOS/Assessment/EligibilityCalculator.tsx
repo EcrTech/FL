@@ -409,9 +409,8 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
       const { error } = await supabase
         .from("loan_applications")
         .update({
-          current_stage: "approved",
-          status: "approved",
-          approved_by: user?.id,
+          current_stage: "approval_pending",
+          status: "in_progress",
           approved_amount: approvedAmount,
           tenure_days: tenureDays,
           interest_rate: interestRate,
