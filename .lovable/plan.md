@@ -1,42 +1,49 @@
 
+## Fix: Aadhaar Card Data Not Showing in Verified Document Data
 
-## Make Location Capture Strictly Mandatory
+### Root Cause
+The code in three files calls `getParsedData("aadhaar_card")` / `getOcrData("aadhaar_card")`, but Aadhaar documents are stored with types `aadhaar_front` and `aadhaar_back` -- not `aadhaar_card`. Since no document matches `aadhaar_card`, the Aadhaar section never renders.
 
-### Problem
-Currently, the referral application flow attempts to capture geolocation on page load and shows a warning if it fails, but users can still proceed through all steps without location. The location is only checked at the very end (before final submission in `handleVideoKycComplete`), which wastes the user's time if they complete all steps only to be blocked at submission.
+### Database Evidence
+- `aadhaar_front` (id: `61150a6e`) has OCR data: name, DOB, gender, aadhaar_number
+- `aadhaar_back` (id: `c2a29356`) has OCR data: full address, aadhaar_number
+- No document with type `aadhaar_card` exists
 
-### Solution
-Block form progression at **Step 1** itself if location is not captured. The user must grant location permission before they can proceed to any subsequent step.
+### Fix
+Update the Aadhaar data lookup in all three files to merge data from both `aadhaar_front` and `aadhaar_back` documents.
 
-### Changes
+### Files to Change
 
-**1. `src/pages/ReferralLoanApplication.tsx`**
-- In `LoanRequirementsScreen`'s `onContinue` callback (sub-step 1 to sub-step 2 transition), add a check: if `geolocation` is null, show a toast error ("Please enable location access to continue") and call `captureGeolocation()` again instead of advancing.
-- In `ContactConsentScreen`'s `onContinue` callback (step 1 to step 2 transition), add the same geolocation guard.
-- Move the location error alert to be more prominent -- display it as a full-width blocking overlay/banner at the top of Step 1 content area with a clear "Enable Location" retry button.
-- Keep the existing final check in `handleVideoKycComplete` as a safety net.
+**1. `src/pages/LOS/ApplicationDetail.tsx` (line ~386)**
+- Replace `getParsedData("aadhaar_card")` with logic that merges `aadhaar_front` and `aadhaar_back` OCR data
+- Front provides: name, DOB, gender, aadhaar_number
+- Back provides: address, aadhaar_number (with formatting)
 
-**2. `src/pages/PublicLoanApplication.tsx`** (same treatment for consistency)
-- Add the same geolocation guard before allowing step progression, mirroring the referral flow logic.
+**2. `src/pages/LOS/SanctionDetail.tsx`**
+- Same fix as ApplicationDetail -- update the Aadhaar lookup to check `aadhaar_front` and `aadhaar_back`
 
-### User Experience
-- On page load, the browser prompts for location permission (existing behavior).
-- If denied or unavailable, a prominent alert with a "Retry" button is shown.
-- Tapping "Continue" on any step without location triggers a toast: "Please enable location access to continue" and re-attempts capture.
-- Once location is captured, the flow proceeds normally.
+**3. `src/components/LOS/DocumentDataVerification.tsx` (line ~129)**
+- Replace `getOcrData("aadhaar_card")` with merged front+back data
 
 ### Technical Details
-- The `onContinue` callbacks in Step 1 sub-screens will be wrapped with a location check:
-  ```typescript
-  const requireLocation = (callback: () => void) => {
-    if (!geolocation) {
-      toast.error("Please enable location access to continue");
-      captureGeolocation();
-      return;
-    }
-    callback();
-  };
-  ```
-- This wrapper will be applied to: `setBasicInfoSubStep(2)`, `setCurrentStep(2)`, `setCurrentStep(3)` transitions, and `handleEnterVideoStep`.
-- No database or backend changes needed -- the backend validation already enforces this on submission.
 
+The merged logic will look like:
+
+```typescript
+const aadhaarFrontData = getParsedData("aadhaar_front");
+const aadhaarBackData = getParsedData("aadhaar_back");
+const aadhaarDocData = (aadhaarFrontData || aadhaarBackData) ? {
+  ...aadhaarBackData,
+  ...aadhaarFrontData,
+  // Back has structured address, prefer it
+  address: aadhaarBackData?.aadhaar_card_details?.address?.english
+    ? [
+        aadhaarBackData.aadhaar_card_details.address.english.s_o,
+        aadhaarBackData.aadhaar_card_details.address.english.house_number_or_locality,
+        aadhaarBackData.aadhaar_card_details.address.english.state_and_pincode,
+      ].filter(Boolean).join(", ")
+    : aadhaarFrontData?.address,
+} : null;
+```
+
+This ensures front data (name, DOB, gender) and back data (address) are combined into the displayed Aadhaar section.
