@@ -126,7 +126,19 @@ export default function DocumentDataVerification({ applicationId }: DocumentData
         }
       : null;
 
-    const aadhaarDocData = getOcrData("aadhaar_card");
+    const aadhaarFrontData = getOcrData("aadhaar_front");
+    const aadhaarBackData = getOcrData("aadhaar_back");
+    const aadhaarDocData = (aadhaarFrontData || aadhaarBackData) ? {
+      ...aadhaarBackData,
+      ...aadhaarFrontData,
+      address: aadhaarBackData?.aadhaar_card_details?.address?.english
+        ? [
+            aadhaarBackData.aadhaar_card_details.address.english.s_o,
+            aadhaarBackData.aadhaar_card_details.address.english.house_number_or_locality,
+            aadhaarBackData.aadhaar_card_details.address.english.state_and_pincode,
+          ].filter(Boolean).join(", ")
+        : aadhaarFrontData?.address,
+    } : null;
     const aadhaarVerData = getVerificationData("aadhaar");
     const aadhaarData: Record<string, any> | null = aadhaarDocData || aadhaarVerData
       ? {

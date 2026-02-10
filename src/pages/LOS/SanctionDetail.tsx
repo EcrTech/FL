@@ -220,7 +220,19 @@ export default function SanctionDetail() {
       }
     : null;
 
-  const aadhaarDocData = getParsedData("aadhaar_card");
+  const aadhaarFrontData = getParsedData("aadhaar_front");
+  const aadhaarBackData = getParsedData("aadhaar_back");
+  const aadhaarDocData = (aadhaarFrontData || aadhaarBackData) ? {
+    ...aadhaarBackData,
+    ...aadhaarFrontData,
+    address: aadhaarBackData?.aadhaar_card_details?.address?.english
+      ? [
+          aadhaarBackData.aadhaar_card_details.address.english.s_o,
+          aadhaarBackData.aadhaar_card_details.address.english.house_number_or_locality,
+          aadhaarBackData.aadhaar_card_details.address.english.state_and_pincode,
+        ].filter(Boolean).join(", ")
+      : aadhaarFrontData?.address,
+  } : null;
   const aadhaarVerData = getVerificationData("aadhaar");
   const aadhaarData: Record<string, any> | null = aadhaarDocData || aadhaarVerData
     ? {
