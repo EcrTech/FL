@@ -1,37 +1,42 @@
 
 
-## Change: Restrict Unassigned Leads to Admins Only
+## Make Location Capture Strictly Mandatory
 
-### Current Behavior
-The SELECT policy on the `contacts` table shows unassigned leads (`assigned_to IS NULL`) to **all** users in the organization.
+### Problem
+Currently, the referral application flow attempts to capture geolocation on page load and shows a warning if it fails, but users can still proceed through all steps without location. The location is only checked at the very end (before final submission in `handleVideoKycComplete`), which wastes the user's time if they complete all steps only to be blocked at submission.
 
-### Desired Behavior
-- **Admins/Super Admins**: Can see all leads (assigned and unassigned)
-- **Other users**: Can only see leads assigned to themselves or their subordinates
+### Solution
+Block form progression at **Step 1** itself if location is not captured. The user must grant location permission before they can proceed to any subsequent step.
+
+### Changes
+
+**1. `src/pages/ReferralLoanApplication.tsx`**
+- In `LoanRequirementsScreen`'s `onContinue` callback (sub-step 1 to sub-step 2 transition), add a check: if `geolocation` is null, show a toast error ("Please enable location access to continue") and call `captureGeolocation()` again instead of advancing.
+- In `ContactConsentScreen`'s `onContinue` callback (step 1 to step 2 transition), add the same geolocation guard.
+- Move the location error alert to be more prominent -- display it as a full-width blocking overlay/banner at the top of Step 1 content area with a clear "Enable Location" retry button.
+- Keep the existing final check in `handleVideoKycComplete` as a safety net.
+
+**2. `src/pages/PublicLoanApplication.tsx`** (same treatment for consistency)
+- Add the same geolocation guard before allowing step progression, mirroring the referral flow logic.
+
+### User Experience
+- On page load, the browser prompts for location permission (existing behavior).
+- If denied or unavailable, a prominent alert with a "Retry" button is shown.
+- Tapping "Continue" on any step without location triggers a toast: "Please enable location access to continue" and re-attempts capture.
+- Once location is captured, the flow proceeds normally.
 
 ### Technical Details
-
-**Single database migration** to replace the existing SELECT policy on `contacts`.
-
-The current condition:
-```
-(assigned_to IS NULL) OR (assigned_to = ANY(get_visible_user_ids(...)))
-```
-
-Will be updated to:
-```
--- Admins see everything (already handled by get_visible_user_ids returning all org users)
--- Non-admins: remove the "assigned_to IS NULL" fallback
-(assigned_to = ANY(get_visible_user_ids(auth.uid())))
-OR
-(assigned_to IS NULL AND EXISTS (
-  SELECT 1 FROM user_roles
-  WHERE user_id = auth.uid()
-    AND role IN ('admin', 'super_admin')
-))
-```
-
-This moves the `assigned_to IS NULL` check behind an admin role gate. The `get_visible_user_ids` function already returns all org user IDs for admins, so assigned leads remain fully visible to them. For non-admins, only leads assigned to them or their subordinates will appear.
-
-No frontend changes required.
+- The `onContinue` callbacks in Step 1 sub-screens will be wrapped with a location check:
+  ```typescript
+  const requireLocation = (callback: () => void) => {
+    if (!geolocation) {
+      toast.error("Please enable location access to continue");
+      captureGeolocation();
+      return;
+    }
+    callback();
+  };
+  ```
+- This wrapper will be applied to: `setBasicInfoSubStep(2)`, `setCurrentStep(2)`, `setCurrentStep(3)` transitions, and `handleEnterVideoStep`.
+- No database or backend changes needed -- the backend validation already enforces this on submission.
 
