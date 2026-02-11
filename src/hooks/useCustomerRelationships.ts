@@ -243,9 +243,8 @@ export function useCustomerRelationships(searchTerm?: string) {
               id,
               payment_amount,
               payment_date,
-              payment_mode,
-              reference_number,
-              status
+              payment_method,
+              transaction_reference
             ),
             loan_documents (
               id,
@@ -282,9 +281,9 @@ export function useCustomerRelationships(searchTerm?: string) {
             id: p.id,
             payment_amount: p.payment_amount,
             payment_date: p.payment_date,
-            payment_mode: p.payment_mode,
-            reference_number: p.reference_number,
-            status: p.status,
+            payment_mode: p.payment_method || 'unknown',
+            reference_number: p.transaction_reference,
+            status: 'completed',
           }));
 
           // Collect documents
