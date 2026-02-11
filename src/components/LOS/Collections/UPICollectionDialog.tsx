@@ -89,7 +89,7 @@ export function UPICollectionDialog({
         schedule_id: record.id,
         loan_application_id: record.loan_application_id,
         loan_id: record.loan_id || undefined,
-        emi_number: record.emi_number,
+        emi_number: 1,
         amount: record.total_emi - record.amount_paid,
         payer_name: record.applicant_name,
         payer_mobile: record.applicant_phone,
@@ -124,7 +124,7 @@ export function UPICollectionDialog({
   const handleShareWhatsApp = () => {
     if (!transaction?.payment_link || !record) return;
 
-    const message = `Dear ${record.applicant_name},\n\nPlease pay your EMI #${record.emi_number} of ${formatCurrency(record.total_emi - record.amount_paid)} using this link:\n\n${transaction.payment_link}\n\nThis link expires in 30 minutes.`;
+    const message = `Dear ${record.applicant_name},\n\nPlease pay your due amount of ${formatCurrency(record.total_emi - record.amount_paid)} using this link:\n\n${transaction.payment_link}\n\nThis link expires in 30 minutes.`;
     
     const whatsappUrl = `https://wa.me/${record.applicant_phone.replace(/\D/g, "")}?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, "_blank");
@@ -204,8 +204,8 @@ export function UPICollectionDialog({
                 </div>
               )}
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">EMI #</span>
-                <span className="font-medium">{record.emi_number}</span>
+                <span className="text-muted-foreground">Due Amount</span>
+                <span className="font-medium">{formatCurrency(record.total_emi)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Due Date</span>

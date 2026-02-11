@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { IndianRupee, AlertTriangle, CheckCircle2, Clock, TrendingUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { IndianRupee, AlertTriangle, CheckCircle2, Clock, TrendingUp, Upload } from "lucide-react";
 import { useEMIStats } from "@/hooks/useEMIStats";
 import { useCollections, CollectionRecord } from "@/hooks/useCollections";
 import { LoadingState } from "@/components/common/LoadingState";
 import { CollectionsTable } from "@/components/LOS/Collections/CollectionsTable";
 import { RecordPaymentDialog } from "@/components/LOS/Collections/RecordPaymentDialog";
+import { CSVUploadDialog } from "@/components/LOS/Collections/CSVUploadDialog";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
 
 export default function Collections() {
@@ -14,6 +16,7 @@ export default function Collections() {
   const { collections, isLoading: collectionsLoading, recordPayment, isRecording } = useCollections();
   const [selectedRecord, setSelectedRecord] = useState<CollectionRecord | null>(null);
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [csvDialogOpen, setCsvDialogOpen] = useState(false);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
@@ -53,6 +56,10 @@ export default function Collections() {
           <h1 className="text-xl font-bold">Collections</h1>
           <p className="text-sm text-muted-foreground">EMI collection and repayment tracking</p>
         </div>
+        <Button variant="outline" size="sm" onClick={() => setCsvDialogOpen(true)}>
+          <Upload className="h-4 w-4 mr-2" />
+          CSV Upload
+        </Button>
       </div>
 
       {/* Compact Stats Row */}
@@ -123,6 +130,15 @@ export default function Collections() {
         onOpenChange={setPaymentDialogOpen}
         record={selectedRecord}
         onSubmit={handlePaymentSubmit}
+        isSubmitting={isRecording}
+      />
+
+      {/* CSV Upload Dialog */}
+      <CSVUploadDialog
+        open={csvDialogOpen}
+        onOpenChange={setCsvDialogOpen}
+        collections={collections}
+        onRecordPayment={recordPayment}
         isSubmitting={isRecording}
       />
     </DashboardLayout>

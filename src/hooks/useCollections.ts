@@ -10,7 +10,6 @@ export interface CollectionRecord {
   loan_id: string | null;
   applicant_name: string;
   applicant_phone: string;
-  emi_number: number;
   due_date: string;
   total_emi: number;
   principal: number;
@@ -20,6 +19,7 @@ export interface CollectionRecord {
   loan_amount: number;
   disbursement_date: string;
   contact_id?: string;
+  utr_number?: string;
 }
 
 export function useCollections() {
@@ -36,7 +36,6 @@ export function useCollections() {
         .select(`
           id,
           loan_application_id,
-          emi_number,
           due_date,
           total_emi,
           principal,
@@ -50,7 +49,8 @@ export function useCollections() {
             contact_id,
             loan_applicants(first_name, last_name, phone),
             loan_disbursements(disbursement_date)
-          )
+          ),
+          loan_payments(transaction_reference)
         `)
         .eq("org_id", orgId!)
         .order("due_date", { ascending: true });
@@ -61,6 +61,7 @@ export function useCollections() {
       const records: CollectionRecord[] = (data || []).map((item: any) => {
         const applicant = item.loan_applications?.loan_applicants?.[0];
         const disbursement = item.loan_applications?.loan_disbursements?.[0];
+        const payment = item.loan_payments?.[0];
         
         return {
           id: item.id,
@@ -71,7 +72,6 @@ export function useCollections() {
             ? `${applicant.first_name} ${applicant.last_name || ""}`.trim() 
             : "N/A",
           applicant_phone: applicant?.phone || "",
-          emi_number: item.emi_number,
           due_date: item.due_date,
           total_emi: item.total_emi,
           principal: item.principal,
@@ -81,6 +81,7 @@ export function useCollections() {
           loan_amount: item.loan_applications?.loan_amount || 0,
           disbursement_date: disbursement?.disbursement_date || "",
           contact_id: item.loan_applications?.contact_id,
+          utr_number: payment?.transaction_reference || undefined,
         };
       });
 
