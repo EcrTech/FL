@@ -1,49 +1,37 @@
 
 
-## Collections Page Updates
+## Simplify Bank Statement Parsing
 
-### Changes Overview
+### Problem
+Bank statements currently use a complex page-by-page chunked parsing strategy that is slow, prone to timeouts, and often fails to extract summary data (like total_credits/debits). Meanwhile, credit reports use a much simpler single-shot approach that sends the entire PDF to Gemini and gets back a clean summary -- and it works reliably.
 
-1. **Remove EMI # column** from the table (since the process is ADHO, not sequential EMIs)
-2. **Rename "EMI Amt" to "Due Amount"** in the table header
-3. **Add "UTR Number" column** to display the transaction reference from payment records
-4. **Add CSV Upload** feature with fields: Loan ID, Applicant, Paid, UTR Number
+### Solution
+Switch bank statement parsing to a single-shot approach identical to how credit reports work:
+1. Send the entire PDF to Gemini in one call
+2. Extract only account identification details and a brief AI-generated analysis summary
+3. No chunking, no self-referential continuation calls
+4. Store the uploaded document for viewing and display the AI summary alongside it
 
-### Technical Details
+### Technical Changes
 
-**File: `src/components/LOS/Collections/CollectionsTable.tsx`**
-- Remove the `EMI #` table header and its corresponding `TableCell`
-- Rename `EMI Amt` header to `Due Amount`
-- Add a `UTR Number` column that displays `transaction_reference` from the linked payment record
-- Update `colSpan` for the empty state row
+**File: `supabase/functions/parse-loan-document/index.ts`**
+- Remove `bank_statement` from the `CHUNKABLE_DOC_TYPES` array (line 212)
+- Update the `bank_statement` prompt to be concise: extract account details (account number, IFSC, holder name, bank name, type) plus ask for a brief analytical summary (spending patterns, salary regularity, bounce flags, average balance assessment)
+- Add an `analysis_summary` field to the prompt output requesting 3-5 key observations
+- Since it will no longer chunk, the existing single-shot PDF path already handles it
 
-**File: `src/hooks/useCollections.ts`**
-- Update the `CollectionRecord` interface: remove `emi_number`, add `utr_number`
-- Update the query to join `loan_payments` and retrieve `transaction_reference` for each schedule entry
-- The `loan_payments` table already has a `transaction_reference` column and `schedule_id` foreign key, so we can fetch this data
+**Prompt update (bank_statement):**
+- Keep: account_number, ifsc_code, branch_name, account_holder_name, bank_name, account_type, statement_period_from/to
+- Keep: opening_balance, closing_balance, total_credits, total_debits, average_monthly_balance
+- Add: `analysis_summary` -- an array of 3-5 key insights (salary pattern, spending behavior, bounce count, EMI regularity, risk flags)
+- Add: `recommendation` -- a 1-2 sentence overall assessment
+- Remove the "ABSOLUTE PROHIBITION" language about transactions (no longer needed since we are not chunking)
 
-**File: `src/components/LOS/Collections/RecordPaymentDialog.tsx`**
-- Remove EMI # reference from the summary section (line showing "EMI #X")
-- Rename label to "Due Amount" instead of referencing EMI
+**No frontend changes required** -- the existing document display and OCR data views will automatically show the new fields. The bank details auto-population logic already reads from `ocr_data` and will continue to work.
 
-**New File: `src/components/LOS/Collections/CSVUploadDialog.tsx`**
-- Dialog with a file upload input accepting `.csv` files
-- Expected CSV columns: `Loan ID`, `Applicant`, `Paid`, `UTR Number`
-- Parse CSV using `papaparse` (already installed)
-- Show preview table of parsed rows before submission
-- On confirm, match each row by `loan_id` to the corresponding repayment schedule entry, then call `recordPayment` for each matched row
-- Display success/error summary after processing
-
-**File: `src/pages/LOS/Collections.tsx`**
-- Add a "CSV Upload" button in the header area next to the title
-- Wire up the new `CSVUploadDialog` component
-
-### Data Flow for CSV Upload
-
-1. User uploads CSV with columns: Loan ID, Applicant, Paid, UTR Number
-2. System parses and displays preview
-3. On confirm, for each row:
-   - Find the pending/overdue schedule entry matching the Loan ID
-   - Record payment with the amount from "Paid" and UTR from "UTR Number"
-4. Show results summary (how many succeeded, any failures)
+### Benefits
+- Faster: single API call instead of multiple chunked calls
+- More reliable: no self-referential fetch chains that can fail mid-way
+- Richer output: AI provides analytical insights, not just raw extracted numbers
+- Consistent: same pattern as credit report analysis
 
