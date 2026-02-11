@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input";
 import { CheckCircle, XCircle, AlertTriangle } from "lucide-react";
 
 import { useLOSPermissions } from "@/hooks/useLOSPermissions";
@@ -35,6 +36,7 @@ export default function ApprovalActionDialog({
   userId,
 }: ApprovalActionDialogProps) {
   const [comments, setComments] = useState("");
+  const [customAmount, setCustomAmount] = useState<string>("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { permissions } = useLOSPermissions();
@@ -54,13 +56,20 @@ export default function ApprovalActionDialog({
     enabled: open && action === "approve",
   });
 
+  // Pre-fill custom amount when eligibility loads
+  useEffect(() => {
+    if (eligibility?.eligible_loan_amount) {
+      setCustomAmount(eligibility.eligible_loan_amount.toString());
+    }
+  }, [eligibility]);
+
   const actionMutation = useMutation({
     mutationFn: async () => {
       const now = new Date().toISOString();
       
-      // For approval, use eligibility data as single source of truth
+      // For approval, use custom amount (capped at eligible max)
       const approvedAmount = action === "approve" && eligibility 
-        ? eligibility.eligible_loan_amount 
+        ? (Number(customAmount) || eligibility.eligible_loan_amount)
         : null;
       const tenureDays = action === "approve" && eligibility 
         ? eligibility.recommended_tenure_days 
@@ -186,18 +195,39 @@ export default function ApprovalActionDialog({
               {eligibilityLoading ? (
                 <p className="text-muted-foreground text-sm">Loading eligibility data...</p>
               ) : eligibility ? (
-                <div className="rounded-lg border bg-muted/50 p-4 space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Eligible Amount:</span>
-                    <span className="font-semibold">₹{eligibility.eligible_loan_amount?.toLocaleString("en-IN")}</span>
+                <div className="space-y-3">
+                  <div className="rounded-lg border bg-muted/50 p-4 space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Max Eligible Amount:</span>
+                      <span className="font-semibold">₹{eligibility.eligible_loan_amount?.toLocaleString("en-IN")}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Tenure:</span>
+                      <span className="font-medium">{eligibility.recommended_tenure_days} days</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Interest Rate:</span>
+                      <span className="font-medium">{eligibility.recommended_interest_rate}%</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Tenure:</span>
-                    <span className="font-medium">{eligibility.recommended_tenure_days} days</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Interest Rate:</span>
-                    <span className="font-medium">{eligibility.recommended_interest_rate}%</span>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="approvedAmount">Approved Amount</Label>
+                    <Input
+                      id="approvedAmount"
+                      type="number"
+                      value={customAmount}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        if (val <= (eligibility.eligible_loan_amount ?? Infinity)) {
+                          setCustomAmount(e.target.value);
+                        }
+                      }}
+                      max={eligibility.eligible_loan_amount ?? undefined}
+                      min={0}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Must not exceed max eligible: ₹{eligibility.eligible_loan_amount?.toLocaleString("en-IN")}
+                    </p>
                   </div>
                 </div>
               ) : (
