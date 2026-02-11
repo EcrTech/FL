@@ -347,7 +347,52 @@ export default function PipelineBoard() {
     tablePagination.setPage(1);
   }, [filters]);
 
-  const applications = applicationsData?.data || [];
+  const rawApplications = applicationsData?.data || [];
+
+  // Deduplicate by phone number: keep most processed stage, fallback to latest
+  const applications = (() => {
+    const stagePriority: Record<string, number> = {
+      'application_login': 1,
+      'video_kyc': 2,
+      'credit_assessment': 3,
+      'assessment': 3,
+      'approval_pending': 4,
+      'rejected': 4,
+      'sanctioned': 5,
+      'disbursement_pending': 6,
+      'disbursed': 7,
+    };
+
+    const grouped: Record<string, typeof rawApplications[0]> = {};
+    const noPhone: typeof rawApplications = [];
+
+    for (const app of rawApplications) {
+      const applicant = app.loan_applicants?.[0];
+      const contact = app.contacts;
+      const phone = applicant?.mobile || contact?.phone;
+
+      if (!phone || phone === '-') {
+        noPhone.push(app);
+        continue;
+      }
+
+      const existing = grouped[phone];
+      if (!existing) {
+        grouped[phone] = app;
+        continue;
+      }
+
+      const appPriority = stagePriority[app.status || ''] || 0;
+      const existingPriority = stagePriority[existing.status || ''] || 0;
+
+      if (appPriority > existingPriority ||
+          (appPriority === existingPriority && app.created_at > existing.created_at)) {
+        grouped[phone] = app;
+      }
+    }
+
+    return [...Object.values(grouped), ...noPhone];
+  })();
 
   const handleStatusChange = (applicationId: string, status: string) => {
     updateStatusMutation.mutate({ applicationId, status });
