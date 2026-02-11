@@ -64,6 +64,17 @@ export function CSVUploadDialog({
   const [processing, setProcessing] = useState(false);
   const [results, setResults] = useState<{ success: number; failed: number } | null>(null);
 
+  const downloadTemplate = () => {
+    const csv = "Loan ID,Applicant,Paid,UTR Number\n";
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "collections_payment_template.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -188,10 +199,16 @@ export function CSVUploadDialog({
                 Expected columns: Loan ID, Applicant, Paid, UTR Number
               </p>
             </div>
-            <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-              <Upload className="h-4 w-4 mr-2" />
-              Select CSV File
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+                <Upload className="h-4 w-4 mr-2" />
+                Select CSV File
+              </Button>
+              <Button variant="ghost" size="sm" className="text-xs" onClick={downloadTemplate}>
+                <FileText className="h-4 w-4 mr-1" />
+                Download Template
+              </Button>
+            </div>
             <input
               ref={fileInputRef}
               type="file"
