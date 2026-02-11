@@ -117,7 +117,7 @@ export function RecordPaymentDialog({
                 <span className="font-medium">{record.applicant_name}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">EMI #{record.emi_number}:</span>
+                <span className="text-muted-foreground">Due Amount:</span>
                 <span className="font-medium">{formatCurrency(record.total_emi)}</span>
               </div>
               <div className="flex justify-between">

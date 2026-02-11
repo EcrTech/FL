@@ -234,16 +234,16 @@ export function CollectionsTable({ collections, onRecordPayment }: CollectionsTa
                 <TableHead className="py-2 text-xs font-semibold">Loan ID</TableHead>
                 <TableHead className="py-2 text-xs font-semibold">App #</TableHead>
                 <TableHead className="py-2 text-xs font-semibold">Applicant</TableHead>
-                <TableHead className="py-2 text-xs font-semibold">EMI #</TableHead>
                 <TableHead className="py-2 text-xs font-semibold cursor-pointer" onClick={() => setSortDirection(d => d === "asc" ? "desc" : "asc")}>
                   <div className="flex items-center gap-1">
                     Due Date
                     <ArrowUpDown className="h-3 w-3" />
                   </div>
                 </TableHead>
-                <TableHead className="py-2 text-xs font-semibold text-right">EMI Amt</TableHead>
+                <TableHead className="py-2 text-xs font-semibold text-right">Due Amount</TableHead>
                 <TableHead className="py-2 text-xs font-semibold text-right">Paid</TableHead>
                 <TableHead className="py-2 text-xs font-semibold text-right">Balance</TableHead>
+                <TableHead className="py-2 text-xs font-semibold">UTR Number</TableHead>
                 <TableHead className="py-2 text-xs font-semibold">Status</TableHead>
                 <TableHead className="py-2 text-xs font-semibold text-center">Actions</TableHead>
               </TableRow>
@@ -251,7 +251,7 @@ export function CollectionsTable({ collections, onRecordPayment }: CollectionsTa
             <TableBody>
               {paginatedCollections.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                     No records found
                   </TableCell>
                 </TableRow>
@@ -276,7 +276,6 @@ export function CollectionsTable({ collections, onRecordPayment }: CollectionsTa
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="py-2 text-xs text-center">{record.emi_number}</TableCell>
                     <TableCell className="py-2 text-xs">{formatDate(record.due_date)}</TableCell>
                     <TableCell className="py-2 text-xs text-right font-medium">
                       {formatCurrency(record.total_emi)}
@@ -286,6 +285,9 @@ export function CollectionsTable({ collections, onRecordPayment }: CollectionsTa
                     </TableCell>
                     <TableCell className="py-2 text-xs text-right font-medium text-primary">
                       {formatCurrency(record.total_emi - record.amount_paid)}
+                    </TableCell>
+                    <TableCell className="py-2 text-xs text-muted-foreground">
+                      {record.utr_number || "—"}
                     </TableCell>
                     <TableCell className="py-2">
                       {getStatusBadge(record.status, record.due_date)}
