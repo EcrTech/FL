@@ -74,8 +74,7 @@ export function useLoansList(searchTerm?: string) {
           loan_payments (
             id,
             payment_amount,
-            payment_date,
-            status
+            payment_date
           )
         `)
         .eq("org_id", orgId)
@@ -113,7 +112,6 @@ export function useLoansList(searchTerm?: string) {
 
           // Calculate payments
           const totalPaid = payments
-            .filter((p: any) => p.status === "completed")
             .reduce((sum: number, p: any) => sum + (p.payment_amount || 0), 0);
 
           const outstandingAmount = Math.max(0, totalEmiAmount - totalPaid);
