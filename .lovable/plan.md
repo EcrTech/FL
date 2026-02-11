@@ -1,23 +1,49 @@
 
 
-## Change Customer ID Format to 6 Digits
+## Collections Page Updates
 
-### Current State
-- Format: `CUST-YYYYMM-XXXXX` (5 digits, e.g., `CUST-202602-00184`)
-- Sequence is currently at value 184
+### Changes Overview
 
-### Changes
-A single database migration to:
+1. **Remove EMI # column** from the table (since the process is ADHO, not sequential EMIs)
+2. **Rename "EMI Amt" to "Due Amount"** in the table header
+3. **Add "UTR Number" column** to display the transaction reference from payment records
+4. **Add CSV Upload** feature with fields: Loan ID, Applicant, Paid, UTR Number
 
-1. **Update the trigger function** `set_customer_id` to use `LPAD(..., 6, '0')` instead of `LPAD(..., 5, '0')` for 6-digit padding (e.g., `CUST-202602-000001`)
+### Technical Details
 
-2. **Backfill existing records** -- update all current `customer_id` values to use 6-digit format by extracting the numeric suffix and re-padding it
+**File: `src/components/LOS/Collections/CollectionsTable.tsx`**
+- Remove the `EMI #` table header and its corresponding `TableCell`
+- Rename `EMI Amt` header to `Due Amount`
+- Add a `UTR Number` column that displays `transaction_reference` from the linked payment record
+- Update `colSpan` for the empty state row
 
-### Result
-- New IDs: `CUST-YYYYMM-000185`, `CUST-YYYYMM-000186`, etc.
-- Existing IDs updated from `CUST-202602-00012` to `CUST-202602-000012`
+**File: `src/hooks/useCollections.ts`**
+- Update the `CollectionRecord` interface: remove `emi_number`, add `utr_number`
+- Update the query to join `loan_payments` and retrieve `transaction_reference` for each schedule entry
+- The `loan_payments` table already has a `transaction_reference` column and `schedule_id` foreign key, so we can fetch this data
 
-### Notes
-- The sequence itself does not need resetting -- it already starts from 1 and is at 184
-- Only the display padding changes from 5 to 6 digits
+**File: `src/components/LOS/Collections/RecordPaymentDialog.tsx`**
+- Remove EMI # reference from the summary section (line showing "EMI #X")
+- Rename label to "Due Amount" instead of referencing EMI
+
+**New File: `src/components/LOS/Collections/CSVUploadDialog.tsx`**
+- Dialog with a file upload input accepting `.csv` files
+- Expected CSV columns: `Loan ID`, `Applicant`, `Paid`, `UTR Number`
+- Parse CSV using `papaparse` (already installed)
+- Show preview table of parsed rows before submission
+- On confirm, match each row by `loan_id` to the corresponding repayment schedule entry, then call `recordPayment` for each matched row
+- Display success/error summary after processing
+
+**File: `src/pages/LOS/Collections.tsx`**
+- Add a "CSV Upload" button in the header area next to the title
+- Wire up the new `CSVUploadDialog` component
+
+### Data Flow for CSV Upload
+
+1. User uploads CSV with columns: Loan ID, Applicant, Paid, UTR Number
+2. System parses and displays preview
+3. On confirm, for each row:
+   - Find the pending/overdue schedule entry matching the Loan ID
+   - Record payment with the amount from "Paid" and UTR from "UTR Number"
+4. Show results summary (how many succeeded, any failures)
 
