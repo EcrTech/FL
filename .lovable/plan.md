@@ -1,37 +1,37 @@
 
+## Fix Aadhaar Back Parsing and Bank Verification
 
-## Simplify Bank Statement Parsing
+### Issue 1: Aadhaar Back Not Parsing Properly
 
-### Problem
-Bank statements currently use a complex page-by-page chunked parsing strategy that is slow, prone to timeouts, and often fails to extract summary data (like total_credits/debits). Meanwhile, credit reports use a much simpler single-shot approach that sends the entire PDF to Gemini and gets back a clean summary -- and it works reliably.
+**Root Cause**: The edge function has a prompt key `aadhaar_card` but the document type stored in the database is `aadhaar_back` (and `aadhaar_front`). Since there's no matching prompt for `aadhaar_back`, it falls back to a generic "Extract all relevant information" prompt, which returns unpredictable field structures.
 
-### Solution
-Switch bank statement parsing to a single-shot approach identical to how credit reports work:
-1. Send the entire PDF to Gemini in one call
-2. Extract only account identification details and a brief AI-generated analysis summary
-3. No chunking, no self-referential continuation calls
-4. Store the uploaded document for viewing and display the AI summary alongside it
+The frontend then tries to read `aadhaarBackData?.aadhaar_card_details?.address?.english` -- a deeply nested path that doesn't exist in the actual OCR output. The real data has `address_english` as a flat string.
 
-### Technical Changes
+**Fix**:
+1. Add dedicated `aadhaar_front` and `aadhaar_back` prompt keys in `DOCUMENT_PROMPTS` in the edge function:
+   - `aadhaar_front`: Extract aadhaar_number, name, dob, gender
+   - `aadhaar_back`: Extract aadhaar_number, address (as a single flat string), VID
+2. Update the address merging logic in **3 files** to handle the actual flat OCR data structure (`address_english` or `address`) instead of expecting a nested `aadhaar_card_details.address.english` path:
+   - `src/pages/LOS/ApplicationDetail.tsx`
+   - `src/pages/LOS/SanctionDetail.tsx`
+   - `src/components/LOS/DocumentDataVerification.tsx`
 
-**File: `supabase/functions/parse-loan-document/index.ts`**
-- Remove `bank_statement` from the `CHUNKABLE_DOC_TYPES` array (line 212)
-- Update the `bank_statement` prompt to be concise: extract account details (account number, IFSC, holder name, bank name, type) plus ask for a brief analytical summary (spending patterns, salary regularity, bounce flags, average balance assessment)
-- Add an `analysis_summary` field to the prompt output requesting 3-5 key observations
-- Since it will no longer chunk, the existing single-shot PDF path already handles it
+### Issue 2: Bank Account Verification Failing
 
-**Prompt update (bank_statement):**
-- Keep: account_number, ifsc_code, branch_name, account_holder_name, bank_name, account_type, statement_period_from/to
-- Keep: opening_balance, closing_balance, total_credits, total_debits, average_monthly_balance
-- Add: `analysis_summary` -- an array of 3-5 key insights (salary pattern, spending behavior, bounce count, EMI regularity, risk flags)
-- Add: `recommendation` -- a 1-2 sentence overall assessment
-- Remove the "ABSOLUTE PROHIBITION" language about transactions (no longer needed since we are not chunking)
+**Root Cause**: The OCR-extracted IFSC code `DBSSOINO811` is incorrect. DBS Bank IFSC codes follow the format `DBSS0IN0XXX` (with zeros, not letter O). The VerifiedU API correctly rejects it as "Invalid account ifsc provided."
 
-**No frontend changes required** -- the existing document display and OCR data views will automatically show the new fields. The bank details auto-population logic already reads from `ocr_data` and will continue to work.
+**Fix**:
+1. Add IFSC validation/sanitization in the bank verification edge function (`verifiedu-bank-verify`) before sending to the API:
+   - Standard IFSC format: 4 letters + 0 + 6 alphanumeric characters (the 5th character is always zero)
+   - Auto-correct common OCR mistakes: replace letter 'O' with digit '0' at position 5 (which must always be '0' per RBI rules)
+2. Also add IFSC format correction in the bank statement parsing prompt to instruct the AI to output valid IFSC codes (5th char must be '0').
 
-### Benefits
-- Faster: single API call instead of multiple chunked calls
-- More reliable: no self-referential fetch chains that can fail mid-way
-- Richer output: AI provides analytical insights, not just raw extracted numbers
-- Consistent: same pattern as credit report analysis
+### Files to Modify
 
+| File | Change |
+|------|--------|
+| `supabase/functions/parse-loan-document/index.ts` | Add `aadhaar_front` and `aadhaar_back` prompt keys; update bank statement prompt to enforce IFSC format |
+| `supabase/functions/verifiedu-bank-verify/index.ts` | Add IFSC sanitization (replace 'O' with '0' at position 5) |
+| `src/pages/LOS/ApplicationDetail.tsx` | Fix aadhaar back address merging to handle flat `address_english` / `address` fields |
+| `src/pages/LOS/SanctionDetail.tsx` | Same address merging fix |
+| `src/components/LOS/DocumentDataVerification.tsx` | Same address merging fix |
