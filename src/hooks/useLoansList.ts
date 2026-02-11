@@ -85,11 +85,11 @@ export function useLoansList(searchTerm?: string) {
       if (error) throw error;
 
       let loans: LoanListItem[] = (data || [])
-        .filter((app: any) => app.loan_disbursements?.length > 0)
+        .filter((app: any) => app.loan_id !== null)
         .map((app: any) => {
           const applicant = app.loan_applicants?.[0];
           const sanction = app.loan_sanctions?.[0];
-          const disbursement = app.loan_disbursements?.[0];
+          const disbursement = app.loan_disbursements?.[0] || null;
           const emiSchedule = app.loan_repayment_schedule || [];
           const payments = app.loan_payments || [];
 

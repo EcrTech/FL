@@ -217,7 +217,7 @@ export function useCustomerRelationships(searchTerm?: string) {
             approved_amount,
             tenure_days,
             created_at,
-            customer_id,
+            
             loan_sanctions (
               id,
               sanctioned_amount,
