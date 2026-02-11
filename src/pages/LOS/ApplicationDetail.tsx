@@ -327,6 +327,27 @@ export default function ApplicationDetail() {
   });
 
 
+  // Mutation to start assessment (advance from application_login to credit_assessment)
+  const startAssessmentMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.rpc("transition_loan_stage", {
+        p_application_id: application?.id,
+        p_expected_current_stage: "application_login",
+        p_new_stage: "credit_assessment",
+        p_new_status: "in_progress",
+      });
+      if (error) throw error;
+      if (!data) throw new Error("Stage has already changed. Please refresh the page.");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["loan-application", id, orgId] });
+      toast.success("Application moved to Credit Assessment");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to start assessment");
+    },
+  });
+
   const ocrApplicantData = extractApplicantFromOCR();
 
 
@@ -966,6 +987,31 @@ export default function ApplicationDetail() {
           {/* Sections only visible in review mode - contextual based on stage */}
           {isReviewMode && (
             <>
+              {/* Start Assessment - shown when at application_login stage */}
+              {application.current_stage === "application_login" && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Start Assessment</CardTitle>
+                    <CardDescription>
+                      Move this application to Credit Assessment to begin the review process
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button
+                      onClick={() => startAssessmentMutation.mutate()}
+                      disabled={startAssessmentMutation.isPending}
+                    >
+                      {startAssessmentMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Calculator className="h-4 w-4 mr-2" />
+                      )}
+                      Start Credit Assessment
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Income & Assessment - shown until approval */}
               {!["sanctioned", "disbursement_pending", "disbursed", "closed"].includes(application.current_stage) && (
                 <>
