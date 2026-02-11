@@ -44,6 +44,16 @@ serve(async (req) => {
       });
     }
 
+    // Sanitize IFSC code: 5th character must always be digit '0', not letter 'O'
+    let sanitizedIfsc = ifscCode.toUpperCase().trim();
+    if (sanitizedIfsc.length === 11) {
+      // Replace letter 'O' with digit '0' at position 4 (5th char, 0-indexed)
+      if (sanitizedIfsc[4] === 'O') {
+        sanitizedIfsc = sanitizedIfsc.substring(0, 4) + '0' + sanitizedIfsc.substring(5);
+        console.log(`[BankVerify] IFSC sanitized: ${ifscCode} -> ${sanitizedIfsc}`);
+      }
+    }
+
     const verifieduToken = Deno.env.get("VERIFIEDU_TOKEN");
     const companyId = Deno.env.get("VERIFIEDU_COMPANY_ID");
     const baseUrl = Deno.env.get("VERIFIEDU_API_BASE_URL");
@@ -82,7 +92,7 @@ serve(async (req) => {
       body: JSON.stringify({
         verification_type: "pennyless",
         account_number: accountNumber,
-        account_ifsc: ifscCode,
+        account_ifsc: sanitizedIfsc,
       }),
     });
 

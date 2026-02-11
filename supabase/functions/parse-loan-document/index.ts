@@ -29,14 +29,27 @@ Return ONLY valid JSON with these fields.`,
 - name: Full name as shown
 - dob: Date of birth in YYYY-MM-DD format
 - gender: Male/Female
-- address: Full address as shown
+- address: Full address as shown (single string)
+Return ONLY valid JSON with these fields.`,
+
+  aadhaar_front: `Extract the following from this Aadhaar card FRONT side image:
+- aadhaar_number: The 12-digit Aadhaar number (with or without spaces)
+- name: Full name as shown
+- dob: Date of birth in YYYY-MM-DD format
+- gender: Male/Female
+Return ONLY valid JSON with these fields.`,
+
+  aadhaar_back: `Extract the following from this Aadhaar card BACK side image:
+- aadhaar_number: The 12-digit Aadhaar number (with or without spaces)
+- address: The complete address as a single flat string, combining all lines (e.g., "S/O Ram Kumar, 123 Main Street, City, State - 123456")
+- vid: The VID (Virtual ID) number if visible
 Return ONLY valid JSON with these fields.`,
 
   bank_statement: `Analyze this bank statement and extract the following information. Return ONLY valid JSON.
 
 === ACCOUNT IDENTIFICATION ===
 - account_number: The bank account number
-- ifsc_code: The IFSC code of the branch
+- ifsc_code: The IFSC code of the branch. IMPORTANT: IFSC codes follow the format: 4 letters + '0' (zero, NOT letter O) + 6 alphanumeric characters. The 5th character is ALWAYS the digit zero '0', never the letter 'O'.
 - branch_name: The branch name and location
 - account_holder_name: Account holder's full name exactly as printed
 - bank_name: Name of the bank

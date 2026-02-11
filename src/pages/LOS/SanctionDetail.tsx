@@ -225,12 +225,14 @@ export default function SanctionDetail() {
   const aadhaarDocData = (aadhaarFrontData || aadhaarBackData) ? {
     ...aadhaarBackData,
     ...aadhaarFrontData,
-    address: aadhaarBackData?.aadhaar_card_details?.address?.english
-      ? [
-          aadhaarBackData.aadhaar_card_details.address.english.s_o,
-          aadhaarBackData.aadhaar_card_details.address.english.house_number_or_locality,
-          aadhaarBackData.aadhaar_card_details.address.english.state_and_pincode,
-        ].filter(Boolean).join(", ")
+    address: aadhaarBackData?.address
+      || aadhaarBackData?.address_english
+      || aadhaarBackData?.aadhaar_card_details?.address?.english
+        ? [
+            aadhaarBackData?.aadhaar_card_details?.address?.english?.s_o,
+            aadhaarBackData?.aadhaar_card_details?.address?.english?.house_number_or_locality,
+            aadhaarBackData?.aadhaar_card_details?.address?.english?.state_and_pincode,
+          ].filter(Boolean).join(", ") || aadhaarBackData?.address || aadhaarBackData?.address_english
       : aadhaarFrontData?.address,
   } : null;
   const aadhaarVerData = getVerificationData("aadhaar");
