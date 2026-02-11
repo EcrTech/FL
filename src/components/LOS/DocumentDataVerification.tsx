@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, XCircle, AlertTriangle, Minus } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { extractAadhaarAddress, extractAddressString } from "@/lib/addressUtils";
 
 interface DocumentDataVerificationProps {
   applicationId: string;
@@ -131,15 +132,7 @@ export default function DocumentDataVerification({ applicationId }: DocumentData
     const aadhaarDocData = (aadhaarFrontData || aadhaarBackData) ? {
       ...aadhaarBackData,
       ...aadhaarFrontData,
-      address: aadhaarBackData?.address
-        || aadhaarBackData?.address_english
-        || aadhaarBackData?.aadhaar_card_details?.address?.english
-          ? [
-              aadhaarBackData?.aadhaar_card_details?.address?.english?.s_o,
-              aadhaarBackData?.aadhaar_card_details?.address?.english?.house_number_or_locality,
-              aadhaarBackData?.aadhaar_card_details?.address?.english?.state_and_pincode,
-            ].filter(Boolean).join(", ") || aadhaarBackData?.address || aadhaarBackData?.address_english
-        : aadhaarFrontData?.address,
+      address: extractAadhaarAddress(aadhaarBackData, aadhaarFrontData),
     } : null;
     const aadhaarVerData = getVerificationData("aadhaar");
     const aadhaarData: Record<string, any> | null = aadhaarDocData || aadhaarVerData
@@ -147,10 +140,9 @@ export default function DocumentDataVerification({ applicationId }: DocumentData
           ...aadhaarVerData,
           ...aadhaarDocData,
           address:
-            aadhaarDocData?.address ||
+            extractAddressString(aadhaarDocData?.address) ||
             aadhaarVerData?.verified_address ||
-            aadhaarVerData?.address?.combined ||
-            aadhaarVerData?.address,
+            extractAddressString(aadhaarVerData?.address),
         }
       : null;
 
@@ -229,7 +221,7 @@ export default function DocumentDataVerification({ applicationId }: DocumentData
 
     // Calculate match status for each field
     return fields.map((field) => {
-      const nonEmptyValues = field.values.filter((v) => v.value && v.value.trim() !== "");
+      const nonEmptyValues = field.values.filter((v) => v.value && typeof v.value === 'string' && v.value.trim() !== "");
 
       // For PAN field: if only PAN Card source has value, it's valid (mandatory verified source)
       if (field.field === "pan" && nonEmptyValues.length === 1) {
