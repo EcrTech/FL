@@ -1,26 +1,39 @@
 
 
-## Fix: Loans and Clients Tabs Not Showing Data
+## Fix: Loans and Clients Tabs -- Apply Correct Business Logic and Fix Remaining Query Error
 
-### Root Causes Found
+### Problem Summary
 
-**Issue 1 -- Clients Tab: Invalid column reference**
-The `useCustomerRelationships` hook (line 220) requests `customer_id` from `loan_applications`, but this column does not exist in the table. This causes a PostgREST 400 error, silently returning no data.
+1. **Loans tab shows nothing** -- The current filter shows all applications with a `loan_id`, but a `loan_id` is assigned at many early stages (application_login, video_kyc, etc.). These are not actual loans. Per business logic, a "loan" only exists after disbursement. Additionally, the query itself may be returning too many irrelevant records.
 
-**Issue 2 -- Loans Tab: No disbursement records**
-The `useLoansList` hook filters results with `app.loan_disbursements?.length > 0`. Only one application (`d7491e36` / LA-202602-80732) has a disbursement record in the database. However, it should appear. The likely issue is that the query may be silently failing or the single record is not passing through. Since the hook uses `!inner` join on `loan_applicants`, and this applicant exists, the real problem may be that loans with `loan_id` set but no disbursement yet (like approved/sanctioned loans) should also appear in the Loans tab -- but the filter excludes them.
+2. **Clients tab shows nothing** -- The previous fix removed `customer_id` from the code, but the network logs confirm the browser is still sending a request with `customer_id`, resulting in a 400 error. This is likely a stale build issue. However, there's also a business logic problem: the Clients tab currently shows all applicants regardless of loan status. A "client" should only be someone with at least one disbursed loan.
+
+3. **Business rule**: A person becomes a "client" only after a loan is disbursed, not before.
 
 ### Fixes
 
-**File: `src/hooks/useCustomerRelationships.ts`**
-- Remove `customer_id` from the select query on line 220 (column does not exist)
-
 **File: `src/hooks/useLoansList.ts`**
-- No code change needed for the query itself -- the disbursed loan should appear. But we should also consider showing loans that have a `loan_id` and are at `disbursement_pending` or `disbursed` stage, not just ones with disbursement records. This makes the Loans tab useful for tracking loans that are approved but awaiting disbursement.
-- Remove the strict `.filter((app) => app.loan_disbursements?.length > 0)` requirement and instead show all applications with a `loan_id`, marking those without disbursements as "pending disbursement"
+- Change the filter from `app.loan_id !== null` to `app.current_stage === 'disbursed'`
+- This ensures only truly disbursed loans appear in the Loans tab
+- Add `current_stage` to the select query (it's currently missing)
+
+**File: `src/hooks/useCustomerRelationships.ts`**
+- Confirm `customer_id` is removed (already done in previous edit -- verify deployment)
+- Add a post-query filter: only include customers who have at least one application with `current_stage === 'disbursed'`
+- This ensures only actual clients (with disbursed loans) appear in the Clients tab
+- Update the empty state message to say "Clients will appear here once loans are disbursed"
 
 ### Technical Details
 
-1. In `useCustomerRelationships.ts` line 220: delete `customer_id,` from the select string
-2. In `useLoansList.ts` line 88: change the filter to not require disbursements, and adjust the mapping to handle missing disbursement data gracefully (show 0 for disbursed amount, null for disbursement date)
+1. **`src/hooks/useLoansList.ts`**:
+   - Add `current_stage` to the select string on the `loan_applications` query
+   - Line 88: Change `.filter((app: any) => app.loan_id !== null)` to `.filter((app: any) => app.current_stage === 'disbursed')`
+
+2. **`src/hooks/useCustomerRelationships.ts`**:
+   - After building `relationships` array (around line 371), filter to only include customers who have at least one application with `currentStage === 'disbursed'`
+   - Add: `const clients = relationships.filter(r => r.applications.some(a => a.currentStage === 'disbursed'));`
+   - Return `clients` instead of `relationships`
+
+3. **`src/components/LOS/Relationships/ClientsTab.tsx`**:
+   - Update empty state message (line 256) from "Customer relationships will appear here once loan applications are created" to "Clients will appear here once loans are disbursed"
 
