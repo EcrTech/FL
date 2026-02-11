@@ -32,34 +32,32 @@ Return ONLY valid JSON with these fields.`,
 - address: Full address as shown
 Return ONLY valid JSON with these fields.`,
 
-  bank_statement: `YOU MUST EXTRACT THE FOLLOWING ACCOUNT IDENTIFICATION DETAILS. THESE ARE THE MOST IMPORTANT FIELDS:
+  bank_statement: `Analyze this bank statement and extract the following information. Return ONLY valid JSON.
 
-=== HIGHEST PRIORITY - ACCOUNT DETAILS (extract from page header/top section) ===
-- account_number: The bank account number (CRITICAL - usually near top of first page, e.g. "1947828245")
-- ifsc_code: The IFSC code of the branch (CRITICAL - e.g. "KKBK0008083")
-- branch_name: The branch name and location (CRITICAL - e.g. "SMVIT BRANCH, BANGALORE")
+=== ACCOUNT IDENTIFICATION ===
+- account_number: The bank account number
+- ifsc_code: The IFSC code of the branch
+- branch_name: The branch name and location
 - account_holder_name: Account holder's full name exactly as printed
-- bank_name: Name of the bank (e.g. "Kotak Mahindra Bank")
+- bank_name: Name of the bank
 - account_type: Type of account (Savings/Current/etc)
 
 === STATEMENT PERIOD ===
 - statement_period_from: Statement start date (YYYY-MM-DD)
 - statement_period_to: Statement end date (YYYY-MM-DD)
 
-=== SUMMARY BALANCES (from statement summary, NOT from transactions) ===
+=== SUMMARY FIGURES (from statement summary or calculated from transactions) ===
 - opening_balance: Opening balance (number only)
 - closing_balance: Closing balance (number only)
 - total_credits: Total credits/deposits (number only)
 - total_debits: Total debits/withdrawals (number only)
-- average_monthly_balance: Average monthly balance if visible (number only)
-- salary_credits: Total salary/regular income credits (number only)
-- emi_debits: Total EMI/loan debits (number only)
-- bounce_count: Number of bounced transactions (number only, 0 if none)
-- transaction_count: Total number of transactions visible (number only)
+- average_monthly_balance: Average monthly balance if determinable (number only)
 
-ABSOLUTE PROHIBITION: Do NOT include any "transactions" array. Do NOT list individual transactions. Do NOT include transaction dates, descriptions, amounts, or references. Return ONLY the summary fields above.
+=== AI ANALYSIS (provide your expert assessment) ===
+- analysis_summary: An array of 3-5 key insights about this bank statement. Consider: salary/income regularity and amounts, spending patterns, EMI/loan payment regularity, bounced transactions or returns, average balance health, any red flags for lending.
+- recommendation: A 1-2 sentence overall assessment of the account holder's financial health based on this statement.
 
-Return ONLY a small valid JSON object with these fields. Use 0 or null for missing values.`,
+Return ONLY valid JSON with these fields. Use 0 or null for missing numeric values. Do NOT include individual transactions.`,
 
   salary_slip_1: `Extract the following from this salary slip:
 - employee_name: Employee full name
@@ -209,7 +207,7 @@ Return ONLY valid JSON with these fields. Use null for missing values.`,
 };
 
 // Document types that benefit from chunked processing
-const CHUNKABLE_DOC_TYPES = ['bank_statement', 'itr_year_1', 'itr_year_2', 'form_16_year_1', 'form_16_year_2'];
+const CHUNKABLE_DOC_TYPES = ['itr_year_1', 'itr_year_2', 'form_16_year_1', 'form_16_year_2'];
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
