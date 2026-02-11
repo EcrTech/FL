@@ -83,7 +83,6 @@ export default function ApprovalActionDialog({
         .from("loan_approvals")
         .insert({
           loan_application_id: applicationId,
-          org_id: orgId,
           approver_id: userId,
           approver_role: "credit_manager",
           approval_level: "final",
