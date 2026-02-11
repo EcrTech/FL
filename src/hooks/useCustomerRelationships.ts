@@ -370,12 +370,17 @@ export function useCustomerRelationships(searchTerm?: string) {
         });
       }
 
+      // Only include customers who have at least one disbursed loan (business rule: client = disbursed)
+      const clients = relationships.filter(r => 
+        r.applications.some(a => a.currentStage === 'disbursed')
+      );
+
       // Sort by last application date descending
-      relationships.sort((a, b) => 
+      clients.sort((a, b) => 
         new Date(b.lastApplicationDate).getTime() - new Date(a.lastApplicationDate).getTime()
       );
 
-      return relationships;
+      return clients;
     },
     enabled: !!orgId,
   });
