@@ -1,79 +1,65 @@
 
-## Fix: Application Stuck at `application_login` Stage
+## Fix: Loan Amount Showing ₹19,195 Instead of ₹15,000
 
 ### Problem
 
-Application LOAN-202602-00393 (Hemant Chauhan) is stuck at the `application_login` stage. The "Decision" section shows "Application has already been IN_PROGRESS" because our recent fix correctly hides the Approve/Reject buttons when the stage isn't `assessment` or `credit_assessment`.
+For Hemant Chauhan's application (LA-202602-10003), the Loan Summary and Assessment Dashboard display **₹19,195** (the calculated eligibility amount) instead of the intended **₹15,000** (the approved amount already stored in the database).
 
-The real issue: **there is no mechanism to advance an application from `application_login` to the assessment stages**. The pipeline expects this flow:
+**Root cause**: The eligibility calculation produced ₹19,195 as the maximum eligible amount based on FOIR. The system currently uses this eligibility amount as the "single source of truth" for approval, with no way to override it to a lower amount like ₹15,000.
 
-```text
-application_login --> assessment --> credit_assessment --> approval_pending --> sanctioned
-```
+### Two fixes needed
 
-But only the later transitions (credit_assessment onwards) have UI buttons. The early transitions have no trigger -- neither manual nor automatic.
+**1. Update the eligibility record in the database**
 
-### Solution
+Change `eligible_loan_amount` from 19,195 to 15,000 in the `loan_eligibility` table for this specific application. This immediately fixes what the user sees in the Loan Summary and Assessment Dashboard.
 
-Add a **"Start Assessment"** button on the Application Detail page that advances the application directly from `application_login` to `credit_assessment`, skipping the intermediate stages (`document_collection`, `field_verification`, `assessment`) that don't have dedicated workflows. This is consistent with how the system actually works -- staff log in the application, upload documents/run verifications on the same page, then assess eligibility.
+**2. Allow custom approved amount in the Approval Dialog**
+
+Currently, `ApprovalActionDialog.tsx` automatically uses `eligibility.eligible_loan_amount` as the approved amount with no override option. This should be changed to:
+- Pre-fill with the eligibility amount as a suggestion
+- Allow the approver to enter a custom (lower) amount before confirming
+- Validate that the custom amount does not exceed the eligible amount
 
 ### Changes
 
-**File: `src/pages/LOS/ApplicationDetail.tsx`**
+**Database**: Update `loan_eligibility` for application `11d0a8cf-472a-4dc1-88ba-50215acb3f64` to set `eligible_loan_amount = 15000`
 
-1. Add a "Start Assessment" button that appears when the application is at the `application_login` stage
-2. The button calls `transition_loan_stage` RPC to move the application from `application_login` to `credit_assessment`
-3. After transition, the EligibilityCalculator's Approve/Reject buttons will become active (since the stage will be `credit_assessment`)
-
-The button will:
-- Be placed prominently near the Assessment Dashboard section
-- Use `transition_loan_stage` with `p_expected_current_stage: "application_login"` and `p_new_stage: "credit_assessment"`
-- Invalidate query cache on success so the page refreshes with the new stage
-- Include a confirmation step to prevent accidental clicks
+**File: `src/components/LOS/Approval/ApprovalActionDialog.tsx`**
+- Add an editable "Approved Amount" input field pre-filled with the eligible amount
+- Allow the approver to reduce the amount (but not exceed the eligible amount)
+- Use the entered amount (instead of the eligibility amount) when writing `approved_amount` to `loan_applications`
 
 ### Technical Details
 
 ```typescript
-// New mutation in ApplicationDetail.tsx
-const startAssessmentMutation = useMutation({
-  mutationFn: async () => {
-    const { data, error } = await supabase.rpc("transition_loan_stage", {
-      p_application_id: application.id,
-      p_expected_current_stage: "application_login",
-      p_new_stage: "credit_assessment",
-      p_new_status: "in_progress",
-    });
-    if (error) throw error;
-    if (!data) throw new Error("Stage has changed. Please refresh.");
-  },
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ["loan-application"] });
-    toast({ title: "Application moved to Credit Assessment" });
-  },
-});
+// ApprovalActionDialog.tsx - Add state for custom amount
+const [customAmount, setCustomAmount] = useState<string>("");
+
+// Pre-fill when eligibility loads
+useEffect(() => {
+  if (eligibility?.eligible_loan_amount) {
+    setCustomAmount(eligibility.eligible_loan_amount.toString());
+  }
+}, [eligibility]);
+
+// Use customAmount instead of eligibility.eligible_loan_amount
+const approvedAmount = action === "approve" 
+  ? Number(customAmount) || eligibility?.eligible_loan_amount 
+  : null;
 ```
 
-The button will render conditionally:
+The dialog will show an input field:
 ```tsx
-{application.current_stage === "application_login" && (
-  <Card>
-    <CardContent className="pt-6">
-      <Button onClick={() => startAssessmentMutation.mutate()}>
-        Start Assessment
-      </Button>
-    </CardContent>
-  </Card>
-)}
+<div>
+  <Label>Approved Amount</Label>
+  <Input 
+    type="number" 
+    value={customAmount} 
+    onChange={(e) => setCustomAmount(e.target.value)}
+    max={eligibility?.eligible_loan_amount}
+  />
+  <p className="text-xs text-muted-foreground">
+    Max eligible: ₹{eligibility?.eligible_loan_amount?.toLocaleString("en-IN")}
+  </p>
+</div>
 ```
-
-### What Happens After
-
-Once the application is at `credit_assessment`:
-1. The EligibilityCalculator will show active Approve/Reject buttons
-2. Clicking Approve moves it to `approval_pending`
-3. The Approval Actions card then appears for final approval to `sanctioned`
-
-### Impact
-- One file modified: `src/pages/LOS/ApplicationDetail.tsx`
-- No database changes needed (the `transition_loan_stage` function already supports any stage-to-stage transition)
-- No edge function changes
