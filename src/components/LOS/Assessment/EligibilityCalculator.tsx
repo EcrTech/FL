@@ -112,7 +112,7 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
     enabled: !!applicationId,
   });
 
-  const isFinalized = application?.status === "approved" || application?.status === "rejected";
+  const isFinalized = application?.status === "approved" || application?.status === "rejected" || !["assessment", "credit_assessment"].includes(application?.current_stage);
   // Fetch salary slip documents for income calculation
   const { data: salaryDocs = [] } = useQuery({
     queryKey: ["loan-salary-docs", applicationId],
