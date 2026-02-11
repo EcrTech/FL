@@ -42,6 +42,7 @@ export function useLoansList(searchTerm?: string) {
           id,
           loan_id,
           application_number,
+          current_stage,
           tenure_days,
           loan_applicants!inner (
             first_name,
@@ -85,7 +86,7 @@ export function useLoansList(searchTerm?: string) {
       if (error) throw error;
 
       let loans: LoanListItem[] = (data || [])
-        .filter((app: any) => app.loan_id !== null)
+        .filter((app: any) => app.loan_disbursements?.length > 0)
         .map((app: any) => {
           const applicant = app.loan_applicants?.[0];
           const sanction = app.loan_sanctions?.[0];

@@ -252,7 +252,7 @@ export function ClientsTab() {
               message={
                 searchTerm
                   ? "Try adjusting your search or filters"
-                  : "Customer relationships will appear here once loan applications are created"
+                  : "Clients will appear here once loans are disbursed"
               }
             />
           </CardContent>
