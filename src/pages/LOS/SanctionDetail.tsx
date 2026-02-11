@@ -13,6 +13,7 @@ import { ArrowLeft, Upload, User, MapPin, Edit2, Save, X, FileText, Pencil, Hist
 import { LoadingState } from "@/components/common/LoadingState";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { extractAadhaarAddress, extractAddressString } from "@/lib/addressUtils";
 import DisbursementDashboard from "@/components/LOS/Disbursement/DisbursementDashboard";
 import SanctionGenerator from "@/components/LOS/Sanction/SanctionGenerator";
 import UploadSignedDocumentDialog from "@/components/LOS/Sanction/UploadSignedDocumentDialog";
@@ -225,22 +226,14 @@ export default function SanctionDetail() {
   const aadhaarDocData = (aadhaarFrontData || aadhaarBackData) ? {
     ...aadhaarBackData,
     ...aadhaarFrontData,
-    address: aadhaarBackData?.address
-      || aadhaarBackData?.address_english
-      || aadhaarBackData?.aadhaar_card_details?.address?.english
-        ? [
-            aadhaarBackData?.aadhaar_card_details?.address?.english?.s_o,
-            aadhaarBackData?.aadhaar_card_details?.address?.english?.house_number_or_locality,
-            aadhaarBackData?.aadhaar_card_details?.address?.english?.state_and_pincode,
-          ].filter(Boolean).join(", ") || aadhaarBackData?.address || aadhaarBackData?.address_english
-      : aadhaarFrontData?.address,
+    address: extractAadhaarAddress(aadhaarBackData, aadhaarFrontData),
   } : null;
   const aadhaarVerData = getVerificationData("aadhaar");
   const aadhaarData: Record<string, any> | null = aadhaarDocData || aadhaarVerData
     ? {
         ...aadhaarVerData,
         ...aadhaarDocData,
-        address: aadhaarDocData?.address || aadhaarVerData?.verified_address || aadhaarVerData?.address?.combined || aadhaarVerData?.address,
+        address: extractAddressString(aadhaarDocData?.address) || aadhaarVerData?.verified_address || extractAddressString(aadhaarVerData?.address),
       }
     : null;
 

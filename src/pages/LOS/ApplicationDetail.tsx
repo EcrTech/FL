@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, User, FileText, Calculator, FileCheck, XCircle, CreditCard, CheckCircle, MapPin, Edit2, Save, X, RefreshCw, Loader2, Sparkles, Plus, Pencil, Trash2, History, Lock } from "lucide-react";
 import { toast } from "sonner";
+import { extractAadhaarAddress, extractAddressString } from "@/lib/addressUtils";
 import { LoadingState } from "@/components/common/LoadingState";
 import { format } from "date-fns";
 import DocumentUpload from "@/components/LOS/DocumentUpload";
@@ -158,7 +159,8 @@ export default function ApplicationDetail() {
       (employeeId?.ocr_data as any)?.employee_name;
     
     // Parse name into parts
-    const nameParts = extractedName?.trim().split(/\s+/) || [];
+    const nameStr = typeof extractedName === 'string' ? extractedName : '';
+    const nameParts = nameStr.trim().split(/\s+/).filter(Boolean);
     const firstName = nameParts[0] || '';
     const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
     const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '';
@@ -182,7 +184,7 @@ export default function ApplicationDetail() {
     const email = (employeeId?.ocr_data as any)?.email;
     
     // Extract address from Aadhaar
-    const address = (aadhaarCard?.ocr_data as any)?.address;
+    const address = extractAddressString((aadhaarCard?.ocr_data as any)?.address);
     
     return {
       firstName,
@@ -391,25 +393,16 @@ export default function ApplicationDetail() {
   const aadhaarDocData = (aadhaarFrontData || aadhaarBackData) ? {
     ...aadhaarBackData,
     ...aadhaarFrontData,
-    address: aadhaarBackData?.address
-      || aadhaarBackData?.address_english
-      || aadhaarBackData?.aadhaar_card_details?.address?.english
-        ? [
-            aadhaarBackData?.aadhaar_card_details?.address?.english?.s_o,
-            aadhaarBackData?.aadhaar_card_details?.address?.english?.house_number_or_locality,
-            aadhaarBackData?.aadhaar_card_details?.address?.english?.state_and_pincode,
-          ].filter(Boolean).join(", ") || aadhaarBackData?.address || aadhaarBackData?.address_english
-      : aadhaarFrontData?.address,
+    address: extractAadhaarAddress(aadhaarBackData, aadhaarFrontData),
   } : null;
   const aadhaarVerData = getVerificationData("aadhaar");
   const aadhaarData: Record<string, any> | null = aadhaarDocData || aadhaarVerData ? { 
     ...aadhaarVerData, 
     ...aadhaarDocData,
     address:
-      aadhaarDocData?.address ||
+      extractAddressString(aadhaarDocData?.address) ||
       aadhaarVerData?.verified_address ||
-      aadhaarVerData?.address?.combined ||
-      aadhaarVerData?.address
+      extractAddressString(aadhaarVerData?.address)
   } : null;
 
   const primaryApplicant = application?.loan_applicants?.[0];
