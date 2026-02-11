@@ -198,6 +198,26 @@ export function useCustomerRelationships(searchTerm?: string) {
         });
       }
 
+      // Fetch customer_id from contacts for all customers by phone
+      const allMobiles = Array.from(customerMap.values())
+        .map(c => c.info.mobile)
+        .filter(Boolean);
+      
+      const contactCustomerIdMap = new Map<string, string>();
+      if (allMobiles.length > 0) {
+        const { data: contactsData } = await supabase
+          .from("contacts")
+          .select("phone, customer_id")
+          .in("phone", allMobiles)
+          .not("customer_id", "is", null);
+        
+        contactsData?.forEach((c: any) => {
+          if (c.customer_id) {
+            contactCustomerIdMap.set(c.phone, c.customer_id);
+          }
+        });
+      }
+
       // Step 2: For each customer, fetch detailed application data
       const relationships: CustomerRelationship[] = [];
 
@@ -351,7 +371,7 @@ export function useCustomerRelationships(searchTerm?: string) {
           .join(' ');
 
         relationships.push({
-          customerId: customer.info.pan_number || customer.info.mobile,
+          customerId: contactCustomerIdMap.get(customer.info.mobile) || customer.info.pan_number || customer.info.mobile,
           panNumber: customer.info.pan_number || 'N/A',
           aadhaarNumber: maskAadhaar(customer.info.aadhaar_number),
           mobile: customer.info.mobile || 'N/A',
