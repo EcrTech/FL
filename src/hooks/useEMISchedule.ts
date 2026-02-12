@@ -63,12 +63,13 @@ export function useEMISchedule(applicationId?: string) {
       disbursementDate: string;
     }) => {
       // Use shared calculation utility for daily flat rate model
-      const { totalInterest, totalRepayment, dailyEMI } = calculateLoanDetails(
+      const { totalInterest, totalRepayment } = calculateLoanDetails(
         loanAmount,
         interestRate,
         tenureDays
       );
 
+      const dailyEMI = Math.round(totalRepayment / tenureDays);
       const dailyInterest = loanAmount * (interestRate / 100);
       const dailyPrincipal = dailyEMI - dailyInterest;
       let outstandingPrincipal = loanAmount;

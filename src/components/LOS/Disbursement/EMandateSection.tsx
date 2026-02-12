@@ -17,7 +17,7 @@ interface EMandateSectionProps {
   borrowerName: string;
   borrowerPhone: string;
   borrowerEmail?: string;
-  dailyEMI: number;
+  totalRepayment: number;
   loanAmount: number;
   tenureDays: number;
   loanNo: string;
@@ -42,7 +42,7 @@ export default function EMandateSection({
   borrowerName,
   borrowerPhone,
   borrowerEmail,
-  dailyEMI,
+  totalRepayment,
   loanAmount,
   tenureDays,
   loanNo,
@@ -199,7 +199,7 @@ export default function EMandateSection({
                 <div className="p-3 rounded-lg bg-muted/50">
                   <p className="text-xs text-muted-foreground">Amount</p>
                   <p className="font-medium text-sm">
-                    {formatCurrency(mandateData.collection_amount || dailyEMI)}
+                    {formatCurrency(mandateData.collection_amount || totalRepayment)}
                     {mandateData.frequency === "ADHO" || mandateData.seq_type === "OOFF" 
                       ? " (One-time)" 
                       : ` / ${mandateData.frequency === "MNTH" ? "month" : 
@@ -311,7 +311,7 @@ export default function EMandateSection({
         applicantPhone={borrowerPhone}
         applicantEmail={borrowerEmail}
         loanAmount={loanAmount}
-        emiAmount={dailyEMI}
+        emiAmount={totalRepayment}
         tenure={tenureDays}
         loanNo={loanNo}
         prefillData={mandateData ? {
