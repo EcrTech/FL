@@ -25,7 +25,7 @@ import CallingUploadLeads from "./pages/CallingUploadLeads";
 import CallingLeadDetail from "./pages/CallingLeadDetail";
 import ExotelSettings from "./pages/ExotelSettings";
 import PublicForm from "./pages/PublicForm";
-import PublicLoanApplication from "./pages/PublicLoanApplication";
+
 
 import WhatsAppSettings from "./pages/WhatsAppSettings";
 import Templates from "./pages/Templates";
@@ -86,7 +86,7 @@ const App = () => {
             <Route path="/signup" element={<SignUp />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/form/:formId" element={<PublicForm />} />
-            <Route path="/apply/:slug" element={<PublicLoanApplication />} />
+            
             <Route path="/apply/ref/:referralCode" element={<ReferralLoanApplication />} />
             
             <Route path="/videokyc/:token" element={<VideoKYC />} />
