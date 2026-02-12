@@ -150,6 +150,14 @@ export function BulkLeadUploadDialog({ open, onOpenChange, orgId, onComplete }: 
     const results: UploadResult = { created: 0, skipped: 0, errors: [] };
     const total = parsedRows.length;
 
+    // Get current user ID for created_by field (required by RLS)
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("You must be logged in to upload leads");
+      setIsUploading(false);
+      return;
+    }
+
     for (let i = 0; i < parsedRows.length; i++) {
       const row = parsedRows[i];
       const phone = row.phone!.trim().replace(/\D/g, "").slice(-10);
@@ -183,6 +191,7 @@ export function BulkLeadUploadDialog({ open, onOpenChange, orgId, onComplete }: 
               email,
               source: "bulk_upload",
               status: "new",
+              created_by: user.id,
             })
             .select("id")
             .single();
