@@ -323,8 +323,15 @@ serve(async (req) => {
       }
     }
 
-    // Convert to base64 safely
-    const base64 = safeBase64Encode(pdfBytesToParse.buffer);
+    // Convert to base64 safely - use the Uint8Array directly to avoid buffer offset issues
+    const base64 = safeBase64Encode(pdfBytesToParse.buffer.byteLength === pdfBytesToParse.byteLength 
+      ? pdfBytesToParse.buffer 
+      : pdfBytesToParse.buffer.slice(pdfBytesToParse.byteOffset, pdfBytesToParse.byteOffset + pdfBytesToParse.byteLength));
+
+    if (!base64 || base64.length === 0) {
+      throw new Error("File conversion to base64 resulted in empty data. The file may be corrupted or empty.");
+    }
+    console.log(`[ParseDocument] Base64 encoded, length: ${base64.length}`);
 
     // Get the appropriate prompt for this document type
     const basePrompt = DOCUMENT_PROMPTS[documentType] || `Extract all relevant information from this document and return as JSON.`;
@@ -345,7 +352,8 @@ serve(async (req) => {
     let aiResponse: Response;
 
     if (isPdf) {
-      console.log(`[ParseDocument] Using Gemini Flash for PDF parsing...`);
+      const dataUrl = `data:application/pdf;base64,${base64}`;
+      console.log(`[ParseDocument] Using Gemini Flash for PDF parsing, data URL length: ${dataUrl.length}`);
       
       aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
@@ -364,10 +372,9 @@ serve(async (req) => {
               role: "user",
               content: [
                 {
-                  type: "file",
-                  file: {
-                    filename: filePath.split('/').pop() || "document.pdf",
-                    file_data: `data:application/pdf;base64,${base64}`,
+                  type: "image_url",
+                  image_url: {
+                    url: dataUrl,
                   },
                 },
                 {
