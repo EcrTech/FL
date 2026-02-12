@@ -386,9 +386,10 @@ serve(async (req) => {
               role: "user",
               content: [
                 {
-                  type: "image_url",
-                  image_url: {
-                    url: dataUrl,
+                  type: "file",
+                  file: {
+                    filename: filename,
+                    file_data: dataUrl,
                   },
                 },
                 {
