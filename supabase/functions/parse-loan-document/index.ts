@@ -239,6 +239,7 @@ serve(async (req) => {
   }
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  let parsedDocumentId: string | undefined;
 
   try {
     const reqBody = await req.json();
@@ -255,6 +256,7 @@ serve(async (req) => {
     const isFirstChunk = currentPage === 1 && totalPages === 0;
     console.log(`[ParseDocument] Processing: ${documentType}, ID: ${documentId}, Page: ${currentPage}/${totalPages || 'unknown'}`);
 
+    parsedDocumentId = documentId;
     if (!documentId || !documentType || !filePath) {
       throw new Error("Missing required parameters: documentId, documentType, filePath");
     }
@@ -386,10 +388,9 @@ serve(async (req) => {
               role: "user",
               content: [
                 {
-                  type: "file",
-                  file: {
-                    filename: filename,
-                    file_data: dataUrl,
+                  type: "image_url",
+                  image_url: {
+                    url: dataUrl,
                   },
                 },
                 {
@@ -805,7 +806,7 @@ serve(async (req) => {
     
     // Try to update status to failed
     try {
-      const docId = reqBody?.documentId;
+      const docId = parsedDocumentId;
       if (docId) {
         await supabase
           .from("loan_documents")
