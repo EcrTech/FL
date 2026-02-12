@@ -156,12 +156,20 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
         throw new Error("Selected file is empty (0 bytes). Please select a valid document.");
       }
 
+      // Read file into ArrayBuffer to ensure full content is captured
+      const arrayBuffer = await file.arrayBuffer();
+      if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+        throw new Error("Failed to read file content. The file may be corrupted or inaccessible.");
+      }
+
       const fileExt = file.name.split(".").pop();
       const filePath = `${orgId}/${applicationId}/${docType}_${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from("loan-documents")
-        .upload(filePath, file);
+        .upload(filePath, arrayBuffer, {
+          contentType: file.type || 'application/octet-stream',
+        });
 
       if (uploadError) throw uploadError;
 
@@ -171,7 +179,7 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
         document_category: REQUIRED_DOCUMENTS.find((d) => d.type === docType)?.category || "other",
         file_path: filePath,
         file_name: file.name,
-        file_size: file.size,
+        file_size: arrayBuffer.byteLength,
         mime_type: file.type,
         upload_status: "uploaded",
         verification_status: "pending",
