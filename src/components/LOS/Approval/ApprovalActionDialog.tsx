@@ -93,6 +93,22 @@ export default function ApprovalActionDialog({
 
       if (approvalError) throw approvalError;
 
+      // Sync eligibility derived values when approving with a different amount
+      if (action === "approve" && approvedAmount && tenureDays && interestRate) {
+        const recalcInterest = approvedAmount * (interestRate / 100) * tenureDays;
+        const recalcRepayment = approvedAmount + recalcInterest;
+        
+        await supabase
+          .from("loan_eligibility")
+          .update({
+            eligible_loan_amount: approvedAmount,
+            total_interest: Math.round(recalcInterest * 100) / 100,
+            total_repayment: Math.round(recalcRepayment * 100) / 100,
+            daily_emi: 0, // ADHO model
+          })
+          .eq("loan_application_id", applicationId);
+      }
+
       // Update application - guarded stage transition
       const newStage = action === "approve" ? "sanctioned" : "rejected";
       const newStatus = action === "approve" ? "approved" : "rejected";
