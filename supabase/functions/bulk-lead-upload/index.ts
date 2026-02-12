@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
     }
 
     const orgId = profile.org_id;
-    const { rows } = await req.json();
+    const { rows, assignmentStrategy = 'unassigned' } = await req.json();
 
     if (!Array.isArray(rows) || rows.length === 0) {
       return new Response(JSON.stringify({ error: 'No rows provided' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -59,7 +59,43 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Maximum 500 rows allowed' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const results = { created: 0, skipped: 0, errors: [] as string[] };
+    // Cache for CSV-based email-to-userId lookups
+    const emailToUserCache = new Map<string, string | null>();
+
+    // Lookup user by email in the org
+    async function resolveUserByEmail(email: string): Promise<string | null> {
+      if (!email) return null;
+      const normalized = email.trim().toLowerCase();
+      if (emailToUserCache.has(normalized)) return emailToUserCache.get(normalized)!;
+
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, email')
+        .eq('org_id', orgId)
+        .ilike('email', normalized)
+        .maybeSingle();
+
+      const uid = data?.id || null;
+      emailToUserCache.set(normalized, uid);
+      return uid;
+    }
+
+    // Round-robin: get next assignee using existing DB function
+    async function getNextAssignee(): Promise<string | null> {
+      try {
+        const { data, error } = await supabase.rpc('get_next_assignee', { p_org_id: orgId });
+        if (error) {
+          console.error('Round-robin error:', error.message);
+          return null;
+        }
+        return data || null;
+      } catch (e) {
+        console.error('Round-robin exception:', e);
+        return null;
+      }
+    }
+
+    const results = { created: 0, skipped: 0, assigned: 0, assignment_failures: 0, errors: [] as string[] };
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -110,19 +146,47 @@ Deno.serve(async (req) => {
           contactId = newContact.id;
         }
 
+        // Resolve assignment
+        let assignedTo: string | null = null;
+
+        if (assignmentStrategy === 'csv') {
+          const assignEmail = row.assigned_to_email?.trim();
+          if (assignEmail) {
+            assignedTo = await resolveUserByEmail(assignEmail);
+            if (!assignedTo) {
+              results.assignment_failures++;
+            }
+          }
+        } else if (assignmentStrategy === 'round_robin') {
+          assignedTo = await getNextAssignee();
+          if (!assignedTo) {
+            results.assignment_failures++;
+          }
+        }
+
+        if (assignedTo) {
+          results.assigned++;
+        }
+
         const appNumber = `BLK-${Date.now()}-${i}`;
+        const insertData: Record<string, unknown> = {
+          application_number: appNumber,
+          org_id: orgId,
+          contact_id: contactId,
+          requested_amount: loanAmount,
+          tenure_days: 365,
+          status: 'new',
+          current_stage: 'lead',
+          source,
+        };
+
+        if (assignedTo) {
+          insertData.assigned_to = assignedTo;
+        }
+
         const { error: appError } = await supabase
           .from('loan_applications')
-          .insert({
-            application_number: appNumber,
-            org_id: orgId,
-            contact_id: contactId,
-            requested_amount: loanAmount,
-            tenure_days: 365,
-            status: 'new',
-            current_stage: 'lead',
-            source,
-          });
+          .insert(insertData);
 
         if (appError) throw appError;
         results.created++;
