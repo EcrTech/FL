@@ -96,15 +96,15 @@ export default function BulkPaymentReport() {
 
   const mappedRows: BulkPaymentRow[] = records.map((app: any) => {
     const applicant = app.loan_applicants?.[0];
-    const sanction = app.loan_sanctions?.[0];
-    const disbursement = app.loan_disbursements?.[0];
+    const sanction = app.loan_sanctions;
+    const disbursement = app.loan_disbursements;
 
     return {
       applicationNumber: app.application_number || "",
       beneficiaryName: applicant?.bank_account_holder_name || `${applicant?.first_name || ""} ${applicant?.last_name || ""}`.trim(),
       accountNumber: applicant?.bank_account_number || "",
       ifscCode: applicant?.bank_ifsc_code || "",
-      amount: (() => {
+      amount: sanction?.net_disbursement_amount || (() => {
         const sanctionedAmt = sanction?.sanctioned_amount || 0;
         const procFee = sanction?.processing_fee || Math.round(sanctionedAmt * 0.10);
         const gst = Math.round(procFee * 0.18);
