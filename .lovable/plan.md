@@ -1,38 +1,56 @@
 
+## Bulk Lead Upload on Pipeline Page
 
-## Fix: Net Disbursal Showing as 0 in Bulk Payment Report
+Add a "Bulk Upload" button to the Pipeline Board header that opens a CSV upload dialog, allowing users to import multiple leads at once. Each CSV row creates a contact and a corresponding loan application.
 
-### Root Cause
+### User Experience
 
-The database query returns `loan_sanctions` as a **single object** (one-to-one relationship), not an array. The current code accesses it with `app.loan_sanctions?.[0]`, which returns `undefined` when used on an object. This causes the amount calculation to fall back to 0.
+1. A new "Bulk Upload" button appears next to "Advanced Search" in the Pipeline header
+2. Clicking it opens a dialog with:
+   - Download CSV template button
+   - Drag-and-drop file upload area
+   - Validation feedback
+   - Upload button
+3. The CSV template includes columns: `name`, `phone`, `email`, `loan_amount`, `source`
+4. On upload, each row creates a contact (deduped by phone) and a draft loan application
+5. Success/error toast notifications
 
-Same issue affects `loan_disbursements` (returned as object/null, not array).
+### Technical Details
 
-### Changes
+**New file: `src/components/Pipeline/BulkLeadUploadDialog.tsx`**
+- Dialog component with drag-and-drop CSV upload
+- CSV template download with columns: `name`, `phone`, `email`, `loan_amount`, `source`
+- Client-side validation: CSV format, max 500 rows, required `name` + `phone` columns
+- Uses PapaParse for CSV parsing
+- For each row:
+  - Check if contact exists by phone number (dedup)
+  - Create or reuse contact record with `source: 'bulk_upload'`
+  - Create a draft `loan_application` linked to the contact
+- Uses `supabase.from("contacts")` and `supabase.from("loan_applications")` directly
+- Shows progress and result summary (created/skipped/errors)
 
-**File: `src/components/LOS/Reports/BulkPaymentReport.tsx`** (lines 97-116)
+**Modified file: `src/pages/PipelineBoard.tsx`**
+- Import the new `BulkLeadUploadDialog` component
+- Add state: `showBulkUpload`
+- Add "Bulk Upload" button in the header next to "Advanced Search"
+- Render the dialog, passing `orgId` and a callback to refresh the query
 
-1. Change `app.loan_sanctions?.[0]` to `app.loan_sanctions` (direct object access)
-2. Change `app.loan_disbursements?.[0]` to `app.loan_disbursements` (direct object access)
-3. Use the pre-calculated `net_disbursement_amount` from the database instead of recalculating, with a fallback calculation for legacy records
+### Processing Logic (client-side, per row)
 
-Updated mapping logic:
-```typescript
-const sanction = app.loan_sanctions;  // object, not array
-const disbursement = app.loan_disbursements;  // object or null
-
-// Use stored net_disbursement_amount directly
-amount: sanction?.net_disbursement_amount || (() => {
-  const sanctionedAmt = sanction?.sanctioned_amount || 0;
-  const procFee = sanction?.processing_fee || Math.round(sanctionedAmt * 0.10);
-  const gst = Math.round(procFee * 0.18);
-  return sanctionedAmt - procFee - gst;
-})(),
+```text
+For each CSV row:
+  1. Look up contact by phone in org
+  2. If not found -> insert new contact
+  3. Insert loan_application (status: 'new', current_stage: 'lead', source from CSV or 'bulk_upload')
+  4. Track results for summary
 ```
 
-### Impact
+### CSV Template Columns
 
-- Fixes the ₹0 display for all 3 visible records
-- Also fixes the exported BLKPAY Excel file (which would contain 0 amounts)
-- No database changes needed
-
+| Column | Required | Description |
+|--------|----------|-------------|
+| name | Yes | Full name (split into first/last) |
+| phone | Yes | Phone number (used for dedup) |
+| email | No | Email address |
+| loan_amount | No | Requested amount (default: 25000) |
+| source | No | Lead source (default: 'bulk_upload') |
