@@ -307,15 +307,12 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
   const interestRate = sanction?.sanctioned_rate || application.interest_rate || eligibility?.recommended_interest_rate || 0;
   const tenureDays = sanction?.sanctioned_tenure_days || application.tenure_days || eligibility?.recommended_tenure_days || 30;
   
-  // Only use stored eligibility values if the loan amount matches what eligibility was calculated on
-  const eligibilityMatchesLoan = eligibility && Number(eligibility.eligible_loan_amount) === loanAmount;
-  
+  // Always recalculate from principal + rate + tenure to avoid stale stored values
   const calculatedInterest = loanAmount * (interestRate / 100) * tenureDays;
   const calculatedRepayment = loanAmount + calculatedInterest;
   
-  const interestAmount = eligibilityMatchesLoan ? (eligibility.total_interest ?? Math.round(calculatedInterest * 100) / 100) : Math.round(calculatedInterest * 100) / 100;
-  const totalRepayment = eligibilityMatchesLoan ? (eligibility.total_repayment ?? Math.round(calculatedRepayment * 100) / 100) : Math.round(calculatedRepayment * 100) / 100;
-  const dailyEMI = eligibilityMatchesLoan ? (eligibility.daily_emi ?? Math.round(calculatedRepayment / tenureDays)) : Math.round(calculatedRepayment / tenureDays);
+  const interestAmount = Math.round(calculatedInterest * 100) / 100;
+  const totalRepayment = Math.round(calculatedRepayment * 100) / 100;
   
   // Processing fee is 10% of loan amount (standard)
   const processingFeeRate = 10;
@@ -375,7 +372,7 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
           </div>
         </CardHeader>
         <CardContent className="pt-6">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <div className="p-4 rounded-lg bg-muted/50 space-y-1">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Banknote className="h-4 w-4" />
@@ -423,14 +420,6 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
               <p className="text-xs text-muted-foreground">Principal + Interest</p>
             </div>
             
-            <div className="p-4 rounded-lg bg-muted/50 space-y-1">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Calendar className="h-4 w-4" />
-                <span className="text-sm">Daily EMI</span>
-              </div>
-              <p className="text-2xl font-bold">{formatCurrency(dailyEMI)}</p>
-              <p className="text-xs text-muted-foreground">Over {tenureDays} days</p>
-            </div>
           </div>
         </CardContent>
       </Card>
@@ -477,7 +466,7 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
         borrowerName={borrowerName}
         borrowerPhone={borrowerPhone}
         borrowerEmail={applicant?.email}
-        dailyEMI={dailyEMI}
+        totalRepayment={totalRepayment}
         loanAmount={loanAmount}
         tenureDays={tenureDays}
         loanNo={application.application_number || `LOAN-${applicationId.slice(0, 8)}`}

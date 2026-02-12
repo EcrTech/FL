@@ -6,7 +6,6 @@
 export interface LoanCalculationResult {
   totalInterest: number;
   totalRepayment: number;
-  dailyEMI: number;
 }
 
 /**
@@ -23,12 +22,10 @@ export function calculateLoanDetails(
 ): LoanCalculationResult {
   const totalInterest = principal * (dailyInterestRate / 100) * tenureDays;
   const totalRepayment = principal + totalInterest;
-  const dailyEMI = Math.round(totalRepayment / tenureDays);
 
   return {
-    totalInterest: Math.round(totalInterest * 100) / 100, // Round to 2 decimal places
+    totalInterest: Math.round(totalInterest * 100) / 100,
     totalRepayment: Math.round(totalRepayment * 100) / 100,
-    dailyEMI,
   };
 }
 

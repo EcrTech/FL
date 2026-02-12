@@ -384,7 +384,6 @@ export default function Sanctions() {
                       <TableHead className="text-right">Net Disbursal</TableHead>
                       <TableHead className="text-right">Total Interest</TableHead>
                       <TableHead className="text-right">Total Repayment</TableHead>
-                      <TableHead className="text-right">Daily EMI</TableHead>
                       <TableHead>Approved By</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
@@ -444,9 +443,6 @@ export default function Sanctions() {
                           </TableCell>
                           <TableCell className="text-right font-semibold">
                             {formatCurrency(loanCalc.totalRepayment)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {formatCurrency(loanCalc.dailyEMI)}
                           </TableCell>
                           <TableCell className="text-muted-foreground">
                             {app.approver_name || "—"}
@@ -545,7 +541,6 @@ function generateSanctionLetterHtml(data: {
   netDisbursement: number;
   totalInterest: number;
   totalRepayment: number;
-  dailyEMI: number;
 }) {
   return `
     <!DOCTYPE html>
@@ -585,7 +580,6 @@ function generateSanctionLetterHtml(data: {
           <tr><td>Net Disbursement Amount</td><td class="amount">₹${data.netDisbursement.toLocaleString('en-IN')}</td></tr>
           <tr><td>Total Interest Payable</td><td>₹${data.totalInterest.toLocaleString('en-IN')}</td></tr>
           <tr><td>Total Repayment Amount</td><td>₹${data.totalRepayment.toLocaleString('en-IN')}</td></tr>
-          <tr><td>Daily EMI</td><td>₹${data.dailyEMI.toLocaleString('en-IN')}</td></tr>
         </table>
         
         <p>This sanction is valid for 30 days from the date of issue. Please sign and return the Loan Agreement to proceed with disbursement.</p>
@@ -619,7 +613,6 @@ function generateLoanAgreementHtml(data: {
   netDisbursement: number;
   totalInterest: number;
   totalRepayment: number;
-  dailyEMI: number;
 }) {
   return `
     <!DOCTYPE html>
@@ -660,7 +653,6 @@ function generateLoanAgreementHtml(data: {
         <tr><td>Net Disbursement</td><td>₹${data.netDisbursement.toLocaleString('en-IN')}</td></tr>
         <tr><td>Total Interest</td><td>₹${data.totalInterest.toLocaleString('en-IN')}</td></tr>
         <tr><td>Total Amount Payable</td><td>₹${data.totalRepayment.toLocaleString('en-IN')}</td></tr>
-        <tr><td>Daily EMI</td><td>₹${data.dailyEMI.toLocaleString('en-IN')}</td></tr>
       </table>
       
       <h2>2. TERMS AND CONDITIONS</h2>

@@ -124,11 +124,7 @@ export default function SanctionViewer({ applicationId }: SanctionViewerProps) {
 
             <div>
               <h4 className="font-medium mb-3">Payment Details</h4>
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="p-4 border rounded-lg">
-                  <div className="text-sm text-muted-foreground">Daily EMI</div>
-                  <div className="text-xl font-bold">{formatCurrency(loanDetails.dailyEMI)}</div>
-                </div>
+              <div className="grid gap-4 md:grid-cols-2">
                 <div className="p-4 border rounded-lg">
                   <div className="text-sm text-muted-foreground">Total Repayment</div>
                   <div className="text-xl font-bold">{formatCurrency(loanDetails.totalRepayment)}</div>

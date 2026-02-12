@@ -78,9 +78,9 @@ export default function EMIScheduleGenerator({
           </div>
 
           <div className="space-y-1">
-            <div className="text-sm text-muted-foreground">Daily EMI</div>
+            <div className="text-sm text-muted-foreground">Total Repayment</div>
             <div className="text-lg font-semibold text-primary">
-              {formatCurrency(loanDetails.dailyEMI)}
+              {formatCurrency(loanDetails.totalRepayment)}
             </div>
           </div>
 
