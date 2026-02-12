@@ -97,6 +97,8 @@ export default function ReferralLoanApplication() {
   const [submissionSuccess, setSubmissionSuccess] = useState(false);
   const [draftApplicationId, setDraftApplicationId] = useState<string | null>(null);
   const [creatingDraft, setCreatingDraft] = useState(false);
+  const [earlyLeadContactId, setEarlyLeadContactId] = useState<string | null>(null);
+  const earlyLeadCreatedRef = useRef(false);
   const [geolocation, setGeolocation] = useState<{
     latitude: number;
     longitude: number;
@@ -480,6 +482,7 @@ export default function ReferralLoanApplication() {
         referralCode,
         geolocation,
         draftApplicationId,
+        earlyLeadContactId,
         source: getMarketingSource(utmParamsRef.current),
       };
 
@@ -636,6 +639,32 @@ export default function ReferralLoanApplication() {
                     if (!step1PixelFiredRef.current) {
                       trackStep1Lead(basicInfo.requestedAmount, utmParamsRef.current);
                       step1PixelFiredRef.current = true;
+                    }
+                    // Create early lead (fire-and-forget, non-blocking)
+                    if (!earlyLeadCreatedRef.current && referrerInfo) {
+                      earlyLeadCreatedRef.current = true;
+                      supabase.functions.invoke('create-early-lead', {
+                        body: {
+                          name: basicInfo.name,
+                          phone: basicInfo.phone,
+                          loanAmount: basicInfo.requestedAmount,
+                          referralCode: referrerInfo.referralCode,
+                          source: getMarketingSource(utmParamsRef.current),
+                          geolocation,
+                        },
+                      }).then(({ data, error }) => {
+                        if (!error && data?.success) {
+                          console.log('[ReferralLoanApplication] Early lead created:', data);
+                          setEarlyLeadContactId(data.contactId || null);
+                          if (data.draftApplicationId) {
+                            setDraftApplicationId(data.draftApplicationId);
+                          }
+                        } else {
+                          console.warn('[ReferralLoanApplication] Early lead creation failed:', error || data?.error);
+                        }
+                      }).catch((err) => {
+                        console.warn('[ReferralLoanApplication] Early lead creation error:', err);
+                      });
                     }
                     setBasicInfoSubStep(2);
                   })}

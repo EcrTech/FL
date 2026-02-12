@@ -104,3 +104,6 @@ verify_jwt = false
 
 [functions.detect-document-fraud]
 verify_jwt = false
+
+[functions.create-early-lead]
+verify_jwt = false

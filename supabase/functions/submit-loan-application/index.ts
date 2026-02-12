@@ -340,42 +340,62 @@ Deno.serve(async (req) => {
 
       console.log(`[submit-loan-application] Created referral application: ${application.id}`);
 
-      // Check for existing contact
-      const { data: existingContact } = await supabase
-        .from('contacts')
-        .select('id')
-        .eq('org_id', formConfig.org_id)
-        .eq('phone', applicant.phone)
-        .maybeSingle();
+      // Check if we already have a contact from early lead creation
+      const earlyLeadContactId = body.earlyLeadContactId;
+      let contactId = earlyLeadContactId || null;
 
-      let contactId = existingContact?.id;
-
-      if (!existingContact) {
-        // Create new contact/lead
-        const { data: newContact, error: contactError } = await supabase
+      if (!contactId) {
+        // Check for existing contact by phone
+        const { data: existingContact } = await supabase
           .from('contacts')
-          .insert({
-            org_id: formConfig.org_id,
-            first_name: firstName,
-            last_name: lastName || null,
-            phone: applicant.phone,
-            email: applicant.email || null,
-            source: body.source || 'referral_link',
-            status: 'in_progress',
-            referred_by: referrerUserId || null,
-            notes: `New Lead from Referral Application ${applicationNumber}`,
-          })
-          .select()
-          .single();
+          .select('id')
+          .eq('org_id', formConfig.org_id)
+          .eq('phone', applicant.phone)
+          .maybeSingle();
 
-        if (contactError) {
-          console.error('[submit-loan-application] Error creating contact:', contactError);
+        contactId = existingContact?.id;
+
+        if (!existingContact) {
+          // Create new contact/lead
+          const { data: newContact, error: contactError } = await supabase
+            .from('contacts')
+            .insert({
+              org_id: formConfig.org_id,
+              first_name: firstName,
+              last_name: lastName || null,
+              phone: applicant.phone,
+              email: applicant.email || null,
+              source: body.source || 'referral_link',
+              status: 'in_progress',
+              referred_by: referrerUserId || null,
+              notes: `New Lead from Referral Application ${applicationNumber}`,
+            })
+            .select()
+            .single();
+
+          if (contactError) {
+            console.error('[submit-loan-application] Error creating contact:', contactError);
+          } else {
+            contactId = newContact.id;
+            console.log(`[submit-loan-application] Created new lead: ${newContact.id}`);
+          }
         } else {
-          contactId = newContact.id;
-          console.log(`[submit-loan-application] Created new lead: ${newContact.id}`);
+          console.log(`[submit-loan-application] Contact already exists: ${existingContact.id}`);
         }
       } else {
-        console.log(`[submit-loan-application] Contact already exists: ${existingContact.id}`);
+        // Update the early lead contact with latest info and status
+        console.log(`[submit-loan-application] Updating early lead contact: ${contactId}`);
+        await supabase
+          .from('contacts')
+          .update({
+            first_name: firstName,
+            last_name: lastName || null,
+            email: applicant.email || null,
+            status: 'in_progress',
+            notes: `Application submitted: ${applicationNumber}`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', contactId);
       }
 
       // Update application with contact_id
