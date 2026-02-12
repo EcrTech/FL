@@ -45,9 +45,8 @@ Return ONLY valid JSON with these fields.`,
 - vid: The VID (Virtual ID) number if visible
 Return ONLY valid JSON with these fields.`,
 
-  bank_statement: `Analyze this bank statement and extract the following information. Return ONLY valid JSON.
+  bank_statement: `Extract ONLY the bank account identification details from this bank statement. Return ONLY valid JSON.
 
-=== ACCOUNT IDENTIFICATION ===
 - account_number: The bank account number
 - ifsc_code: The IFSC code of the branch. IMPORTANT: IFSC codes follow the format: 4 letters + '0' (zero, NOT letter O) + 6 alphanumeric characters. The 5th character is ALWAYS the digit zero '0', never the letter 'O'.
 - branch_name: The branch name and location
@@ -55,22 +54,7 @@ Return ONLY valid JSON with these fields.`,
 - bank_name: Name of the bank
 - account_type: Type of account (Savings/Current/etc)
 
-=== STATEMENT PERIOD ===
-- statement_period_from: Statement start date (YYYY-MM-DD)
-- statement_period_to: Statement end date (YYYY-MM-DD)
-
-=== SUMMARY FIGURES (from statement summary or calculated from transactions) ===
-- opening_balance: Opening balance (number only)
-- closing_balance: Closing balance (number only)
-- total_credits: Total credits/deposits (number only)
-- total_debits: Total debits/withdrawals (number only)
-- average_monthly_balance: Average monthly balance if determinable (number only)
-
-=== AI ANALYSIS (provide your expert assessment) ===
-- analysis_summary: An array of 3-5 key insights about this bank statement. Consider: salary/income regularity and amounts, spending patterns, EMI/loan payment regularity, bounced transactions or returns, average balance health, any red flags for lending.
-- recommendation: A 1-2 sentence overall assessment of the account holder's financial health based on this statement.
-
-Return ONLY valid JSON with these fields. Use 0 or null for missing numeric values. Do NOT include individual transactions.`,
+Return ONLY valid JSON with these 6 fields. Use null for missing values.`,
 
   salary_slip_1: `Extract the following from this salary slip:
 - employee_name: Employee full name
@@ -388,9 +372,10 @@ serve(async (req) => {
               role: "user",
               content: [
                 {
-                  type: "image_url",
-                  image_url: {
-                    url: dataUrl,
+                  type: "file",
+                  file: {
+                    filename: filename,
+                    file_data: dataUrl,
                   },
                 },
                 {
