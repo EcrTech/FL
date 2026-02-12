@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LoadingState } from "@/components/common/LoadingState";
 import { useNotification } from "@/hooks/useNotification";
-import { Search, FileCheck, FileX, Phone, Mail, UserPlus } from "lucide-react";
+import { Search, FileCheck, FileX, Phone, Mail, UserPlus, Upload } from "lucide-react";
+import { BulkLeadUploadDialog } from "@/components/Pipeline/BulkLeadUploadDialog";
 import { useNavigate } from "react-router-dom";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -193,6 +194,7 @@ export default function PipelineBoard() {
   
   const tablePagination = usePagination({ defaultPageSize: 50 });
 
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [assignmentDialog, setAssignmentDialog] = useState<{
     open: boolean;
     applicationId: string;
@@ -464,11 +466,24 @@ export default function PipelineBoard() {
             <h1 className="text-2xl font-bold">Leads</h1>
             <p className="text-sm text-muted-foreground">Loan applications overview</p>
           </div>
-          <Button onClick={() => navigate('/pipeline/advanced-search')} variant="outline" size="sm">
-            <Search className="h-4 w-4 mr-2" />
-            Advanced Search
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={() => setShowBulkUpload(true)} variant="outline" size="sm">
+              <Upload className="h-4 w-4 mr-2" />
+              Bulk Upload
+            </Button>
+            <Button onClick={() => navigate('/pipeline/advanced-search')} variant="outline" size="sm">
+              <Search className="h-4 w-4 mr-2" />
+              Advanced Search
+            </Button>
+          </div>
         </div>
+
+        <BulkLeadUploadDialog
+          open={showBulkUpload}
+          onOpenChange={setShowBulkUpload}
+          orgId={orgId}
+          onComplete={() => queryClient.invalidateQueries({ queryKey: ['leads-applications'] })}
+        />
 
         {/* Status Filter Tabs */}
         <Tabs value={filters.statusFilter} onValueChange={(value) => handleFilterChange("statusFilter", value)} className="w-full">
