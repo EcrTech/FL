@@ -1,65 +1,54 @@
 
-## Fix: Loan Amount Showing ₹19,195 Instead of ₹15,000
+
+## Fix: Total Repayment Using Wrong Values + Remove Daily EMI
 
 ### Problem
 
-For Hemant Chauhan's application (LA-202602-10003), the Loan Summary and Assessment Dashboard display **₹19,195** (the calculated eligibility amount) instead of the intended **₹15,000** (the approved amount already stored in the database).
+1. **Stale stored values**: The `loan_eligibility` record has `total_interest = 3071.2`, `total_repayment = 22266.2`, `daily_emi = 1392` -- all calculated when the eligible amount was 19,195. Even though `eligible_loan_amount` was corrected to 15,000, these derived values were never updated. The code's "eligibility matches loan" check passes (both 15,000), so it trusts the wrong stored values.
 
-**Root cause**: The eligibility calculation produced ₹19,195 as the maximum eligible amount based on FOIR. The system currently uses this eligibility amount as the "single source of truth" for approval, with no way to override it to a lower amount like ₹15,000.
+2. **Daily EMI is incorrect terminology**: The loan uses ADHO (bullet) repayment, not daily EMI installments. "Daily EMI" should be removed from all UI surfaces.
 
-### Two fixes needed
-
-**1. Update the eligibility record in the database**
-
-Change `eligible_loan_amount` from 19,195 to 15,000 in the `loan_eligibility` table for this specific application. This immediately fixes what the user sees in the Loan Summary and Assessment Dashboard.
-
-**2. Allow custom approved amount in the Approval Dialog**
-
-Currently, `ApprovalActionDialog.tsx` automatically uses `eligibility.eligible_loan_amount` as the approved amount with no override option. This should be changed to:
-- Pre-fill with the eligibility amount as a suggestion
-- Allow the approver to enter a custom (lower) amount before confirming
-- Validate that the custom amount does not exceed the eligible amount
+### Correct values for this loan
+- Principal: Rs 15,000
+- Interest: Rs 2,400 (15,000 x 1% x 16 days)
+- Total Repayment: Rs 17,400
 
 ### Changes
 
-**Database**: Update `loan_eligibility` for application `11d0a8cf-472a-4dc1-88ba-50215acb3f64` to set `eligible_loan_amount = 15000`
+#### 1. Database: Fix stale values in `loan_eligibility`
+Update the stored `total_interest`, `total_repayment`, and `daily_emi` for this application to match the corrected Rs 15,000 principal.
 
-**File: `src/components/LOS/Approval/ApprovalActionDialog.tsx`**
-- Add an editable "Approved Amount" input field pre-filled with the eligible amount
-- Allow the approver to reduce the amount (but not exceed the eligible amount)
-- Use the entered amount (instead of the eligibility amount) when writing `approved_amount` to `loan_applications`
+#### 2. `src/components/LOS/Disbursement/DisbursementDashboard.tsx`
+- **Remove the "Daily EMI" card** from the Loan Summary grid (change from 6-column to 5-column layout)
+- **Always recalculate** interest and total repayment from the resolved `loanAmount` instead of trusting stored eligibility values. Remove the `eligibilityMatchesLoan` check entirely -- it's a footgun because derived values can be stale even when the principal matches.
+- Remove `dailyEMI` variable and its usage in EMandateSection prop (replace with `totalRepayment` for the ADHO model)
 
-### Technical Details
+#### 3. `src/components/LOS/Assessment/EligibilityCalculator.tsx`
+- Remove the "Daily EMI" card from the Loan Summary section (lines 746-754)
+- Change from 4-column to 3-column grid
 
-```typescript
-// ApprovalActionDialog.tsx - Add state for custom amount
-const [customAmount, setCustomAmount] = useState<string>("");
+#### 4. `src/components/LOS/Sanction/SanctionViewer.tsx`
+- Remove the "Daily EMI" card from Payment Details
+- Keep "Total Repayment" and "Processing Fee"
 
-// Pre-fill when eligibility loads
-useEffect(() => {
-  if (eligibility?.eligible_loan_amount) {
-    setCustomAmount(eligibility.eligible_loan_amount.toString());
-  }
-}, [eligibility]);
+#### 5. `src/pages/LOS/Sanctions.tsx`
+- Remove the "Daily EMI" column from the sanctions table
+- Remove `dailyEMI` from email templates (sanction email and approval email)
 
-// Use customAmount instead of eligibility.eligible_loan_amount
-const approvedAmount = action === "approve" 
-  ? Number(customAmount) || eligibility?.eligible_loan_amount 
-  : null;
-```
+#### 6. `src/utils/loanCalculations.ts`
+- Remove `dailyEMI` from `LoanCalculationResult` interface and `calculateLoanDetails` function
 
-The dialog will show an input field:
-```tsx
-<div>
-  <Label>Approved Amount</Label>
-  <Input 
-    type="number" 
-    value={customAmount} 
-    onChange={(e) => setCustomAmount(e.target.value)}
-    max={eligibility?.eligible_loan_amount}
-  />
-  <p className="text-xs text-muted-foreground">
-    Max eligible: ₹{eligibility?.eligible_loan_amount?.toLocaleString("en-IN")}
-  </p>
-</div>
-```
+#### 7. `src/hooks/useEMISchedule.ts`
+- Remove usage of `dailyEMI` from `calculateLoanDetails` return
+
+#### 8. `src/components/LOS/Disbursement/EMandateSection.tsx`
+- Change prop from `dailyEMI` to `totalRepayment` (since mandate collection is ADHO/bullet, the amount is the total repayment, not a daily installment)
+
+#### 9. `src/components/LOS/Disbursement/CombinedLoanPackCard.tsx`
+- Remove any Daily EMI display if present
+
+### Impact
+- 8-9 files modified
+- 1 database update (fix stale derived values)
+- No schema changes needed
+- All financial calculations will always be derived from principal + rate + tenure at render time, eliminating stale data issues permanently
