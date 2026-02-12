@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -12,6 +12,7 @@ import { PANVerificationStep } from "@/components/ReferralApplication/PANVerific
 import { AadhaarVerificationStep } from "@/components/ReferralApplication/AadhaarVerificationStep";
 import { VideoKYCStep } from "@/components/ReferralApplication/VideoKYCStep";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import { captureUTMParams, getMarketingSource, type UTMParams } from "@/utils/utm";
 
 interface ReferrerInfo {
   name: string;
@@ -76,7 +77,11 @@ export default function ReferralLoanApplication() {
   console.log('[ReferralLoanApplication] Component mounting at', new Date().toISOString());
   
   const { referralCode } = useParams<{ referralCode: string }>();
-  const { trackStep, trackFormStart, trackConversion, trackVideoKYC, trackMetaEvent } = useAnalytics();
+  const { trackStep, trackFormStart, trackStep1Lead, trackConversion, trackVideoKYC, trackMetaEvent } = useAnalytics();
+  
+  // Capture UTM params on mount (before they get lost on navigation)
+  const utmParamsRef = useRef<UTMParams>(captureUTMParams());
+  const step1PixelFiredRef = useRef(false);
   
   // Debug: Log referral code and environment
   console.log('[ReferralLoanApplication] URL referralCode param:', referralCode);
@@ -474,7 +479,8 @@ export default function ReferralLoanApplication() {
         referrerInfo,
         referralCode,
         geolocation,
-        draftApplicationId, // Include the draft ID so the edge function can update it
+        draftApplicationId,
+        source: getMarketingSource(utmParamsRef.current),
       };
 
       const { data, error: submitError } = await supabase.functions.invoke("submit-loan-application", {
@@ -625,7 +631,14 @@ export default function ReferralLoanApplication() {
                   onConsentChange={handleConsentChange}
                   verificationStatus={{ phoneVerified: verificationStatus.phoneVerified }}
                   onVerificationComplete={() => handleVerificationComplete('phone')}
-                  onContinue={() => requireLocation(() => setBasicInfoSubStep(2))}
+                  onContinue={() => requireLocation(() => {
+                    // Fire Google & Meta lead pixels on Step 1 completion
+                    if (!step1PixelFiredRef.current) {
+                      trackStep1Lead(basicInfo.requestedAmount, utmParamsRef.current);
+                      step1PixelFiredRef.current = true;
+                    }
+                    setBasicInfoSubStep(2);
+                  })}
                 />
               </div>
             )}

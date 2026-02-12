@@ -7,6 +7,7 @@ import {
   trackAadhaarInitiated,
   trackAadhaarVerified,
   trackReferralFormStart,
+  trackReferralStep1Lead,
   trackMetaEvent,
   trackMetaCustomEvent,
   trackGoogleConversion,
@@ -76,6 +77,16 @@ export function useAnalytics() {
   }, []);
 
   /**
+   * Track Step 1 lead (fires Google & Meta pixels with UTM source)
+   */
+  const trackStep1Lead = useCallback((
+    loanAmount?: number,
+    utmParams?: { utm_source?: string | null; utm_medium?: string | null; utm_campaign?: string | null }
+  ) => {
+    trackReferralStep1Lead(loanAmount, utmParams);
+  }, []);
+
+  /**
    * Track custom event on both platforms
    */
   const trackCustomEvent = useCallback((
@@ -103,6 +114,7 @@ export function useAnalytics() {
     
     // Form tracking
     trackFormStart,
+    trackStep1Lead,
     
     // Generic tracking
     trackCustomEvent,

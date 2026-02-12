@@ -241,3 +241,34 @@ export function trackReferralFormStart(loanAmount?: number): void {
   // Track step
   trackLoanStep(1, 'basic_info', 'referral');
 }
+
+/**
+ * Track referral Step 1 lead submission (fires both Google & Meta pixels)
+ * Called when user completes the first screen (Loan Amount, Name, Phone)
+ * @param loanAmount - Requested loan amount
+ * @param utmParams - Captured UTM parameters for source attribution
+ */
+export function trackReferralStep1Lead(
+  loanAmount?: number,
+  utmParams?: { utm_source?: string | null; utm_medium?: string | null; utm_campaign?: string | null }
+): void {
+  console.log('[Analytics] Referral Step 1 Lead:', { loanAmount, utmParams });
+
+  // Google Analytics event
+  gtag('event', 'step1_lead_form', {
+    event_category: 'Loan Application',
+    event_label: 'referral_step_1_basic_info',
+    value: loanAmount,
+    utm_source: utmParams?.utm_source || undefined,
+    utm_medium: utmParams?.utm_medium || undefined,
+    utm_campaign: utmParams?.utm_campaign || undefined,
+  });
+
+  // Meta Lead event
+  trackMetaEvent('Lead', {
+    content_name: 'Referral Loan Step 1',
+    value: loanAmount,
+    currency: 'INR',
+    status: 'lead_form_submit',
+  });
+}
