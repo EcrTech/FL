@@ -1,88 +1,161 @@
+## Plan: Fire Pixels on Step 1 Referral Form Submission
 
-## Root Cause Analysis: Why Stale Values Keep Breaking Disbursals
+### Current State
 
-### The Core Problem
+- Pixels (Google Ads & Meta Pixel) are currently integrated but only fire at later stages:
+  - **PAN Verified** → Meta `Lead` event
+  - **Aadhaar Initiated** → Meta `InitiateCheckout`
+  - **Video KYC Complete** → Google Ads Conversion + Meta `CompleteRegistration`
+  - **Final Submission** → Meta `Purchase`
+- **No pixels fire on Step 1 submission**, missing the earliest lead capture opportunity
+- The `loan_applications` table has a `source` field that can store marketing source information
+- UTM parameters exist in the URL but are not currently being captured
 
-The system stores the same financial data (principal, interest, total repayment) in **three different places** at different stages of the loan lifecycle. When one value is corrected, the others are not updated, causing downstream stages to pick up wrong numbers.
+### Problem
 
-```text
-Stage 1: ASSESSMENT
-  loan_eligibility table stores:
-    - eligible_loan_amount = 19,195 (calculated from FOIR)
-    - total_interest = 3,071
-    - total_repayment = 22,266
-    - daily_emi = 1,392
+Step 1 of the referral form (Loan Amount, Name, Phone) is when a user shows genuine intent. Currently, if they leave after Step 1, no conversion is tracked. The user wants to:
 
-Stage 2: APPROVAL
-  loan_applications table stores:
-    - approved_amount = 15,000 (manually reduced by approver)
-    BUT: loan_eligibility is NOT updated -- still has 19,195 derived values
+1. Fire both Google & Meta pixels immediately on Step 1 submission
+2. Capture marketing source (UTM parameters if available)
+3. Create a "lead" record even if the user doesn't proceed further. Show the source in the lead table. 
 
-Stage 3: SANCTION
-  loan_sanctions table stores:
-    - sanctioned_amount = 15,000 (copied from approved_amount)
-    - sanctioned_rate, sanctioned_tenure_days
+### Solution Architecture
 
-Stage 4: DISBURSEMENT
-  Code tries to resolve loanAmount via a fallback chain:
-    sanction > application > eligibility > requested
-  Even when loanAmount resolves correctly to 15,000,
-  interest/repayment were previously read from eligibility's STALE values
+#### 1. **Capture UTM Parameters**
+
+Create a utility function to extract UTM parameters from the URL on page load:
+
+- `utm_source` (e.g., "google", "facebook", "direct")
+- `utm_medium` (e.g., "cpc", "organic", "referral")
+- `utm_campaign` (e.g., "summer_promo")
+- Store in context/state for use throughout the form
+
+**New file**: `src/utils/utm.ts`
+
+```typescript
+export function captureUTMParams() {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    utm_source: params.get('utm_source'),
+    utm_medium: params.get('utm_medium'),
+    utm_campaign: params.get('utm_campaign'),
+  };
+}
+
+export function getMarketingSource(utmParams: any): string {
+  // Map UTM source to human-readable source
+  const sourceMap: Record<string, string> = {
+    'google': 'Google Ads',
+    'facebook': 'Meta Ads',
+    'instagram': 'Instagram',
+    'direct': 'Direct',
+    'organic': 'Organic Search',
+  };
+  return sourceMap[utmParams?.utm_source?.toLowerCase()] || 'Direct';
+}
 ```
 
-The recent fix (always recalculating at render time in DisbursementDashboard) addressed the symptom for that one component. But the **root cause** remains: the EligibilityCalculator still writes `daily_emi` and derived values based on the eligible amount, and the approval step never syncs these back when a lower amount is approved.
+#### 2. **Enhance Analytics for Lead Creation**
 
-### Why This Keeps Recurring
+Add a new tracking function for Step 1 submission that fires BOTH Google & Meta pixels:
 
-1. **Approval reduces amount but does not update eligibility derived values** -- The ApprovalActionDialog writes `approved_amount = 15,000` to `loan_applications` but leaves `loan_eligibility.total_interest`, `total_repayment`, and `daily_emi` calculated for 19,195.
+**Update**: `src/utils/analytics.ts`
 
-2. **Multiple components read from different tables** -- Some read from `loan_eligibility`, some from `loan_sanctions`, some from `loan_applications`. Any mismatch causes wrong displays.
+```typescript
+export function trackReferralStep1Lead(loanAmount?: number, utmParams?: any): void {
+  console.log('[Analytics] Referral Step 1 Lead:', { loanAmount, utmParams });
+  
+  // Google Analytics event - Step 1 view
+  gtag('event', 'step1_lead_form', {
+    event_category: 'Loan Application',
+    event_label: 'referral_step_1_basic_info',
+    value: loanAmount,
+    utm_source: utmParams?.utm_source,
+    utm_medium: utmParams?.utm_medium,
+    utm_campaign: utmParams?.utm_campaign,
+  });
+  
+  // Meta Lead event for Step 1 submission
+  trackMetaEvent('Lead', {
+    content_name: 'Referral Loan Step 1',
+    value: loanAmount,
+    currency: 'INR',
+    status: 'lead_form_submit',
+  });
+}
+```
 
-3. **EligibilityCalculator still writes `daily_emi`** -- Even though ADHO has no daily EMI concept, the save mutation still calculates and stores it, which can confuse any component that reads it.
+#### 3. **Update useAnalytics Hook**
 
-### The Fix: Single Derivation Rule
+Add the new tracking function to the hook:
 
-**Principle**: Never trust stored derived values (interest, repayment, daily_emi). Always recalculate from `(principal, rate, tenure)` at the point of use.
+**Update**: `src/hooks/useAnalytics.ts`
 
-### Changes
+```typescript
+const trackStep1Lead = useCallback((loanAmount?: number, utmParams?: any) => {
+  trackReferralStep1Lead(loanAmount, utmParams);
+}, []);
+```
 
-#### 1. EligibilityCalculator -- Stop writing `daily_emi`, update derived values on approval
+#### 4. **Fire Pixels on Step 1 → Step 2 Transition**
 
-When the "Approve" action is triggered inside EligibilityCalculator, recalculate `total_interest` and `total_repayment` based on the **approved amount** (not the eligible amount) and update the eligibility record accordingly. Remove `daily_emi` calculation entirely.
+When the user clicks "Continue to Contact Information" (moving from `basicInfoSubStep === 1` to `basicInfoSubStep === 2`), fire the lead pixel.
 
-**File**: `src/components/LOS/Assessment/EligibilityCalculator.tsx`
-- In `saveMutation`: Remove `daily_emi` calculation, set it to 0
-- In `approveMutation`: After determining `approvedAmount`, update `loan_eligibility` with recalculated `total_interest` and `total_repayment` based on `approvedAmount`
+**Update**: `src/pages/ReferralLoanApplication.tsx`
 
-#### 2. ApprovalActionDialog -- Sync eligibility on approval
+- Capture UTM parameters on component mount
+- When user proceeds from LoanRequirementsScreen to ContactConsentScreen, call `trackStep1Lead()` with the loan amount and UTM params
+- Pass UTM params through the form flow so they can be used when creating the draft application
 
-When the approver confirms with a custom amount, update `loan_eligibility` to reflect the approved principal's derived values.
+#### 5. **Store Marketing Source in Database**
 
-**File**: `src/components/LOS/Approval/ApprovalActionDialog.tsx`
-- After writing `approved_amount` to `loan_applications`, also update `loan_eligibility` with:
-  - `eligible_loan_amount = approvedAmount`
-  - `total_interest = recalculated`
-  - `total_repayment = recalculated`
-  - `daily_emi = 0`
+When the draft application is created (before Video KYC), or when the final application is submitted, store the marketing source in the `loan_applications.source` field.
 
-#### 3. Sanctions page -- Use `approved_amount` for calculations, not eligibility
+**Update**: `src/pages/ReferralLoanApplication.tsx` (submitApplication function)
 
-**File**: `src/pages/LOS/Sanctions.tsx`
-- Already uses `app.approved_amount` for sanction creation -- verified correct
-- Ensure email templates use recalculated values, not stored eligibility
+```typescript
+// Include source field when submitting the application
+source: getMarketingSource(utmParams) || 'Direct',
+```
 
-#### 4. ApplicationSummary -- Recalculate instead of reading stored values
+### Implementation Steps
 
-**File**: `src/components/LOS/ApplicationSummary.tsx`
-- If it reads `total_interest` or `total_repayment` from eligibility, switch to recalculating from sanctioned/approved principal
+1. **Create UTM capture utility** (`src/utils/utm.ts`)
+  - Extract `utm_source`, `utm_medium`, `utm_campaign` from query params
+  - Provide mapping function to convert UTM source to readable format
+2. **Enhance analytics.ts**
+  - Add `trackReferralStep1Lead()` function that fires both Google & Meta Lead events
+  - Include UTM parameters in the event payload
+3. **Update useAnalytics hook**
+  - Export `trackStep1Lead` as a usable function in components
+4. **Update ReferralLoanApplication.tsx**
+  - Capture UTM params on mount using the new utility
+  - Fire pixel when transitioning from Step 1 Sub-step 1 → Sub-step 2 (onContinue in LoanRequirementsScreen)
+  - Pass UTM params/source through to the draft application creation
+  - Include `source` field in the final application submission
+5. **Verify pixels fire**
+  - Test the referral form on preview/published URLs
+  - Check Google Analytics and Meta Pixel event logs
+  - Verify UTM parameters are captured and stored
 
-#### 5. Database cleanup -- Fix current stale record
+### Expected Outcome
 
-Update the existing stale eligibility record for application `11d0a8cf-472a-4dc1-88ba-50215acb3f64` to set `daily_emi = 0` (it may have been fixed already, but confirm).
+- **Immediate Lead Capture**: Pixels fire as soon as Step 1 is submitted (loan amount, name, phone verified)
+- **Source Tracking**: Marketing source is captured from UTM parameters and stored in the database
+- **Both Platforms**: Google Analytics and Meta Pixel both receive lead events
+- **No Duplicate Fires**: Step 1 lead pixel fires once; subsequent pixels (PAN, Video KYC, Submit) continue to fire as before
+- **Fallback**: If no UTM params, source defaults to "Direct"
+
+### Files to Modify
+
+1. `src/utils/utm.ts` (new file)
+2. `src/utils/analytics.ts` (add new function)
+3. `src/hooks/useAnalytics.ts` (expose new function)
+4. `src/pages/ReferralLoanApplication.tsx` (integrate UTM capture and pixel firing)
 
 ### Impact
 
-- 3-4 files modified
-- Eliminates the category of bug permanently by ensuring derived values are always recalculated or synced when the principal changes
-- No schema changes needed
-- `daily_emi` will always be 0 going forward (ADHO model)
+- Captures marketing source for the first time
+- Enables earlier conversion tracking on the referral flow
+- Provides lead-level analytics instead of just final conversions
+- No breaking changes; all existing pixel tracking continues to work
