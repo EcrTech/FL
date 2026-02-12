@@ -107,3 +107,6 @@ verify_jwt = false
 
 [functions.create-early-lead]
 verify_jwt = false
+
+[functions.bulk-lead-upload]
+verify_jwt = false

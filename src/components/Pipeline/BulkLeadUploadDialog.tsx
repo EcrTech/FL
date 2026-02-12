@@ -145,94 +145,40 @@ export function BulkLeadUploadDialog({ open, onOpenChange, orgId, onComplete }: 
   const processUpload = async () => {
     if (parsedRows.length === 0) return;
     setIsUploading(true);
-    setProgress(0);
+    setProgress(10);
 
-    const results: UploadResult = { created: 0, skipped: 0, errors: [] };
-    const total = parsedRows.length;
+    try {
+      // Refresh session to ensure valid token
+      await supabase.auth.refreshSession();
+      setProgress(20);
 
-    // Get current user ID for created_by field (required by RLS)
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      toast.error("You must be logged in to upload leads");
-      setIsUploading(false);
-      return;
-    }
+      const { data, error } = await supabase.functions.invoke("bulk-lead-upload", {
+        body: { rows: parsedRows },
+      });
 
-    for (let i = 0; i < parsedRows.length; i++) {
-      const row = parsedRows[i];
-      const phone = row.phone!.trim().replace(/\D/g, "").slice(-10);
-      const { first_name, last_name } = splitName(row.name!);
-      const email = row.email?.trim() || null;
-      const loanAmount = parseFloat(row.loan_amount || "") || 25000;
-      const source = row.source?.trim() || "bulk_upload";
+      setProgress(100);
 
-      try {
-        // Check for existing contact by phone
-        const { data: existing } = await supabase
-          .from("contacts")
-          .select("id")
-          .eq("org_id", orgId)
-          .eq("phone", phone)
-          .maybeSingle();
-
-        let contactId: string;
-
-        if (existing) {
-          contactId = existing.id;
-          results.skipped++;
-        } else {
-          const { data: newContact, error: contactError } = await supabase
-            .from("contacts")
-            .insert({
-              org_id: orgId,
-              first_name,
-              last_name,
-              phone,
-              email,
-              source: "bulk_upload",
-              status: "new",
-              created_by: user.id,
-            })
-            .select("id")
-            .single();
-
-          if (contactError) throw contactError;
-          contactId = newContact.id;
+      if (error) {
+        toast.error(error.message || "Upload failed");
+        setResult({ created: 0, skipped: 0, errors: [error.message || "Upload failed"] });
+      } else if (data?.error) {
+        toast.error(data.error);
+        setResult({ created: 0, skipped: 0, errors: [data.error] });
+      } else {
+        setResult(data as UploadResult);
+        if (data.created > 0) {
+          toast.success(`${data.created} lead(s) uploaded successfully`);
+          onComplete();
         }
-
-        // Create loan application
-        const appNumber = `BLK-${Date.now()}-${i}`;
-        const { error: appError } = await supabase
-          .from("loan_applications")
-          .insert({
-            application_number: appNumber,
-            org_id: orgId,
-            contact_id: contactId,
-            requested_amount: loanAmount,
-            tenure_days: 365,
-            status: "new",
-            current_stage: "lead",
-            source,
-          });
-
-        if (appError) throw appError;
-        results.created++;
-      } catch (err: any) {
-        results.errors.push(`Row ${i + 2}: ${err.message || "Unknown error"}`);
+        if (data.errors?.length > 0) {
+          toast.error(`${data.errors.length} row(s) failed`);
+        }
       }
-
-      setProgress(Math.round(((i + 1) / total) * 100));
-    }
-
-    setResult(results);
-    setIsUploading(false);
-
-    if (results.created > 0) {
-      toast.success(`${results.created} lead(s) uploaded successfully`);
-      onComplete();
-    }
-    if (results.errors.length > 0) {
-      toast.error(`${results.errors.length} row(s) failed`);
+    } catch (err: any) {
+      toast.error(err.message || "Upload failed");
+      setResult({ created: 0, skipped: 0, errors: [err.message || "Upload failed"] });
+    } finally {
+      setIsUploading(false);
     }
   };
 
