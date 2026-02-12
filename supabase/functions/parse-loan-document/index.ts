@@ -306,6 +306,24 @@ serve(async (req) => {
     let actualTotalPages = totalPages;
     let pdfBytesToParse = fileBytes;
     const chunkConfig = getChunkConfig(documentType);
+    
+    // For all PDFs, try to validate/decrypt the PDF to strip restrictions
+    if (isPdf) {
+      try {
+        const { PDFDocument } = await import('https://esm.sh/pdf-lib@1.17.1');
+        const pdfDoc = await PDFDocument.load(fileBytes, { ignoreEncryption: true });
+        const pageCount = pdfDoc.getPageCount();
+        console.log(`[ParseDocument] PDF validated: ${pageCount} pages`);
+        
+        // Re-save the PDF to strip encryption/restrictions
+        const cleanedPdfBytes = await pdfDoc.save();
+        pdfBytesToParse = new Uint8Array(cleanedPdfBytes);
+        console.log(`[ParseDocument] PDF re-saved (stripped encryption), new size: ${cleanedPdfBytes.byteLength}`);
+      } catch (pdfError) {
+        console.warn(`[ParseDocument] PDF validation/cleanup failed:`, pdfError);
+        // Continue with original bytes
+      }
+    }
 
     // For PDFs, determine if we need chunked processing
     if (isPdf && isChunkable) {
@@ -367,7 +385,7 @@ serve(async (req) => {
     if (isPdf) {
       const dataUrl = `data:application/pdf;base64,${base64}`;
       const filename = filePath.split('/').pop() || "document.pdf";
-      console.log(`[ParseDocument] Using Gemini Flash for PDF parsing, filename: ${filename}, base64 length: ${base64.length}`);
+      console.log(`[ParseDocument] Using Gemini Flash for PDF parsing, filename: ${filename}, base64 length: ${base64.length}, first 50 chars of base64: ${base64.substring(0, 50)}`);
       
       aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
@@ -378,10 +396,6 @@ serve(async (req) => {
         body: JSON.stringify({
           model: "google/gemini-2.5-flash",
           messages: [
-            {
-              role: "system",
-              content: "You are a document data extraction assistant. You MUST respond with ONLY valid JSON. No explanations, no reasoning, no markdown formatting, no code fences. Output raw JSON only.",
-            },
             {
               role: "user",
               content: [
@@ -394,7 +408,7 @@ serve(async (req) => {
                 },
                 {
                   type: "text",
-                  text: prompt + "\n\nCRITICAL: Respond with ONLY the JSON object. No text before or after. No markdown. No code fences. No explanation.",
+                  text: prompt + "\n\nCRITICAL: Respond with ONLY the raw JSON object. No text before or after. No markdown. No code fences. No explanation.",
                 },
               ],
             },
@@ -402,6 +416,77 @@ serve(async (req) => {
           max_tokens: chunkConfig.maxTokens,
         }),
       });
+      
+      // If type: "file" fails with 400 (e.g. encrypted PDFs), retry with image_url format
+      if (!aiResponse.ok && aiResponse.status === 400) {
+        const errorBody = await aiResponse.text();
+        console.warn(`[ParseDocument] type:file failed (400): ${errorBody}. Retrying with image_url format...`);
+        
+        aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${lovableApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash",
+            messages: [
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "image_url",
+                    image_url: {
+                      url: dataUrl,
+                    },
+                  },
+                  {
+                    type: "text",
+                    text: prompt + "\n\nCRITICAL: Respond with ONLY the raw JSON object. No text before or after. No markdown. No code fences. No explanation.",
+                  },
+                ],
+              },
+            ],
+            max_tokens: chunkConfig.maxTokens,
+          }),
+        });
+
+        // If image_url also fails, try with openai/gpt-5-mini as last resort
+        if (!aiResponse.ok && aiResponse.status === 400) {
+          const errorBody2 = await aiResponse.text();
+          console.warn(`[ParseDocument] image_url also failed (400): ${errorBody2}. Trying with GPT-5-mini...`);
+          
+          aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${lovableApiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: "openai/gpt-5-mini",
+              messages: [
+                {
+                  role: "user",
+                  content: [
+                    {
+                      type: "file",
+                      file: {
+                        filename: filename,
+                        file_data: dataUrl,
+                      },
+                    },
+                    {
+                      type: "text",
+                      text: prompt + "\n\nCRITICAL: Respond with ONLY the raw JSON object. No text before or after. No markdown. No code fences. No explanation.",
+                    },
+                  ],
+                },
+              ],
+              max_completion_tokens: chunkConfig.maxTokens,
+            }),
+          });
+        }
+      }
     } else {
       const mimeType = fileDataToUse.type || "image/jpeg";
       console.log(`[ParseDocument] Using Gemini Flash for image parsing, MIME: ${mimeType}`);
