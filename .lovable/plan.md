@@ -1,33 +1,38 @@
 
 
-## Fix: Full Name Not Showing in Pipeline
+## Fix: Net Disbursal Showing as 0 in Bulk Payment Report
 
-### Problem
-When a returning user submits the referral form with a full name (e.g., "Amit Kumar"), the pipeline only shows "Amit" because:
+### Root Cause
 
-1. The contact record was originally created with only "Amit" (no last name provided at that time)
-2. On subsequent submissions, the edge function finds the existing contact by phone number but **only updates the status** -- it does not update the name fields
+The database query returns `loan_sanctions` as a **single object** (one-to-one relationship), not an array. The current code accesses it with `app.loan_sanctions?.[0]`, which returns `undefined` when used on an object. This causes the amount calculation to fall back to 0.
 
-### Solution
-Update the `create-early-lead` edge function to also update `first_name` and `last_name` when an existing contact is found. This ensures the latest name entered by the user is always reflected.
+Same issue affects `loan_disbursements` (returned as object/null, not array).
 
-### Technical Details
+### Changes
 
-**File**: `supabase/functions/create-early-lead/index.ts`
+**File: `src/components/LOS/Reports/BulkPaymentReport.tsx`** (lines 97-116)
 
-Change the existing contact update block (lines 96-99) from:
+1. Change `app.loan_sanctions?.[0]` to `app.loan_sanctions` (direct object access)
+2. Change `app.loan_disbursements?.[0]` to `app.loan_disbursements` (direct object access)
+3. Use the pre-calculated `net_disbursement_amount` from the database instead of recalculating, with a fallback calculation for legacy records
+
+Updated mapping logic:
 ```typescript
-.update({ status: 'new' })
-```
-to:
-```typescript
-.update({
-  status: 'new',
-  first_name: firstName,
-  last_name: lastName || null,
-})
+const sanction = app.loan_sanctions;  // object, not array
+const disbursement = app.loan_disbursements;  // object or null
+
+// Use stored net_disbursement_amount directly
+amount: sanction?.net_disbursement_amount || (() => {
+  const sanctionedAmt = sanction?.sanctioned_amount || 0;
+  const procFee = sanction?.processing_fee || Math.round(sanctionedAmt * 0.10);
+  const gst = Math.round(procFee * 0.18);
+  return sanctionedAmt - procFee - gst;
+})(),
 ```
 
-This is a one-line change in one file. After deploying, the next time a user submits Step 1, the contact's name will be fully updated.
+### Impact
 
-**After the fix**, you'll need to delete the current test record and re-test to see the full name appear correctly.
+- Fixes the ₹0 display for all 3 visible records
+- Also fixes the exported BLKPAY Excel file (which would contain 0 amounts)
+- No database changes needed
+
