@@ -92,7 +92,12 @@ Deno.serve(async (req) => {
       contactId = newContact.id;
       console.log('[create-early-lead] Created new contact:', contactId);
     } else {
-      console.log('[create-early-lead] Existing contact found:', contactId);
+      // Update existing contact to status 'new' if it's not already
+      await supabase
+        .from('contacts')
+        .update({ status: 'new' })
+        .eq('id', contactId);
+      console.log('[create-early-lead] Updated existing contact to new status:', contactId);
     }
 
     // Check if there's already a draft application for this contact
