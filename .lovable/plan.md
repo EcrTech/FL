@@ -1,18 +1,33 @@
 
 
-## Clean Up Test Lead
+## Fix: Full Name Not Showing in Pipeline
 
-### Action
-Delete the draft loan application created during the Meta UTM test so you can re-test without UTM parameters.
+### Problem
+When a returning user submits the referral form with a full name (e.g., "Amit Kumar"), the pipeline only shows "Amit" because:
 
-### Record to Delete
-- **Table**: `loan_applications`
-- **ID**: `137dcfb9-8d9b-4f8f-9da6-8d45c022f4e9`
-- **Details**: Status `draft`, Stage `lead`, Source `Meta Ads`
+1. The contact record was originally created with only "Amit" (no last name provided at that time)
+2. On subsequent submissions, the edge function finds the existing contact by phone number but **only updates the status** -- it does not update the name fields
 
-### After Cleanup
-Test URL without UTM parameters:
-`https://id-preview--3dde44ee-dbff-485f-a3a3-07b86d234bf5.lovable.app/apply/ref/REF-MIUHLOTL`
+### Solution
+Update the `create-early-lead` edge function to also update `first_name` and `last_name` when an existing contact is found. This ensures the latest name entered by the user is always reflected.
 
-The source should default to **"Direct"** since no UTM parameters are present.
+### Technical Details
 
+**File**: `supabase/functions/create-early-lead/index.ts`
+
+Change the existing contact update block (lines 96-99) from:
+```typescript
+.update({ status: 'new' })
+```
+to:
+```typescript
+.update({
+  status: 'new',
+  first_name: firstName,
+  last_name: lastName || null,
+})
+```
+
+This is a one-line change in one file. After deploying, the next time a user submits Step 1, the contact's name will be fully updated.
+
+**After the fix**, you'll need to delete the current test record and re-test to see the full name appear correctly.
