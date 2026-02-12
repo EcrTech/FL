@@ -269,14 +269,28 @@ serve(async (req) => {
     }
 
     if (!fileData || fileData.size === 0) {
-      console.error(`[ParseDocument] Downloaded file is empty. Blob size: ${fileData?.size}, type: ${fileData?.type}`);
-      throw new Error("Downloaded file is empty (0 bytes). Please re-upload the document.");
+      console.warn(`[ParseDocument] First download returned empty. Retrying...`);
+      // Retry once after a short delay
+      await new Promise(r => setTimeout(r, 1500));
+      const { data: retryData, error: retryError } = await supabase.storage
+        .from("loan-documents")
+        .download(filePath);
+      
+      if (retryError || !retryData || retryData.size === 0) {
+        console.error(`[ParseDocument] Retry also failed. Blob size: ${retryData?.size}`);
+        throw new Error("Downloaded file is empty (0 bytes). Please re-upload the document.");
+      }
+      // Use retry data - reassign to work with downstream code
+      Object.defineProperty(fileData, 'size', { value: retryData.size });
+      var fileDataToUse = retryData;
+    } else {
+      var fileDataToUse = fileData;
     }
 
-    const arrayBuffer = await fileData.arrayBuffer();
+    const arrayBuffer = await fileDataToUse.arrayBuffer();
     
     if (!arrayBuffer || arrayBuffer.byteLength === 0) {
-      console.error(`[ParseDocument] ArrayBuffer is empty after conversion. Blob size was: ${fileData.size}`);
+      console.error(`[ParseDocument] ArrayBuffer is empty after conversion. Blob size was: ${fileDataToUse.size}`);
       throw new Error("File data is empty after conversion. Please re-upload the document.");
     }
     
@@ -284,7 +298,7 @@ serve(async (req) => {
     
     // Detect file type from path or content
     const fileExtension = filePath.split('.').pop()?.toLowerCase() || '';
-    const isPdf = fileExtension === 'pdf' || fileData.type === 'application/pdf';
+    const isPdf = fileExtension === 'pdf' || fileDataToUse.type === 'application/pdf';
     const isChunkable = isPdf && CHUNKABLE_DOC_TYPES.includes(documentType);
     
     console.log(`[ParseDocument] File size: ${arrayBuffer.byteLength}, isPDF: ${isPdf}, isChunkable: ${isChunkable}`);
@@ -372,10 +386,9 @@ serve(async (req) => {
               role: "user",
               content: [
                 {
-                  type: "file",
-                  file: {
-                    filename: filename,
-                    file_data: dataUrl,
+                  type: "image_url",
+                  image_url: {
+                    url: dataUrl,
                   },
                 },
                 {
@@ -389,7 +402,7 @@ serve(async (req) => {
         }),
       });
     } else {
-      const mimeType = fileData.type || "image/jpeg";
+      const mimeType = fileDataToUse.type || "image/jpeg";
       console.log(`[ParseDocument] Using Gemini Flash for image parsing, MIME: ${mimeType}`);
       
       aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
