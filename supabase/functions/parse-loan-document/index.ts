@@ -353,7 +353,8 @@ serve(async (req) => {
 
     if (isPdf) {
       const dataUrl = `data:application/pdf;base64,${base64}`;
-      console.log(`[ParseDocument] Using Gemini Flash for PDF parsing, data URL length: ${dataUrl.length}`);
+      const filename = filePath.split('/').pop() || "document.pdf";
+      console.log(`[ParseDocument] Using Gemini Flash for PDF parsing, filename: ${filename}, base64 length: ${base64.length}`);
       
       aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
@@ -372,9 +373,10 @@ serve(async (req) => {
               role: "user",
               content: [
                 {
-                  type: "image_url",
-                  image_url: {
-                    url: dataUrl,
+                  type: "file",
+                  file: {
+                    filename: filename,
+                    file_data: dataUrl,
                   },
                 },
                 {
