@@ -241,6 +241,7 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
+    const reqBody = await req.json();
     const { 
       documentId, 
       documentType, 
@@ -249,7 +250,7 @@ serve(async (req) => {
       currentPage = 1,
       totalPages = 0,
       accumulatedData = null,
-    } = await req.json();
+    } = reqBody;
     
     const isFirstChunk = currentPage === 1 && totalPages === 0;
     console.log(`[ParseDocument] Processing: ${documentType}, ID: ${documentId}, Page: ${currentPage}/${totalPages || 'unknown'}`);
@@ -281,7 +282,18 @@ serve(async (req) => {
       throw new Error(`Failed to download document: ${downloadError.message}`);
     }
 
+    if (!fileData || fileData.size === 0) {
+      console.error(`[ParseDocument] Downloaded file is empty. Blob size: ${fileData?.size}, type: ${fileData?.type}`);
+      throw new Error("Downloaded file is empty (0 bytes). Please re-upload the document.");
+    }
+
     const arrayBuffer = await fileData.arrayBuffer();
+    
+    if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+      console.error(`[ParseDocument] ArrayBuffer is empty after conversion. Blob size was: ${fileData.size}`);
+      throw new Error("File data is empty after conversion. Please re-upload the document.");
+    }
+    
     const fileBytes = new Uint8Array(arrayBuffer);
     
     // Detect file type from path or content
@@ -308,28 +320,29 @@ serve(async (req) => {
           .update({
             parsing_status: 'processing',
             parsing_started_at: new Date().toISOString(),
-            parsing_progress: calculateProgress(1, actualTotalPages, chunkConfig.pagesPerChunk),
+            parsing_progress: {
+              current_page: currentPage,
+              total_pages: actualTotalPages,
+              percentage: 0,
+            },
           })
           .eq("id", documentId);
       }
 
-      // Calculate chunk range
+      // Extract page range if needed
       const endPage = Math.min(currentPage + chunkConfig.pagesPerChunk - 1, actualTotalPages);
-      
-      // Extract only the pages we need for this chunk
       if (actualTotalPages > chunkConfig.pagesPerChunk) {
         console.log(`[ParseDocument] Extracting pages ${currentPage}-${endPage} of ${actualTotalPages}`);
         pdfBytesToParse = await extractPdfPages(fileBytes, currentPage, endPage);
       }
     }
 
-    // Convert to base64 safely - use the Uint8Array directly to avoid buffer offset issues
-    const base64 = safeBase64Encode(pdfBytesToParse.buffer.byteLength === pdfBytesToParse.byteLength 
-      ? pdfBytesToParse.buffer 
-      : pdfBytesToParse.buffer.slice(pdfBytesToParse.byteOffset, pdfBytesToParse.byteOffset + pdfBytesToParse.byteLength));
+    // Convert to base64 safely
+    const bytesToEncode = pdfBytesToParse.slice(0);
+    const base64 = safeBase64Encode(bytesToEncode.buffer);
 
     if (!base64 || base64.length === 0) {
-      throw new Error("File conversion to base64 resulted in empty data. The file may be corrupted or empty.");
+      throw new Error("File conversion to base64 resulted in empty data. Please re-upload the document.");
     }
     console.log(`[ParseDocument] Base64 encoded, length: ${base64.length}`);
 
@@ -792,8 +805,8 @@ serve(async (req) => {
     
     // Try to update status to failed
     try {
-      const { documentId } = await req.clone().json();
-      if (documentId) {
+      const docId = reqBody?.documentId;
+      if (docId) {
         await supabase
           .from("loan_documents")
           .update({
@@ -802,7 +815,7 @@ serve(async (req) => {
               error: error instanceof Error ? error.message : "Unknown error",
             },
           })
-          .eq("id", documentId);
+          .eq("id", docId);
       }
     } catch (e) {
       console.error(`[ParseDocument] Failed to update error status:`, e);
