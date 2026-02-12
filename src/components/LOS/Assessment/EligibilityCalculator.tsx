@@ -328,7 +328,6 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
       // Calculate loan values using consistent formula (single source of truth)
       const totalInterest = eligibleAmount * (dailyInterestRate / 100) * tenureDays;
       const totalRepayment = eligibleAmount + totalInterest;
-      const dailyEmi = Math.round(totalRepayment / tenureDays);
       
       const eligibilityData = {
         loan_application_id: applicationId,
@@ -346,7 +345,7 @@ export default function EligibilityCalculator({ applicationId, orgId }: Eligibil
         // Store calculated values - single source of truth
         total_interest: Math.round(totalInterest * 100) / 100,
         total_repayment: Math.round(totalRepayment * 100) / 100,
-        daily_emi: dailyEmi,
+        daily_emi: 0, // ADHO model - no daily EMI
         policy_checks: policyChecks,
         is_eligible: POLICY_RULES.filter(r => r.critical).every(r => policyChecks[r.key]?.passed),
         calculation_details: {
