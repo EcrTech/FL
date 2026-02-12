@@ -151,6 +151,11 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
 
   const uploadMutation = useMutation({
     mutationFn: async ({ docType, file }: { docType: string; file: File }) => {
+      // Validate file is not empty
+      if (!file || file.size === 0) {
+        throw new Error("Selected file is empty (0 bytes). Please select a valid document.");
+      }
+
       const fileExt = file.name.split(".").pop();
       const filePath = `${orgId}/${applicationId}/${docType}_${Date.now()}.${fileExt}`;
 
