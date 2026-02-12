@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
       // Update existing contact to status 'new' if it's not already
       await supabase
         .from('contacts')
-        .update({ status: 'new' })
+        .update({ status: 'new', first_name: firstName, last_name: lastName || null })
         .eq('id', contactId);
       console.log('[create-early-lead] Updated existing contact to new status:', contactId);
     }
