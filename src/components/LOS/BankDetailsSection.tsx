@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Landmark, Edit2, Save, X, Upload, CheckCircle, Loader2, AlertCircle } from "lucide-react";
+import { Landmark, Edit2, Save, X, Upload, CheckCircle, Loader2, AlertCircle, ShieldCheck, FileUp } from "lucide-react";
 import { toast } from "sonner";
 
 interface BankDetailsSectionProps {
@@ -25,11 +25,16 @@ interface BankDetails {
   bank_account_type: string;
   bank_verified: boolean;
   bank_verified_at: string | null;
+  bank_verification_method?: string | null;
 }
 
 export function BankDetailsSection({ applicationId, orgId, applicantId }: BankDetailsSectionProps) {
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
+  const [showManualVerification, setShowManualVerification] = useState(false);
+  const [manualUtr, setManualUtr] = useState("");
+  const [manualProofFile, setManualProofFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState<BankDetails>({
     bank_account_number: "",
     bank_ifsc_code: "",
@@ -39,6 +44,7 @@ export function BankDetailsSection({ applicationId, orgId, applicantId }: BankDe
     bank_account_type: "savings",
     bank_verified: false,
     bank_verified_at: null,
+    bank_verification_method: null,
   });
 
   // Fetch applicant data with bank details
@@ -48,7 +54,7 @@ export function BankDetailsSection({ applicationId, orgId, applicantId }: BankDe
       if (!applicantId) return null;
       const { data, error } = await supabase
         .from("loan_applicants")
-        .select("bank_account_number, bank_ifsc_code, bank_name, bank_branch, bank_account_holder_name, bank_account_type, bank_verified, bank_verified_at")
+        .select("bank_account_number, bank_ifsc_code, bank_name, bank_branch, bank_account_holder_name, bank_account_type, bank_verified, bank_verified_at, bank_verification_method")
         .eq("id", applicantId)
         .single();
       if (error) throw error;
@@ -76,12 +82,10 @@ export function BankDetailsSection({ applicationId, orgId, applicantId }: BankDe
   });
 
   // Populate form with existing data or parsed data
-  // Priority: 1) Saved applicant bank data, 2) OCR-parsed bank statement data
   useEffect(() => {
     const applicantHasBankData = applicant?.bank_account_number || applicant?.bank_ifsc_code;
     
     if (applicant && applicantHasBankData) {
-      // Use saved applicant bank details (priority 1)
       setFormData({
         bank_account_number: applicant.bank_account_number || "",
         bank_ifsc_code: applicant.bank_ifsc_code || "",
@@ -91,9 +95,9 @@ export function BankDetailsSection({ applicationId, orgId, applicantId }: BankDe
         bank_account_type: applicant.bank_account_type || "savings",
         bank_verified: applicant.bank_verified || false,
         bank_verified_at: applicant.bank_verified_at || null,
+        bank_verification_method: (applicant as any).bank_verification_method || null,
       });
     } else if (bankStatementDoc?.ocr_data) {
-      // Auto-fill from parsed bank statement (priority 2)
       const parsed = bankStatementDoc.ocr_data as Record<string, any>;
       setFormData({
         bank_account_number: parsed.account_number || "",
@@ -104,8 +108,8 @@ export function BankDetailsSection({ applicationId, orgId, applicantId }: BankDe
         bank_account_type: "savings",
         bank_verified: false,
         bank_verified_at: null,
+        bank_verification_method: null,
       });
-      // Auto-enter edit mode when OCR data is detected so user can review and save
       setIsEditing(true);
     }
   }, [applicant, bankStatementDoc]);
@@ -150,14 +154,14 @@ export function BankDetailsSection({ applicationId, orgId, applicantId }: BankDe
     },
     onSuccess: async (data) => {
       if (data.data?.is_valid) {
-        // Update applicant record with verified status
         const { error } = await supabase
           .from("loan_applicants")
           .update({
             bank_verified: true,
             bank_verified_at: new Date().toISOString(),
             bank_account_holder_name: data.data.account_holder_name || formData.bank_account_holder_name,
-          })
+            bank_verification_method: "api",
+          } as any)
           .eq("id", applicantId);
         
         if (error) {
@@ -170,18 +174,86 @@ export function BankDetailsSection({ applicationId, orgId, applicantId }: BankDe
           bank_verified: true,
           bank_verified_at: new Date().toISOString(),
           bank_account_holder_name: data.data.account_holder_name || prev.bank_account_holder_name,
+          bank_verification_method: "api",
         }));
         
         queryClient.invalidateQueries({ queryKey: ["applicant-bank-details", applicantId] });
         toast.success("Bank account verified successfully");
       } else if (data.verification_status === "error") {
         toast.warning(data.error || "Bank verification service is temporarily unavailable. Please try again later.");
+        setShowManualVerification(true);
       } else {
         toast.error("Bank verification failed - account details may be incorrect");
       }
     },
     onError: (error: Error) => {
       toast.error(error.message || "Failed to verify bank account");
+      setShowManualVerification(true);
+    },
+  });
+
+  // Manual bank verification mutation
+  const manualVerifyMutation = useMutation({
+    mutationFn: async () => {
+      if (!manualProofFile) throw new Error("Please upload a proof screenshot");
+      if (!manualUtr.trim()) throw new Error("Please enter the UTR number");
+      if (!applicantId) throw new Error("No applicant record found");
+
+      // 1. Upload file
+      const timestamp = Date.now();
+      const filePath = `${orgId}/${applicationId}/bank-verification-proof/${timestamp}-${manualProofFile.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from("loan-documents")
+        .upload(filePath, manualProofFile);
+      if (uploadError) throw new Error("Failed to upload proof: " + uploadError.message);
+
+      // 2. Get public URL
+      const { data: urlData } = supabase.storage
+        .from("loan-documents")
+        .getPublicUrl(filePath);
+      const fileUrl = urlData.publicUrl;
+
+      // 3. Insert verification record
+      const { error: verifyError } = await supabase
+        .from("loan_verifications")
+        .insert({
+          loan_application_id: applicationId,
+          applicant_id: applicantId,
+          org_id: orgId,
+          verification_type: "bank_manual",
+          request_data: { utr: manualUtr.trim() },
+          response_data: { file_url: fileUrl, file_path: filePath },
+          status: "verified",
+        } as any);
+      if (verifyError) throw new Error("Failed to save verification: " + verifyError.message);
+
+      // 4. Update applicant
+      const { error: updateError } = await supabase
+        .from("loan_applicants")
+        .update({
+          bank_verified: true,
+          bank_verified_at: new Date().toISOString(),
+          bank_verification_method: "manual",
+        } as any)
+        .eq("id", applicantId);
+      if (updateError) throw new Error("Failed to update applicant: " + updateError.message);
+    },
+    onSuccess: () => {
+      toast.success("Bank account manually verified successfully");
+      setFormData(prev => ({
+        ...prev,
+        bank_verified: true,
+        bank_verified_at: new Date().toISOString(),
+        bank_verification_method: "manual",
+      }));
+      setShowManualVerification(false);
+      setManualUtr("");
+      setManualProofFile(null);
+      queryClient.invalidateQueries({ queryKey: ["applicant-bank-details", applicantId] });
+      queryClient.invalidateQueries({ queryKey: ["loan-application", applicationId, orgId] });
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Manual verification failed");
     },
   });
 
@@ -200,6 +272,7 @@ export function BankDetailsSection({ applicationId, orgId, applicantId }: BankDe
         bank_account_type: applicant.bank_account_type || "savings",
         bank_verified: applicant.bank_verified || false,
         bank_verified_at: applicant.bank_verified_at || null,
+        bank_verification_method: (applicant as any).bank_verification_method || null,
       });
     }
     setIsEditing(false);
@@ -227,6 +300,20 @@ export function BankDetailsSection({ applicationId, orgId, applicantId }: BankDe
     );
   }
 
+  const verificationBadge = formData.bank_verified ? (
+    formData.bank_verification_method === "manual" ? (
+      <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20">
+        <ShieldCheck className="h-3 w-3 mr-1" />
+        Manually Verified
+      </Badge>
+    ) : (
+      <Badge className="bg-green-500/10 text-green-600 border-green-500/20">
+        <CheckCircle className="h-3 w-3 mr-1" />
+        Verified
+      </Badge>
+    )
+  ) : null;
+
   return (
     <Card>
       <CardHeader className="py-3">
@@ -235,12 +322,7 @@ export function BankDetailsSection({ applicationId, orgId, applicantId }: BankDe
             <CardTitle className="flex items-center gap-2 text-base">
               <Landmark className="h-4 w-4" />
               Bank Account Details
-              {formData.bank_verified && (
-                <Badge className="bg-green-500/10 text-green-600 border-green-500/20">
-                  <CheckCircle className="h-3 w-3 mr-1" />
-                  Verified
-                </Badge>
-              )}
+              {verificationBadge}
             </CardTitle>
             <CardDescription>
               {hasParsedData
@@ -396,6 +478,96 @@ export function BankDetailsSection({ applicationId, orgId, applicantId }: BankDe
             <p className="text-xs text-muted-foreground mt-1">
               Verify account details via VerifiedU API
             </p>
+          </div>
+        )}
+
+        {/* Manual verification fallback */}
+        {showManualVerification && !formData.bank_verified && !isEditing && (
+          <div className="mt-4 pt-4 border-t">
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 space-y-4">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-amber-700">Manual Verification</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    API verification unavailable. Upload a screenshot of a ₹1 transfer to the applicant's bank account with UTR clearly visible.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-xs">UTR Number *</Label>
+                  <Input
+                    value={manualUtr}
+                    onChange={(e) => setManualUtr(e.target.value)}
+                    placeholder="Enter UTR number from ₹1 transfer"
+                    className="mt-1"
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-xs">Transfer Proof Screenshot *</Label>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,application/pdf"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) setManualProofFile(file);
+                    }}
+                  />
+                  <div
+                    className="mt-1 border-2 border-dashed rounded-md p-3 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    {manualProofFile ? (
+                      <div className="flex items-center justify-center gap-2 text-sm">
+                        <FileUp className="h-4 w-4 text-primary" />
+                        <span className="truncate max-w-[200px]">{manualProofFile.name}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-5 w-5 p-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setManualProofFile(null);
+                            if (fileInputRef.current) fileInputRef.current.value = "";
+                          }}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                        <Upload className="h-5 w-5" />
+                        <span className="text-xs">Click to upload (JPG, PNG, PDF)</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <Button
+                  size="sm"
+                  onClick={() => manualVerifyMutation.mutate()}
+                  disabled={manualVerifyMutation.isPending || !manualUtr.trim() || !manualProofFile}
+                  className="w-full"
+                >
+                  {manualVerifyMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="h-4 w-4 mr-2" />
+                      Submit Manual Verification
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
           </div>
         )}
       </CardContent>
