@@ -3510,6 +3510,7 @@ export type Database = {
           bank_branch: string | null
           bank_ifsc_code: string | null
           bank_name: string | null
+          bank_verification_method: string | null
           bank_verified: boolean | null
           bank_verified_at: string | null
           created_at: string
@@ -3555,6 +3556,7 @@ export type Database = {
           bank_branch?: string | null
           bank_ifsc_code?: string | null
           bank_name?: string | null
+          bank_verification_method?: string | null
           bank_verified?: boolean | null
           bank_verified_at?: string | null
           created_at?: string
@@ -3600,6 +3602,7 @@ export type Database = {
           bank_branch?: string | null
           bank_ifsc_code?: string | null
           bank_name?: string | null
+          bank_verification_method?: string | null
           bank_verified?: boolean | null
           bank_verified_at?: string | null
           created_at?: string

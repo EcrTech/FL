@@ -1,0 +1,1 @@
+ALTER TABLE public.loan_applicants ADD COLUMN bank_verification_method TEXT DEFAULT NULL;
