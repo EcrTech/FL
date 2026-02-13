@@ -1,3 +1,4 @@
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -5,10 +6,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { LoadingState } from "@/components/common/LoadingState";
 import { EmptyState } from "@/components/common/EmptyState";
-import { Eye, FileText } from "lucide-react";
+import { Eye, FileText, Search, CalendarIcon, X, Filter } from "lucide-react";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 interface ApprovalQueueProps {
   orgId: string;
@@ -44,6 +51,16 @@ const STAGE_COLORS: Record<string, string> = {
 export default function ApprovalQueue({ orgId, userId }: ApprovalQueueProps) {
   const navigate = useNavigate();
 
+  // Filter state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedStages, setSelectedStages] = useState<string[]>([]);
+  const [selectedAssignee, setSelectedAssignee] = useState<string>("all");
+  const [amountMin, setAmountMin] = useState("");
+  const [amountMax, setAmountMax] = useState("");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
+  const [selectedProductType, setSelectedProductType] = useState<string>("all");
+
   const { data: applications, isLoading } = useQuery({
     queryKey: ["approval-queue", orgId],
     queryFn: async () => {
@@ -72,10 +89,6 @@ export default function ApprovalQueue({ orgId, userId }: ApprovalQueueProps) {
     }).format(amount);
   };
 
-  if (isLoading) {
-    return <LoadingState message="Loading applications..." />;
-  }
-
   const getApplicantName = (app: any) => {
     const applicant = app.loan_applicants?.[0];
     if (!applicant) return "N/A";
@@ -86,6 +99,97 @@ export default function ApprovalQueue({ orgId, userId }: ApprovalQueueProps) {
     if (!app.assigned_profile) return "Unassigned";
     return `${app.assigned_profile.first_name} ${app.assigned_profile.last_name || ""}`.trim();
   };
+
+  // Derive unique assignees and product types from data
+  const { uniqueAssignees, uniqueProductTypes, uniqueStages } = useMemo(() => {
+    if (!applications) return { uniqueAssignees: [], uniqueProductTypes: [], uniqueStages: [] };
+
+    const assigneeMap = new Map<string, string>();
+    const productSet = new Set<string>();
+    const stageSet = new Set<string>();
+
+    applications.forEach((app) => {
+      if (app.assigned_to && app.assigned_profile) {
+        assigneeMap.set(app.assigned_to, getAssigneeName(app));
+      }
+      if (app.product_type) productSet.add(app.product_type);
+      if (app.current_stage) stageSet.add(app.current_stage);
+    });
+
+    return {
+      uniqueAssignees: Array.from(assigneeMap.entries()).map(([id, name]) => ({ id, name })),
+      uniqueProductTypes: Array.from(productSet).sort(),
+      uniqueStages: Array.from(stageSet).sort(),
+    };
+  }, [applications]);
+
+  // Client-side filtering
+  const filteredApplications = useMemo(() => {
+    if (!applications) return [];
+
+    return applications.filter((app) => {
+      // Search
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const applicantName = getApplicantName(app).toLowerCase();
+        const loanId = (app.loan_id || "").toLowerCase();
+        const appNum = (app.application_number || "").toLowerCase();
+        if (!loanId.includes(q) && !appNum.includes(q) && !applicantName.includes(q)) return false;
+      }
+
+      // Stage
+      if (selectedStages.length > 0 && !selectedStages.includes(app.current_stage)) return false;
+
+      // Assignee
+      if (selectedAssignee !== "all" && app.assigned_to !== selectedAssignee) return false;
+
+      // Amount range
+      const minAmt = amountMin ? parseFloat(amountMin) : null;
+      const maxAmt = amountMax ? parseFloat(amountMax) : null;
+      if (minAmt !== null && app.requested_amount < minAmt) return false;
+      if (maxAmt !== null && app.requested_amount > maxAmt) return false;
+
+      // Date range
+      if (dateFrom) {
+        const created = new Date(app.created_at);
+        if (created < dateFrom) return false;
+      }
+      if (dateTo) {
+        const created = new Date(app.created_at);
+        const endOfDay = new Date(dateTo);
+        endOfDay.setHours(23, 59, 59, 999);
+        if (created > endOfDay) return false;
+      }
+
+      // Product type
+      if (selectedProductType !== "all" && app.product_type !== selectedProductType) return false;
+
+      return true;
+    });
+  }, [applications, searchQuery, selectedStages, selectedAssignee, amountMin, amountMax, dateFrom, dateTo, selectedProductType]);
+
+  const toggleStage = (stage: string) => {
+    setSelectedStages((prev) =>
+      prev.includes(stage) ? prev.filter((s) => s !== stage) : [...prev, stage]
+    );
+  };
+
+  const hasActiveFilters = searchQuery || selectedStages.length > 0 || selectedAssignee !== "all" || amountMin || amountMax || dateFrom || dateTo || selectedProductType !== "all";
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setSelectedStages([]);
+    setSelectedAssignee("all");
+    setAmountMin("");
+    setAmountMax("");
+    setDateFrom(undefined);
+    setDateTo(undefined);
+    setSelectedProductType("all");
+  };
+
+  if (isLoading) {
+    return <LoadingState message="Loading applications..." />;
+  }
 
   return (
     <div className="space-y-4">
@@ -101,14 +205,167 @@ export default function ApprovalQueue({ orgId, userId }: ApprovalQueueProps) {
             In-Progress Applications
           </CardTitle>
           <CardDescription>
-            {applications?.length || 0} application(s) requiring attention
+            {hasActiveFilters
+              ? `Showing ${filteredApplications.length} of ${applications?.length || 0} application(s)`
+              : `${applications?.length || 0} application(s) requiring attention`}
           </CardDescription>
         </CardHeader>
+
+        {/* Filter Bar */}
+        <div className="px-6 pb-4 space-y-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Search */}
+            <div className="relative flex-1 min-w-[200px] max-w-sm">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by Loan ID, App # or Name..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
+            {/* Stage Multi-Select */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-10 gap-1">
+                  <Filter className="h-3.5 w-3.5" />
+                  Stage
+                  {selectedStages.length > 0 && (
+                    <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
+                      {selectedStages.length}
+                    </Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56 p-2" align="start">
+                <div className="space-y-1">
+                  {uniqueStages.map((stage) => (
+                    <label
+                      key={stage}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted cursor-pointer text-sm"
+                    >
+                      <Checkbox
+                        checked={selectedStages.includes(stage)}
+                        onCheckedChange={() => toggleStage(stage)}
+                      />
+                      {STAGE_LABELS[stage] || stage}
+                    </label>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {/* Assigned To */}
+            <Select value={selectedAssignee} onValueChange={setSelectedAssignee}>
+              <SelectTrigger className="w-[160px] h-10">
+                <SelectValue placeholder="Assigned To" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Assignees</SelectItem>
+                {uniqueAssignees.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Product Type */}
+            {uniqueProductTypes.length > 0 && (
+              <Select value={selectedProductType} onValueChange={setSelectedProductType}>
+                <SelectTrigger className="w-[160px] h-10">
+                  <SelectValue placeholder="Product Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Products</SelectItem>
+                  {uniqueProductTypes.map((pt) => (
+                    <SelectItem key={pt} value={pt}>{pt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            {/* Clear Filters */}
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="h-10 gap-1">
+                <X className="h-3.5 w-3.5" />
+                Clear
+              </Button>
+            )}
+          </div>
+
+          {/* Second row: Amount range + Date range */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5">
+              <Input
+                type="number"
+                placeholder="Min Amount"
+                value={amountMin}
+                onChange={(e) => setAmountMin(e.target.value)}
+                className="w-[130px] h-9"
+              />
+              <span className="text-muted-foreground text-sm">–</span>
+              <Input
+                type="number"
+                placeholder="Max Amount"
+                value={amountMax}
+                onChange={(e) => setAmountMax(e.target.value)}
+                className="w-[130px] h-9"
+              />
+            </div>
+
+            {/* Date From */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={cn("h-9 w-[140px] justify-start text-left font-normal", !dateFrom && "text-muted-foreground")}
+                >
+                  <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
+                  {dateFrom ? format(dateFrom, "MMM dd, yy") : "From Date"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={dateFrom}
+                  onSelect={setDateFrom}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
+
+            {/* Date To */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={cn("h-9 w-[140px] justify-start text-left font-normal", !dateTo && "text-muted-foreground")}
+                >
+                  <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
+                  {dateTo ? format(dateTo, "MMM dd, yy") : "To Date"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={dateTo}
+                  onSelect={setDateTo}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
+
         <CardContent>
-          {!applications || applications.length === 0 ? (
+          {filteredApplications.length === 0 ? (
             <EmptyState
-              title="No applications in queue"
-              message="There are no in-progress applications at this time."
+              title={hasActiveFilters ? "No matching applications" : "No applications in queue"}
+              message={hasActiveFilters ? "Try adjusting your filters." : "There are no in-progress applications at this time."}
             />
           ) : (
             <Table>
@@ -125,7 +382,7 @@ export default function ApprovalQueue({ orgId, userId }: ApprovalQueueProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {applications.map((app) => (
+                {filteredApplications.map((app) => (
                   <TableRow key={app.id}>
                     <TableCell className="font-medium text-primary">
                       {app.loan_id || "—"}
