@@ -644,6 +644,21 @@ export default function DocumentUpload({ applicationId, orgId, applicant }: Docu
     // For API-verifiable docs (PAN, Aadhaar), now handled in ApplicantProfileCard
     // Allow manual approval only for other docs
 
+    // Auto-verified types show "Auto-verified" tooltip instead of manual approve button
+    const autoVerifyTypes = ['bank_statement', 'utility_bill'];
+    if (autoVerifyTypes.includes(docType) && document.parsing_status === 'completed') {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button size="icon" variant="ghost" className="h-8 w-8">
+              <CheckCircle className="h-4 w-4 text-amber-500" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Auto-verified after parsing</TooltipContent>
+        </Tooltip>
+      );
+    }
+
     // For other docs, allow manual approval
     return (
       <Tooltip>
