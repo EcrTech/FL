@@ -174,6 +174,8 @@ export function BankDetailsSection({ applicationId, orgId, applicantId }: BankDe
         
         queryClient.invalidateQueries({ queryKey: ["applicant-bank-details", applicantId] });
         toast.success("Bank account verified successfully");
+      } else if (data.verification_status === "error") {
+        toast.warning(data.error || "Bank verification service is temporarily unavailable. Please try again later.");
       } else {
         toast.error("Bank verification failed - account details may be incorrect");
       }

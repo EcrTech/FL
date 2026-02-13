@@ -109,6 +109,19 @@ serve(async (req) => {
       });
     }
 
+    // Check if the API itself reported an error (HTTP 200 but success: false)
+    if (!responseData.success || responseData.data === null) {
+      console.error("VerifiedU API-level error:", responseData.message);
+      return new Response(JSON.stringify({
+        success: false,
+        error: responseData.message || "Verification service error",
+        verification_status: "error",
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Save verification to database if applicationId is provided
     if (applicationId && orgId) {
       const adminClient = createClient(
