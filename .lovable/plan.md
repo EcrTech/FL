@@ -1,51 +1,47 @@
 
-
-## Manual Bank Verification Fallback
+## Add Filters to Approval Queue
 
 ### Overview
-When the VerifiedU bank verification API fails (returns a service error), a manual verification option will appear. The user must upload a screenshot of a Re 1 transfer to the target bank account, with the UTR number clearly visible. This serves as proof of a valid, active bank account.
+Add a comprehensive filter bar above the Approval Queue table so users can quickly narrow down the 65+ applications. Filters will be based on the columns visible in the table and the available data.
 
-### How It Works
+### Filters to Add
 
-1. When the automated "Verify Bank Account" button fails with a service error, a new "Manual Verification" section appears below.
-2. The section shows:
-   - Instructions: "Upload a screenshot of a Re 1 transfer to the applicant's bank account with UTR clearly visible"
-   - A file upload input (accepts images: JPG, PNG, PDF)
-   - A text input for the UTR number (mandatory)
-   - A "Submit Manual Verification" button
-3. On submission:
-   - The screenshot is uploaded to storage at `loan-documents/{orgId}/{applicationId}/bank-verification-proof/`
-   - A record is saved to `loan_verifications` with `verification_type: "bank_manual"` and relevant metadata (UTR, file URL)
-   - The applicant's `bank_verified` is set to `true` and `bank_verified_at` is updated
-   - A "Manually Verified" badge (distinct from the API-verified badge) is shown
+1. **Search** (text input) -- Search by Loan ID, Application #, or Applicant name
+2. **Current Stage** (multi-select dropdown) -- Filter by stage: Application Login, Credit Assessment, Approval Pending, Sanctioned, Disbursement Pending, Disbursed, etc.
+3. **Assigned To** (dropdown) -- Filter by staff member the application is assigned to
+4. **Amount Range** (min/max inputs) -- Filter by requested loan amount
+5. **Date Range** (date picker) -- Filter by created date (from/to)
+6. **Product Type** (dropdown) -- Filter by the `product_type` field on loan applications
 
 ### Technical Details
 
-#### Database Changes
-- Add a new column `bank_verification_method` (TEXT, nullable, default null) to `loan_applicants` to distinguish between `"api"` and `"manual"` verification methods.
+#### File: `src/components/LOS/Approval/ApprovalQueue.tsx`
 
-#### File: `src/components/LOS/BankDetailsSection.tsx`
-- Add state: `showManualVerification` (boolean), `manualUtr` (string), `manualProofFile` (File | null)
-- After `verifyBankMutation` returns `verification_status === "error"`, set `showManualVerification = true`
-- Add a new UI section (below the existing verify button) that renders when `showManualVerification` is true and bank is not yet verified:
-  - File upload input for the Re 1 transfer screenshot
-  - Text input for UTR number (required, validated for non-empty)
-  - Submit button triggering a new `manualVerifyMutation`
-- `manualVerifyMutation` logic:
-  1. Upload file to `loan-documents/{orgId}/{applicationId}/bank-verification-proof/{timestamp}-{filename}`
-  2. Get the public/signed URL
-  3. Insert a `loan_verifications` record with `verification_type: "bank_manual"`, `request_data: { utr: manualUtr }`, `response_data: { file_url }`, `status: "verified"`
-  4. Update `loan_applicants` with `bank_verified: true`, `bank_verified_at: now()`, `bank_verification_method: "manual"`
-  5. Invalidate queries and show success toast
-- Update the verified badge to show "Manually Verified" (orange/amber) vs "Verified" (green) based on `bank_verification_method`
+**Changes:**
+- Add filter state variables: `searchQuery`, `selectedStages`, `selectedAssignee`, `amountMin`, `amountMax`, `dateFrom`, `dateTo`, `selectedProductType`
+- Add a filter bar section between the card header and the table, containing:
+  - A search `Input` with a search icon
+  - A `Select` dropdown for Current Stage (multi-select via checkboxes in a Popover)
+  - A `Select` dropdown for Assigned To (populated from distinct assignees in the data)
+  - Min/Max amount `Input` fields
+  - Date range pickers using the existing `react-day-picker` / Popover pattern
+  - A "Clear Filters" button
+- Apply all filters client-side using `useMemo` to create a `filteredApplications` array from the fetched `applications` data
+- Update the table to render `filteredApplications` instead of `applications`
+- Update the count in `CardDescription` to show filtered vs total count (e.g., "Showing 12 of 65 applications")
 
-#### Storage
-- Uses the existing `loan-documents` bucket -- no new bucket needed
-- File path pattern: `{orgId}/{applicationId}/bank-verification-proof/{file}`
+**Filter logic (client-side in useMemo):**
+- Search: case-insensitive match against `loan_id`, `application_number`, and applicant `first_name`/`last_name`
+- Stage: include if `current_stage` is in selected set (or show all if none selected)
+- Assigned To: match `assigned_to` UUID
+- Amount: `requested_amount >= amountMin` and `requested_amount <= amountMax`
+- Date: `created_at` between `dateFrom` and `dateTo`
+- Product Type: match `product_type`
+
+#### No database or migration changes required
+All filtering is done client-side on the already-fetched data.
 
 #### Files Changed
 | File | Change |
 |------|--------|
-| **Migration** | Add `bank_verification_method` column to `loan_applicants` |
-| `src/components/LOS/BankDetailsSection.tsx` | Add manual verification UI, upload logic, and distinct badge |
-
+| `src/components/LOS/Approval/ApprovalQueue.tsx` | Add filter bar UI and client-side filtering logic |
