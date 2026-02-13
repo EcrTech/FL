@@ -1,75 +1,75 @@
 
-## Fix Bank Statement Parsing: Use Correct PDF Format
+## Plan: Auto-Verify Bank Statement and Utility Bill Documents After Successful Parsing
 
-### Root Cause
+### Problem
+Bank statements and utility bills currently require manual verification (clicking a checkmark icon) even after successful AI parsing and data extraction. This adds unnecessary manual steps in the workflow and slows down the application processing.
 
-The `parse-loan-document` edge function currently uses `type: "image_url"` to send PDFs to the AI gateway (Gemini). This is incorrect for PDFs because:
-- `type: "image_url"` is designed for **image files** (JPG, PNG, etc.)
-- PDFs are not images and should use `type: "file"` format
-- When Gemini receives a PDF as `image_url`, it cannot properly process the document content
-- This causes empty or incomplete JSON responses, resulting in failed parsing
+### Solution Overview
+Automatically set `verification_status` to `verified` when these document types complete parsing successfully. This will streamline the workflow while maintaining quality since the parsing success itself serves as verification.
 
-### Evidence from Testing
+### Implementation Approach
 
-**Successful parse (05:54 UTC)**: Used correct format → Got full account details
-- `account_number`: 10264703418
-- `ifsc_code`: IDFB0081611
-- `bank_name`: IDFC FIRST Bank
-- All other fields populated correctly
-- `parsing_status: completed` with full `ocr_data`
+#### 1. **Update `parse-loan-document` Edge Function** (Primary Location)
+**File:** `supabase/functions/parse-loan-document/index.ts`
 
-**Recent failed parses (09:23 UTC)**: Using current `type: "image_url"` format → Empty `ocr_data`
-- `ocr_data: {}` (empty object)
-- `parsing_status: failed`
-- Files download successfully (759+ KB), but AI returns no structured data
+**What to Change:** After successful parsing completes and OCR data is merged, automatically update the document's verification status:
 
-### Solution: Use `type: "file"` for PDFs
+- **For bank_statement** and **utility_bill** document types only
+- When `parsing_status` transitions to `completed`
+- Update `verification_status` from `pending` to `verified`
+- Set `verified_at` to current timestamp
+- This ensures auto-verification happens at the data layer (backend)
 
-**File**: `supabase/functions/parse-loan-document/index.ts`
+**Location in Code:** Around lines 880-887, after the successful OCR merge and before the success response, add an update query to set these fields.
 
-**Changes needed**:
-
-1. **Lines 388-393**: Change the PDF request format
+**Technical Details:**
 ```
-CURRENT (broken):
-  {
-    type: "image_url",
-    image_url: {
-      url: dataUrl,  // data:application/pdf;base64,...
-    },
-  }
-
-FIXED:
-  {
-    type: "file",
-    file: {
-      filename: filename,  // e.g., "bank_statement.pdf"
-      file_data: dataUrl,  // data:application/pdf;base64,...
-    },
-  }
+After merging OCR data and syncing to applicant:
+- Check if documentType is 'bank_statement' or 'utility_bill'
+- Execute: UPDATE loan_documents SET verification_status='verified', verified_at=NOW() WHERE id=documentId
+- This is idempotent (safe to retry) and happens atomically with the parse completion
 ```
 
-2. **Validation**: Keep the existing 0-byte file retry logic (lines 271-288) - this is working correctly
+#### 2. **Update Frontend UI to Reflect Auto-Verification** (Secondary - UX Clarity)
+**File:** `src/components/LOS/DocumentUpload.tsx`
 
-3. **No other changes needed**: The prompt, JSON parsing, and database logic are all correct
+**What to Change:** Hide or disable the manual approval checkmark button for bank statements and utility bills after parsing completes:
 
-### Why This Works
+- When a document has `parsing_status: 'completed'` AND `document_type` is `bank_statement` or `utility_bill`
+- Display a green checkmark or "Verified" badge instead of the approval button
+- Remove the ability to click "approve" since it's already verified
 
-- Gemini's API expects `type: "file"` for PDFs to properly decode and process document content
-- The successful parse from 05:54 used this format
-- This aligns with the working `parse-cibil-report` function which uses the same `type: "file"` format for PDFs
-- The base64 data URL format is compatible with both approaches, but must be paired with `type: "file"` for PDFs
+**Technical Details:**
+- Update the `getVerifyIcon()` function (around lines 584-620) to detect auto-verified documents
+- When showing the approval button, exclude `bank_statement` and `utility_bill` types if they have `parsing_status: 'completed'`
+- Add a visual indicator (locked/checkmark badge) to show these are auto-verified
 
-### Testing Plan
+#### 3. **Data Consistency Checks**
+**No Migration Needed:** Existing parsed documents with `parsing_status: 'completed'` and `verification_status: 'pending'` can be manually verified once in the UI, or you can provide a migration query to bulk-update them if desired. Going forward, new documents will auto-verify on parse completion.
 
-After deployment, re-upload a bank statement PDF and verify:
-- Parsing status changes to `completed` (not `failed`)
-- `ocr_data` contains the 6 account fields:
-  - `account_number`
-  - `ifsc_code`
-  - `branch_name`
-  - `account_holder_name`
-  - `bank_name`
-  - `account_type`
-- No empty `ocr_data` object
+### Key Benefits
+- **Reduced Manual Work:** One fewer click per bank statement/utility bill
+- **Faster Processing:** Documents are immediately verified upon successful parsing
+- **Consistent UX:** Parsing success indicates data quality confidence, so auto-verification is appropriate
+- **Safety:** Limited to documents with high-quality OCR (bank statements, utility bills with structured data)
+
+### Design Decisions
+- **Why Backend Update:** Doing this in the edge function ensures atomicity—parsing completion and verification happen together in one transaction
+- **Why Only Bank/Utility Bills:** These document types have reliable OCR extraction with key fields (account info, bill details). Identity documents (PAN, Aadhaar) are already handled separately via API verification
+- **Why Not Auto-Verify Everything:** Income documents (salary slips, ITR, Form 16) have variable structure and may need manual review. Identity documents have dedicated verification APIs.
+
+### Affected User Flows
+1. **Upload Bank Statement** → Parse Automatically Triggered → **Auto-Verified** (no manual click)
+2. **Upload Utility Bill** → Parse Automatically Triggered → **Auto-Verified** (no manual click)
+3. **Manual Parse Retry** on completed documents → Still auto-verifies (idempotent)
+4. Existing **idle/failed documents** can still be manually approved via the checkmark (unchanged)
+
+### Testing Checklist
+- Bank statement parses successfully → Verify `verification_status` is automatically `verified`
+- Utility bill parses successfully → Verify `verification_status` is automatically `verified`
+- Other document types (salary slips, rental agreement, etc.) remain `pending` after parsing
+- Manual approve button is hidden/disabled for auto-verified bank/utility docs
+- No visual change to documents that are manually approved
+- Refresh page → verified status persists
+- Other document types can still be manually approved
 
