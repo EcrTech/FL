@@ -1,47 +1,51 @@
 
-## Add Filters to Approval Queue
 
-### Overview
-Add a comprehensive filter bar above the Approval Queue table so users can quickly narrow down the 65+ applications. Filters will be based on the columns visible in the table and the available data.
+## Fix: Manual Bank Verification Upload Failure
 
-### Filters to Add
+### Root Cause
 
-1. **Search** (text input) -- Search by Loan ID, Application #, or Applicant name
-2. **Current Stage** (multi-select dropdown) -- Filter by stage: Application Login, Credit Assessment, Approval Pending, Sanctioned, Disbursement Pending, Disbursed, etc.
-3. **Assigned To** (dropdown) -- Filter by staff member the application is assigned to
-4. **Amount Range** (min/max inputs) -- Filter by requested loan amount
-5. **Date Range** (date picker) -- Filter by created date (from/to)
-6. **Product Type** (dropdown) -- Filter by the `product_type` field on loan applications
+The manual verification mutation inserts a record into the `loan_verifications` table with an `org_id` field, but **this column does not exist** in the table. The insert fails with a database error, which causes the entire mutation to throw, and the error toast may show a generic message.
 
-### Technical Details
+Even though the file upload to storage (step 1) may succeed, the subsequent database insert (step 3) fails, causing the overall operation to appear as though "the image is not uploading."
 
-#### File: `src/components/LOS/Approval/ApprovalQueue.tsx`
+### Fix
 
-**Changes:**
-- Add filter state variables: `searchQuery`, `selectedStages`, `selectedAssignee`, `amountMin`, `amountMax`, `dateFrom`, `dateTo`, `selectedProductType`
-- Add a filter bar section between the card header and the table, containing:
-  - A search `Input` with a search icon
-  - A `Select` dropdown for Current Stage (multi-select via checkboxes in a Popover)
-  - A `Select` dropdown for Assigned To (populated from distinct assignees in the data)
-  - Min/Max amount `Input` fields
-  - Date range pickers using the existing `react-day-picker` / Popover pattern
-  - A "Clear Filters" button
-- Apply all filters client-side using `useMemo` to create a `filteredApplications` array from the fetched `applications` data
-- Update the table to render `filteredApplications` instead of `applications`
-- Update the count in `CardDescription` to show filtered vs total count (e.g., "Showing 12 of 65 applications")
+**File: `src/components/LOS/BankDetailsSection.tsx`**
 
-**Filter logic (client-side in useMemo):**
-- Search: case-insensitive match against `loan_id`, `application_number`, and applicant `first_name`/`last_name`
-- Stage: include if `current_stage` is in selected set (or show all if none selected)
-- Assigned To: match `assigned_to` UUID
-- Amount: `requested_amount >= amountMin` and `requested_amount <= amountMax`
-- Date: `created_at` between `dateFrom` and `dateTo`
-- Product Type: match `product_type`
+Remove the `org_id: orgId` field from the `loan_verifications` insert object (around line 223), since the table does not have an `org_id` column.
 
-#### No database or migration changes required
-All filtering is done client-side on the already-fetched data.
+Before:
+```typescript
+const { error: verifyError } = await supabase
+  .from("loan_verifications")
+  .insert({
+    loan_application_id: applicationId,
+    applicant_id: applicantId,
+    org_id: orgId,                    // <-- does not exist in table
+    verification_type: "bank_manual",
+    request_data: { utr: manualUtr.trim() },
+    response_data: { file_url: fileUrl, file_path: filePath },
+    status: "verified",
+  } as any);
+```
 
-#### Files Changed
+After:
+```typescript
+const { error: verifyError } = await supabase
+  .from("loan_verifications")
+  .insert({
+    loan_application_id: applicationId,
+    applicant_id: applicantId,
+    verification_type: "bank_manual",
+    request_data: { utr: manualUtr.trim() },
+    response_data: { file_url: fileUrl, file_path: filePath },
+    status: "verified",
+  } as any);
+```
+
+### Files Changed
+
 | File | Change |
 |------|--------|
-| `src/components/LOS/Approval/ApprovalQueue.tsx` | Add filter bar UI and client-side filtering logic |
+| `src/components/LOS/BankDetailsSection.tsx` | Remove non-existent `org_id` field from the `loan_verifications` insert |
+
