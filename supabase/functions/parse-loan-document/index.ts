@@ -724,6 +724,24 @@ serve(async (req) => {
 
     console.log(`[ParseDocument] Successfully parsed and saved data for document ${documentId}`);
 
+    // Auto-verify bank statements and utility bills after successful parsing
+    const autoVerifyTypes = ['bank_statement', 'utility_bill'];
+    if (autoVerifyTypes.includes(documentType) && !mergedData.parse_error) {
+      const { error: verifyError } = await supabase
+        .from("loan_documents")
+        .update({
+          verification_status: 'verified',
+          verified_at: new Date().toISOString(),
+        })
+        .eq("id", documentId);
+      
+      if (verifyError) {
+        console.warn(`[ParseDocument] Failed to auto-verify ${documentType}:`, verifyError);
+      } else {
+        console.log(`[ParseDocument] Auto-verified ${documentType} document ${documentId}`);
+      }
+    }
+
     // === Sync date_of_joining from salary slips to loan_employment_details ===
     const isSalarySlip = documentType.startsWith('salary_slip');
     
