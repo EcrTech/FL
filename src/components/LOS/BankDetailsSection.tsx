@@ -219,8 +219,7 @@ export function BankDetailsSection({ applicationId, orgId, applicantId }: BankDe
         .insert({
           loan_application_id: applicationId,
           applicant_id: applicantId,
-          org_id: orgId,
-          verification_type: "bank_manual",
+           verification_type: "bank_manual",
           request_data: { utr: manualUtr.trim() },
           response_data: { file_url: fileUrl, file_path: filePath },
           status: "verified",
