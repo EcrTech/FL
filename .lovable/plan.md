@@ -1,51 +1,35 @@
 
+# Convert DRAFT-1771058869199 to Formal Loan Application
 
-## Fix: Manual Bank Verification Upload Failure
+## Summary
+Manually convert the stuck draft application to a formal loan application, same as was done for the previous draft.
 
-### Root Cause
+## Verified Facts
+- Application ID: `9b7c0e99-c3a0-47bc-ba1b-580cc9b237a4`
+- Video KYC: Completed successfully on Feb 14, 2026 at 11:02 AM
+- Recording: Available in storage
+- Same root cause: Browser/network issue prevented the submission function from firing after Video KYC completion
 
-The manual verification mutation inserts a record into the `loan_verifications` table with an `org_id` field, but **this column does not exist** in the table. The insert fails with a database error, which causes the entire mutation to throw, and the error toast may show a generic message.
+## Action
+Run a single database update to convert the draft:
 
-Even though the file upload to storage (step 1) may succeed, the subsequent database insert (step 3) fails, causing the overall operation to appear as though "the image is not uploading."
-
-### Fix
-
-**File: `src/components/LOS/BankDetailsSection.tsx`**
-
-Remove the `org_id: orgId` field from the `loan_verifications` insert object (around line 223), since the table does not have an `org_id` column.
-
-Before:
-```typescript
-const { error: verifyError } = await supabase
-  .from("loan_verifications")
-  .insert({
-    loan_application_id: applicationId,
-    applicant_id: applicantId,
-    org_id: orgId,                    // <-- does not exist in table
-    verification_type: "bank_manual",
-    request_data: { utr: manualUtr.trim() },
-    response_data: { file_url: fileUrl, file_path: filePath },
-    status: "verified",
-  } as any);
+```text
+Application Number: DRAFT-1771058869199 -> LOAN-202602-00376
+Current Stage:      video_kyc           -> application_login
+Status:             in_progress         (unchanged)
 ```
 
-After:
-```typescript
-const { error: verifyError } = await supabase
-  .from("loan_verifications")
-  .insert({
-    loan_application_id: applicationId,
-    applicant_id: applicantId,
-    verification_type: "bank_manual",
-    request_data: { utr: manualUtr.trim() },
-    response_data: { file_url: fileUrl, file_path: filePath },
-    status: "verified",
-  } as any);
+## Technical Details
+Execute this SQL update on the `loan_applications` table:
+
+```sql
+UPDATE loan_applications 
+SET application_number = 'LOAN-202602-00376', 
+    current_stage = 'application_login', 
+    status = 'in_progress',
+    updated_at = now()
+WHERE id = '9b7c0e99-c3a0-47bc-ba1b-580cc9b237a4'
+  AND application_number = 'DRAFT-1771058869199';
 ```
 
-### Files Changed
-
-| File | Change |
-|------|--------|
-| `src/components/LOS/BankDetailsSection.tsx` | Remove non-existent `org_id` field from the `loan_verifications` insert |
-
+No code changes are required -- this is a data-only fix.
