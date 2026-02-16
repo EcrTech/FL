@@ -50,8 +50,11 @@ export function MarketingHeader() {
             ))}
           </nav>
 
-          {/* Right side: Phone + Quick Apply */}
+          {/* Right side: Login + Phone + Quick Apply */}
           <div className="hidden lg:flex items-center gap-4">
+            <Link to="/login" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+              Login
+            </Link>
             <a href={`tel:${PHONE_NUMBER.replace(/\s/g, "")}`} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
               <div className="h-8 w-8 rounded-full border border-border flex items-center justify-center">
                 <Phone className="h-4 w-4 text-primary" />
@@ -92,6 +95,13 @@ export function MarketingHeader() {
                 {link.label}
               </Link>
             ))}
+            <Link
+              to="/login"
+              onClick={() => setMobileOpen(false)}
+              className="block px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted"
+            >
+              Login
+            </Link>
             <a href={`tel:${PHONE_NUMBER.replace(/\s/g, "")}`} className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
               <Phone className="h-4 w-4 text-primary" />
               <span>{PHONE_NUMBER}</span>
