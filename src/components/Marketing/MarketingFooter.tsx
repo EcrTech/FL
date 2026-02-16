@@ -4,15 +4,20 @@ import logo from "@/assets/paisaa-saarthi-logo.jpeg";
 const quickLinks = [
   { label: "Home", to: "/" },
   { label: "About Us", to: "/about" },
-  { label: "Services", to: "/services" },
+  { label: "Our Services", to: "/services" },
   { label: "How to Apply", to: "/how-to-apply" },
   { label: "FAQ", to: "/faq" },
-  { label: "Contact", to: "/contact" },
+  { label: "Apply Now", to: "/apply" },
 ];
 
-const legalLinks = [
-  { label: "Privacy Policy", to: "/privacy" },
-  { label: "Terms & Conditions", to: "/terms" },
+const loanInfoItems = [
+  "Loan Amount: ₹10,000 - ₹1,00,000",
+  "Tenure: 1 to 90 days",
+  "Processing Fee: 10%",
+  "Quick Disbursement",
+  "Minimal Documentation",
+  "No Collateral Required",
+  "Flexible Repayment",
 ];
 
 const loanTypes = [
@@ -27,8 +32,70 @@ const loanTypes = [
 export function MarketingFooter() {
   return (
     <footer className="text-white" style={{ background: "hsl(220, 13%, 12%)" }}>
+      {/* Main footer grid */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+          {/* Brand */}
+          <div className="md:col-span-1">
+            <div className="flex items-center gap-2 mb-4">
+              <img src={logo} alt="Paisaa Saarthi" className="h-10 w-10 rounded-lg object-cover" />
+              <div>
+                <span className="font-heading font-bold text-lg block">Paisaa Saarthi</span>
+                <span className="text-xs" style={{ color: "hsl(var(--gold-500))" }}>Chhote loans, badi udaan</span>
+              </div>
+            </div>
+            <p className="text-sm text-white/60 leading-relaxed">
+              Your trusted partner for small-ticket personal loans. Quick, easy, and hassle-free loans up to ₹1,00,000 for salaried individuals.
+            </p>
+            <div className="flex gap-3 mt-4">
+              <a href="#" className="w-8 h-8 rounded-full border border-white/20 flex items-center justify-center text-white/60 hover:text-white hover:border-white/40 transition-colors text-xs">f</a>
+              <a href="#" className="w-8 h-8 rounded-full border border-white/20 flex items-center justify-center text-white/60 hover:text-white hover:border-white/40 transition-colors text-xs">𝕏</a>
+              <a href="#" className="w-8 h-8 rounded-full border border-white/20 flex items-center justify-center text-white/60 hover:text-white hover:border-white/40 transition-colors text-xs">📷</a>
+              <a href="#" className="w-8 h-8 rounded-full border border-white/20 flex items-center justify-center text-white/60 hover:text-white hover:border-white/40 transition-colors text-xs">in</a>
+            </div>
+          </div>
+
+          {/* Quick Links */}
+          <div>
+            <h3 className="font-heading font-semibold text-base mb-4">Quick Links</h3>
+            <ul className="space-y-2">
+              {quickLinks.map((link) => (
+                <li key={link.to}>
+                  <Link to={link.to} className="text-sm text-white/60 hover:text-white transition-colors">
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Loan Info */}
+          <div>
+            <h3 className="font-heading font-semibold text-base mb-4">Loan Info</h3>
+            <ul className="space-y-2">
+              {loanInfoItems.map((item) => (
+                <li key={item} className="text-sm text-white/60 flex items-start gap-2">
+                  <span className="mt-1.5 w-2 h-2 rounded-full flex-shrink-0" style={{ background: "hsl(var(--gold-500))" }} />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Contact */}
+          <div>
+            <h3 className="font-heading font-semibold text-base mb-4">Contact Us</h3>
+            <div className="space-y-3 text-sm text-white/60">
+              <p className="flex items-start gap-2">📍 Paisaa Saarthi, Office no. 110, 1st floor, H-161, BSI Business Park Sec-63, Noida, UP-201301</p>
+              <p>📞 <a href="tel:+917982012776" className="hover:text-white transition-colors">+91 79-82012776</a></p>
+              <p>📧 <a href="mailto:info@paisaasaarthi.com" className="hover:text-white transition-colors">info@paisaasaarthi.com</a></p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Fraud Warning */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-10">
         <div className="rounded-xl border border-yellow-600/40 p-6" style={{ background: "hsl(220, 13%, 15%)" }}>
           <p className="text-center font-bold text-yellow-400 mb-4">⚠️ NEVER PAY IN CASH OR INTO ANYONE'S PERSONAL ACCOUNT ⚠️</p>
           <div className="space-y-2 text-sm text-white/70">
@@ -53,65 +120,6 @@ export function MarketingFooter() {
         <p className="mt-4 text-sm text-white/70">
           📞 Call us at: <a href="tel:+917982012776" className="font-semibold" style={{ color: "hsl(var(--gold-500))" }}>+91 79-82012776</a> | 📧 Email us at: <a href="mailto:info@paisaasaarthi.com" className="font-semibold" style={{ color: "hsl(var(--gold-500))" }}>info@paisaasaarthi.com</a>
         </p>
-      </div>
-
-      {/* Main footer grid */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 border-t border-white/10">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          {/* Brand */}
-          <div className="md:col-span-1">
-            <div className="flex items-center gap-2 mb-4">
-              <img src={logo} alt="Paisaa Saarthi" className="h-10 w-10 rounded-lg object-cover" />
-              <div>
-                <span className="font-heading font-bold text-lg block">Paisaa Saarthi</span>
-                <span className="text-xs" style={{ color: "hsl(var(--gold-500))" }}>Chhote loans, badi udaan</span>
-              </div>
-            </div>
-            <p className="text-sm text-white/60 leading-relaxed">
-              Your trusted companion for small-ticket personal loans. Quick, transparent, and hassle-free.
-            </p>
-          </div>
-
-          {/* Quick Links */}
-          <div>
-            <h3 className="font-heading font-semibold text-base mb-4">Quick Links</h3>
-            <ul className="space-y-2">
-              {quickLinks.map((link) => (
-                <li key={link.to}>
-                  <Link to={link.to} className="text-sm text-white/60 hover:text-white transition-colors">
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Legal */}
-          <div>
-            <h3 className="font-heading font-semibold text-base mb-4">Legal</h3>
-            <ul className="space-y-2">
-              {legalLinks.map((link) => (
-                <li key={link.to}>
-                  <Link to={link.to} className="text-sm text-white/60 hover:text-white transition-colors">
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Contact */}
-          <div>
-            <h3 className="font-heading font-semibold text-base mb-4">Contact Us</h3>
-            <div className="space-y-2 text-sm text-white/60">
-              <p>📞 +91 79-82012776</p>
-              <p>📧 info@paisaasaarthi.com</p>
-              <p>📧 support@paisaasaarthi.com</p>
-              <p className="leading-relaxed">📍 Paisaa Saarthi, Office no. 110, 1st floor, H-161, BSI Business Park Sec-63, Noida, UP-201301</p>
-              <p>🕐 Mon - Sat, 9:00 AM - 6:00 PM</p>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Loan type links */}
