@@ -1,47 +1,106 @@
 import { Link } from "react-router-dom";
+import { PageHeroBanner } from "@/components/Marketing/PageHeroBanner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Briefcase, User, GraduationCap, Home, Stethoscope, Car } from "lucide-react";
+import { ArrowRight, CheckCircle, Stethoscope, GraduationCap, Heart, Home, Plane, ShoppingBag, Check } from "lucide-react";
 
-const services = [
-  { icon: User, title: "Personal Loan", desc: "Quick personal loans from ₹5,000 to ₹1,00,000 for your immediate needs.", rate: "Starting 1%/day" },
-  { icon: Briefcase, title: "Business Loan", desc: "Fund your business growth with flexible loan amounts and easy repayment.", rate: "Competitive rates" },
-  { icon: GraduationCap, title: "Education Loan", desc: "Invest in your future with affordable education financing options.", rate: "Special rates" },
-  { icon: Stethoscope, title: "Medical Emergency", desc: "Instant funds for medical emergencies when you need them most.", rate: "Fast approval" },
-  { icon: Home, title: "Home Improvement", desc: "Renovate or repair your home with our home improvement loans.", rate: "Flexible terms" },
-  { icon: Car, title: "Vehicle Loan", desc: "Get on the road with easy two-wheeler and four-wheeler financing.", rate: "Low EMI" },
+const loanFeatures = [
+  "Loan amount from ₹10,000 to ₹1,00,000",
+  "Flexible tenure from 1 to 90 days",
+  "10% processing fee (transparent pricing)",
+  "No collateral or guarantor required",
+  "Minimal documentation",
+  "Quick disbursement within 24 hours",
+  "No hidden charges",
+  "Easy online application",
+];
+
+const useCases = [
+  { icon: Stethoscope, title: "Medical Emergency", desc: "Unexpected medical expenses shouldn't wait" },
+  { icon: GraduationCap, title: "Education", desc: "Invest in your or your child's future" },
+  { icon: Heart, title: "Wedding/Celebration", desc: "Make your special moments memorable" },
+  { icon: Home, title: "Home Renovation", desc: "Transform your living space" },
+  { icon: Plane, title: "Travel", desc: "Plan that dream vacation" },
+  { icon: ShoppingBag, title: "Shopping", desc: "Buy what you need, when you need" },
+];
+
+const eligibility = [
+  "Indian citizen aged 21-55 years",
+  "Salaried employee with minimum 6 months experience",
+  "Monthly income of at least ₹15,000",
+  "Valid bank account for disbursement",
+  "Valid ID proof (Aadhaar/PAN)",
 ];
 
 export default function Services() {
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-      <div className="text-center mb-12">
-        <h1 className="font-heading text-4xl font-extrabold text-foreground">Our <span className="text-primary">Services</span></h1>
-        <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-          We offer a range of loan products tailored to your specific needs.
-        </p>
-      </div>
+    <>
+      <PageHeroBanner title="Our" highlightedWord="Services" subtitle="Flexible personal loans tailored to your needs" />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {services.map((s) => (
-          <Card key={s.title} className="card-hover-lift border-border">
-            <CardContent className="pt-6">
-              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                <s.icon className="h-6 w-6 text-primary" />
+      {/* What We Offer */}
+      <section className="py-16 md:py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="text-sm font-semibold uppercase tracking-wide mb-2" style={{ color: "hsl(var(--gold-500))" }}>What We Offer</p>
+          <h2 className="font-heading text-3xl md:text-4xl font-bold text-foreground">Personal Loans Made Simple</h2>
+          <p className="mt-4 text-muted-foreground max-w-2xl leading-relaxed">
+            At Paisaa Saarthi, we offer quick and hassle-free personal loans designed specifically for salaried individuals. Our streamlined process ensures you get the money you need without the usual banking headaches.
+          </p>
+          <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {loanFeatures.map((f) => (
+              <div key={f} className="flex items-center gap-3">
+                <CheckCircle className="h-5 w-5 shrink-0" style={{ color: "hsl(var(--teal-500))" }} />
+                <span className="text-sm text-foreground">{f}</span>
               </div>
-              <h3 className="font-heading font-bold text-lg text-foreground">{s.title}</h3>
-              <p className="mt-2 text-sm text-muted-foreground">{s.desc}</p>
-              <span className="inline-block mt-3 text-xs font-semibold text-primary bg-primary/10 px-3 py-1 rounded-full">{s.rate}</span>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+            ))}
+          </div>
+          <Button asChild size="lg" className="mt-8 rounded-full px-8 font-semibold" style={{ background: "hsl(var(--gold-500))", color: "#000" }}>
+            <Link to="/apply">Apply Now <ArrowRight className="ml-2 h-5 w-5" /></Link>
+          </Button>
+        </div>
+      </section>
 
-      <div className="text-center mt-12">
-        <Button asChild size="lg">
-          <Link to="/apply">Apply Now <ArrowRight className="ml-2 h-5 w-5" /></Link>
-        </Button>
-      </div>
-    </div>
+      {/* Use Cases */}
+      <section className="py-16 bg-muted">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <p className="text-sm font-semibold uppercase tracking-wide text-center mb-2" style={{ color: "hsl(var(--gold-500))" }}>Use Your Loan For</p>
+          <h2 className="font-heading text-3xl font-bold text-center text-foreground mb-10">Loans for Every Need</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {useCases.map((u) => (
+              <Card key={u.title} className="border-border card-hover-lift">
+                <CardContent className="pt-6 text-center">
+                  <div className="mx-auto h-14 w-14 rounded-full flex items-center justify-center mb-4" style={{ background: "hsl(var(--teal-100))" }}>
+                    <u.icon className="h-7 w-7" style={{ color: "hsl(var(--teal-500))" }} />
+                  </div>
+                  <h3 className="font-heading font-bold text-foreground">{u.title}</h3>
+                  <p className="mt-2 text-sm text-muted-foreground">{u.desc}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Eligibility */}
+      <section className="py-16 md:py-24">
+        <div className="max-w-3xl mx-auto px-4 text-center">
+          <h2 className="font-heading text-3xl font-bold text-foreground mb-8">Eligibility Criteria</h2>
+          <div className="space-y-3 text-left max-w-md mx-auto">
+            {eligibility.map((e) => (
+              <div key={e} className="flex items-center gap-3">
+                <Check className="h-5 w-5 shrink-0" style={{ color: "hsl(var(--teal-500))" }} />
+                <span className="text-foreground">{e}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-10 p-6 rounded-2xl" style={{ background: "hsl(var(--teal-100))" }}>
+            <h3 className="font-heading font-bold text-foreground">Check Your Eligibility</h3>
+            <p className="text-sm text-muted-foreground mt-1">It takes just 2 minutes and won't affect your credit score</p>
+            <Button asChild size="lg" className="mt-4 rounded-full px-8 font-semibold" style={{ background: "hsl(var(--teal-500))" }}>
+              <Link to="/apply">Check Now</Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+    </>
   );
 }
