@@ -89,7 +89,7 @@ export default function About() {
       <section className="py-16 text-center text-white" style={{ background: "linear-gradient(135deg, hsl(var(--teal-600)), hsl(var(--teal-500)))" }}>
         <div className="max-w-3xl mx-auto px-4">
           <h2 className="font-heading text-3xl font-bold">Join 10,000+ Happy Customers</h2>
-          <p className="mt-4 text-white/70">Start your loan application today and experience the PaisaaSaarthi difference.</p>
+          <p className="mt-4 text-white/70">Experience the Paisaa Saarthi difference. Quick loans, transparent terms, and a team that truly cares about your financial well-being.</p>
           <Button asChild size="lg" className="mt-8 rounded-full px-10 font-semibold" style={{ background: "hsl(var(--gold-500))", color: "#000" }}>
             <Link to="/apply">Apply Now <ArrowRight className="ml-2 h-5 w-5" /></Link>
           </Button>
