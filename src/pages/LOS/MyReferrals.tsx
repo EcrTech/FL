@@ -11,7 +11,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { Copy, Check, Link2 } from "lucide-react";
 import { toast } from "sonner";
 
-const REFERRAL_BASE_URL = "https://ps.in-sync.co.in/apply/ref";
+const REFERRAL_BASE_URL = "https://paisaasaarthi.com/apply/ref";
 
 export default function MyReferrals() {
   const { orgId } = useOrgContext();
