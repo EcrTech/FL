@@ -25,7 +25,7 @@ export function MarketingHeader() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo + Tagline */}
-          <Link to="/" className="flex items-center gap-3">
+          <Link to="/home" className="flex items-center gap-3">
             <img src={logo} alt="Paisaa Saarthi" className="h-11 w-11 rounded-xl object-cover" />
             <div>
               <span className="font-heading font-bold text-lg text-foreground leading-none block">Paisaa Saarthi</span>
