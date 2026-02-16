@@ -1,22 +1,20 @@
 
+# Replace All `ps.in-sync.co.in` References with `paisaasaarthi.com`
 
-# Add Login Button to Marketing Header
+## Summary
+Replace the old domain `https://ps.in-sync.co.in` with `https://paisaasaarthi.com` across 4 files (28 occurrences found).
 
-## What Changes
+## Files to Update
 
-### MarketingHeader.tsx
-- Add a **"Login"** link/button in the desktop nav area, positioned between the nav links and the phone number (matching the reference screenshot)
-- The Login button navigates to `/login`
-- Style it to match the reference: appears as a distinct clickable element in the header bar
-- Also add Login link in the mobile menu
+### 1. `src/pages/LOS/MyReferrals.tsx` (line 14)
+- Change `REFERRAL_BASE_URL` from `https://ps.in-sync.co.in/apply/ref` to `https://paisaasaarthi.com/apply/ref`
 
-The homepage at `/` is already the landing page -- no route changes needed. This is purely a header update to add the missing Login navigation.
+### 2. `src/pages/Profile.tsx` (line 18)
+- Change `REFERRAL_BASE_URL` from `https://ps.in-sync.co.in/apply/ref` to `https://paisaasaarthi.com/apply/ref`
 
-## Technical Details
+### 3. `index.html` (lines 38, 41)
+- Update `og:url` meta tag to `https://paisaasaarthi.com`
+- Update `canonical` link to `https://paisaasaarthi.com`
 
-**File to modify:** `src/components/Marketing/MarketingHeader.tsx`
-
-- Add a `<Link to="/login">` styled as a button or nav link in the desktop right-side area (before the phone number)
-- Add the same Login link in the mobile dropdown menu
-- Match the visual style from the reference: the login button appears as a text link or outlined element in the nav bar
-
+### 4. `supabase/functions/digilocker-callback/index.ts` (lines 115, 155)
+- Update both fallback `FRONTEND_URL` values from `https://ps.in-sync.co.in` to `https://paisaasaarthi.com`
