@@ -1,20 +1,12 @@
 
-# Replace All `ps.in-sync.co.in` References with `paisaasaarthi.com`
 
-## Summary
-Replace the old domain `https://ps.in-sync.co.in` with `https://paisaasaarthi.com` across 4 files (28 occurrences found).
+# Remove Dropped Azure Deployment Workflow
 
-## Files to Update
+## What Changes
 
-### 1. `src/pages/LOS/MyReferrals.tsx` (line 14)
-- Change `REFERRAL_BASE_URL` from `https://ps.in-sync.co.in/apply/ref` to `https://paisaasaarthi.com/apply/ref`
+Delete only the old, dropped Azure Static Web Apps workflow file:
 
-### 2. `src/pages/Profile.tsx` (line 18)
-- Change `REFERRAL_BASE_URL` from `https://ps.in-sync.co.in/apply/ref` to `https://paisaasaarthi.com/apply/ref`
+- **Delete:** `.github/workflows/azure-static-web-apps-polite-field-0bd47cb1e.yml`
 
-### 3. `index.html` (lines 38, 41)
-- Update `og:url` meta tag to `https://paisaasaarthi.com`
-- Update `canonical` link to `https://paisaasaarthi.com`
+The other workflow file (`azure-static-web-apps-victorious-mushroom-0b9caf41e.yml`) will be kept as-is since it powers the active deployment.
 
-### 4. `supabase/functions/digilocker-callback/index.ts` (lines 115, 155)
-- Update both fallback `FRONTEND_URL` values from `https://ps.in-sync.co.in` to `https://paisaasaarthi.com`
