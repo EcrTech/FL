@@ -3,6 +3,16 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
+import { MarketingLayout } from "./components/Marketing/MarketingLayout";
+import MarketingHome from "./pages/Marketing/Home";
+import MarketingAbout from "./pages/Marketing/About";
+import MarketingServices from "./pages/Marketing/Services";
+import MarketingContact from "./pages/Marketing/Contact";
+import MarketingFAQ from "./pages/Marketing/FAQ";
+import MarketingHowToApply from "./pages/Marketing/HowToApply";
+import MarketingApply from "./pages/Marketing/Apply";
+import MarketingPrivacy from "./pages/Marketing/Privacy";
+import MarketingTerms from "./pages/Marketing/Terms";
 import SignUp from "./pages/SignUp";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
@@ -82,7 +92,20 @@ const App = () => {
       <Toaster />
       <Sonner />
       <Routes>
-            <Route path="/" element={<Login />} />
+            {/* Marketing public pages */}
+            <Route element={<MarketingLayout />}>
+              <Route path="/" element={<MarketingHome />} />
+              <Route path="/about" element={<MarketingAbout />} />
+              <Route path="/services" element={<MarketingServices />} />
+              <Route path="/contact" element={<MarketingContact />} />
+              <Route path="/faq" element={<MarketingFAQ />} />
+              <Route path="/how-to-apply" element={<MarketingHowToApply />} />
+              <Route path="/apply" element={<MarketingApply />} />
+              <Route path="/privacy" element={<MarketingPrivacy />} />
+              <Route path="/terms" element={<MarketingTerms />} />
+            </Route>
+
+            <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<SignUp />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/form/:formId" element={<PublicForm />} />
