@@ -123,6 +123,18 @@ export function WhatsAppChatDialog({
       }
 
       setMessages(data || []);
+
+      // Mark all inbound messages as read
+      const unreadIds = (data || [])
+        .filter(m => m.direction === 'inbound')
+        .map(m => m.id);
+      if (unreadIds.length > 0) {
+        await supabase
+          .from('whatsapp_messages')
+          .update({ is_read: true } as any)
+          .in('id', unreadIds);
+      }
+
       return data || [];
     } catch (error) {
       console.error('Error fetching messages:', error);

@@ -11,6 +11,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useOrgContext } from "@/hooks/useOrgContext";
 import { useNotification } from "@/hooks/useNotification";
 import { WhatsAppChatDialog } from "@/components/LOS/Relationships/WhatsAppChatDialog";
+import { useUnreadWhatsApp } from "@/hooks/useUnreadWhatsApp";
 import { format } from "date-fns";
 
 export default function CallingLeadDetail() {
@@ -42,6 +43,8 @@ export default function CallingLeadDetail() {
     },
     enabled: !!id,
   });
+
+  const { data: unreadWhatsApp = 0 } = useUnreadWhatsApp(contact?.phone);
 
   // Fetch call logs
   const { data: callLogs = [] } = useQuery({
@@ -169,10 +172,15 @@ export default function CallingLeadDetail() {
             <Button
               variant="outline"
               size="sm"
-              className="text-green-600"
+              className="text-green-600 relative"
               onClick={() => setWhatsappOpen(true)}
             >
               <MessageCircle className="h-4 w-4 mr-1" /> WhatsApp
+              {unreadWhatsApp > 0 && (
+                <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-[10px] font-bold text-white flex items-center justify-center">
+                  {unreadWhatsApp > 9 ? '9+' : unreadWhatsApp}
+                </span>
+              )}
             </Button>
           </div>
         </div>
