@@ -1,33 +1,76 @@
 
-# Auto-Assign Leads Created by Team Members
+# Restrict Chat/Message Visibility to Own Messages + Admin
 
 ## Problem
-When a team member (non-admin) creates a lead or contact, the `assigned_to` field may be left empty depending on the creation path. This means the lead could appear as "unassigned" and -- with the recent RLS change -- become invisible to the creator themselves.
+Currently, all WhatsApp messages, email conversations, and SMS messages are visible to every member in the organization. The RLS policies only check `org_id`, meaning any team member can see conversations initiated by other members. There is no chat privacy.
 
 ## Solution
-Create a database trigger on both `contacts` and `loan_applications` tables that automatically sets `assigned_to = created_by` when:
-- A new record is inserted
-- `assigned_to` is NULL (no explicit assignment was made)
-- `created_by` is NOT NULL
-- The creator is NOT an admin or super_admin (admins may intentionally leave leads unassigned)
+Update RLS policies on all three messaging tables and the `get_unified_inbox` database function so that:
+- **Regular members** see only messages they sent (`sent_by = auth.uid()`) or messages from contacts assigned to them
+- **Admins and Super Admins** see all messages in the org (for oversight)
 
-This runs at the database level, so it works regardless of how the lead is created -- manual form, bulk upload (for rows without assignment), edge functions, etc.
+## Changes
+
+### 1. Database Migration -- Update RLS Policies
+
+**Tables affected:** `whatsapp_messages`, `email_conversations`, `sms_messages`
+
+For each table, drop the existing SELECT policy and replace it with one that checks:
+- User is an admin/super_admin in the org (full access), OR
+- The message was sent by the current user (`sent_by = auth.uid()`), OR
+- The message is inbound and the linked contact is assigned to the current user
+
+This uses the existing `has_role` pattern and `get_visible_user_ids()` function already used elsewhere in the project.
+
+### 2. Database Migration -- Update `get_unified_inbox` Function
+
+The `get_unified_inbox` RPC function runs with its own query logic. It currently filters only by `org_id`. Update it to also apply the same visibility rules:
+- If the calling user is admin/super_admin: show all org messages (current behavior)
+- Otherwise: filter to messages where `sent_by = auth.uid()` or the contact is assigned to the user
+
+### 3. No Frontend Changes Required
+
+The Communications page and WhatsApp chat dialogs already query through the same tables and RPC function. Once the database-level restrictions are in place, the UI will automatically show only the permitted messages.
 
 ## Technical Details
 
-### Database Migration
-A single migration with a trigger function and two triggers:
+### RLS Policy Pattern (applied to all 3 tables)
 
-**Function: `auto_assign_to_creator()`**
-- Runs BEFORE INSERT on both tables
-- Checks if `NEW.assigned_to IS NULL` and `NEW.created_by IS NOT NULL`
-- Looks up whether the creator has an `admin` or `super_admin` role in `user_roles`
-- If the creator is a regular member (not admin), sets `NEW.assigned_to = NEW.created_by`
-- Admins keep the lead unassigned (they manage the assignment pool)
+```sql
+-- Example for whatsapp_messages (same pattern for email_conversations, sms_messages)
+DROP POLICY IF EXISTS "Users can view messages in their org" ON public.whatsapp_messages;
 
-**Triggers:**
-- `auto_assign_contact_to_creator` on `contacts` (BEFORE INSERT)
-- `auto_assign_loan_app_to_creator` on `loan_applications` (BEFORE INSERT)
+CREATE POLICY "Users can view own or assigned messages"
+ON public.whatsapp_messages
+FOR SELECT TO authenticated
+USING (
+  org_id = get_user_org_id(auth.uid())
+  AND (
+    -- Admins see everything in org
+    EXISTS (
+      SELECT 1 FROM public.user_roles
+      WHERE user_id = auth.uid()
+        AND role IN ('admin', 'super_admin')
+    )
+    OR
+    -- User sent this message
+    sent_by = auth.uid()
+    OR
+    -- Inbound message for a contact assigned to this user
+    (direction = 'inbound' AND contact_id IN (
+      SELECT id FROM public.contacts
+      WHERE assigned_to = auth.uid()
+    ))
+  )
+);
+```
 
-### No Frontend Changes Required
-The trigger handles assignment transparently at the database level. The existing forms and edge functions continue to work as-is -- they just won't produce unassigned leads for non-admin users anymore.
+### Updated `get_unified_inbox` Function
+Add a role check at the top of the function. If the caller is not admin, add `AND (wm.sent_by = auth.uid() OR c.assigned_to = auth.uid())` filters to both UNION branches.
+
+| Change | Type | Scope |
+|--------|------|-------|
+| RLS on `whatsapp_messages` | DB migration | Replace SELECT policy |
+| RLS on `email_conversations` | DB migration | Replace SELECT policy |
+| RLS on `sms_messages` | DB migration | Replace SELECT policy |
+| Update `get_unified_inbox` | DB migration | Add user-level filtering |
