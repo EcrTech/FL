@@ -116,23 +116,11 @@ export default function Disbursals() {
             // Fetch applicant name
             const { data: applicant } = await supabase
               .from("loan_applicants")
-              .select("first_name, last_name")
+              .select("first_name, last_name, bank_account_number, bank_ifsc_code, bank_name, bank_account_holder_name")
               .eq("loan_application_id", app.id)
               .eq("applicant_type", "primary")
               .maybeSingle();
 
-            // Fetch bank details from OCR
-            const { data: bankStatement } = await supabase
-              .from("loan_documents")
-              .select("ocr_data")
-              .eq("loan_application_id", app.id)
-              .eq("document_type", "bank_statement")
-              .not("ocr_data", "is", null)
-              .order("created_at", { ascending: false })
-              .limit(1)
-              .maybeSingle();
-
-            const ocrData = bankStatement?.ocr_data as Record<string, unknown> | null;
             const sanction = Array.isArray(app.loan_sanctions) ? app.loan_sanctions[0] : app.loan_sanctions;
             const approvedAmount = Number(app.approved_amount) || 0;
             const processingFee = Number(sanction?.processing_fee) || Math.round(approvedAmount * 0.10);
@@ -150,11 +138,11 @@ export default function Disbursals() {
               status: "ready",
               date: app.created_at,
               sanction_id: sanction?.id,
-              bank_details: ocrData ? {
-                beneficiaryName: (ocrData.account_holder_name as string) || "",
-                accountNumber: (ocrData.account_number as string) || "",
-                ifscCode: (ocrData.ifsc_code as string) || "",
-                bankName: (ocrData.bank_name as string) || "",
+              bank_details: applicant?.bank_account_number ? {
+                beneficiaryName: applicant.bank_account_holder_name || `${applicant.first_name} ${applicant.last_name || ""}`.trim(),
+                accountNumber: applicant.bank_account_number,
+                ifscCode: applicant.bank_ifsc_code || "",
+                bankName: applicant.bank_name || "",
               } : undefined,
             });
           }

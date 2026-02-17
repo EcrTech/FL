@@ -61,18 +61,15 @@ export default function DisbursementForm({ applicationId }: DisbursementFormProp
     },
   });
 
-  // Fetch OCR data from bank statement (read-only)
-  const { data: bankStatementOCR } = useQuery({
-    queryKey: ["bank-statement-ocr", applicationId],
+  // Fetch primary applicant's bank details
+  const { data: primaryApplicant } = useQuery({
+    queryKey: ["primary-applicant-bank", applicationId],
     queryFn: async () => {
       const { data } = await supabase
-        .from("loan_documents")
-        .select("ocr_data")
+        .from("loan_applicants")
+        .select("first_name, last_name, bank_account_number, bank_ifsc_code, bank_name, bank_account_holder_name")
         .eq("loan_application_id", applicationId)
-        .eq("document_type", "bank_statement")
-        .not("ocr_data", "is", null)
-        .order("created_at", { ascending: false })
-        .limit(1)
+        .eq("applicant_type", "primary")
         .maybeSingle();
       return data;
     },
@@ -94,13 +91,12 @@ export default function DisbursementForm({ applicationId }: DisbursementFormProp
     },
   });
 
-  // Extract bank details from OCR
-  const ocrData = bankStatementOCR?.ocr_data as Record<string, unknown> | null;
+  // Extract bank details from applicant record
   const bankDetails = {
-    beneficiaryName: (ocrData?.account_holder_name as string) || "",
-    accountNumber: (ocrData?.account_number as string) || "",
-    ifscCode: (ocrData?.ifsc_code as string) || "",
-    bankName: (ocrData?.bank_name as string) || "",
+    beneficiaryName: primaryApplicant?.bank_account_holder_name || (primaryApplicant ? `${primaryApplicant.first_name} ${primaryApplicant.last_name || ""}`.trim() : ""),
+    accountNumber: primaryApplicant?.bank_account_number || "",
+    ifscCode: primaryApplicant?.bank_ifsc_code || "",
+    bankName: primaryApplicant?.bank_name || "",
   };
 
   const isVerified = bankVerification?.status === "success";
@@ -201,7 +197,7 @@ export default function DisbursementForm({ applicationId }: DisbursementFormProp
             ) : hasBankDetails ? (
               <>
                 <AlertCircle className="h-4 w-4 text-yellow-600" />
-                <span className="text-sm font-medium text-yellow-700">Bank details from OCR (unverified)</span>
+                <span className="text-sm font-medium text-yellow-700">Bank details available (unverified)</span>
                 <Badge variant="outline" className="ml-auto">Pending Verification</Badge>
               </>
             ) : (
