@@ -159,8 +159,8 @@ Return ONLY valid JSON with these fields. Use 0 for missing numeric values.`,
 - refund_due: Refund due if any (number only, 0 if not applicable)
 Return ONLY valid JSON with these fields. Use 0 for missing numeric values.`,
 
-  disbursement_proof: `Extract the following from this UTR/disbursement proof document (bank transfer screenshot, NEFT/RTGS confirmation, payment receipt):
-- utr_number: The UTR (Unique Transaction Reference) number or transaction reference ID
+  disbursement_proof: `Extract the following from this UTR/disbursement proof document (bank transfer screenshot, NEFT/RTGS/IMPS confirmation, payment receipt):
+- utr_number: The UTR (Unique Transaction Reference) number or transaction reference ID. IMPORTANT: Look for ANY transaction reference number on the document, including fields labeled "Transaction ID", "Txn ID", "Reference Number", "Ref No", "NEFT Reference", "RTGS Reference", "IMPS Reference", "CMS Reference", "CMS Ref No", "UTR No", or any similar alphanumeric reference code. This is the most critical field to extract.
 - transaction_date: The date of the transaction (YYYY-MM-DD format)
 - amount: The transferred amount (number only)
 - beneficiary_name: Name of the beneficiary/payee
@@ -169,8 +169,8 @@ Return ONLY valid JSON with these fields. Use 0 for missing numeric values.`,
 - transaction_status: Transaction status (e.g., "Success", "Completed", "Processed")
 Return ONLY valid JSON with these fields. Use null for missing values.`,
 
-  utr_proof: `Extract the following from this UTR/disbursement proof document (bank transfer screenshot, NEFT/RTGS confirmation, payment receipt):
-- utr_number: The UTR (Unique Transaction Reference) number or transaction reference ID
+  utr_proof: `Extract the following from this UTR/disbursement proof document (bank transfer screenshot, NEFT/RTGS/IMPS confirmation, payment receipt):
+- utr_number: The UTR (Unique Transaction Reference) number or transaction reference ID. IMPORTANT: Look for ANY transaction reference number on the document, including fields labeled "Transaction ID", "Txn ID", "Reference Number", "Ref No", "NEFT Reference", "RTGS Reference", "IMPS Reference", "CMS Reference", "CMS Ref No", "UTR No", or any similar alphanumeric reference code. This is the most critical field to extract.
 - transaction_date: The date of the transaction (YYYY-MM-DD format)
 - amount: The transferred amount (number only)
 - beneficiary_name: Name of the beneficiary/payee
@@ -511,7 +511,7 @@ serve(async (req) => {
                 },
                 {
                   type: "text",
-                  text: prompt,
+                  text: prompt + "\n\nCRITICAL: Respond with ONLY the raw JSON object. No text before or after. No markdown. No code fences. No explanation.",
                 },
               ],
             },
@@ -610,6 +610,58 @@ serve(async (req) => {
       console.error(`[ParseDocument] JSON parse error:`, parseError);
       console.error(`[ParseDocument] Raw content (first 500):`, content.substring(0, 500));
       parsedData = { raw_text: content, parse_error: true };
+    }
+
+    // Retry for UTR extraction if null on disbursement/utr proof images
+    if ((documentType === 'disbursement_proof' || documentType === 'utr_proof') && !parsedData.utr_number && !parsedData.parse_error && !isPdf) {
+      console.log(`[ParseDocument] UTR is null for image-based ${documentType}, retrying with focused prompt...`);
+      try {
+        const retryPrompt = `Look at this bank transaction receipt/screenshot carefully. Find the main transaction reference number or ID shown on the document. It may be labeled as "Transaction ID", "UTR", "Reference Number", "Ref No", "NEFT Ref", "RTGS Ref", "IMPS Ref", "CMS Ref", or similar. Return ONLY a JSON object like: {"utr_number": "THE_REFERENCE_NUMBER_HERE"}. If you truly cannot find any reference number, return {"utr_number": null}.\n\nCRITICAL: Respond with ONLY the raw JSON object. No text before or after. No markdown. No code fences.`;
+        
+        const mimeType = fileDataToUse?.type || "image/jpeg";
+        const retryResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${lovableApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-pro",
+            messages: [
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "image_url",
+                    image_url: { url: `data:${mimeType};base64,${base64}` },
+                  },
+                  { type: "text", text: retryPrompt },
+                ],
+              },
+            ],
+            max_tokens: 500,
+          }),
+        });
+
+        if (retryResponse.ok) {
+          const retryResult = await retryResponse.json();
+          const retryContent = retryResult.choices?.[0]?.message?.content || "";
+          const firstBrace = retryContent.indexOf('{');
+          const lastBrace = retryContent.lastIndexOf('}');
+          if (firstBrace !== -1 && lastBrace > firstBrace) {
+            const retryJson = JSON.parse(retryContent.substring(firstBrace, lastBrace + 1));
+            if (retryJson.utr_number) {
+              console.log(`[ParseDocument] UTR retry successful: ${retryJson.utr_number}`);
+              parsedData.utr_number = retryJson.utr_number;
+            }
+          }
+        } else {
+          const errText = await retryResponse.text();
+          console.warn(`[ParseDocument] UTR retry failed: ${retryResponse.status}`, errText);
+        }
+      } catch (retryError) {
+        console.warn(`[ParseDocument] UTR retry error:`, retryError);
+      }
     }
 
     // Merge with accumulated data if this is a continuation
