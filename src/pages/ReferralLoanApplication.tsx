@@ -8,6 +8,7 @@ import { ApplicationHeader } from "@/components/ReferralApplication/ApplicationH
 import { StepProgressBar } from "@/components/ReferralApplication/StepProgressBar";
 import { LoanRequirementsScreen } from "@/components/ReferralApplication/LoanRequirementsScreen";
 import { ContactConsentScreen } from "@/components/ReferralApplication/ContactConsentScreen";
+import { DPDPConsentStep } from "@/components/ReferralApplication/DPDPConsentStep";
 import { PANVerificationStep } from "@/components/ReferralApplication/PANVerificationStep";
 import { AadhaarVerificationStep } from "@/components/ReferralApplication/AadhaarVerificationStep";
 import { VideoKYCStep } from "@/components/ReferralApplication/VideoKYCStep";
@@ -195,6 +196,7 @@ export default function ReferralLoanApplication() {
   } | undefined>();
 
   const [videoKycCompleted, setVideoKycCompleted] = useState(false);
+  const [dpdpConsented, setDpdpConsented] = useState(false);
 
   // Restore form state from localStorage on mount (for DigiLocker redirect return)
   useEffect(() => {
@@ -564,7 +566,7 @@ export default function ReferralLoanApplication() {
             <p className="text-muted-foreground font-body mb-8">
               Your loan application has been successfully submitted. Our team will review and contact you shortly.
             </p>
-            <div className="bg-[hsl(var(--electric-blue-100))] p-6 rounded-2xl border border-[hsl(var(--electric-blue-400))]/20">
+            <div className="bg-[hsl(var(--coral-100))] p-6 rounded-2xl border border-[hsl(var(--coral-400))]/20">
               <p className="text-sm text-muted-foreground font-body mb-1">Application Number</p>
               <p className="text-2xl font-heading font-bold text-primary">{applicationNumber}</p>
             </div>
@@ -616,7 +618,19 @@ export default function ReferralLoanApplication() {
         </div>
       )}
 
-      {/* Main Content */}
+      {/* DPDP Consent Step — shown before all other steps */}
+      {!dpdpConsented && referrerInfo && (
+        <main className="max-w-lg mx-auto px-4 py-6">
+          <DPDPConsentStep
+            orgId={referrerInfo.orgId}
+            userIdentifier={basicInfo.phone || basicInfo.email || "anonymous"}
+            onConsent={() => setDpdpConsented(true)}
+          />
+        </main>
+      )}
+
+      {/* Main Content — only shown after DPDP consent */}
+      {dpdpConsented && (
       <main className="max-w-lg mx-auto">
         {/* Step 1: Basic Info (2 sub-screens) */}
         {currentStep === 1 && (
@@ -766,6 +780,7 @@ export default function ReferralLoanApplication() {
           </div>
         )}
       </main>
+      )}
 
       {/* Footer */}
       <div className="py-6 text-center flex items-center justify-center gap-2 text-xs text-muted-foreground font-body">

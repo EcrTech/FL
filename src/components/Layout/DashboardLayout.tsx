@@ -1,7 +1,7 @@
 import { ReactNode, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import logo from "@/assets/paisaa-saarthi-logo.jpeg";
+import logo from "@/assets/loanflow-logo.svg";
 import {
   LayoutDashboard,
   Settings,
@@ -378,6 +378,14 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                   >
                     <Shield size={18} />
                     <span>Access Management</span>
+                  </Link>
+                  <Link
+                    to="/admin/dpdp-compliance"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
+                    onClick={() => setSidebarOpen(false)}
+                  >
+                    <Shield size={18} />
+                    <span>DPDP Compliance</span>
                   </Link>
                 </>
               )}

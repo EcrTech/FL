@@ -3,12 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, TrendingUp, Phone, Target, ArrowUpRight, ArrowDownRight, CheckSquare } from "lucide-react";
+import { Users, TrendingUp, Phone, Target, ArrowUpRight, ArrowDownRight, CheckSquare, Shield } from "lucide-react";
 import { Bar, BarChart, Line, LineChart, Pie, PieChart, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from "recharts";
 import { useAuth } from "@/contexts/AuthContext";
 import { LoadingState } from "@/components/common/LoadingState";
 import { TaskList } from "@/components/Tasks/TaskList";
 import { useTasks } from "@/hooks/useTasks";
+import { useDPDPStats } from "@/hooks/useDPDPStats";
 import { Link } from "react-router-dom";
 import { ArrowRight, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -41,7 +42,7 @@ interface ActivityData {
 const COLORS = ['#01B8AA', '#168980', '#8AD4EB', '#F2C80F', '#A66999', '#FE9666', '#FD625E'];
 
 export default function Dashboard() {
-  const { orgId, isLoading: authLoading, profileError, isInitialized } = useAuth();
+  const { orgId, isAdmin, isLoading: authLoading, profileError, isInitialized } = useAuth();
   
 
   // Fetch optimized dashboard stats using database function
@@ -112,6 +113,9 @@ export default function Dashboard() {
   const pendingTasksCount = allTasks.filter(t => t.status === "pending").length;
   const inProgressTasksCount = allTasks.filter(t => t.status === "in_progress").length;
   const overdueTasksCount = allTasks.filter(t => t.isOverdue && t.status !== "completed").length;
+
+  // DPDP compliance stats (admin only)
+  const { data: dpdpStats } = useDPDPStats(isAdmin ? orgId : undefined);
 
   // Only show loading during initial auth - not blocking on orgId
   const loading = !isInitialized;
@@ -351,6 +355,42 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {/* DPDP Compliance Card (Admin Only) */}
+        {isAdmin && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <div className="flex items-center gap-2">
+                <Shield className="h-5 w-5 text-primary" />
+                <CardTitle className="text-sm font-medium">DPDP Compliance</CardTitle>
+              </div>
+              <Link to="/admin/dpdp-compliance">
+                <Button variant="ghost" size="sm">
+                  View Dashboard
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-6 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Pending Requests: </span>
+                  <span className="font-semibold">{dpdpStats?.pending_requests || 0}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Overdue: </span>
+                  <span className={`font-semibold ${(dpdpStats?.overdue_requests || 0) > 0 ? 'text-red-600' : ''}`}>
+                    {dpdpStats?.overdue_requests || 0}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Active Consents: </span>
+                  <span className="font-semibold">{dpdpStats?.active_consents || 0}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* My Tasks Section - Top 5 */}
         <Card>

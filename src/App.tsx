@@ -3,16 +3,6 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
-import { MarketingLayout } from "./components/Marketing/MarketingLayout";
-import MarketingHome from "./pages/Marketing/Home";
-import MarketingAbout from "./pages/Marketing/About";
-import MarketingServices from "./pages/Marketing/Services";
-import MarketingContact from "./pages/Marketing/Contact";
-import MarketingFAQ from "./pages/Marketing/FAQ";
-import MarketingHowToApply from "./pages/Marketing/HowToApply";
-import MarketingApply from "./pages/Marketing/Apply";
-import MarketingPrivacy from "./pages/Marketing/Privacy";
-import MarketingTerms from "./pages/Marketing/Terms";
 import SignUp from "./pages/SignUp";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
@@ -76,6 +66,9 @@ import NegativePinCodes from "./pages/NegativePinCodes";
 import AccessManagement from "./pages/AccessManagement";
 import BulkPaymentReport from "./components/LOS/Reports/BulkPaymentReport";
 import Profile from "./pages/Profile";
+import DPDPCompliance from "./pages/DPDPCompliance";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import DataRightsRequest from "./pages/DataRightsRequest";
 
 import VideoKYC from "./pages/VideoKYC";
 import DigilockerSuccess from "./pages/DigilockerSuccess";
@@ -92,18 +85,7 @@ const App = () => {
       <Toaster />
       <Sonner />
       <Routes>
-            {/* Marketing public pages */}
-            <Route element={<MarketingLayout />}>
-              <Route path="/" element={<MarketingHome />} />
-              <Route path="/about" element={<MarketingAbout />} />
-              <Route path="/services" element={<MarketingServices />} />
-              <Route path="/contact" element={<MarketingContact />} />
-              <Route path="/faq" element={<MarketingFAQ />} />
-              <Route path="/how-to-apply" element={<MarketingHowToApply />} />
-              <Route path="/apply" element={<MarketingApply />} />
-              <Route path="/privacy" element={<MarketingPrivacy />} />
-              <Route path="/terms" element={<MarketingTerms />} />
-            </Route>
+            <Route path="/" element={<Navigate to="/login" replace />} />
 
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<SignUp />} />
@@ -115,6 +97,8 @@ const App = () => {
             <Route path="/videokyc/:token" element={<VideoKYC />} />
             <Route path="/digilocker/success" element={<DigilockerSuccess />} />
             <Route path="/digilocker/failure" element={<DigilockerFailure />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/data-rights-request" element={<DataRightsRequest />} />
             
             <Route path="/dashboard" element={
               <ProtectedRoute>
@@ -422,6 +406,12 @@ const App = () => {
                 <AccessManagement />
               </ProtectedRoute>
             } />
+
+            <Route path="/admin/dpdp-compliance" element={
+              <ProtectedRoute requiredRole="admin">
+                <DPDPCompliance />
+              </ProtectedRoute>
+            } />
             
             <Route path="/los/bulk-payment-report" element={
               <ProtectedRoute>
@@ -447,7 +437,7 @@ const App = () => {
               </ProtectedRoute>
             } />
             
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
       </TooltipProvider>
   );
