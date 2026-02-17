@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
-import { CheckCircle, XCircle, Clock, Building2, Upload, FileCheck, ExternalLink, Sparkles } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Building2, Upload, FileCheck, ExternalLink, Sparkles, Eye } from "lucide-react";
+import { DocumentPreviewDialog } from "@/components/LOS/Verification/DocumentPreviewDialog";
 import { format } from "date-fns";
 import { useLOSPermissions } from "@/hooks/useLOSPermissions";
 import ProofUploadDialog from "./ProofUploadDialog";
@@ -18,6 +19,7 @@ export default function DisbursementStatus({ applicationId }: DisbursementStatus
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [showProofUpload, setShowProofUpload] = useState(false);
+  const [showProofPreview, setShowProofPreview] = useState(false);
   const { permissions } = useLOSPermissions();
 
   const { data: disbursement } = useQuery({
@@ -181,10 +183,16 @@ export default function DisbursementStatus({ applicationId }: DisbursementStatus
                     )}
                   </div>
                 </div>
-                <Button variant="outline" size="sm" onClick={handleViewProof}>
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  View Proof
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setShowProofPreview(true)}>
+                    <Eye className="h-4 w-4 mr-2" />
+                    View Proof
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleViewProof}>
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Open in Tab
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="p-4 border border-dashed rounded-lg">
@@ -214,6 +222,14 @@ export default function DisbursementStatus({ applicationId }: DisbursementStatus
         onSuccess={() => {
           queryClient.invalidateQueries({ queryKey: ["loan-disbursements", applicationId] });
         }}
+      />
+
+      {/* Proof Preview Dialog */}
+      <DocumentPreviewDialog
+        open={showProofPreview}
+        onClose={() => setShowProofPreview(false)}
+        document={disbursement?.proof_document_path ? { file_path: disbursement.proof_document_path, file_name: "Disbursement Proof" } : null}
+        title="Disbursement Proof"
       />
     </div>
   );

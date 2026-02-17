@@ -12,7 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Upload, Loader2, FileCheck, X, Sparkles, ArrowLeft, CheckCircle, AlertTriangle, Edit2 } from "lucide-react";
+import { Upload, Loader2, FileCheck, X, Sparkles, ArrowLeft, CheckCircle, AlertTriangle, Edit2, Eye } from "lucide-react";
+import { DocumentPreviewDialog } from "@/components/LOS/Verification/DocumentPreviewDialog";
 
 interface BankDetails {
   beneficiaryName: string;
@@ -52,6 +53,7 @@ export default function ProofUploadDialog({
   const [ocrExtracted, setOcrExtracted] = useState(false);
   const [targetDisbursementIdState, setTargetDisbursementIdState] = useState<string | null>(null);
   const [uploadedFilePath, setUploadedFilePath] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   // Step 1: Upload file and run OCR
   const uploadMutation = useMutation({
@@ -354,6 +356,20 @@ export default function ProofUploadDialog({
                 </div>
               )}
 
+              {/* View uploaded slip */}
+              {uploadedFilePath && (
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <FileCheck className="h-4 w-4 text-green-600" />
+                    <span className="text-sm truncate max-w-[200px]">{file?.name || "Uploaded Slip"}</span>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => setShowPreview(true)}>
+                    <Eye className="h-4 w-4 mr-1" />
+                    View
+                  </Button>
+                </div>
+              )}
+
               <div className="space-y-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="utr-number" className="flex items-center gap-1">
@@ -402,6 +418,13 @@ export default function ProofUploadDialog({
             </>
           )}
         </div>
+
+        <DocumentPreviewDialog
+          open={showPreview}
+          onClose={() => setShowPreview(false)}
+          document={uploadedFilePath ? { file_path: uploadedFilePath, file_name: file?.name || "UTR Proof" } : null}
+          title="UTR Proof Document"
+        />
       </DialogContent>
     </Dialog>
   );
