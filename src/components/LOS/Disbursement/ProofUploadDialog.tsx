@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Upload, Loader2, FileCheck, X, Sparkles } from "lucide-react";
+import { Upload, Loader2, FileCheck, X, Sparkles, ArrowLeft, CheckCircle, AlertTriangle, Edit2 } from "lucide-react";
 
 interface BankDetails {
   beneficiaryName: string;
@@ -28,7 +28,7 @@ interface ProofUploadDialogProps {
   sanctionId?: string;
   disbursementAmount?: number;
   bankDetails?: BankDetails;
-  disbursementId?: string; // Optional - if provided, just upload proof
+  disbursementId?: string;
   onSuccess?: () => void;
 }
 
@@ -45,7 +45,15 @@ export default function ProofUploadDialog({
   const queryClient = useQueryClient();
   const [file, setFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [step, setStep] = useState<"upload" | "confirm">("upload");
+  const [utrNumber, setUtrNumber] = useState("");
+  const [disbursementDate, setDisbursementDate] = useState("");
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [ocrExtracted, setOcrExtracted] = useState(false);
+  const [targetDisbursementIdState, setTargetDisbursementIdState] = useState<string | null>(null);
+  const [uploadedFilePath, setUploadedFilePath] = useState<string | null>(null);
 
+  // Step 1: Upload file and run OCR
   const uploadMutation = useMutation({
     mutationFn: async () => {
       if (!file) throw new Error("No file selected");
@@ -95,12 +103,23 @@ export default function ProofUploadDialog({
 
       if (uploadError) throw uploadError;
 
-      // Parse the uploaded document to extract UTR number and date
+      // Update proof path immediately
+      await supabase
+        .from("loan_disbursements")
+        .update({
+          proof_document_path: filePath,
+          proof_uploaded_at: new Date().toISOString(),
+          proof_uploaded_by: userId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", targetDisbursementId);
+
+      // Try OCR extraction
       let extractedUtr: string | null = null;
       let extractedDate: string | null = null;
 
       try {
-        // Create a temporary document record for parsing
+        setIsExtracting(true);
         const { data: docInsert, error: docError } = await supabase
           .from("loan_documents")
           .insert({
@@ -118,7 +137,6 @@ export default function ProofUploadDialog({
           .single();
 
         if (!docError && docInsert) {
-          // Parse the document to extract UTR data
           const { data: parseResult, error: parseError } = await supabase.functions.invoke(
             "parse-loan-document",
             {
@@ -133,41 +151,49 @@ export default function ProofUploadDialog({
           if (!parseError && parseResult?.success && parseResult.data) {
             extractedUtr = parseResult.data.utr_number || null;
             extractedDate = parseResult.data.transaction_date || null;
-            console.log("[ProofUpload] Extracted UTR:", extractedUtr, "Date:", extractedDate);
           }
         }
       } catch (parseErr) {
         console.error("[ProofUpload] Error parsing UTR proof:", parseErr);
-        // Continue even if parsing fails - manual entry is still possible
+      } finally {
+        setIsExtracting(false);
       }
 
-      // Update disbursement record with extracted data
-      const updateData: Record<string, unknown> = {
-        proof_document_path: filePath,
-        proof_uploaded_at: new Date().toISOString(),
-        proof_uploaded_by: userId,
-        updated_at: new Date().toISOString(),
-        status: "completed",
-      };
+      return { targetDisbursementId, filePath, extractedUtr, extractedDate };
+    },
+    onSuccess: (data) => {
+      setTargetDisbursementIdState(data.targetDisbursementId);
+      setUploadedFilePath(data.filePath);
+      setUtrNumber(data.extractedUtr || "");
+      setDisbursementDate(data.extractedDate || new Date().toISOString().split("T")[0]);
+      setOcrExtracted(!!data.extractedUtr);
+      setStep("confirm");
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
 
-      // Add extracted UTR data if available
-      if (extractedUtr) {
-        updateData.utr_number = extractedUtr;
-      }
-      if (extractedDate) {
-        updateData.disbursement_date = extractedDate;
-      } else {
-        updateData.disbursement_date = new Date().toISOString();
-      }
+  // Step 2: Confirm/edit and finalize
+  const confirmMutation = useMutation({
+    mutationFn: async () => {
+      if (!utrNumber.trim()) throw new Error("UTR number is required");
+      const finalDisbursementId = targetDisbursementIdState || disbursementId;
+      if (!finalDisbursementId) throw new Error("No disbursement record found");
 
       const { error: updateError } = await supabase
         .from("loan_disbursements")
-        .update(updateData)
-        .eq("id", targetDisbursementId);
+        .update({
+          utr_number: utrNumber.trim(),
+          disbursement_date: disbursementDate || new Date().toISOString(),
+          status: "completed",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", finalDisbursementId);
 
       if (updateError) throw updateError;
 
-      // Update loan application stage - guarded transition
+      // Transition loan stage
       const { data: transitioned, error: stageError } = await supabase
         .rpc("transition_loan_stage", {
           p_application_id: applicationId,
@@ -177,22 +203,13 @@ export default function ProofUploadDialog({
 
       if (stageError) throw stageError;
       if (!transitioned) throw new Error("Application stage has changed. Please refresh.");
-
-      return { extractedUtr, extractedDate };
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["loan-disbursements"] });
       queryClient.invalidateQueries({ queryKey: ["unified-disbursals"] });
       queryClient.invalidateQueries({ queryKey: ["loan-applications"] });
-      
-      if (data.extractedUtr) {
-        toast.success(`Disbursement completed! UTR: ${data.extractedUtr}`);
-      } else {
-        toast.success("Proof uploaded and disbursement marked as completed");
-      }
-      
-      setFile(null);
-      onOpenChange(false);
+      toast.success(`Disbursement completed! UTR: ${utrNumber.trim()}`);
+      resetAndClose();
       onSuccess?.();
     },
     onError: (error: Error) => {
@@ -203,13 +220,11 @@ export default function ProofUploadDialog({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
-      // Validate file type
       const allowedTypes = ["application/pdf", "image/jpeg", "image/png", "image/jpg"];
       if (!allowedTypes.includes(selectedFile.type)) {
         toast.error("Please upload a PDF or image file");
         return;
       }
-      // Validate file size (max 10MB)
       if (selectedFile.size > 10 * 1024 * 1024) {
         toast.error("File size must be less than 10MB");
         return;
@@ -225,78 +240,167 @@ export default function ProofUploadDialog({
     }
   };
 
+  const resetAndClose = () => {
+    setFile(null);
+    setStep("upload");
+    setUtrNumber("");
+    setDisbursementDate("");
+    setOcrExtracted(false);
+    setTargetDisbursementIdState(null);
+    setUploadedFilePath(null);
+    onOpenChange(false);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) resetAndClose(); }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5" />
-            Upload UTR Proof
+            {step === "upload" ? "Upload UTR Proof" : "Confirm Disbursement Details"}
           </DialogTitle>
           <DialogDescription>
-            Upload the UTR confirmation or bank transfer proof. The UTR number and date will be automatically extracted.
+            {step === "upload"
+              ? "Upload the UTR confirmation or bank transfer proof."
+              : "Review and confirm the UTR number and date before completing the disbursement."
+            }
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          <div className="p-3 bg-primary/10 rounded-lg flex items-start gap-2">
-            <Sparkles className="h-4 w-4 text-primary mt-0.5" />
-            <div className="text-sm">
-              <span className="font-medium">AI-Powered Extraction</span>
-              <p className="text-muted-foreground text-xs mt-0.5">
-                UTR number and transaction date will be automatically extracted from the uploaded document.
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="proof-file">Proof Document</Label>
-            <Input
-              id="proof-file"
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf,.jpg,.jpeg,.png"
-              onChange={handleFileChange}
-              className="cursor-pointer"
-            />
-            <p className="text-xs text-muted-foreground">
-              Accepted formats: PDF, JPG, PNG (max 10MB)
-            </p>
-          </div>
-
-          {file && (
-            <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-              <div className="flex items-center gap-2">
-                <FileCheck className="h-4 w-4 text-green-600" />
-                <span className="text-sm truncate max-w-[200px]">{file.name}</span>
+          {step === "upload" ? (
+            <>
+              <div className="p-3 bg-primary/10 rounded-lg flex items-start gap-2">
+                <Sparkles className="h-4 w-4 text-primary mt-0.5" />
+                <div className="text-sm">
+                  <span className="font-medium">AI-Powered Extraction</span>
+                  <p className="text-muted-foreground text-xs mt-0.5">
+                    UTR number and date will be auto-extracted. You can review and edit before confirming.
+                  </p>
+                </div>
               </div>
-              <Button variant="ghost" size="sm" onClick={clearFile}>
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
 
-          <div className="flex gap-2 justify-end">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => uploadMutation.mutate()}
-              disabled={!file || uploadMutation.isPending}
-            >
-              {uploadMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload & Complete
-                </>
+              <div className="space-y-2">
+                <Label htmlFor="proof-file">Proof Document</Label>
+                <Input
+                  id="proof-file"
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={handleFileChange}
+                  className="cursor-pointer"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Accepted formats: PDF, JPG, PNG (max 10MB)
+                </p>
+              </div>
+
+              {file && (
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <FileCheck className="h-4 w-4 text-green-600" />
+                    <span className="text-sm truncate max-w-[200px]">{file.name}</span>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={clearFile}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
               )}
-            </Button>
-          </div>
+
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={resetAndClose}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => uploadMutation.mutate()}
+                  disabled={!file || uploadMutation.isPending}
+                >
+                  {uploadMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      {isExtracting ? "Extracting..." : "Uploading..."}
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload & Extract
+                    </>
+                  )}
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* OCR status indicator */}
+              {ocrExtracted ? (
+                <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg flex items-start gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-600 mt-0.5" />
+                  <div className="text-sm">
+                    <span className="font-medium text-green-700">Auto-extracted from document</span>
+                    <p className="text-muted-foreground text-xs mt-0.5">
+                      Review the values below and edit if needed.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5" />
+                  <div className="text-sm">
+                    <span className="font-medium text-amber-700">Could not extract details</span>
+                    <p className="text-muted-foreground text-xs mt-0.5">
+                      Please enter the UTR number and transaction date manually.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="utr-number" className="flex items-center gap-1">
+                    UTR Number <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="utr-number"
+                    value={utrNumber}
+                    onChange={(e) => setUtrNumber(e.target.value)}
+                    placeholder="Enter UTR / transaction reference number"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="disbursement-date">Transaction Date</Label>
+                  <Input
+                    id="disbursement-date"
+                    type="date"
+                    value={disbursementDate ? disbursementDate.split("T")[0] : ""}
+                    onChange={(e) => setDisbursementDate(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 justify-between">
+                <Button variant="ghost" size="sm" onClick={() => setStep("upload")}>
+                  <ArrowLeft className="h-4 w-4 mr-1" />
+                  Back
+                </Button>
+                <Button
+                  onClick={() => confirmMutation.mutate()}
+                  disabled={!utrNumber.trim() || confirmMutation.isPending}
+                >
+                  {confirmMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Completing...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Complete Disbursement
+                    </>
+                  )}
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       </DialogContent>
     </Dialog>

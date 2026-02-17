@@ -63,23 +63,6 @@ export function BankDetailsSection({ applicationId, orgId, applicantId }: BankDe
     enabled: !!applicantId,
   });
 
-  // Fetch parsed bank statement data if available
-  const { data: bankStatementDoc } = useQuery({
-    queryKey: ["bank-statement-parsed", applicationId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("loan_documents")
-        .select("ocr_data")
-        .eq("loan_application_id", applicationId)
-        .eq("document_type", "bank_statement")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!applicationId,
-  });
 
   // Populate form with existing data or parsed data
   useEffect(() => {
@@ -97,22 +80,8 @@ export function BankDetailsSection({ applicationId, orgId, applicantId }: BankDe
         bank_verified_at: applicant.bank_verified_at || null,
         bank_verification_method: (applicant as any).bank_verification_method || null,
       });
-    } else if (bankStatementDoc?.ocr_data) {
-      const parsed = bankStatementDoc.ocr_data as Record<string, any>;
-      setFormData({
-        bank_account_number: parsed.account_number || "",
-        bank_ifsc_code: parsed.ifsc_code || "",
-        bank_name: parsed.bank_name || "",
-        bank_branch: parsed.branch_name || "",
-        bank_account_holder_name: parsed.account_holder_name || "",
-        bank_account_type: "savings",
-        bank_verified: false,
-        bank_verified_at: null,
-        bank_verification_method: null,
-      });
-      setIsEditing(true);
     }
-  }, [applicant, bankStatementDoc]);
+  }, [applicant]);
 
   const saveMutation = useMutation({
     mutationFn: async (data: Partial<BankDetails>) => {
@@ -278,7 +247,7 @@ export function BankDetailsSection({ applicationId, orgId, applicantId }: BankDe
   };
 
   const hasBankDetails = formData.bank_account_number || formData.bank_ifsc_code || formData.bank_name;
-  const hasParsedData = bankStatementDoc?.ocr_data && !applicant?.bank_account_number;
+  const hasParsedData = false;
 
   if (!applicantId) {
     return (

@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calculator, TrendingUp, TrendingDown, Minus, RefreshCw, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Calculator, TrendingUp, TrendingDown, Minus, RefreshCw, Loader2, Plus, Trash2, Edit2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface IncomeSummaryProps {
@@ -22,6 +23,7 @@ interface SalarySlipData {
   pf_deduction: number;
   tds: number;
   other_deductions: number;
+  is_manual?: boolean;
 }
 
 interface AnnualIncomeData {
@@ -30,6 +32,7 @@ interface AnnualIncomeData {
   gross_income: number;
   taxable_income: number;
   tax_paid: number;
+  is_manual?: boolean;
 }
 
 const formatCurrency = (amount: number | null | undefined) => {
@@ -41,10 +44,35 @@ const formatCurrency = (amount: number | null | undefined) => {
   }).format(amount);
 };
 
+const EMPTY_SALARY: SalarySlipData = {
+  month: "",
+  gross_salary: 0,
+  net_salary: 0,
+  basic_salary: 0,
+  hra: 0,
+  pf_deduction: 0,
+  tds: 0,
+  other_deductions: 0,
+  is_manual: true,
+};
+
+const EMPTY_ANNUAL: AnnualIncomeData = {
+  year: "",
+  source: "Manual",
+  gross_income: 0,
+  taxable_income: 0,
+  tax_paid: 0,
+  is_manual: true,
+};
+
 export default function IncomeSummary({ applicationId, orgId }: IncomeSummaryProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isCalculating, setIsCalculating] = useState(false);
+  const [manualSalarySlips, setManualSalarySlips] = useState<SalarySlipData[]>([]);
+  const [manualAnnualIncomes, setManualAnnualIncomes] = useState<AnnualIncomeData[]>([]);
+  const [showSalaryForm, setShowSalaryForm] = useState(false);
+  const [showAnnualForm, setShowAnnualForm] = useState(false);
 
   const { data: documents = [], refetch: refetchDocuments, isLoading: isLoadingDocs } = useQuery({
     queryKey: ["loan-documents", applicationId],
@@ -57,7 +85,7 @@ export default function IncomeSummary({ applicationId, orgId }: IncomeSummaryPro
       return data;
     },
     enabled: !!applicationId,
-    staleTime: 0, // Always consider data stale to get latest parsed data
+    staleTime: 0,
   });
 
   const { data: incomeSummary } = useQuery({
@@ -74,14 +102,12 @@ export default function IncomeSummary({ applicationId, orgId }: IncomeSummaryPro
     enabled: !!applicationId,
   });
 
-  // Extract salary slip data from documents
-  const salarySlips = useMemo((): SalarySlipData[] => {
+  // Extract salary slip data from OCR documents
+  const ocrSalarySlips = useMemo((): SalarySlipData[] => {
     const slips: SalarySlipData[] = [];
-    
     ["salary_slip_1", "salary_slip_2", "salary_slip_3"].forEach((docType) => {
       const doc = documents.find((d) => d.document_type === docType);
       const ocr = doc?.ocr_data as Record<string, any> | null;
-      
       if (ocr && !ocr.parse_error) {
         slips.push({
           month: ocr.month || docType.replace("salary_slip_", "Month "),
@@ -95,15 +121,15 @@ export default function IncomeSummary({ applicationId, orgId }: IncomeSummaryPro
         });
       }
     });
-    
     return slips;
   }, [documents]);
 
-  // Extract annual income data from Form 16 / ITR
-  const annualIncomes = useMemo((): AnnualIncomeData[] => {
+  // Combine OCR + manual salary slips
+  const salarySlips = useMemo(() => [...ocrSalarySlips, ...manualSalarySlips], [ocrSalarySlips, manualSalarySlips]);
+
+  // Extract annual income from OCR
+  const ocrAnnualIncomes = useMemo((): AnnualIncomeData[] => {
     const incomes: AnnualIncomeData[] = [];
-    
-    // Form 16 Year 1
     const form16Y1 = documents.find((d) => d.document_type === "form_16_year_1")?.ocr_data as Record<string, any> | null;
     if (form16Y1 && !form16Y1.parse_error) {
       incomes.push({
@@ -114,8 +140,6 @@ export default function IncomeSummary({ applicationId, orgId }: IncomeSummaryPro
         tax_paid: Number(form16Y1.tax_deducted) || 0,
       });
     }
-    
-    // Form 16 Year 2
     const form16Y2 = documents.find((d) => d.document_type === "form_16_year_2")?.ocr_data as Record<string, any> | null;
     if (form16Y2 && !form16Y2.parse_error) {
       incomes.push({
@@ -126,8 +150,6 @@ export default function IncomeSummary({ applicationId, orgId }: IncomeSummaryPro
         tax_paid: Number(form16Y2.tax_deducted) || 0,
       });
     }
-    
-    // ITR Year 1 (if no Form 16)
     if (!form16Y1) {
       const itrY1 = documents.find((d) => d.document_type === "itr_year_1")?.ocr_data as Record<string, any> | null;
       if (itrY1 && !itrY1.parse_error) {
@@ -140,8 +162,6 @@ export default function IncomeSummary({ applicationId, orgId }: IncomeSummaryPro
         });
       }
     }
-    
-    // ITR Year 2 (if no Form 16)
     if (!form16Y2) {
       const itrY2 = documents.find((d) => d.document_type === "itr_year_2")?.ocr_data as Record<string, any> | null;
       if (itrY2 && !itrY2.parse_error) {
@@ -154,25 +174,23 @@ export default function IncomeSummary({ applicationId, orgId }: IncomeSummaryPro
         });
       }
     }
-    
     return incomes;
   }, [documents]);
+
+  // Combine OCR + manual annual incomes
+  const annualIncomes = useMemo(() => [...ocrAnnualIncomes, ...manualAnnualIncomes], [ocrAnnualIncomes, manualAnnualIncomes]);
 
   // Calculate summary metrics
   const summaryMetrics = useMemo(() => {
     const avgMonthlyGross = salarySlips.length > 0
       ? salarySlips.reduce((sum, s) => sum + s.gross_salary, 0) / salarySlips.length
       : 0;
-    
     const avgMonthlyNet = salarySlips.length > 0
       ? salarySlips.reduce((sum, s) => sum + s.net_salary, 0) / salarySlips.length
       : 0;
-    
     const avgAnnualIncome = annualIncomes.length > 0
       ? annualIncomes.reduce((sum, a) => sum + a.gross_income, 0) / annualIncomes.length
       : 0;
-    
-    // Calculate YoY growth if we have 2 years of data
     let yoyGrowth: number | null = null;
     if (annualIncomes.length >= 2) {
       const sorted = [...annualIncomes].sort((a, b) => a.year.localeCompare(b.year));
@@ -182,28 +200,18 @@ export default function IncomeSummary({ applicationId, orgId }: IncomeSummaryPro
         yoyGrowth = ((newerYear - olderYear) / olderYear) * 100;
       }
     }
-    
-    // Calculate income stability (variance)
     let stabilityScore = "N/A";
     if (salarySlips.length >= 2) {
-      const variance = salarySlips.reduce((sum, s) => 
+      const variance = salarySlips.reduce((sum, s) =>
         sum + Math.pow(s.gross_salary - avgMonthlyGross, 2), 0
       ) / salarySlips.length;
       const stdDev = Math.sqrt(variance);
       const cv = avgMonthlyGross > 0 ? (stdDev / avgMonthlyGross) * 100 : 0;
-      
       if (cv < 5) stabilityScore = "High";
       else if (cv < 15) stabilityScore = "Medium";
       else stabilityScore = "Low";
     }
-    
-    return {
-      avgMonthlyGross,
-      avgMonthlyNet,
-      avgAnnualIncome,
-      yoyGrowth,
-      stabilityScore,
-    };
+    return { avgMonthlyGross, avgMonthlyNet, avgAnnualIncome, yoyGrowth, stabilityScore };
   }, [salarySlips, annualIncomes]);
 
   // Save summary to database
@@ -232,7 +240,6 @@ export default function IncomeSummary({ applicationId, orgId }: IncomeSummaryPro
         source_documents: documents.filter((d) => d.ocr_data).map((d) => d.id),
       };
 
-      // Upsert to prevent race condition on duplicate inserts
       const { error } = await supabase
         .from("loan_income_summaries")
         .upsert(summaryData as any, { onConflict: "loan_application_id" });
@@ -255,16 +262,53 @@ export default function IncomeSummary({ applicationId, orgId }: IncomeSummaryPro
     saveMutation.mutate();
   };
 
+  // Manual salary slip handlers
+  const addManualSalarySlip = () => {
+    setManualSalarySlips((prev) => [...prev, { ...EMPTY_SALARY }]);
+    setShowSalaryForm(true);
+  };
+
+  const updateManualSalarySlip = (index: number, field: keyof SalarySlipData, value: string | number) => {
+    setManualSalarySlips((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: typeof value === "string" && field !== "month" ? Number(value) || 0 : value };
+      return updated;
+    });
+  };
+
+  const removeManualSalarySlip = (index: number) => {
+    setManualSalarySlips((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Manual annual income handlers
+  const addManualAnnualIncome = () => {
+    setManualAnnualIncomes((prev) => [...prev, { ...EMPTY_ANNUAL }]);
+    setShowAnnualForm(true);
+  };
+
+  const updateManualAnnualIncome = (index: number, field: keyof AnnualIncomeData, value: string | number) => {
+    setManualAnnualIncomes((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: typeof value === "string" && field !== "year" && field !== "source" ? Number(value) || 0 : value };
+      return updated;
+    });
+  };
+
+  const removeManualAnnualIncome = (index: number) => {
+    setManualAnnualIncomes((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const hasData = salarySlips.length > 0 || annualIncomes.length > 0;
 
-  if (!hasData) {
-    return (
-      <Card>
-        <CardHeader className="py-4 flex flex-row items-center justify-between">
-          <CardTitle className="text-base">Income Summary</CardTitle>
-          <Button 
-            variant="outline" 
-            size="sm" 
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Income Summary</h3>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => refetchDocuments()}
             disabled={isLoadingDocs}
           >
@@ -274,108 +318,99 @@ export default function IncomeSummary({ applicationId, orgId }: IncomeSummaryPro
               <RefreshCw className="h-4 w-4" />
             )}
           </Button>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            No income data available. Parse salary slips and Form 16/ITR documents to generate income summary.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      {/* Header with Refresh Button */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Income Summary</h3>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => refetchDocuments()}
-          disabled={isLoadingDocs}
-        >
-          {isLoadingDocs ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4 mr-2" />
-          )}
-          Refresh
-        </Button>
-      </div>
-      
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="py-3 px-4">
-            <CardTitle className="text-xs font-medium text-muted-foreground">Avg Monthly (Net)</CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-3">
-            <div className="text-xl font-bold">{formatCurrency(summaryMetrics.avgMonthlyNet)}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="py-3 px-4">
-            <CardTitle className="text-xs font-medium text-muted-foreground">Annual Average</CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-3">
-            <div className="text-xl font-bold">{formatCurrency(summaryMetrics.avgAnnualIncome)}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="py-3 px-4">
-            <CardTitle className="text-xs font-medium text-muted-foreground">YoY Growth</CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-3">
-            <div className="text-xl font-bold flex items-center gap-2">
-              {summaryMetrics.yoyGrowth !== null ? (
-                <>
-                  {summaryMetrics.yoyGrowth >= 0 ? (
-                    <TrendingUp className="h-4 w-4 text-green-500" />
-                  ) : (
-                    <TrendingDown className="h-4 w-4 text-destructive" />
-                  )}
-                  {summaryMetrics.yoyGrowth.toFixed(1)}%
-                </>
-              ) : (
-                <>
-                  <Minus className="h-4 w-4 text-muted-foreground" />
-                  N/A
-                </>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="py-3 px-4">
-            <CardTitle className="text-xs font-medium text-muted-foreground">Stability</CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-3">
-            <Badge 
-              className={
-                summaryMetrics.stabilityScore === "High" 
-                  ? "bg-green-500/10 text-green-600 border-green-500/20"
-                  : summaryMetrics.stabilityScore === "Medium"
-                  ? "bg-yellow-500/10 text-yellow-600 border-yellow-500/20"
-                  : "bg-muted text-muted-foreground"
-              }
+          {hasData && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCalculate}
+              disabled={isCalculating}
             >
-              {summaryMetrics.stabilityScore}
-            </Badge>
-          </CardContent>
-        </Card>
+              {isCalculating ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <Calculator className="h-4 w-4 mr-1" />
+              )}
+              Save Summary
+            </Button>
+          )}
+        </div>
       </div>
+
+      {/* Summary Cards - only show when data exists */}
+      {hasData && (
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card>
+            <CardHeader className="py-3 px-4">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Avg Monthly (Net)</CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-3">
+              <div className="text-xl font-bold">{formatCurrency(summaryMetrics.avgMonthlyNet)}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="py-3 px-4">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Annual Average</CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-3">
+              <div className="text-xl font-bold">{formatCurrency(summaryMetrics.avgAnnualIncome)}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="py-3 px-4">
+              <CardTitle className="text-xs font-medium text-muted-foreground">YoY Growth</CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-3">
+              <div className="text-xl font-bold flex items-center gap-2">
+                {summaryMetrics.yoyGrowth !== null ? (
+                  <>
+                    {summaryMetrics.yoyGrowth >= 0 ? (
+                      <TrendingUp className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <TrendingDown className="h-4 w-4 text-destructive" />
+                    )}
+                    {summaryMetrics.yoyGrowth.toFixed(1)}%
+                  </>
+                ) : (
+                  <>
+                    <Minus className="h-4 w-4 text-muted-foreground" />
+                    N/A
+                  </>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="py-3 px-4">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Stability</CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-3">
+              <Badge
+                className={
+                  summaryMetrics.stabilityScore === "High"
+                    ? "bg-green-500/10 text-green-600 border-green-500/20"
+                    : summaryMetrics.stabilityScore === "Medium"
+                    ? "bg-yellow-500/10 text-yellow-600 border-yellow-500/20"
+                    : "bg-muted text-muted-foreground"
+                }
+              >
+                {summaryMetrics.stabilityScore}
+              </Badge>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Monthly Income Table */}
-      {salarySlips.length > 0 && (
-        <Card>
-          <CardHeader className="py-4 flex flex-row items-center justify-between">
-            <CardTitle className="text-base">Monthly Income (Salary Slips)</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
+      <Card>
+        <CardHeader className="py-4 flex flex-row items-center justify-between">
+          <CardTitle className="text-base">Monthly Income (Salary Slips)</CardTitle>
+          <Button variant="outline" size="sm" onClick={addManualSalarySlip}>
+            <Plus className="h-4 w-4 mr-1" />
+            Add Manually
+          </Button>
+        </CardHeader>
+        <CardContent className="p-0">
+          {salarySlips.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -386,52 +421,126 @@ export default function IncomeSummary({ applicationId, orgId }: IncomeSummaryPro
                   <TableHead className="text-right">PF</TableHead>
                   <TableHead className="text-right">TDS</TableHead>
                   <TableHead className="text-right">Net</TableHead>
+                  <TableHead className="w-[60px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {salarySlips.map((slip, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell className="font-medium">{slip.month}</TableCell>
+                {ocrSalarySlips.map((slip, idx) => (
+                  <TableRow key={`ocr-${idx}`}>
+                    <TableCell className="font-medium">
+                      {slip.month}
+                      <Badge variant="outline" className="ml-2 text-[10px] py-0">OCR</Badge>
+                    </TableCell>
                     <TableCell className="text-right">{formatCurrency(slip.gross_salary)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(slip.basic_salary)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(slip.hra)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(slip.pf_deduction)}</TableCell>
                     <TableCell className="text-right">{formatCurrency(slip.tds)}</TableCell>
                     <TableCell className="text-right font-medium">{formatCurrency(slip.net_salary)}</TableCell>
+                    <TableCell></TableCell>
                   </TableRow>
                 ))}
-                <TableRow className="bg-muted/50">
-                  <TableCell className="font-bold">Average</TableCell>
-                  <TableCell className="text-right font-bold">{formatCurrency(summaryMetrics.avgMonthlyGross)}</TableCell>
-                  <TableCell colSpan={4}></TableCell>
-                  <TableCell className="text-right font-bold">{formatCurrency(summaryMetrics.avgMonthlyNet)}</TableCell>
-                </TableRow>
+                {manualSalarySlips.map((slip, idx) => (
+                  <TableRow key={`manual-${idx}`} className="bg-primary/5">
+                    <TableCell>
+                      <Input
+                        value={slip.month}
+                        onChange={(e) => updateManualSalarySlip(idx, "month", e.target.value)}
+                        placeholder="e.g. Jan 2026"
+                        className="h-8 text-sm w-28"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={slip.gross_salary || ""}
+                        onChange={(e) => updateManualSalarySlip(idx, "gross_salary", e.target.value)}
+                        placeholder="0"
+                        className="h-8 text-sm text-right w-24"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={slip.basic_salary || ""}
+                        onChange={(e) => updateManualSalarySlip(idx, "basic_salary", e.target.value)}
+                        placeholder="0"
+                        className="h-8 text-sm text-right w-24"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={slip.hra || ""}
+                        onChange={(e) => updateManualSalarySlip(idx, "hra", e.target.value)}
+                        placeholder="0"
+                        className="h-8 text-sm text-right w-24"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={slip.pf_deduction || ""}
+                        onChange={(e) => updateManualSalarySlip(idx, "pf_deduction", e.target.value)}
+                        placeholder="0"
+                        className="h-8 text-sm text-right w-24"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={slip.tds || ""}
+                        onChange={(e) => updateManualSalarySlip(idx, "tds", e.target.value)}
+                        placeholder="0"
+                        className="h-8 text-sm text-right w-24"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={slip.net_salary || ""}
+                        onChange={(e) => updateManualSalarySlip(idx, "net_salary", e.target.value)}
+                        placeholder="0"
+                        className="h-8 text-sm text-right w-24"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="sm" onClick={() => removeManualSalarySlip(idx)}>
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {salarySlips.length > 0 && (
+                  <TableRow className="bg-muted/50">
+                    <TableCell className="font-bold">Average</TableCell>
+                    <TableCell className="text-right font-bold">{formatCurrency(summaryMetrics.avgMonthlyGross)}</TableCell>
+                    <TableCell colSpan={4}></TableCell>
+                    <TableCell className="text-right font-bold">{formatCurrency(summaryMetrics.avgMonthlyNet)}</TableCell>
+                    <TableCell></TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
-      )}
+          ) : (
+            <div className="p-6 text-center text-sm text-muted-foreground">
+              No salary slip data available. Upload salary slips for auto-extraction or add entries manually.
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Annual Income Table */}
-      {annualIncomes.length > 0 && (
-        <Card>
-          <CardHeader className="py-4 flex flex-row items-center justify-between">
-            <CardTitle className="text-base">Annual Income (Form 16 / ITR)</CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCalculate}
-              disabled={isCalculating}
-            >
-              {isCalculating ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Calculator className="h-4 w-4 mr-2" />
-              )}
-              Save Summary
-            </Button>
-          </CardHeader>
-          <CardContent className="p-0">
+      <Card>
+        <CardHeader className="py-4 flex flex-row items-center justify-between">
+          <CardTitle className="text-base">Annual Income (Form 16 / ITR)</CardTitle>
+          <Button variant="outline" size="sm" onClick={addManualAnnualIncome}>
+            <Plus className="h-4 w-4 mr-1" />
+            Add Manually
+          </Button>
+        </CardHeader>
+        <CardContent className="p-0">
+          {annualIncomes.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -441,12 +550,16 @@ export default function IncomeSummary({ applicationId, orgId }: IncomeSummaryPro
                   <TableHead className="text-right">Taxable Income</TableHead>
                   <TableHead className="text-right">Tax Paid</TableHead>
                   <TableHead className="text-right">Net Income</TableHead>
+                  <TableHead className="w-[60px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {annualIncomes.map((income, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell className="font-medium">{income.year}</TableCell>
+                {ocrAnnualIncomes.map((income, idx) => (
+                  <TableRow key={`ocr-annual-${idx}`}>
+                    <TableCell className="font-medium">
+                      {income.year}
+                      <Badge variant="outline" className="ml-2 text-[10px] py-0">OCR</Badge>
+                    </TableCell>
                     <TableCell>
                       <Badge variant="outline">{income.source}</Badge>
                     </TableCell>
@@ -456,13 +569,68 @@ export default function IncomeSummary({ applicationId, orgId }: IncomeSummaryPro
                     <TableCell className="text-right font-medium">
                       {formatCurrency(income.gross_income - income.tax_paid)}
                     </TableCell>
+                    <TableCell></TableCell>
+                  </TableRow>
+                ))}
+                {manualAnnualIncomes.map((income, idx) => (
+                  <TableRow key={`manual-annual-${idx}`} className="bg-primary/5">
+                    <TableCell>
+                      <Input
+                        value={income.year}
+                        onChange={(e) => updateManualAnnualIncome(idx, "year", e.target.value)}
+                        placeholder="e.g. AY 2025-26"
+                        className="h-8 text-sm w-32"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">Manual</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={income.gross_income || ""}
+                        onChange={(e) => updateManualAnnualIncome(idx, "gross_income", e.target.value)}
+                        placeholder="0"
+                        className="h-8 text-sm text-right w-28"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={income.taxable_income || ""}
+                        onChange={(e) => updateManualAnnualIncome(idx, "taxable_income", e.target.value)}
+                        placeholder="0"
+                        className="h-8 text-sm text-right w-28"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        value={income.tax_paid || ""}
+                        onChange={(e) => updateManualAnnualIncome(idx, "tax_paid", e.target.value)}
+                        placeholder="0"
+                        className="h-8 text-sm text-right w-28"
+                      />
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {formatCurrency(income.gross_income - income.tax_paid)}
+                    </TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="sm" onClick={() => removeManualAnnualIncome(idx)}>
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
-      )}
+          ) : (
+            <div className="p-6 text-center text-sm text-muted-foreground">
+              No annual income data available. Upload Form 16/ITR for auto-extraction or add entries manually.
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
