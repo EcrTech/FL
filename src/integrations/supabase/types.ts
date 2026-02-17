@@ -8328,6 +8328,7 @@ export type Database = {
           error_message: string | null
           exotel_message_id: string | null
           id: string
+          is_read: boolean
           media_type: string | null
           media_url: string | null
           message_content: string
@@ -8352,6 +8353,7 @@ export type Database = {
           error_message?: string | null
           exotel_message_id?: string | null
           id?: string
+          is_read?: boolean
           media_type?: string | null
           media_url?: string | null
           message_content: string
@@ -8376,6 +8378,7 @@ export type Database = {
           error_message?: string | null
           exotel_message_id?: string | null
           id?: string
+          is_read?: boolean
           media_type?: string | null
           media_url?: string | null
           message_content?: string

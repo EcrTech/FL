@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useOrgContext } from "@/hooks/useOrgContext";
 import { useNotification } from "@/hooks/useNotification";
 import { WhatsAppChatDialog } from "@/components/LOS/Relationships/WhatsAppChatDialog";
+import { useUnreadWhatsApp } from "@/hooks/useUnreadWhatsApp";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import Papa from "papaparse";
@@ -199,18 +200,13 @@ export default function CallingUploadLeads() {
                             <Phone className="h-4 w-4" />
                           </a>
                         </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 text-green-600 hover:text-green-700"
+                        <WhatsAppLeadButton
+                          phone={lead.phone}
                           onClick={() => {
                             setWhatsappContact({ id: lead.id, name: lead.first_name, phone: lead.phone });
                             setWhatsappOpen(true);
                           }}
-                          title="WhatsApp"
-                        >
-                          <MessageCircle className="h-4 w-4" />
-                        </Button>
+                        />
                         <Button
                           size="icon"
                           variant="ghost"
@@ -270,5 +266,25 @@ export default function CallingUploadLeads() {
         />
       )}
     </DashboardLayout>
+  );
+}
+
+function WhatsAppLeadButton({ phone, onClick }: { phone: string; onClick: () => void }) {
+  const { data: unread = 0 } = useUnreadWhatsApp(phone);
+  return (
+    <Button
+      size="icon"
+      variant="ghost"
+      className="h-8 w-8 text-green-600 hover:text-green-700 relative"
+      onClick={onClick}
+      title="WhatsApp"
+    >
+      <MessageCircle className="h-4 w-4" />
+      {unread > 0 && (
+        <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-[10px] font-bold text-white flex items-center justify-center">
+          {unread > 9 ? '9+' : unread}
+        </span>
+      )}
+    </Button>
   );
 }

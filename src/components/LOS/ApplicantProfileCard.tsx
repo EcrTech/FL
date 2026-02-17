@@ -18,6 +18,7 @@ import { VideoKYCViewDialog } from "@/components/LOS/Verification/VideoKYCViewDi
 import { WhatsAppChatDialog } from "@/components/LOS/Relationships/WhatsAppChatDialog";
 import { EmailChatDialog } from "@/components/LOS/Relationships/EmailChatDialog";
 import { CallChatDialog } from "@/components/LOS/Relationships/CallChatDialog";
+import { useUnreadWhatsApp } from "@/hooks/useUnreadWhatsApp";
 interface Document {
   id: string;
   document_type: string;
@@ -258,6 +259,8 @@ export function ApplicantProfileCard({
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [callDialogOpen, setCallDialogOpen] = useState(false);
 
+  const { data: unreadWhatsApp = 0 } = useUnreadWhatsApp(mobile);
+
   // Fetch verifications using React Query for proper cache invalidation
   const { data: verifications = [], isLoading: verificationsLoading } = useQuery({
     queryKey: ["loan-verifications", applicationId],
@@ -399,11 +402,16 @@ export function ApplicantProfileCard({
                     <Button 
                       variant="default" 
                       size="icon" 
-                      className="h-9 w-9 bg-green-500 hover:bg-green-600 shadow-md"
+                      className="h-9 w-9 bg-green-500 hover:bg-green-600 shadow-md relative"
                       onClick={() => setWhatsappDialogOpen(true)}
                       disabled={!mobile}
                     >
                       <MessageSquare className="h-5 w-5 text-white" />
+                      {unreadWhatsApp > 0 && (
+                        <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-[10px] font-bold text-white flex items-center justify-center">
+                          {unreadWhatsApp > 9 ? '9+' : unreadWhatsApp}
+                        </span>
+                      )}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
