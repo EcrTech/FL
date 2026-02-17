@@ -1,52 +1,32 @@
 
-
-# Fix UTR Extraction from Image-Based Transaction Slips
+# Replace OCR-Based Bank Details with Direct Table Data
 
 ## Problem
+Three files fetch bank details from bank statement OCR data (`loan_documents.ocr_data`) instead of using the verified data stored directly in the `loan_applicants` table. This causes "Bank details not available" errors when no bank statement was uploaded or OCR didn't capture the fields — even though the applicant has verified bank information.
 
-When transaction slip images (JPEG/PNG screenshots of bank e-receipts) are uploaded during disbursement completion, the system fails to extract the UTR number. PDF uploads work fine -- all 4 PDF-based disbursement proofs in the database have UTR numbers extracted. The one image upload (JPEG) has `utr_number: null` despite parsing completing.
+## What Changes
 
-## Root Causes
+### 1. `src/pages/LOS/Disbursals.tsx`
+- Remove the bank statement OCR query (lines 124-133) and `ocrData` variable (line 135)
+- Expand the applicant query (line 119) to include: `bank_account_number, bank_ifsc_code, bank_name, bank_account_holder_name`
+- Replace `bank_details` construction (lines 153-158) to read directly from the applicant record
 
-**1. Prompt inconsistency for image parsing**
-The PDF parsing path appends a critical instruction to force clean JSON output (line 411):
-```
-"\n\nCRITICAL: Respond with ONLY the raw JSON object. No text before or after..."
-```
-But the **image parsing path** (line 514) sends just the base prompt without this instruction, leading to unreliable JSON parsing.
+### 2. `src/components/LOS/Disbursement/DisbursementForm.tsx`
+- Remove the bank statement OCR query (lines 64-79) and `ocrData` variable (lines 97-104)
+- Add a query to fetch the primary applicant's bank fields from `loan_applicants`
+- Populate `bankDetails` from the applicant record instead of OCR
 
-**2. Prompt doesn't account for bank-specific terminology**
-Bank receipts label the reference as "Transaction ID" (e.g., `IDFB604565324016` in the uploaded IDFC First Bank slip), but the extraction prompt only asks for "UTR (Unique Transaction Reference) number or transaction reference ID". The AI sometimes fails to map "Transaction ID" to "utr_number" for image inputs.
+### 3. `src/components/LOS/Verification/BankAccountVerificationDialog.tsx`
+- Remove the bank statement OCR query (lines 44-59)
+- Add a query to fetch the primary applicant's bank fields from `loan_applicants`
+- Auto-populate the verification form from applicant data instead of OCR data (lines 62-73)
 
-## Solution
+## What Stays the Same
+- `DocumentDataVerification.tsx` and `SanctionDetail.tsx` — these use OCR data for **cross-referencing** (comparing document data against application data), which is their intended purpose. No changes needed.
+- The OCR parsing edge function — it still parses documents; the data just won't be the primary source for bank details anymore.
 
-### File: `supabase/functions/parse-loan-document/index.ts`
-
-**Change 1: Add missing JSON instruction to image parsing path**
-On line 514, append the same critical JSON instruction that the PDF path uses:
-```
-text: prompt + "\n\nCRITICAL: Respond with ONLY the raw JSON object..."
-```
-
-**Change 2: Enhance the disbursement_proof prompt**
-Update the `disbursement_proof` and `utr_proof` prompts (lines 162-180) to explicitly list common bank-specific field names:
-- "Transaction ID", "Reference Number", "NEFT Reference", "RTGS Reference", "IMPS Reference", "CMS Reference" should all be mapped to `utr_number`
-- Add instruction: "Look for ANY transaction reference number, including fields labeled Transaction ID, Ref No, Reference Number, CMS Ref, etc."
-
-**Change 3: Add retry with enhanced prompt for null UTR**
-After parsing the image response, if `utr_number` is null, add a targeted retry with a simpler, more direct prompt specifically asking for the transaction reference number visible in the image.
-
-### Expected Result
-- Image-based transaction slips (bank screenshots, e-receipts) will have UTR numbers reliably extracted
-- The system will recognize bank-specific terminology like "Transaction ID" as the UTR
-- PDF parsing continues to work as before
-
-### Technical Details
-
-Only one file is modified: `supabase/functions/parse-loan-document/index.ts`
-
-1. Lines 162-170 and 172-180: Update both `disbursement_proof` and `utr_proof` prompt text to be more explicit about field name variations
-2. Line 514: Add the JSON-only instruction suffix to image parsing
-3. After line 138 in `ProofUploadDialog.tsx`: No changes needed -- the frontend already handles null UTR gracefully
-
-The edge function will be automatically redeployed after the change.
+## Technical Summary
+All three files follow the same pattern:
+1. Remove the `loan_documents` OCR query
+2. Query `loan_applicants` for `bank_account_number`, `bank_ifsc_code`, `bank_name`, `bank_account_holder_name` (filtered by `applicant_type = 'primary'`)
+3. Map those fields to the existing `bankDetails` / `bank_details` object structure
