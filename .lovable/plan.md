@@ -1,56 +1,33 @@
 
-# WhatsApp Incoming Message Notification System
+# Auto-Assign Leads Created by Team Members
 
 ## Problem
-When you send a WhatsApp message to a customer and then navigate away (switch to another customer or page), there is no way to know if the first customer replied. The realtime subscription only works while the WhatsApp chat dialog is open. Once closed, incoming replies are silently stored in the database with no alert.
+When a team member (non-admin) creates a lead or contact, the `assigned_to` field may be left empty depending on the creation path. This means the lead could appear as "unassigned" and -- with the recent RLS change -- become invisible to the creator themselves.
 
 ## Solution
-Add two layers of awareness for incoming WhatsApp replies:
+Create a database trigger on both `contacts` and `loan_applications` tables that automatically sets `assigned_to = created_by` when:
+- A new record is inserted
+- `assigned_to` is NULL (no explicit assignment was made)
+- `created_by` is NOT NULL
+- The creator is NOT an admin or super_admin (admins may intentionally leave leads unassigned)
 
-### 1. Database: Add `is_read` column to `whatsapp_messages`
-- Add an `is_read` boolean column (default `false`) to the `whatsapp_messages` table
-- Outbound messages default to `true` (you sent them, they're "read")
-- Inbound messages default to `false` (unread until opened)
+This runs at the database level, so it works regardless of how the lead is created -- manual form, bulk upload (for rows without assignment), edge functions, etc.
 
-### 2. Database trigger: Auto-create a notification on inbound WhatsApp message
-- Create a Postgres trigger on `whatsapp_messages` that fires on INSERT
-- When `direction = 'inbound'`, insert a row into the `notifications` table with:
-  - `title`: "New WhatsApp message"
-  - `message`: truncated preview of `message_content`
-  - `action_url`: link to the Communications page or the contact's profile
-  - `entity_type`: "whatsapp_message"
-  - `entity_id`: the message ID
-- This leverages the existing `NotificationBell` component and `useNotifications` hook which already have realtime subscriptions -- so the bell badge updates instantly
+## Technical Details
 
-### 3. Mark messages as read when chat is opened
-**File: `src/components/LOS/Relationships/WhatsAppChatDialog.tsx`**
-- When messages are fetched (dialog opens), update all inbound messages for that phone number to `is_read = true`
-- This clears the unread state for that conversation
+### Database Migration
+A single migration with a trigger function and two triggers:
 
-### 4. Show unread indicator on WhatsApp buttons
-**Files that open WhatsAppChatDialog:**
-- `src/components/LOS/ApplicantProfileCard.tsx` -- WhatsApp icon button on applicant cards
-- `src/pages/CallingUploadLeads.tsx` -- WhatsApp action in lead lists
-- `src/pages/CallingLeadDetail.tsx` -- WhatsApp button on lead detail
+**Function: `auto_assign_to_creator()`**
+- Runs BEFORE INSERT on both tables
+- Checks if `NEW.assigned_to IS NULL` and `NEW.created_by IS NOT NULL`
+- Looks up whether the creator has an `admin` or `super_admin` role in `user_roles`
+- If the creator is a regular member (not admin), sets `NEW.assigned_to = NEW.created_by`
+- Admins keep the lead unassigned (they manage the assignment pool)
 
-For each, add a small query to check if there are unread inbound WhatsApp messages for that contact's phone number, and show a dot/badge on the WhatsApp button if so.
+**Triggers:**
+- `auto_assign_contact_to_creator` on `contacts` (BEFORE INSERT)
+- `auto_assign_loan_app_to_creator` on `loan_applications` (BEFORE INSERT)
 
-### 5. Communications page integration
-**File: `src/pages/Communications.tsx`**
-- The existing `is_read` field in the conversation list view should now work for WhatsApp messages too since the column will exist
-- No major changes needed if the view already reads from `whatsapp_messages.is_read`; if it uses a separate mapping, update to use the new column
-
-## What Stays the Same
-- The WhatsApp chat dialog UI and messaging flow
-- The NotificationBell component (no code changes -- it already handles new notifications via realtime)
-- The `useNotifications` hook (already has realtime subscription for new inserts)
-
-## Technical Summary
-
-| Change | Type | Details |
-|--------|------|---------|
-| Add `is_read` to `whatsapp_messages` | DB migration | Boolean column, default false for inbound, true for outbound |
-| Create notification trigger | DB migration | Postgres function + trigger on INSERT |
-| Mark as read on dialog open | Code change | `WhatsAppChatDialog.tsx` |
-| Unread dot on WhatsApp buttons | Code change | `ApplicantProfileCard.tsx`, `CallingUploadLeads.tsx`, `CallingLeadDetail.tsx` |
-| Communications page | Code change | Ensure `is_read` is used from the new column |
+### No Frontend Changes Required
+The trigger handles assignment transparently at the database level. The existing forms and edge functions continue to work as-is -- they just won't produce unassigned leads for non-admin users anymore.
