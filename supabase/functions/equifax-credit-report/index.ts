@@ -414,6 +414,23 @@ serve(async (req) => {
       );
     }
 
+    // If PAN is missing or masked on applicant record, fetch from parsed PAN card document
+    if (!applicant.pan_number || (applicant.pan_number as string).startsWith("XXXXX")) {
+      const { data: panDoc } = await supabase
+        .from("loan_documents")
+        .select("ocr_data")
+        .eq("loan_application_id", applicationId)
+        .eq("document_type", "pan_card")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const panFromDoc = (panDoc?.ocr_data as any)?.pan_number || (panDoc?.ocr_data as any)?.pan;
+      if (panFromDoc) {
+        console.log("[EQUIFAX] PAN resolved from parsed document data");
+        applicant.pan_number = panFromDoc;
+      }
+    }
+
     // Parse current_address JSONB
     const currentAddress = applicant.current_address;
     let addressLine1 = "";

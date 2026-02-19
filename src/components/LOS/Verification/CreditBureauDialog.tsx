@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -99,10 +99,28 @@ export default function CreditBureauDialog({
     existingVerification?.response_data?.quick_analysis || null
   );
 
+  // Fetch PAN from parsed document data as fallback (loan_applicants.pan_number may not be synced)
+  const { data: panDocRecord } = useQuery({
+    queryKey: ["pan-doc-data", applicationId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("loan_documents")
+        .select("ocr_data")
+        .eq("loan_application_id", applicationId)
+        .eq("document_type", "pan_card")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!applicationId,
+  });
+
   const applicantName = applicant ?
     `${applicant.first_name || ''} ${applicant.middle_name || ''} ${applicant.last_name || ''}`.trim() :
     'Unknown';
-  const applicantPAN = applicant?.pan_number || '';
+  const panFromDoc = (panDocRecord?.ocr_data as any)?.pan_number || (panDocRecord?.ocr_data as any)?.pan || '';
+  const applicantPAN = applicant?.pan_number || panFromDoc || '';
   // Use 'dob' field (the actual column name) - fall back to date_of_birth for compatibility
   const applicantDOB = applicant?.dob || applicant?.date_of_birth || '';
   const applicantMobile = applicant?.mobile || '';
