@@ -481,7 +481,7 @@ export function BasicInfoStep({
                   <strong>Test Mode:</strong> SMS not configured. Use OTP: <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono font-bold">{phoneTestOtp}</code>
                 </div>
               )}
-              <div className="flex gap-3 p-4 bg-[hsl(var(--electric-blue-100))] rounded-xl border border-[hsl(var(--electric-blue-400))]/20">
+              <div className="flex gap-3 p-4 bg-[hsl(var(--coral-100))] rounded-xl border border-[hsl(var(--coral-400))]/20">
                 <Input
                   placeholder="Enter 6-digit OTP"
                   value={phoneOtp}
@@ -538,7 +538,7 @@ export function BasicInfoStep({
 
           {/* Email OTP Input - Shows automatically when OTP is sent */}
           {emailOtpSent && !verificationStatus.emailVerified && (
-            <div className="flex gap-3 mt-3 p-4 bg-[hsl(var(--electric-blue-100))] rounded-xl border border-[hsl(var(--electric-blue-400))]/20">
+            <div className="flex gap-3 mt-3 p-4 bg-[hsl(var(--coral-100))] rounded-xl border border-[hsl(var(--coral-400))]/20">
               <Input
                 placeholder="Enter 6-digit OTP"
                 value={emailOtp}
@@ -594,7 +594,7 @@ export function BasicInfoStep({
 
           {/* Office Email OTP Input - Shows automatically when OTP is sent */}
           {officeEmailOtpSent && !verificationStatus.officeEmailVerified && (
-            <div className="flex gap-3 mt-3 p-4 bg-[hsl(var(--electric-blue-100))] rounded-xl border border-[hsl(var(--electric-blue-400))]/20">
+            <div className="flex gap-3 mt-3 p-4 bg-[hsl(var(--coral-100))] rounded-xl border border-[hsl(var(--coral-400))]/20">
               <Input
                 placeholder="Enter 6-digit OTP"
                 value={officeEmailOtp}
@@ -654,8 +654,8 @@ export function BasicInfoStep({
             />
       <Label htmlFor="termsAndConditions" className="text-sm text-muted-foreground font-body leading-relaxed cursor-pointer">
         I have read and agreed to the{' '}
-        <a href="https://paisaasaarthi.com/terms" className="text-primary font-semibold hover:underline" target="_blank" rel="noopener noreferrer">Terms and Conditions</a>,{' '}
-        <a href="https://paisaasaarthi.com/privacy" className="text-primary font-semibold hover:underline" target="_blank" rel="noopener noreferrer">Privacy Policy</a> and{' '}
+        <a href="https://loanflow.com/terms" className="text-primary font-semibold hover:underline" target="_blank" rel="noopener noreferrer">Terms and Conditions</a>,{' '}
+        <a href="https://loanflow.com/privacy" className="text-primary font-semibold hover:underline" target="_blank" rel="noopener noreferrer">Privacy Policy</a> and{' '}
         <a href="/risk" className="text-primary font-semibold hover:underline" target="_blank">Gradation of Risk</a>
       </Label>
           </div>

@@ -110,8 +110,8 @@ serve(async (req) => {
       
       // Use org's verified domain if available, otherwise use global verified domain
       const fromEmail = emailSettings?.verification_status === "verified" && emailSettings?.sending_domain
-        ? `Paisaa Saarthi <info@${emailSettings.sending_domain}>`
-        : "Paisaa Saarthi <info@paisaasaarthi.com>";
+        ? `LoanFlow <info@${emailSettings.sending_domain}>`
+        : "LoanFlow <info@loanflow.com>";
       
       console.log("Sending email from:", fromEmail, "to:", target);
       
@@ -122,8 +122,8 @@ serve(async (req) => {
         html: `
           <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f9fafb; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
             <!-- Header -->
-            <div style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); padding: 30px; text-align: center;">
-              <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 600;">Paisaa Saarthi</h1>
+            <div style="background: linear-gradient(135deg, #E84C3D 0%, #C0392B 100%); padding: 30px; text-align: center;">
+              <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 600;">LoanFlow</h1>
               <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 14px;">Secure Verification</p>
             </div>
             
@@ -141,7 +141,7 @@ serve(async (req) => {
                 <p style="color: #64748b; font-size: 14px; margin: 0 0 15px 0; text-transform: uppercase; letter-spacing: 1px;">Your verification code</p>
                 <div style="font-size: 44px; font-weight: bold; letter-spacing: 14px; 
                             color: #1e293b; font-family: 'Courier New', Courier, monospace;
-                            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+                            background: linear-gradient(135deg, #E84C3D 0%, #C0392B 100%);
                             -webkit-background-clip: text;
                             -webkit-text-fill-color: transparent;
                             background-clip: text;">
@@ -159,9 +159,9 @@ serve(async (req) => {
               </div>
               
               <!-- Security Notice -->
-              <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; 
+              <div style="background-color: #eff6ff; border-left: 4px solid #E84C3D; 
                           padding: 16px 20px; margin-top: 30px; border-radius: 0 8px 8px 0;">
-                <p style="color: #1e40af; margin: 0; font-size: 14px; line-height: 1.5;">
+                <p style="color: #881337; margin: 0; font-size: 14px; line-height: 1.5;">
                   🔒 <strong>Security Notice:</strong> Never share this code with anyone. 
                   Our team will never ask for your verification code via phone or email.
                 </p>
@@ -174,7 +174,7 @@ serve(async (req) => {
                 If you didn't request this code, you can safely ignore this email.
               </p>
               <p style="color: #94a3b8; font-size: 12px; margin: 0;">
-                © ${new Date().getFullYear()} Paisaa Saarthi. All rights reserved.
+                © ${new Date().getFullYear()} LoanFlow. All rights reserved.
               </p>
             </div>
           </div>

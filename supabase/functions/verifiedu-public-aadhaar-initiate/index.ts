@@ -50,9 +50,10 @@ serve(async (req) => {
       });
     }
 
-    const verifieduToken = Deno.env.get("VERIFIEDU_TOKEN");
-    const companyId = Deno.env.get("VERIFIEDU_COMPANY_ID");
-    const baseUrl = Deno.env.get("VERIFIEDU_API_BASE_URL");
+    // Credentials: prefer request body, fall back to env vars
+    const verifieduToken = body.verifieduToken || Deno.env.get("VERIFIEDU_TOKEN");
+    const companyId = body.verifieduCompanyId || Deno.env.get("VERIFIEDU_COMPANY_ID");
+    const baseUrl = body.verifieduBaseUrl || Deno.env.get("VERIFIEDU_API_BASE_URL");
 
     console.log("[verifiedu-public-aadhaar-initiate] VerifiedU credentials check:", {
       hasToken: !!verifieduToken,

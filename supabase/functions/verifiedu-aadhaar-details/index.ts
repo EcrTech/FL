@@ -35,7 +35,7 @@ serve(async (req) => {
       });
     }
 
-    const { uniqueRequestNumber, applicationId, orgId } = await req.json();
+    const { uniqueRequestNumber, applicationId, orgId, verifieduToken: bodyToken, verifieduCompanyId: bodyCompanyId, verifieduBaseUrl: bodyBaseUrl } = await req.json();
 
     if (!uniqueRequestNumber) {
       return new Response(JSON.stringify({ error: "Unique request number is required" }), {
@@ -44,9 +44,10 @@ serve(async (req) => {
       });
     }
 
-    const verifieduToken = Deno.env.get("VERIFIEDU_TOKEN");
-    const companyId = Deno.env.get("VERIFIEDU_COMPANY_ID");
-    const baseUrl = Deno.env.get("VERIFIEDU_API_BASE_URL");
+    // Credentials: prefer request body, fall back to env vars
+    const verifieduToken = bodyToken || Deno.env.get("VERIFIEDU_TOKEN");
+    const companyId = bodyCompanyId || Deno.env.get("VERIFIEDU_COMPANY_ID");
+    const baseUrl = bodyBaseUrl || Deno.env.get("VERIFIEDU_API_BASE_URL");
 
     // Initialize admin client for database lookups
     const adminClient = createClient(

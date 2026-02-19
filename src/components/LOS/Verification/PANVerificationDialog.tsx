@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useVerifiedUCredentials } from "@/hooks/useVerifiedUCredentials";
 import { Loader2, CheckCircle } from "lucide-react";
 
 interface PANVerificationDialogProps {
@@ -29,6 +30,7 @@ export default function PANVerificationDialog({
 }: PANVerificationDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { credentials: verifiedUCreds } = useVerifiedUCredentials();
 
   const [formData, setFormData] = useState({
     pan_number: existingVerification?.request_data?.pan_number || applicant?.pan_number || "",
@@ -51,6 +53,7 @@ export default function PANVerificationDialog({
           panNumber: formData.pan_number,
           applicationId,
           orgId,
+          ...verifiedUCreds,
         },
       });
 

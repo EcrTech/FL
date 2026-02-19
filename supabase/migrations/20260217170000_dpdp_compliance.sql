@@ -27,7 +27,7 @@ ALTER TABLE dpdp_consent_records ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Admins full access to consent records"
   ON dpdp_consent_records FOR ALL
   USING (org_id = get_user_org_id(auth.uid()) AND EXISTS (
-    SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin')
+    SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role IN ('admin', 'super_admin') AND is_active = true
   ));
 
 CREATE POLICY "Staff can view consent records"
@@ -64,7 +64,7 @@ ALTER TABLE dpdp_data_requests ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Admins full access to data requests"
   ON dpdp_data_requests FOR ALL
   USING (org_id = get_user_org_id(auth.uid()) AND EXISTS (
-    SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin')
+    SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role IN ('admin', 'super_admin') AND is_active = true
   ));
 
 CREATE POLICY "Staff can view data requests"
@@ -101,7 +101,7 @@ ALTER TABLE dpdp_breach_notifications ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Admins full access to breach notifications"
   ON dpdp_breach_notifications FOR ALL
   USING (org_id = get_user_org_id(auth.uid()) AND EXISTS (
-    SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin')
+    SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role IN ('admin', 'super_admin') AND is_active = true
   ));
 
 CREATE POLICY "Staff can view breach notifications"
@@ -128,7 +128,7 @@ ALTER TABLE dpdp_pii_access_log ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Admins can view PII access log"
   ON dpdp_pii_access_log FOR SELECT
   USING (org_id = get_user_org_id(auth.uid()) AND EXISTS (
-    SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin')
+    SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role IN ('admin', 'super_admin') AND is_active = true
   ));
 
 CREATE POLICY "System insert PII access log"

@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Landmark, Edit2, Save, X, Upload, CheckCircle, Loader2, AlertCircle, ShieldCheck, FileUp } from "lucide-react";
 import { toast } from "sonner";
+import { useVerifiedUCredentials } from "@/hooks/useVerifiedUCredentials";
 
 interface BankDetailsSectionProps {
   applicationId: string;
@@ -30,6 +31,7 @@ interface BankDetails {
 
 export function BankDetailsSection({ applicationId, orgId, applicantId }: BankDetailsSectionProps) {
   const queryClient = useQueryClient();
+  const { credentials: verifiedUCreds } = useVerifiedUCredentials();
   const [isEditing, setIsEditing] = useState(false);
   const [showManualVerification, setShowManualVerification] = useState(false);
   const [manualUtr, setManualUtr] = useState("");
@@ -115,6 +117,7 @@ export function BankDetailsSection({ applicationId, orgId, applicantId }: BankDe
           ifscCode: formData.bank_ifsc_code,
           applicationId,
           orgId,
+          ...verifiedUCreds,
         },
       });
       if (error) throw error;

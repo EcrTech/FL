@@ -1,5 +1,5 @@
 import { MapPin, Loader2, ArrowLeft } from "lucide-react";
-import logo from "@/assets/paisaa-saarthi-logo.jpeg";
+import logo from "@/assets/loanflow-logo.png";
 
 interface ApplicationHeaderProps {
   showBack?: boolean;
@@ -34,11 +34,11 @@ export function ApplicationHeader({
         <div className="flex items-center gap-2.5">
           <img 
             src={logo} 
-            alt="Paisaa Saarthi" 
+            alt="LoanFlow"
             className="h-10 w-10 rounded-lg object-cover shadow-sm" 
           />
           <span className="text-lg font-heading font-bold text-foreground tracking-tight">
-            Paisaa<span className="text-primary">Saarthi</span>
+            Loan<span className="text-primary">Flow</span>
           </span>
         </div>
 

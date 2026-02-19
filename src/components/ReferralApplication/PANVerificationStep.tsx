@@ -8,6 +8,7 @@ import { Check, Loader2, AlertCircle, ArrowLeft, ArrowRight, CreditCard, ShieldC
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import { fetchVerifiedUCredentials } from "@/hooks/useVerifiedUCredentials";
 
 interface PANVerificationStepProps {
   panNumber: string;
@@ -57,9 +58,13 @@ export function PANVerificationStep({
       // Call VerifiedU PAN verification (public endpoint)
       console.log('[PAN Verification] Verifying PAN via VerifiedU:', panNumber.substring(0, 4) + '****');
       
+      // Fetch credentials from org settings
+      const creds = await fetchVerifiedUCredentials();
+
       const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verifiedu-public-pan-verify', {
         body: {
           panNumber,
+          ...creds,
         },
       });
 

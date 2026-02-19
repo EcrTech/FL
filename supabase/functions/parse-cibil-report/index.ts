@@ -1,15 +1,15 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { 
-  safeBase64Encode, 
-  getPdfPageCount, 
-  extractPdfPages, 
-  getChunkConfig, 
-  mergeOcrData, 
+import {
+  safeBase64Encode,
+  getPdfPageCount,
+  extractPdfPages,
+  getChunkConfig,
+  mergeOcrData,
   calculateProgress,
-  type ParsingProgress 
+  type ParsingProgress
 } from "../_shared/pdfUtils.ts";
+import { callGemini } from "../_shared/geminiClient.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -67,8 +67,8 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    const { 
-      filePath, 
+    const {
+      filePath,
       applicationId,
       documentId,
       // Chunking parameters (optional)
@@ -96,14 +96,14 @@ serve(async (req) => {
 
     const arrayBuffer = await fileData.arrayBuffer();
     const fileBytes = new Uint8Array(arrayBuffer);
-    
+
     // Determine file type
     const fileExtension = filePath.split('.').pop()?.toLowerCase();
     const isPdf = fileExtension === 'pdf';
-    const mimeType = isPdf 
-      ? 'application/pdf' 
-      : fileExtension === 'png' 
-        ? 'image/png' 
+    const mimeType = isPdf
+      ? 'application/pdf'
+      : fileExtension === 'png'
+        ? 'image/png'
         : 'image/jpeg';
 
     console.log("[ParseCIBIL] File type:", mimeType, "Size:", arrayBuffer.byteLength);
@@ -117,7 +117,7 @@ serve(async (req) => {
       if (isFirstChunk) {
         actualTotalPages = await getPdfPageCount(fileBytes);
         console.log(`[ParseCIBIL] PDF has ${actualTotalPages} pages`);
-        
+
         // Update document status if documentId provided
         if (documentId) {
           await supabase
@@ -145,10 +145,10 @@ serve(async (req) => {
     // Build context-aware prompt for chunked processing
     let prompt = CIBIL_PROMPT;
     if (!isFirstChunk && accumulatedData) {
-      const prevSummary = accumulatedData.credit_score 
+      const prevSummary = accumulatedData.credit_score
         ? `Score: ${accumulatedData.credit_score}, ${accumulatedData.active_accounts || 0} active accounts found`
         : 'Basic info extracted';
-      
+
       prompt = `You are continuing to analyze pages ${currentPage}-${Math.min(currentPage + chunkConfig.pagesPerChunk - 1, actualTotalPages)} of a ${actualTotalPages}-page credit bureau report.
 
 Previous pages contained: ${prevSummary}
@@ -160,136 +160,50 @@ ${CIBIL_PROMPT}
 Important: Only return NEW data found in these pages. The credit score and basic info were already captured.`;
     }
 
-    let parsedData;
-
-    // Use Lovable AI Gateway (preferred)
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
-    
-    if (lovableApiKey) {
-      console.log("[ParseCIBIL] Using Lovable AI Gateway");
-      
-      const aiResponse = await fetch(
-        "https://ai.gateway.lovable.dev/v1/chat/completions",
-        {
-          method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${lovableApiKey}`
+    // Build message content based on file type
+    const messageContent = isPdf
+      ? [
+          {
+            type: "file" as const,
+            file: {
+              filename: filePath.split('/').pop() || "report.pdf",
+              file_data: `data:application/pdf;base64,${base64Data}`,
+            },
           },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-pro",
-            messages: [
-              {
-                role: "user",
-                content: isPdf 
-                  ? [
-                      {
-                        type: "file",
-                        file: {
-                          filename: filePath.split('/').pop() || "report.pdf",
-                          file_data: `data:application/pdf;base64,${base64Data}`,
-                        },
-                      },
-                      { type: "text", text: prompt }
-                    ]
-                  : [
-                      { type: "text", text: prompt },
-                      { 
-                        type: "image_url", 
-                        image_url: { 
-                          url: `data:${mimeType};base64,${base64Data}` 
-                        } 
-                      }
-                    ]
-              }
-            ],
-            max_tokens: chunkConfig.maxTokens,
-          })
-        }
-      );
-
-      if (!aiResponse.ok) {
-        const errorText = await aiResponse.text();
-        console.error("[ParseCIBIL] AI API error:", errorText);
-        
-        if (aiResponse.status === 429) {
-          throw new Error("Rate limit exceeded. Please try again later.");
-        }
-        if (aiResponse.status === 402) {
-          throw new Error("AI credits exhausted. Please add funds to continue.");
-        }
-        throw new Error(`AI parsing failed: ${aiResponse.status}`);
-      }
-
-      const result = await aiResponse.json();
-      const responseText = result.choices?.[0]?.message?.content;
-
-      if (!responseText) {
-        throw new Error("No response from AI model");
-      }
-
-      console.log("[ParseCIBIL] AI Response length:", responseText.length);
-
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        parsedData = JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error("Could not parse AI response as JSON");
-      }
-    } else {
-      // Fallback to Gemini direct API if configured
-      const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
-      
-      if (!geminiApiKey) {
-        throw new Error("No AI API key configured (LOVABLE_API_KEY or GEMINI_API_KEY)");
-      }
-      
-      console.log("[ParseCIBIL] Using Gemini API directly");
-      
-      const geminiResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{
-              parts: [
-                { text: prompt },
-                {
-                  inline_data: {
-                    mime_type: mimeType,
-                    data: base64Data
-                  }
-                }
-              ]
-            }],
-            generationConfig: {
-              temperature: 0.1,
-              maxOutputTokens: chunkConfig.maxTokens,
+          { type: "text" as const, text: prompt }
+        ]
+      : [
+          { type: "text" as const, text: prompt },
+          {
+            type: "image_url" as const,
+            image_url: {
+              url: `data:${mimeType};base64,${base64Data}`
             }
-          })
-        }
-      );
+          }
+        ];
 
-      if (!geminiResponse.ok) {
-        const errorText = await geminiResponse.text();
-        console.error("[ParseCIBIL] Gemini API error:", errorText);
-        throw new Error(`Gemini API error: ${geminiResponse.status}`);
-      }
+    console.log("[ParseCIBIL] Calling Gemini Pro");
 
-      const geminiResult = await geminiResponse.json();
-      const responseText = geminiResult.candidates?.[0]?.content?.parts?.[0]?.text;
+    const result = await callGemini("gemini-2.5-pro", {
+      messages: [
+        { role: "user", content: messageContent }
+      ],
+      maxTokens: chunkConfig.maxTokens,
+    });
 
-      if (!responseText) {
-        throw new Error("No response from AI model");
-      }
+    const responseText = result.text;
+    if (!responseText) {
+      throw new Error("No response from AI model");
+    }
 
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        parsedData = JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error("Could not parse AI response as JSON");
-      }
+    console.log("[ParseCIBIL] AI Response length:", responseText.length);
+
+    let parsedData;
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      parsedData = JSON.parse(jsonMatch[0]);
+    } else {
+      throw new Error("Could not parse AI response as JSON");
     }
 
     console.log("[ParseCIBIL] Parsed data:", JSON.stringify(parsedData).substring(0, 500));
@@ -320,7 +234,7 @@ Important: Only return NEW data found in these pages. The credit score and basic
 
       // Trigger self-invocation for next chunk
       console.log(`[ParseCIBIL] Triggering continuation for pages ${nextPage}-${Math.min(nextPage + chunkConfig.pagesPerChunk - 1, actualTotalPages)}`);
-      
+
       fetch(`${supabaseUrl}/functions/v1/parse-cibil-report`, {
         method: 'POST',
         headers: {
@@ -343,12 +257,12 @@ Important: Only return NEW data found in these pages. The credit score and basic
 
       // Return immediately with processing status
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           success: true,
           status: "processing",
           message: `Processing pages ${currentPage}-${nextPage - 1} of ${actualTotalPages}`,
           data: mergedData,
-          filePath 
+          filePath
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
@@ -368,11 +282,11 @@ Important: Only return NEW data found in these pages. The credit score and basic
     }
 
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         success: true,
         status: "completed",
         data: mergedData,
-        filePath 
+        filePath
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
@@ -380,7 +294,7 @@ Important: Only return NEW data found in these pages. The credit score and basic
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : "Unknown error";
     console.error("[ParseCIBIL] Error:", errorMessage);
-    
+
     // Try to update status to failed
     try {
       const { documentId } = await req.clone().json();
@@ -396,15 +310,15 @@ Important: Only return NEW data found in these pages. The credit score and basic
     } catch (e) {
       console.error("[ParseCIBIL] Failed to update error status:", e);
     }
-    
+
     return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: errorMessage 
+      JSON.stringify({
+        success: false,
+        error: errorMessage
       }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
       }
     );
   }

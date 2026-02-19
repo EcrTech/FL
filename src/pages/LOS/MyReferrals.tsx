@@ -11,7 +11,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { Copy, Check, Link2 } from "lucide-react";
 import { toast } from "sonner";
 
-const REFERRAL_BASE_URL = "https://paisaasaarthi.com/apply/ref";
+const REFERRAL_BASE_URL = "https://loanflow.com/apply/ref";
 
 export default function MyReferrals() {
   const { orgId } = useOrgContext();

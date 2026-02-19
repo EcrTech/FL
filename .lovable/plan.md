@@ -8,7 +8,7 @@ The user wants to integrate a help widget by adding a specific script tag to the
 ### 1. Update `index.html`
 I will add the following script tag to the `index.html` file:
 ```html
-<script src="https://go-in-sync.lovable.app/help-widget.js" data-source="paisaa_saarthi"></script>
+<script src="https://go-in-sync.lovable.app/help-widget.js" data-source="loanflow"></script>
 ```
 
 I'll place it just before the closing `</body>` tag to ensure it doesn't interfere with the initial page load performance.

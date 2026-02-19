@@ -186,8 +186,8 @@ export function LoanRequirementsScreen({
       {/* Title Section */}
       <div className="px-5 py-4">
         <div className="flex items-center gap-3 mb-1">
-          <div className="w-10 h-10 rounded-xl bg-[hsl(var(--gold-500))]/10 flex items-center justify-center">
-            <Wallet className="h-5 w-5 text-[hsl(var(--gold-500))]" />
+          <div className="w-10 h-10 rounded-xl bg-[hsl(var(--maroon-500))]/10 flex items-center justify-center">
+            <Wallet className="h-5 w-5 text-[hsl(var(--maroon-500))]" />
           </div>
           <div>
             <h2 className="text-xl font-heading font-bold text-foreground">
@@ -206,7 +206,7 @@ export function LoanRequirementsScreen({
           {/* Loan Amount Field */}
           <div className="space-y-3">
             <Label className="text-xs font-heading font-semibold text-foreground uppercase tracking-wide flex items-center gap-2">
-              <span className="text-[hsl(var(--gold-500))]">₹</span>
+              <span className="text-[hsl(var(--maroon-500))]">₹</span>
               Loan Amount <span className="text-destructive">*</span>
             </Label>
             <div className="relative">
@@ -352,8 +352,8 @@ export function LoanRequirementsScreen({
                 />
       <span className="text-[13px] text-muted-foreground leading-relaxed">
         I agree to{' '}
-        <a href="https://paisaasaarthi.com/terms" className="text-primary underline" target="_blank" rel="noopener noreferrer">Terms</a>,{' '}
-        <a href="https://paisaasaarthi.com/privacy" className="text-primary underline" target="_blank" rel="noopener noreferrer">Privacy Policy</a>{' '}
+        <a href="https://loanflow.com/terms" className="text-primary underline" target="_blank" rel="noopener noreferrer">Terms</a>,{' '}
+        <a href="https://loanflow.com/privacy" className="text-primary underline" target="_blank" rel="noopener noreferrer">Privacy Policy</a>{' '}
         & Gradation of Risk
       </span>
               </label>
@@ -375,7 +375,7 @@ export function LoanRequirementsScreen({
           <Button
             onClick={onContinue}
             disabled={!canContinue}
-            className="w-full h-[54px] text-base font-heading font-semibold rounded-[14px] bg-gradient-to-r from-primary to-[hsl(var(--teal-600))] shadow-[var(--shadow-teal)] hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:shadow-none disabled:transform-none"
+            className="w-full h-[54px] text-base font-heading font-semibold rounded-[14px] bg-gradient-to-r from-primary to-[hsl(var(--coral-600))] shadow-[var(--shadow-coral)] hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:shadow-none disabled:transform-none"
           >
             Continue
             <ArrowRight className="h-5 w-5 ml-2" />

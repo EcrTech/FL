@@ -1,4 +1,5 @@
 import { getSupabaseClient } from '../_shared/supabaseClient.ts';
+import { callGemini } from '../_shared/geminiClient.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,11 +13,6 @@ Deno.serve(async (req) => {
 
   try {
     const supabase = getSupabaseClient();
-
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
-    }
 
     // Get all organizations
     const { data: orgs, error: orgsError } = await supabase
@@ -61,11 +57,11 @@ Deno.serve(async (req) => {
 
       // Calculate pipeline metrics
       const stageMetrics = new Map();
-      
+
       for (const stage of stages) {
         const stageContacts = contacts?.filter(c => c.pipeline_stage_id === stage.id) || [];
         const stageMovements = movements?.filter(m => m.from_stage_id === stage.id) || [];
-        
+
         // Calculate average days in stage
         const avgDaysInStage = stageMovements.length > 0
           ? stageMovements.reduce((sum, m) => sum + (m.days_in_previous_stage || 0), 0) / stageMovements.length
@@ -78,11 +74,11 @@ Deno.serve(async (req) => {
         });
 
         // Calculate conversion rate to next stage
-        const movedToNext = movements?.filter(m => 
-          m.from_stage_id === stage.id && 
+        const movedToNext = movements?.filter(m =>
+          m.from_stage_id === stage.id &&
           m.to_stage_id === stages[stages.indexOf(stage) + 1]?.id
         ).length || 0;
-        
+
         const totalMoved = stageMovements.length || 1;
         const conversionRate = (movedToNext / totalMoved) * 100;
 
@@ -90,7 +86,7 @@ Deno.serve(async (req) => {
         const stageScores = stageContacts
           .map(c => scoreMap.get(c.id)?.total_score)
           .filter(s => s !== undefined) as number[];
-        
+
         const avgLeadScore = stageScores.length > 0
           ? stageScores.reduce((sum, s) => sum + s, 0) / stageScores.length
           : 0;
@@ -131,103 +127,82 @@ Identify the TOP 2-3 most critical pipeline issues and opportunities:
 
 For each insight, provide clear actionable recommendations.`;
 
-      // Call Lovable AI with tool calling
+      // Call Gemini with tool calling
       try {
-        const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'google/gemini-2.5-flash',
-            messages: [
-              { role: 'system', content: 'You are an expert sales operations analyst. Provide actionable pipeline insights.' },
-              { role: 'user', content: prompt }
-            ],
-            tools: [{
-              type: 'function',
-              function: {
-                name: 'create_pipeline_insights',
-                description: 'Generate actionable pipeline insights',
-                parameters: {
-                  type: 'object',
-                  properties: {
-                    insights: {
-                      type: 'array',
-                      items: {
-                        type: 'object',
-                        properties: {
-                          priority: { type: 'string', enum: ['high', 'medium', 'low'] },
-                          insight_type: { type: 'string', enum: ['bottleneck', 'at_risk_deals', 'velocity_issue', 'optimization'] },
-                          title: { type: 'string', description: 'Clear action statement (max 60 chars)' },
-                          description: { type: 'string', description: 'Why this matters (1 sentence)' },
-                          impact: { type: 'string', description: 'Expected result' },
-                          supportingData: {
-                            type: 'object',
-                            properties: {
-                              stage: { type: 'string' },
-                              metric: { type: 'string' }
-                            }
-                          },
-                          analysis: { type: 'string', description: 'Your reasoning (2-3 sentences)' },
-                          suggestedAction: { type: 'string', description: 'Specific action to take' }
+        const result = await callGemini('gemini-2.5-flash', {
+          messages: [
+            { role: 'system', content: 'You are an expert sales operations analyst. Provide actionable pipeline insights.' },
+            { role: 'user', content: prompt }
+          ],
+          tools: [{
+            type: 'function',
+            function: {
+              name: 'create_pipeline_insights',
+              description: 'Generate actionable pipeline insights',
+              parameters: {
+                type: 'object',
+                properties: {
+                  insights: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        priority: { type: 'string', enum: ['high', 'medium', 'low'] },
+                        insight_type: { type: 'string', enum: ['bottleneck', 'at_risk_deals', 'velocity_issue', 'optimization'] },
+                        title: { type: 'string', description: 'Clear action statement (max 60 chars)' },
+                        description: { type: 'string', description: 'Why this matters (1 sentence)' },
+                        impact: { type: 'string', description: 'Expected result' },
+                        supportingData: {
+                          type: 'object',
+                          properties: {
+                            stage: { type: 'string' },
+                            metric: { type: 'string' }
+                          }
                         },
-                        required: ['priority', 'insight_type', 'title', 'description', 'suggestedAction']
-                      }
+                        analysis: { type: 'string', description: 'Your reasoning (2-3 sentences)' },
+                        suggestedAction: { type: 'string', description: 'Specific action to take' }
+                      },
+                      required: ['priority', 'insight_type', 'title', 'description', 'suggestedAction']
                     }
-                  },
-                  required: ['insights']
-                }
+                  }
+                },
+                required: ['insights']
               }
-            }],
-            tool_choice: { type: 'function', function: { name: 'create_pipeline_insights' } }
-          }),
+            }
+          }],
+          toolChoice: { type: 'function', function: { name: 'create_pipeline_insights' } }
         });
 
-        if (!aiResponse.ok) {
-          const errorText = await aiResponse.text();
-          console.error(`AI API error for org ${org.id}:`, errorText);
-          continue;
-        }
+        console.log(`AI response for org ${org.id}:`, JSON.stringify(result));
 
-        const aiData = await aiResponse.json();
-        console.log(`AI response for org ${org.id}:`, JSON.stringify(aiData));
-        
-        // Extract insights from tool call
+        // Extract insights from tool call or text response
         let insightsArray = [];
         try {
-          const toolCall = aiData.choices[0].message.tool_calls?.[0];
-          if (toolCall && toolCall.function) {
-            const functionArgs = JSON.parse(toolCall.function.arguments);
+          if (result.toolCall) {
+            const functionArgs = JSON.parse(result.toolCall.arguments);
             insightsArray = functionArgs.insights || [];
           } else {
-            // Fallback: try to parse direct response
-            const responseText = aiData.choices[0].message.content;
+            // Fallback: try to parse direct text response
+            const responseText = result.text;
             console.log(`Fallback parsing for org ${org.id}, response:`, responseText);
-            
-            // Try multiple extraction methods
+
             let parsed;
             try {
-              // Method 1: Direct JSON parse
               parsed = JSON.parse(responseText);
             } catch {
-              // Method 2: Extract JSON from markdown
               const jsonMatch = responseText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
               if (jsonMatch) {
                 parsed = JSON.parse(jsonMatch[1]);
               } else {
-                // Method 3: Find any JSON object or array
                 const objectMatch = responseText.match(/\{[\s\S]*\}/);
                 if (objectMatch) {
                   parsed = JSON.parse(objectMatch[0]);
                 }
               }
             }
-            
-            // Handle both single object and array responses
+
             if (parsed) {
-              insightsArray = Array.isArray(parsed) ? parsed : 
+              insightsArray = Array.isArray(parsed) ? parsed :
                              parsed.insights ? parsed.insights : [parsed];
             }
           }

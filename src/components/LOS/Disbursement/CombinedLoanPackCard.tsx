@@ -406,7 +406,7 @@ export default function CombinedLoanPackCard({
       <div className="hidden">
         <div id="combined-loan-pack-template" ref={printRef}>
           <CombinedLoanDocuments
-            companyName={orgSettings?.company_name || "Paisaa Saarthi"}
+            companyName={orgSettings?.company_name || "LoanFlow"}
             companyAddress={orgSettings?.company_address}
             companyCIN={orgSettings?.company_cin}
             companyPhone={orgSettings?.company_phone}

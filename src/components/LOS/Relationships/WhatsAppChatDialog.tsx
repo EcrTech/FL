@@ -56,7 +56,7 @@ const CONVERSATION_TEMPLATE = {
 
 I have a few clarifications to seek about your application. Are you available now?
 
-team PaisaaSaarthi`,
+team LoanFlow`,
   buttons: [
     { type: "quick_reply", text: "Yes, I am available" }
   ]

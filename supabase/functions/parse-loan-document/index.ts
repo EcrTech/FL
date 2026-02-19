@@ -1,15 +1,16 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
-import { 
-  safeBase64Encode, 
-  getPdfPageCount, 
-  extractPdfPages, 
-  getChunkConfig, 
-  mergeOcrData, 
+import {
+  safeBase64Encode,
+  getPdfPageCount,
+  extractPdfPages,
+  getChunkConfig,
+  mergeOcrData,
   getChunkPrompt,
   calculateProgress,
-  type ParsingProgress 
+  type ParsingProgress
 } from "../_shared/pdfUtils.ts";
+import { callGemini } from "../_shared/geminiClient.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -213,30 +214,22 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
-
-  if (!lovableApiKey) {
-    return new Response(
-      JSON.stringify({ success: false, error: "LOVABLE_API_KEY is not configured" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
   let parsedDocumentId: string | undefined;
 
   try {
     const reqBody = await req.json();
-    const { 
-      documentId, 
-      documentType, 
+    const {
+      documentId,
+      documentType,
       filePath,
       // Chunking parameters (optional - for continuation invocations)
       currentPage = 1,
       totalPages = 0,
       accumulatedData = null,
     } = reqBody;
-    
+
     const isFirstChunk = currentPage === 1 && totalPages === 0;
     console.log(`[ParseDocument] Processing: ${documentType}, ID: ${documentId}, Page: ${currentPage}/${totalPages || 'unknown'}`);
 
@@ -275,7 +268,7 @@ serve(async (req) => {
       const { data: retryData, error: retryError } = await supabase.storage
         .from("loan-documents")
         .download(filePath);
-      
+
       if (retryError || !retryData || retryData.size === 0) {
         console.error(`[ParseDocument] Retry also failed. Blob size: ${retryData?.size}`);
         throw new Error("Downloaded file is empty (0 bytes). Please re-upload the document.");
@@ -288,25 +281,25 @@ serve(async (req) => {
     }
 
     const arrayBuffer = await fileDataToUse.arrayBuffer();
-    
+
     if (!arrayBuffer || arrayBuffer.byteLength === 0) {
       console.error(`[ParseDocument] ArrayBuffer is empty after conversion. Blob size was: ${fileDataToUse.size}`);
       throw new Error("File data is empty after conversion. Please re-upload the document.");
     }
-    
+
     const fileBytes = new Uint8Array(arrayBuffer);
-    
+
     // Detect file type from path or content
     const fileExtension = filePath.split('.').pop()?.toLowerCase() || '';
     const isPdf = fileExtension === 'pdf' || fileDataToUse.type === 'application/pdf';
     const isChunkable = isPdf && CHUNKABLE_DOC_TYPES.includes(documentType);
-    
+
     console.log(`[ParseDocument] File size: ${arrayBuffer.byteLength}, isPDF: ${isPdf}, isChunkable: ${isChunkable}`);
 
     let actualTotalPages = totalPages;
     let pdfBytesToParse = fileBytes;
     const chunkConfig = getChunkConfig(documentType);
-    
+
     // For all PDFs, try to validate/decrypt the PDF to strip restrictions
     if (isPdf) {
       try {
@@ -314,7 +307,7 @@ serve(async (req) => {
         const pdfDoc = await PDFDocument.load(fileBytes, { ignoreEncryption: true });
         const pageCount = pdfDoc.getPageCount();
         console.log(`[ParseDocument] PDF validated: ${pageCount} pages`);
-        
+
         // Re-save the PDF to strip encryption/restrictions
         const cleanedPdfBytes = await pdfDoc.save();
         pdfBytesToParse = new Uint8Array(cleanedPdfBytes);
@@ -331,7 +324,7 @@ serve(async (req) => {
       if (isFirstChunk) {
         actualTotalPages = await getPdfPageCount(fileBytes);
         console.log(`[ParseDocument] PDF has ${actualTotalPages} pages`);
-        
+
         // Update status to processing if we're starting
         await supabase
           .from("loan_documents")
@@ -366,7 +359,7 @@ serve(async (req) => {
 
     // Get the appropriate prompt for this document type
     const basePrompt = DOCUMENT_PROMPTS[documentType] || `Extract all relevant information from this document and return as JSON.`;
-    
+
     // Adjust prompt for chunked processing
     const prompt = isPdf && isChunkable && actualTotalPages > chunkConfig.pagesPerChunk
       ? getChunkPrompt(
@@ -380,21 +373,18 @@ serve(async (req) => {
         )
       : basePrompt;
 
-    let aiResponse: Response;
+    const criticalSuffix = "\n\nCRITICAL: Respond with ONLY the raw JSON object. No text before or after. No markdown. No code fences. No explanation.";
+
+    let resultText: string;
 
     if (isPdf) {
       const dataUrl = `data:application/pdf;base64,${base64}`;
       const filename = filePath.split('/').pop() || "document.pdf";
-      console.log(`[ParseDocument] Using Gemini Flash for PDF parsing, filename: ${filename}, base64 length: ${base64.length}, first 50 chars of base64: ${base64.substring(0, 50)}`);
-      
-      aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${lovableApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+      console.log(`[ParseDocument] Using Gemini Flash for PDF parsing, filename: ${filename}, base64 length: ${base64.length}`);
+
+      // Try with file type first
+      try {
+        const result = await callGemini("gemini-2.5-flash", {
           messages: [
             {
               role: "user",
@@ -408,147 +398,66 @@ serve(async (req) => {
                 },
                 {
                   type: "text",
-                  text: prompt + "\n\nCRITICAL: Respond with ONLY the raw JSON object. No text before or after. No markdown. No code fences. No explanation.",
+                  text: prompt + criticalSuffix,
                 },
               ],
             },
           ],
-          max_tokens: chunkConfig.maxTokens,
-        }),
-      });
-      
-      // If type: "file" fails with 400 (e.g. encrypted PDFs), retry with image_url format
-      if (!aiResponse.ok && aiResponse.status === 400) {
-        const errorBody = await aiResponse.text();
-        console.warn(`[ParseDocument] type:file failed (400): ${errorBody}. Retrying with image_url format...`);
-        
-        aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${lovableApiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
-            messages: [
-              {
-                role: "user",
-                content: [
-                  {
-                    type: "image_url",
-                    image_url: {
-                      url: dataUrl,
-                    },
-                  },
-                  {
-                    type: "text",
-                    text: prompt + "\n\nCRITICAL: Respond with ONLY the raw JSON object. No text before or after. No markdown. No code fences. No explanation.",
-                  },
-                ],
-              },
-            ],
-            max_tokens: chunkConfig.maxTokens,
-          }),
+          maxTokens: chunkConfig.maxTokens,
         });
+        resultText = result.text;
+      } catch (fileError) {
+        // If file type fails, retry with image_url format (e.g. encrypted PDFs)
+        console.warn(`[ParseDocument] type:file failed: ${fileError}. Retrying with image_url format...`);
 
-        // If image_url also fails, try with openai/gpt-5-mini as last resort
-        if (!aiResponse.ok && aiResponse.status === 400) {
-          const errorBody2 = await aiResponse.text();
-          console.warn(`[ParseDocument] image_url also failed (400): ${errorBody2}. Trying with GPT-5-mini...`);
-          
-          aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${lovableApiKey}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              model: "openai/gpt-5-mini",
-              messages: [
-                {
-                  role: "user",
-                  content: [
-                    {
-                      type: "file",
-                      file: {
-                        filename: filename,
-                        file_data: dataUrl,
-                      },
-                    },
-                    {
-                      type: "text",
-                      text: prompt + "\n\nCRITICAL: Respond with ONLY the raw JSON object. No text before or after. No markdown. No code fences. No explanation.",
-                    },
-                  ],
-                },
-              ],
-              max_completion_tokens: chunkConfig.maxTokens,
-            }),
-          });
-        }
-      }
-    } else {
-      const mimeType = fileDataToUse.type || "image/jpeg";
-      console.log(`[ParseDocument] Using Gemini Flash for image parsing, MIME: ${mimeType}`);
-      
-      aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${lovableApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
+        const result = await callGemini("gemini-2.5-flash", {
           messages: [
             {
               role: "user",
               content: [
                 {
                   type: "image_url",
-                  image_url: {
-                    url: `data:${mimeType};base64,${base64}`,
-                  },
+                  image_url: { url: dataUrl },
                 },
                 {
                   type: "text",
-                  text: prompt + "\n\nCRITICAL: Respond with ONLY the raw JSON object. No text before or after. No markdown. No code fences. No explanation.",
+                  text: prompt + criticalSuffix,
                 },
               ],
             },
           ],
-          max_tokens: chunkConfig.maxTokens,
-        }),
-      });
-    }
+          maxTokens: chunkConfig.maxTokens,
+        });
+        resultText = result.text;
+      }
+    } else {
+      const mimeType = fileDataToUse.type || "image/jpeg";
+      console.log(`[ParseDocument] Using Gemini Flash for image parsing, MIME: ${mimeType}`);
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error(`[ParseDocument] AI API error: ${aiResponse.status}`, errorText);
-      
-      // Mark as failed
-      await supabase
-        .from("loan_documents")
-        .update({
-          parsing_status: 'failed',
-          parsing_progress: {
-            ...calculateProgress(currentPage, actualTotalPages, chunkConfig.pagesPerChunk),
-            error: `AI API error: ${aiResponse.status}`,
-            failed_at_page: currentPage,
+      const result = await callGemini("gemini-2.5-flash", {
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:${mimeType};base64,${base64}`,
+                },
+              },
+              {
+                type: "text",
+                text: prompt + criticalSuffix,
+              },
+            ],
           },
-        })
-        .eq("id", documentId);
-      
-      if (aiResponse.status === 429) {
-        throw new Error("Rate limit exceeded. Please try again later.");
-      }
-      if (aiResponse.status === 402) {
-        throw new Error("AI credits exhausted. Please add funds to continue.");
-      }
-      throw new Error(`AI parsing failed: ${aiResponse.status}`);
+        ],
+        maxTokens: chunkConfig.maxTokens,
+      });
+      resultText = result.text;
     }
 
-    const aiResult = await aiResponse.json();
-    const content = aiResult.choices?.[0]?.message?.content || "";
+    const content = resultText;
     console.log(`[ParseDocument] AI response received, length: ${content.length}`);
 
     // Parse the JSON from the response
@@ -556,7 +465,7 @@ serve(async (req) => {
     try {
       // Try multiple extraction strategies
       let jsonStr = content.trim();
-      
+
       // Strategy 1: Extract from code fences
       const codeFenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
       if (codeFenceMatch) {
@@ -569,32 +478,28 @@ serve(async (req) => {
           jsonStr = content.substring(firstBrace, lastBrace + 1);
         }
       }
-      
+
       try {
         parsedData = JSON.parse(jsonStr);
       } catch (firstParseError) {
         // Strategy 3: Try to repair truncated JSON by removing trailing incomplete entries
         console.warn(`[ParseDocument] First parse failed, attempting JSON repair...`);
-        
-        // Remove any trailing incomplete array entries or properties
-        let repaired = jsonStr;
-        
+
         // Remove truncated trailing content after last complete property
-        // Find the last complete "key": value pair
+        let repaired = jsonStr;
+
         const lastCompleteComma = repaired.lastIndexOf(',\n');
         if (lastCompleteComma > 0) {
           const afterComma = repaired.substring(lastCompleteComma + 2).trim();
-          // If what's after the comma doesn't end with a proper closing, truncate there
           if (!afterComma.endsWith('}')) {
             repaired = repaired.substring(0, lastCompleteComma);
-            // Close any open arrays and objects
             const openBrackets = (repaired.match(/\[/g) || []).length - (repaired.match(/\]/g) || []).length;
             const openBraces = (repaired.match(/\{/g) || []).length - (repaired.match(/\}/g) || []).length;
             for (let i = 0; i < openBrackets; i++) repaired += ']';
             for (let i = 0; i < openBraces; i++) repaired += '}';
           }
         }
-        
+
         try {
           parsedData = JSON.parse(repaired);
           console.log(`[ParseDocument] JSON repair successful`);
@@ -604,7 +509,7 @@ serve(async (req) => {
           parsedData = { raw_text: content, parse_error: true };
         }
       }
-      
+
       console.log(`[ParseDocument] Parsed data keys:`, Object.keys(parsedData).join(', '));
     } catch (parseError) {
       console.error(`[ParseDocument] JSON parse error:`, parseError);
@@ -617,47 +522,33 @@ serve(async (req) => {
       console.log(`[ParseDocument] UTR is null for image-based ${documentType}, retrying with focused prompt...`);
       try {
         const retryPrompt = `Look at this bank transaction receipt/screenshot carefully. Find the main transaction reference number or ID shown on the document. It may be labeled as "Transaction ID", "UTR", "Reference Number", "Ref No", "NEFT Ref", "RTGS Ref", "IMPS Ref", "CMS Ref", or similar. Return ONLY a JSON object like: {"utr_number": "THE_REFERENCE_NUMBER_HERE"}. If you truly cannot find any reference number, return {"utr_number": null}.\n\nCRITICAL: Respond with ONLY the raw JSON object. No text before or after. No markdown. No code fences.`;
-        
+
         const mimeType = fileDataToUse?.type || "image/jpeg";
-        const retryResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${lovableApiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-pro",
-            messages: [
-              {
-                role: "user",
-                content: [
-                  {
-                    type: "image_url",
-                    image_url: { url: `data:${mimeType};base64,${base64}` },
-                  },
-                  { type: "text", text: retryPrompt },
-                ],
-              },
-            ],
-            max_tokens: 500,
-          }),
+        const retryResult = await callGemini("gemini-2.5-pro", {
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "image_url",
+                  image_url: { url: `data:${mimeType};base64,${base64}` },
+                },
+                { type: "text", text: retryPrompt },
+              ],
+            },
+          ],
+          maxTokens: 500,
         });
 
-        if (retryResponse.ok) {
-          const retryResult = await retryResponse.json();
-          const retryContent = retryResult.choices?.[0]?.message?.content || "";
-          const firstBrace = retryContent.indexOf('{');
-          const lastBrace = retryContent.lastIndexOf('}');
-          if (firstBrace !== -1 && lastBrace > firstBrace) {
-            const retryJson = JSON.parse(retryContent.substring(firstBrace, lastBrace + 1));
-            if (retryJson.utr_number) {
-              console.log(`[ParseDocument] UTR retry successful: ${retryJson.utr_number}`);
-              parsedData.utr_number = retryJson.utr_number;
-            }
+        const retryContent = retryResult.text;
+        const firstBrace = retryContent.indexOf('{');
+        const lastBrace = retryContent.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace > firstBrace) {
+          const retryJson = JSON.parse(retryContent.substring(firstBrace, lastBrace + 1));
+          if (retryJson.utr_number) {
+            console.log(`[ParseDocument] UTR retry successful: ${retryJson.utr_number}`);
+            parsedData.utr_number = retryJson.utr_number;
           }
-        } else {
-          const errText = await retryResponse.text();
-          console.warn(`[ParseDocument] UTR retry failed: ${retryResponse.status}`, errText);
         }
       } catch (retryError) {
         console.warn(`[ParseDocument] UTR retry error:`, retryError);
@@ -689,7 +580,7 @@ serve(async (req) => {
 
       // Update progress and save partial results
       const progress = calculateProgress(nextPage - 1, actualTotalPages, chunkConfig.pagesPerChunk);
-      
+
       await supabase
         .from("loan_documents")
         .update({
@@ -706,7 +597,7 @@ serve(async (req) => {
 
       // Trigger self-invocation for next chunk (fire-and-forget)
       console.log(`[ParseDocument] Triggering continuation for pages ${nextPage}-${Math.min(nextPage + chunkConfig.pagesPerChunk - 1, actualTotalPages)}`);
-      
+
       fetch(`${supabaseUrl}/functions/v1/parse-loan-document`, {
         method: 'POST',
         headers: {
@@ -762,7 +653,7 @@ serve(async (req) => {
         ocr_data: finalData,
         parsing_status: 'completed',
         parsing_completed_at: new Date().toISOString(),
-        parsing_progress: actualTotalPages > 1 
+        parsing_progress: actualTotalPages > 1
           ? calculateProgress(actualTotalPages, actualTotalPages, chunkConfig.pagesPerChunk)
           : { current_page: 1, total_pages: 1, chunks_completed: 1, total_chunks: 1 },
         updated_at: new Date().toISOString(),
@@ -786,7 +677,7 @@ serve(async (req) => {
           verified_at: new Date().toISOString(),
         })
         .eq("id", documentId);
-      
+
       if (verifyError) {
         console.warn(`[ParseDocument] Failed to auto-verify ${documentType}:`, verifyError);
       } else {
@@ -796,10 +687,10 @@ serve(async (req) => {
 
     // === Sync date_of_joining from salary slips to loan_employment_details ===
     const isSalarySlip = documentType.startsWith('salary_slip');
-    
+
     if (isSalarySlip && !mergedData.parse_error && loanApplicationId && mergedData.date_of_joining) {
       console.log(`[ParseDocument] Syncing date_of_joining from salary slip: ${mergedData.date_of_joining}`);
-      
+
       // Find the primary applicant
       const { data: applicant } = await supabase
         .from("loan_applicants")
@@ -807,7 +698,7 @@ serve(async (req) => {
         .eq("loan_application_id", loanApplicationId)
         .eq("applicant_type", "primary")
         .maybeSingle();
-      
+
       if (applicant) {
         // Find existing employment record
         const { data: employment } = await supabase
@@ -815,7 +706,7 @@ serve(async (req) => {
           .select("id, date_of_joining")
           .eq("applicant_id", applicant.id)
           .maybeSingle();
-        
+
         if (employment) {
           // Only update if currently null or different
           if (!employment.date_of_joining || employment.date_of_joining !== mergedData.date_of_joining) {
@@ -823,7 +714,7 @@ serve(async (req) => {
               .from("loan_employment_details")
               .update({ date_of_joining: mergedData.date_of_joining })
               .eq("id", employment.id);
-            
+
             if (empUpdateError) {
               console.warn(`[ParseDocument] Failed to sync date_of_joining:`, empUpdateError);
             } else {
@@ -842,7 +733,7 @@ serve(async (req) => {
               date_of_joining: mergedData.date_of_joining,
               employee_id: mergedData.employee_id || null,
             });
-          
+
           if (empInsertError) {
             console.warn(`[ParseDocument] Failed to create employment record:`, empInsertError);
           } else {
@@ -854,20 +745,20 @@ serve(async (req) => {
 
 
     const isAadhaarOrPan = documentType === 'aadhaar_card' || documentType === 'aadhar_card' || documentType === 'pan_card';
-    
+
     if (isAadhaarOrPan && !mergedData.parse_error && loanApplicationId) {
       console.log(`[ParseDocument] Syncing OCR data to loan_applicants for ${documentType}`);
-      
+
       const { data: applicant, error: applicantFetchError } = await supabase
         .from("loan_applicants")
         .select("id, dob, current_address, gender")
         .eq("loan_application_id", loanApplicationId)
         .eq("applicant_type", "primary")
         .maybeSingle();
-      
+
       if (applicant && !applicantFetchError) {
         const updateData: Record<string, unknown> = {};
-        
+
         // Update DOB if we have new data and it differs from current value
         if (mergedData.dob) {
           const newDob = mergedData.dob;
@@ -881,7 +772,7 @@ serve(async (req) => {
             }
           }
         }
-        
+
         if (documentType === 'aadhaar_card' || documentType === 'aadhar_card') {
           // Update gender if we have new data and current is empty or different
           if (mergedData.gender) {
@@ -892,14 +783,14 @@ serve(async (req) => {
               console.log(`[ParseDocument] Updating gender: ${applicant.gender} -> ${mergedData.gender}`);
             }
           }
-          
+
           // Always update address from Aadhaar OCR (authoritative source for address)
           if (mergedData.address) {
             const addressStr = mergedData.address;
-            
+
             const pincodeMatch = addressStr.match(/(\d{6})\s*$/);
             const pincode = pincodeMatch ? pincodeMatch[1] : '';
-            
+
             const statePatterns = [
               'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
               'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka',
@@ -915,7 +806,7 @@ serve(async (req) => {
                 break;
               }
             }
-            
+
             updateData.current_address = {
               line1: addressStr,
               line2: '',
@@ -923,17 +814,17 @@ serve(async (req) => {
               state: state,
               pincode: pincode
             };
-            
+
             console.log(`[ParseDocument] Updating address - state: ${state}, pincode: ${pincode}`);
           }
         }
-        
+
         if (Object.keys(updateData).length > 0) {
           const { error: syncError } = await supabase
             .from("loan_applicants")
             .update(updateData)
             .eq("id", applicant.id);
-          
+
           if (syncError) {
             console.warn(`[ParseDocument] Failed to sync OCR to applicant:`, syncError);
           } else {
@@ -957,7 +848,7 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error(`[ParseDocument] Error:`, error);
-    
+
     // Try to update status to failed
     try {
       const docId = parsedDocumentId;
@@ -975,7 +866,7 @@ serve(async (req) => {
     } catch (e) {
       console.error(`[ParseDocument] Failed to update error status:`, e);
     }
-    
+
     return new Response(
       JSON.stringify({
         success: false,

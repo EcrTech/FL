@@ -4,34 +4,21 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Paisaa Saarthi Design System - Teal Mobile-First Aesthetic */
+/* LoanFlow Design System - Coral/Maroon Mobile-First Aesthetic */
 @layer base {
   :root {
-    /* Primary Colors - Teal Scale (New) */
-    --teal-600: 172 66% 35%;  /* #0F766E - Hover/headers */
-    --teal-500: 174 61% 32%;  /* #0D9488 - Primary CTA */
-    --teal-400: 174 61% 42%;  /* Lighter teal */
-    --teal-100: 174 61% 95%;  /* Very light teal bg */
-    
-    /* Legacy - Electric Blue Scale (kept for compatibility) */
-    --electric-blue-700: 216 100% 30%;
-    --electric-blue-600: 216 100% 40%;
-    --electric-blue-500: 216 100% 50%;
-    --electric-blue-400: 216 100% 60%;
-    --electric-blue-100: 216 100% 95%;
-    
-    /* Accent Colors - Coral */
-    --coral-600: 14 88% 56%;
-    --coral-500: 14 100% 64%;
-    --coral-400: 14 100% 72%;
-    
-    /* Accent Colors - Purple */
-    --purple-500: 263 70% 58%;
-    --purple-400: 263 70% 68%;
-    
-    /* Gold Accent */
-    --gold-500: 38 92% 50%;
-    
+    /* Primary Colors - Coral Scale */
+    --coral-600: 0 72% 51%;   /* Deep coral - hover/headers */
+    --coral-500: 4 80% 60%;   /* Primary CTA coral */
+    --coral-400: 6 85% 68%;   /* Lighter coral */
+    --coral-100: 6 85% 96%;   /* Very light coral bg */
+
+    /* Accent Colors - Maroon Scale */
+    --maroon-600: 340 75% 30%;  /* Deep maroon */
+    --maroon-500: 340 70% 36%;  /* Primary maroon accent */
+    --maroon-400: 340 65% 45%;  /* Lighter maroon */
+    --maroon-100: 340 40% 95%;  /* Very light maroon bg */
+
     /* Semantic Colors */
     --success: 160 84% 39%;
     --success-bg: 160 84% 95%;
@@ -41,98 +28,96 @@
     --error-bg: 0 84% 95%;
     --info: 217 91% 60%;
     --info-bg: 217 91% 95%;
-    
+
     /* Background for referral pages */
     --referral-bg: 210 40% 98%;  /* #F8FAFC */
-    
-    /* Neutral Scale */
-    --neutral-900: 210 13% 9%;
-    --neutral-700: 214 10% 26%;
-    --neutral-500: 214 8% 49%;
-    --neutral-300: 214 10% 78%;
-    --neutral-100: 214 14% 95%;
-    
+
+    /* Neutral Scale (warm gray shift) */
+    --neutral-900: 220 13% 9%;
+    --neutral-700: 218 10% 26%;
+    --neutral-500: 218 8% 49%;
+    --neutral-300: 218 10% 78%;
+    --neutral-100: 218 14% 95%;
+
     /* Design Tokens */
     --background: 0 0% 100%;
     --foreground: var(--neutral-900);
-    
+
     --card: 0 0% 100%;
     --card-foreground: var(--neutral-900);
-    
+
     --popover: 0 0% 100%;
     --popover-foreground: var(--neutral-900);
-    
-    /* Use teal as primary for referral flow */
-    --primary: var(--teal-500);
+
+    /* Primary - Coral */
+    --primary: var(--coral-500);
     --primary-foreground: 0 0% 100%;
-    
-    --secondary: var(--purple-500);
+
+    /* Secondary - Maroon */
+    --secondary: var(--maroon-500);
     --secondary-foreground: 0 0% 100%;
-    
+
     --muted: var(--neutral-100);
     --muted-foreground: var(--neutral-500);
-    
-    --accent: var(--coral-500);
+
+    --accent: var(--maroon-500);
     --accent-foreground: 0 0% 100%;
-    
+
     --destructive: var(--error);
     --destructive-foreground: 0 0% 100%;
-    
-    --border: 214 20% 89%;  /* #E2E8F0 */
-    --input: 214 20% 89%;
-    --ring: var(--teal-500);
-    
+
+    --border: 218 20% 89%;  /* #E2E8F0 */
+    --input: 218 20% 89%;
+    --ring: var(--coral-500);
+
     --radius: 0.875rem;  /* 14px for mobile-first rounded corners */
-    
+
     /* Shadows with Color */
     --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.05);
     --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.1), 0 2px 4px -2px hsl(0 0% 0% / 0.1);
     --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.1), 0 4px 6px -4px hsl(0 0% 0% / 0.1);
     --shadow-xl: 0 20px 25px -5px hsl(0 0% 0% / 0.1), 0 8px 10px -6px hsl(0 0% 0% / 0.1);
-    --shadow-primary: 0 6px 16px -4px hsl(var(--teal-500) / 0.25);
-    --shadow-teal: 0 6px 16px -4px hsl(var(--teal-500) / 0.25);
-    --shadow-coral: 0 10px 30px -5px hsl(var(--coral-500) / 0.35);
-    --shadow-gold: 0 10px 30px -5px hsl(var(--gold-500) / 0.35);
-    
+    --shadow-primary: 0 6px 16px -4px hsl(var(--coral-500) / 0.25);
+    --shadow-coral: 0 6px 16px -4px hsl(var(--coral-500) / 0.25);
+    --shadow-maroon: 0 10px 30px -5px hsl(var(--maroon-500) / 0.35);
+
     /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(var(--teal-500)) 0%, hsl(var(--teal-600)) 100%);
-    --gradient-teal: linear-gradient(135deg, hsl(var(--teal-500)) 0%, hsl(var(--teal-600)) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(var(--coral-500)) 0%, hsl(var(--coral-600)) 100%);
     --gradient-coral: linear-gradient(135deg, hsl(var(--coral-500)) 0%, hsl(var(--coral-600)) 100%);
-    --gradient-purple: linear-gradient(135deg, hsl(var(--purple-500)) 0%, hsl(var(--purple-400)) 100%);
-    --gradient-gold: linear-gradient(135deg, hsl(var(--gold-500)) 0%, hsl(38 92% 45%) 100%);
+    --gradient-maroon: linear-gradient(135deg, hsl(var(--maroon-500)) 0%, hsl(var(--maroon-400)) 100%);
   }
-  
+
   .dark {
     /* Dark mode tokens */
     --background: 220 13% 10%;
     --foreground: 0 0% 98%;
-    
+
     --card: 220 13% 14%;
     --card-foreground: 0 0% 98%;
-    
+
     --popover: 220 13% 14%;
     --popover-foreground: 0 0% 98%;
-    
-    --primary: var(--electric-blue-400);
+
+    --primary: var(--coral-400);
     --primary-foreground: 0 0% 100%;
-    
-    --secondary: var(--purple-400);
+
+    --secondary: var(--maroon-400);
     --secondary-foreground: 0 0% 100%;
-    
+
     --muted: 220 13% 18%;
-    --muted-foreground: 214 10% 60%;
-    
-    --accent: var(--coral-400);
+    --muted-foreground: 218 10% 60%;
+
+    --accent: var(--maroon-400);
     --accent-foreground: 0 0% 100%;
-    
+
     --destructive: var(--error);
     --destructive-foreground: 0 0% 100%;
-    
+
     --border: 220 13% 22%;
     --input: 220 13% 22%;
-    --ring: var(--electric-blue-400);
-    
-    --shadow-primary: 0 10px 30px -5px hsl(var(--electric-blue-400) / 0.4);
+    --ring: var(--coral-400);
+
+    --shadow-primary: 0 10px 30px -5px hsl(var(--coral-400) / 0.4);
     --shadow-coral: 0 10px 30px -5px hsl(var(--coral-400) / 0.4);
   }
 }
@@ -173,7 +158,7 @@
   
   .btn-electric:hover {
     transform: translateY(-2px);
-    box-shadow: 0 15px 35px -5px hsl(var(--electric-blue-500) / 0.45);
+    box-shadow: 0 15px 35px -5px hsl(var(--coral-500) / 0.45);
   }
   
   .btn-electric:active {
@@ -195,20 +180,20 @@
     box-shadow: 0 15px 35px -5px hsl(var(--coral-500) / 0.45);
   }
 
-  /* Gold Success Button */
-  .btn-gold {
-    background: var(--gradient-gold);
+  /* Maroon Accent Button */
+  .btn-maroon {
+    background: var(--gradient-maroon);
     color: white;
     font-weight: 600;
     border: none;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: var(--shadow-gold);
+    box-shadow: var(--shadow-maroon);
   }
 
   /* Input Focus Glow */
   .input-focus-glow:focus {
-    border-color: hsl(var(--electric-blue-500));
-    box-shadow: 0 0 0 4px hsl(var(--electric-blue-500) / 0.1);
+    border-color: hsl(var(--coral-500));
+    box-shadow: 0 0 0 4px hsl(var(--coral-500) / 0.1);
     outline: none;
   }
 
@@ -228,11 +213,11 @@
   }
   
   .border-accent-blue {
-    border-left: 3px solid hsl(var(--electric-blue-500));
+    border-left: 3px solid hsl(var(--coral-500));
   }
-  
-  .border-accent-gold {
-    border-left: 3px solid hsl(var(--gold-500));
+
+  .border-accent-maroon {
+    border-left: 3px solid hsl(var(--maroon-500));
   }
 
   /* Animated Gradient Background */

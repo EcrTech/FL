@@ -155,7 +155,7 @@ Deno.serve(async (req) => {
         'Authorization': `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: 'Paisaa Saarthi Billing <info@' + (org?.email_settings?.[0]?.sending_domain || 'paisaasaarthi.com') + '>',
+        from: 'LoanFlow Billing <info@' + (org?.email_settings?.[0]?.sending_domain || 'loanflow.com') + '>',
         to: [adminEmail],
         subject,
         html,

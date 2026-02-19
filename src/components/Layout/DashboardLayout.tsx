@@ -1,7 +1,7 @@
 import { ReactNode, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import logo from "@/assets/loanflow-logo.svg";
+import logo from "@/assets/loanflow-logo.png";
 import {
   LayoutDashboard,
   Settings,
@@ -30,7 +30,6 @@ import {
   Webhook,
   MessageSquare,
   Mail,
-  Send,
   Database,
   CreditCard,
   Activity,
@@ -412,16 +411,6 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                     </Link>
                   )}
                   
-                  {canAccessFeature("connectors") && (
-                    <Link
-                      to="/admin/outbound-webhooks"
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
-                      onClick={() => setSidebarOpen(false)}
-                    >
-                      <Send size={18} />
-                      <span>Outbound Webhooks</span>
-                    </Link>
-                  )}
                   
                   {canAccessFeature("exotel_settings") && (
                     <Link

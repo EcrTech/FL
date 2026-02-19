@@ -1,4 +1,5 @@
 import { getSupabaseClient } from '../_shared/supabaseClient.ts';
+import { callGemini } from '../_shared/geminiClient.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,11 +13,6 @@ Deno.serve(async (req) => {
 
   try {
     const supabase = getSupabaseClient();
-
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
-    }
 
     // Get all organizations
     const { data: orgs, error: orgsError } = await supabase
@@ -116,32 +112,18 @@ Respond ONLY with valid JSON in this exact format:
   "suggestedAction": "Specific action to take"
 }`;
 
-        // Call Lovable AI
+        // Call Gemini
         try {
-          const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: 'google/gemini-2.5-flash',
-              messages: [
-                { role: 'system', content: 'You are an expert marketing analyst. Always respond with valid JSON only.' },
-                { role: 'user', content: prompt }
-              ],
-              temperature: 0.7,
-            }),
+          const result = await callGemini('gemini-2.5-flash', {
+            messages: [
+              { role: 'system', content: 'You are an expert marketing analyst. Always respond with valid JSON only.' },
+              { role: 'user', content: prompt }
+            ],
+            temperature: 0.7,
           });
 
-          if (!aiResponse.ok) {
-            console.error(`AI API error for campaign ${campaignId}:`, await aiResponse.text());
-            continue;
-          }
+          const responseText = result.text;
 
-          const aiData = await aiResponse.json();
-          const responseText = aiData.choices[0].message.content;
-          
           // Extract JSON from response
           let insights;
           try {

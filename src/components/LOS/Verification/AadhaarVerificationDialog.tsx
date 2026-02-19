@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useVerifiedUCredentials } from "@/hooks/useVerifiedUCredentials";
 import { Loader2, ExternalLink, CheckCircle, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -30,6 +31,7 @@ export default function AadhaarVerificationDialog({
 }: AadhaarVerificationDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { credentials: verifiedUCreds } = useVerifiedUCredentials();
 
   const [formData, setFormData] = useState({
     aadhaar_last4: existingVerification?.request_data?.aadhaar_last4 || "",
@@ -62,6 +64,7 @@ export default function AadhaarVerificationDialog({
           orgId,
           successUrl: `${baseUrl}/digilocker/success`,
           failureUrl: `${baseUrl}/digilocker/failure`,
+          ...verifiedUCreds,
         },
       });
 

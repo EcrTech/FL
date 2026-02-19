@@ -211,14 +211,14 @@ serve(async (req) => {
           
           // Fall back to default domain instead of failing
           console.log('Domain verification incomplete, falling back to default domain');
-          sendingDomain = 'paisaasaarthi.com';
+          sendingDomain = 'loanflow.com';
           skipDomainVerification = true;
         }
       }
     } else {
       // Fallback: Use verified platform domain (same pattern as E-Sign notifications)
-      console.log('No custom email settings found, using platform default domain: paisaasaarthi.com');
-      sendingDomain = 'paisaasaarthi.com';
+      console.log('No custom email settings found, using platform default domain: loanflow.com');
+      sendingDomain = 'loanflow.com';
       skipDomainVerification = true;
     }
 

@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useVerifiedUCredentials } from "@/hooks/useVerifiedUCredentials";
 import { Loader2, CheckCircle } from "lucide-react";
 
 interface BankAccountVerificationDialogProps {
@@ -29,6 +30,7 @@ export default function BankAccountVerificationDialog({
 }: BankAccountVerificationDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { credentials: verifiedUCreds } = useVerifiedUCredentials();
 
   const [formData, setFormData] = useState({
     account_number: existingVerification?.request_data?.account_number || "",
@@ -82,6 +84,7 @@ export default function BankAccountVerificationDialog({
           ifscCode: formData.ifsc_code,
           applicationId,
           orgId,
+          ...verifiedUCreds,
         },
       });
 

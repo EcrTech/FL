@@ -1,4 +1,5 @@
 import { getSupabaseClient } from '../_shared/supabaseClient.ts';
+import { callGemini } from '../_shared/geminiClient.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,11 +19,6 @@ Deno.serve(async (req) => {
     }
 
     const supabase = getSupabaseClient();
-
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
-    }
 
     // Fetch recent campaign data
     const { data: emailCampaigns } = await supabase
@@ -115,27 +111,27 @@ Deno.serve(async (req) => {
     }) || [];
 
     // Build context summary
-    const emailSummary = emailCampaigns?.map(c => 
+    const emailSummary = emailCampaigns?.map(c =>
       `${c.name}: ${c.status}, ${c.sent_count} sent, ${c.failed_count} failed`
     ).join('\n') || 'No email campaigns';
 
-    const whatsappSummary = whatsappCampaigns?.map(c => 
+    const whatsappSummary = whatsappCampaigns?.map(c =>
       `${c.name}: ${c.status}, ${c.sent_count} sent, ${c.failed_count} failed`
     ).join('\n') || 'No WhatsApp campaigns';
 
-    const analyticsSummary = analytics 
+    const analyticsSummary = analytics
       ? `Total campaigns tracked: ${new Set(analytics.map(a => a.campaign_id)).size}, Total conversions: ${analytics.reduce((sum, a) => sum + (a.conversions || 0), 0)}`
       : 'No analytics data';
 
-    const insightsSummary = insights?.map(i => 
+    const insightsSummary = insights?.map(i =>
       `${i.priority.toUpperCase()}: ${i.title}`
     ).join('\n') || 'No active insights';
 
-    const pipelineSummary = pipelineMetrics.map(m => 
+    const pipelineSummary = pipelineMetrics.map(m =>
       `${m.name}: ${m.count} contacts (${m.probability}% prob), Avg Score: ${m.avgScore}, Hot: ${m.scoreBreakdown.hot}, Warm: ${m.scoreBreakdown.warm}`
     ).join('\n');
 
-    const recentMovementsSummary = recentMovements?.slice(0, 5).map(m => 
+    const recentMovementsSummary = recentMovements?.slice(0, 5).map(m =>
       `${m.from_stage?.name || 'Unknown'} → ${m.to_stage?.name || 'Unknown'} (${m.days_in_previous_stage} days in prev stage)`
     ).join('\n') || 'No recent movements';
 
@@ -165,33 +161,16 @@ Provide helpful, data-driven answers about campaign performance, pipeline health
 Be conversational but precise. Use specific numbers when available.
 If the user asks about specific campaigns, reference the data above.`;
 
-    // Call Lovable AI
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: context },
-          { role: 'user', content: query }
-        ],
-        temperature: 0.7,
-      }),
+    // Call Gemini
+    const result = await callGemini('gemini-2.5-flash', {
+      messages: [
+        { role: 'system', content: context },
+        { role: 'user', content: query }
+      ],
+      temperature: 0.7,
     });
 
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error('AI API error:', errorText);
-      throw new Error(`AI API error: ${errorText}`);
-    }
-
-    const aiData = await aiResponse.json();
-    const response = aiData.choices[0].message.content;
-
-    return new Response(JSON.stringify({ response }), {
+    return new Response(JSON.stringify({ response: result.text }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 

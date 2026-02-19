@@ -11,6 +11,7 @@ import { Check, Loader2, ArrowLeft, ArrowRight, FileCheck, ShieldCheck, MapPin, 
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import { fetchVerifiedUCredentials } from "@/hooks/useVerifiedUCredentials";
 
 interface CommunicationAddress {
   addressLine1: string;
@@ -128,11 +129,15 @@ export function AadhaarVerificationStep({
         isDifferentAddress: localDifferentAddress,
       }));
       
+      // Fetch credentials from org settings
+      const creds = await fetchVerifiedUCredentials();
+
       const { data, error } = await supabase.functions.invoke('verifiedu-public-aadhaar-initiate', {
         body: {
           surl: `${baseUrl}/digilocker/success`,
           furl: `${baseUrl}/digilocker/failure`,
           returnUrl: cleanUrl, // Pass clean returnUrl to survive cross-domain redirect
+          ...creds,
         },
       });
 

@@ -378,7 +378,7 @@ export function ContactConsentScreen({
           <Button
             onClick={onContinue}
             disabled={!canContinue}
-            className="w-full h-[54px] text-base font-heading font-semibold rounded-[14px] bg-gradient-to-r from-primary to-[hsl(var(--teal-600))] shadow-[var(--shadow-teal)] hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:shadow-none disabled:transform-none"
+            className="w-full h-[54px] text-base font-heading font-semibold rounded-[14px] bg-gradient-to-r from-primary to-[hsl(var(--coral-600))] shadow-[var(--shadow-coral)] hover:shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:shadow-none disabled:transform-none"
           >
             Continue to PAN Verification
             <ArrowRight className="h-5 w-5 ml-2" />

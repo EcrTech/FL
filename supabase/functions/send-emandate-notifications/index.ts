@@ -33,7 +33,7 @@ async function sendEmailNotification(
   }
 
   const fromEmail = `info@${emailSettings.sending_domain}`;
-  const fromName = emailSettings.from_name || "Paisaa Saarthi eMandate";
+  const fromName = emailSettings.from_name || "LoanFlow eMandate";
 
   const amountDisplay = collectionAmount 
     ? `₹${collectionAmount.toLocaleString("en-IN")}` 
@@ -249,7 +249,7 @@ serve(async (req) => {
       // Use org's verified domain if available, otherwise use global verified domain
       const effectiveEmailSettings = emailSettings?.sending_domain 
         ? emailSettings 
-        : { sending_domain: "paisaasaarthi.com", from_name: "Paisaa Saarthi eMandate" };
+        : { sending_domain: "loanflow.com", from_name: "LoanFlow eMandate" };
 
       const emailResult = await sendEmailNotification(
         signer_email,

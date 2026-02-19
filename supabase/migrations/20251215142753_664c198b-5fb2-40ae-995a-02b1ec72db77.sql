@@ -24,7 +24,7 @@ CREATE UNIQUE INDEX idx_loan_docs_unique ON public.loan_generated_documents(loan
 CREATE TABLE public.organization_loan_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id UUID NOT NULL REFERENCES public.organizations(id) UNIQUE,
-  company_name TEXT DEFAULT 'Paisaa Saarthi',
+  company_name TEXT DEFAULT 'LoanFlow',
   company_address TEXT,
   company_cin TEXT,
   company_phone TEXT,

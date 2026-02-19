@@ -1,6 +1,6 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { callGemini } from "../_shared/geminiClient.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -74,7 +74,7 @@ serve(async (req) => {
 
     const arrayBuffer = await fileData.arrayBuffer();
     const bytes = new Uint8Array(arrayBuffer);
-    
+
     // Convert to base64 safely
     let binaryString = "";
     for (let i = 0; i < bytes.length; i++) {
@@ -82,60 +82,28 @@ serve(async (req) => {
     }
     const base64Data = btoa(binaryString);
 
-    const mimeType = filePath.endsWith(".pdf") ? "application/pdf" : 
-                     filePath.endsWith(".png") ? "image/png" : 
-                     filePath.endsWith(".jpg") || filePath.endsWith(".jpeg") ? "image/jpeg" : 
+    const mimeType = filePath.endsWith(".pdf") ? "application/pdf" :
+                     filePath.endsWith(".png") ? "image/png" :
+                     filePath.endsWith(".jpg") || filePath.endsWith(".jpeg") ? "image/jpeg" :
                      "application/pdf";
 
-    // Call Lovable AI for quick analysis
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
-
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: ANALYSIS_PROMPT },
-              {
-                type: "image_url",
-                image_url: { url: `data:${mimeType};base64,${base64Data}` },
-              },
-            ],
-          },
-        ],
-      }),
+    // Call Gemini for quick analysis
+    const result = await callGemini("gemini-2.5-flash", {
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: ANALYSIS_PROMPT },
+            {
+              type: "image_url",
+              image_url: { url: `data:${mimeType};base64,${base64Data}` },
+            },
+          ],
+        },
+      ],
     });
 
-    if (!aiResponse.ok) {
-      if (aiResponse.status === 429) {
-        return new Response(JSON.stringify({ success: false, error: "Rate limit exceeded, please try again later." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (aiResponse.status === 402) {
-        return new Response(JSON.stringify({ success: false, error: "AI credits exhausted. Please add funds." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const errText = await aiResponse.text();
-      console.error("AI gateway error:", aiResponse.status, errText);
-      throw new Error(`AI analysis failed: ${aiResponse.status}`);
-    }
-
-    const aiResult = await aiResponse.json();
-    const content = aiResult.choices?.[0]?.message?.content || "";
+    const content = result.text;
 
     // Parse JSON from AI response
     let analysis;

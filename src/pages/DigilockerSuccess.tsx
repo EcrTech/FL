@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchVerifiedUCredentials } from "@/hooks/useVerifiedUCredentials";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, Loader2, AlertCircle } from "lucide-react";
@@ -49,11 +50,15 @@ export default function DigilockerSuccess() {
         };
       }
 
+      // Fetch credentials from org settings
+      const creds = await fetchVerifiedUCredentials();
+
       const { data, error } = await supabase.functions.invoke("verifiedu-aadhaar-details", {
         body: {
           uniqueRequestNumber: id,
           applicationId: isReferralCallback ? undefined : applicationId,
           orgId: isReferralCallback ? undefined : orgId,
+          ...creds,
         },
       });
 
@@ -98,9 +103,13 @@ export default function DigilockerSuccess() {
       console.log("[DigilockerSuccess] Fetching Aadhaar details for referral...");
       setStatus("loading");
 
+      // Fetch credentials from org settings
+      const creds = await fetchVerifiedUCredentials();
+
       const { data, error } = await supabase.functions.invoke("verifiedu-public-aadhaar-details", {
         body: {
           uniqueRequestNumber: id,
+          ...creds,
         },
       });
 

@@ -159,7 +159,7 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
         .maybeSingle();
       
       return data || {
-        company_name: "Paisaa Saarthi",
+        company_name: "LoanFlow",
         company_address: "",
         company_cin: "",
         company_phone: "",
@@ -479,7 +479,7 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
           <>
             <div ref={(el) => { printRefs.current.sanction_letter = el; }}>
               <SanctionLetterDocument
-                companyName={orgSettings?.company_name || "Paisaa Saarthi"}
+                companyName={orgSettings?.company_name || "LoanFlow"}
                 companyAddress={orgSettings?.company_address}
                 companyCIN={orgSettings?.company_cin}
                 documentNumber={generatedDocs?.find(d => d.document_type === "sanction_letter")?.document_number || "SL-DRAFT"}
@@ -502,7 +502,7 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
 
             <div ref={(el) => { printRefs.current.loan_agreement = el; }}>
               <LoanAgreementDocument
-                companyName={orgSettings?.company_name || "Paisaa Saarthi"}
+                companyName={orgSettings?.company_name || "LoanFlow"}
                 companyAddress={orgSettings?.company_address}
                 companyCIN={orgSettings?.company_cin}
                 companyPhone={orgSettings?.company_phone}
@@ -535,7 +535,7 @@ export default function DisbursementDashboard({ applicationId }: DisbursementDas
 
             <div ref={(el) => { printRefs.current.daily_schedule = el; }}>
               <DailyRepaymentScheduleDocument
-                companyName={orgSettings?.company_name || "Paisaa Saarthi"}
+                companyName={orgSettings?.company_name || "LoanFlow"}
                 companyAddress={orgSettings?.company_address}
                 companyCIN={orgSettings?.company_cin}
                 documentNumber={generatedDocs?.find(d => d.document_type === "daily_schedule")?.document_number || "DRS-DRAFT"}

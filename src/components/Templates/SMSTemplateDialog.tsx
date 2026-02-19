@@ -202,7 +202,7 @@
              </div>
              <Textarea
                id="content"
-               placeholder="Your PaisaaSaarthi OTP is {#var#}. Valid for 10 mins"
+               placeholder="Your LoanFlow OTP is {#var#}. Valid for 10 mins"
                value={content}
                onChange={(e) => setContent(e.target.value)}
                rows={4}

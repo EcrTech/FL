@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <rect width="200" height="200" rx="32" fill="#E84C3D"/>
+  <circle cx="72" cy="100" r="38" stroke="#fff" stroke-width="6" fill="none"/>
+  <path d="M72 72v28h28" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M110 80c12-12 36-12 36 8s-24 20-36 36c-12-16-36-16-36-36s24-20 36-8z" fill="none" stroke="#881337" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M120 130 l40 30" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+  <text x="100" y="178" text-anchor="middle" font-family="Arial,sans-serif" font-weight="bold" font-size="22" fill="#fff">LoanFlow</text>
+</svg>

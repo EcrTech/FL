@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
     }
 
     const fromEmail = `noreply@${emailSettings.sending_domain}`;
-    const fromName = 'Paisaa Saarthi LOS Meetings';
+    const fromName = 'LoanFlow LOS Meetings';
 
     // Format date and time
     const scheduledDate = new Date(activity.scheduled_at || Date.now());

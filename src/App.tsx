@@ -47,7 +47,7 @@ import CampaignOverview from "./pages/Campaigns/CampaignOverview";
 import AIInsightsDashboard from "./pages/Campaigns/AIInsightsDashboard";
 import RedefineDataRepository from "./pages/RedefineDataRepository";
 import Inventory from "./pages/Inventory";
-import OutboundWebhooks from "./pages/OutboundWebhooks";
+
 import Tasks from "./pages/Tasks";
 import Applications from "./pages/LOS/Applications";
 // NewApplication import removed - applications only via referral links
@@ -199,12 +199,6 @@ const App = () => {
               </ProtectedRoute>
             } />
             
-            
-            <Route path="/admin/outbound-webhooks" element={
-              <ProtectedRoute requiredRole="admin">
-                <OutboundWebhooks />
-              </ProtectedRoute>
-            } />
             
             <Route path="/whatsapp-settings" element={
               <ProtectedRoute requiredRole="admin">

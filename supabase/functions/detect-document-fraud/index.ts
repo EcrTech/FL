@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.58.0";
+import { callGemini } from "../_shared/geminiClient.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -31,11 +32,6 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -159,7 +155,7 @@ serve(async (req) => {
       // Try to analyze this document
       let finding: any;
       try {
-        finding = await analyzeDocument(supabase, doc, LOVABLE_API_KEY);
+        finding = await analyzeDocument(supabase, doc);
       } catch (err) {
         console.error(`[FraudDetection] Error analyzing ${doc.document_type}:`, err);
         finding = {
@@ -296,7 +292,7 @@ serve(async (req) => {
 });
 
 // ========== Analyze a single document ==========
-async function analyzeDocument(supabase: any, doc: any, apiKey: string): Promise<any> {
+async function analyzeDocument(supabase: any, doc: any): Promise<any> {
   const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB
 
   // Download from storage
@@ -316,7 +312,7 @@ async function analyzeDocument(supabase: any, doc: any, apiKey: string): Promise
 
   const arrayBuffer = await fileData.arrayBuffer();
 
-  // Check file size - note as large but still attempt if possible
+  // Check file size
   if (arrayBuffer.byteLength > MAX_FILE_SIZE) {
     return {
       document_type: doc.document_type,
@@ -331,21 +327,12 @@ async function analyzeDocument(supabase: any, doc: any, apiKey: string): Promise
   const base64 = base64Encode(new Uint8Array(arrayBuffer));
   const mimeType = doc.mime_type || "image/jpeg";
 
-  // Call Gemini with retry on 429
-  let aiResponse: Response | null = null;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "system",
-            content: `You are a document fraud detection expert for Indian financial documents. Analyze the provided document image for signs of tampering, forgery, or manipulation. Look for:
+  // Call Gemini (shared client handles 429 retries)
+  const result = await callGemini("gemini-2.5-flash", {
+    messages: [
+      {
+        role: "system",
+        content: `You are a document fraud detection expert for Indian financial documents. Analyze the provided document image for signs of tampering, forgery, or manipulation. Look for:
 1. Font inconsistencies - different fonts/sizes for key fields vs headers
 2. Pixel artifacts - signs of digital editing, blur patches, misaligned elements
 3. Color/lighting inconsistencies - different brightness/contrast in edited areas
@@ -361,47 +348,26 @@ Respond ONLY with a valid JSON object (no markdown, no code blocks):
   "issues": ["list of specific issues found, empty if none"],
   "details": "brief explanation of findings"
 }`,
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `Analyze this ${doc.document_type.replace(/_/g, " ")} document for signs of fraud or tampering.`,
           },
           {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: `Analyze this ${doc.document_type.replace(/_/g, " ")} document for signs of fraud or tampering.`,
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:${mimeType};base64,${base64}`,
-                },
-              },
-            ],
+            type: "image_url",
+            image_url: {
+              url: `data:${mimeType};base64,${base64}`,
+            },
           },
         ],
-      }),
-    });
+      },
+    ],
+  });
 
-    if (aiResponse.status === 429 && attempt === 0) {
-      console.warn("[FraudDetection] Rate limited, waiting 2s before retry...");
-      await new Promise((r) => setTimeout(r, 2000));
-      continue;
-    }
-    break;
-  }
-
-  if (!aiResponse || !aiResponse.ok) {
-    const status = aiResponse?.status || "unknown";
-    return {
-      document_type: doc.document_type,
-      risk_level: "unknown",
-      confidence: 0,
-      issues: [`AI analysis failed (HTTP ${status})`],
-      details: "",
-    };
-  }
-
-  const aiData = await aiResponse.json();
-  const content = aiData.choices?.[0]?.message?.content || "";
+  const content = result.text;
 
   let parsed;
   try {

@@ -35,7 +35,7 @@ serve(async (req) => {
       });
     }
 
-    const { accountNumber, ifscCode, applicationId, orgId } = await req.json();
+    const { accountNumber, ifscCode, applicationId, orgId, verifieduToken: bodyToken, verifieduCompanyId: bodyCompanyId, verifieduBaseUrl: bodyBaseUrl } = await req.json();
 
     if (!accountNumber || !ifscCode) {
       return new Response(JSON.stringify({ error: "Account number and IFSC code are required" }), {
@@ -54,9 +54,10 @@ serve(async (req) => {
       }
     }
 
-    const verifieduToken = Deno.env.get("VERIFIEDU_TOKEN");
-    const companyId = Deno.env.get("VERIFIEDU_COMPANY_ID");
-    const baseUrl = Deno.env.get("VERIFIEDU_API_BASE_URL");
+    // Credentials: prefer request body, fall back to env vars
+    const verifieduToken = bodyToken || Deno.env.get("VERIFIEDU_TOKEN");
+    const companyId = bodyCompanyId || Deno.env.get("VERIFIEDU_COMPANY_ID");
+    const baseUrl = bodyBaseUrl || Deno.env.get("VERIFIEDU_API_BASE_URL");
 
     if (!verifieduToken || !companyId || !baseUrl) {
       console.log("VerifiedU credentials not configured, using mock mode");
