@@ -33,12 +33,13 @@ Return ONLY valid JSON with these fields.`,
 - address: Full address as shown (single string)
 Return ONLY valid JSON with these fields.`,
 
-  aadhaar_front: `Extract the following from this Aadhaar card FRONT side image:
+  aadhaar_front: `Extract the following from this Aadhaar card image. The image may contain the front side only OR both front and back sides combined:
 - aadhaar_number: The 12-digit Aadhaar number (with or without spaces)
 - name: Full name as shown
 - dob: Date of birth in YYYY-MM-DD format
 - gender: Male/Female
-Return ONLY valid JSON with these fields.`,
+- address: Full address as shown (single string) — if visible (back side may be included in this image)
+Return ONLY valid JSON with these fields. Use null for address if not visible.`,
 
   aadhaar_back: `Extract the following from this Aadhaar card BACK side image:
 - aadhaar_number: The 12-digit Aadhaar number (with or without spaces)
@@ -744,7 +745,7 @@ serve(async (req) => {
     }
 
 
-    const isAadhaarOrPan = documentType === 'aadhaar_card' || documentType === 'aadhar_card' || documentType === 'pan_card';
+    const isAadhaarOrPan = documentType === 'aadhaar_card' || documentType === 'aadhar_card' || documentType === 'aadhaar_front' || documentType === 'aadhaar_back' || documentType === 'pan_card';
 
     if (isAadhaarOrPan && !mergedData.parse_error && loanApplicationId) {
       console.log(`[ParseDocument] Syncing OCR data to loan_applicants for ${documentType}`);
@@ -773,7 +774,7 @@ serve(async (req) => {
           }
         }
 
-        if (documentType === 'aadhaar_card' || documentType === 'aadhar_card') {
+        if (documentType === 'aadhaar_card' || documentType === 'aadhar_card' || documentType === 'aadhaar_front' || documentType === 'aadhaar_back') {
           // Update gender if we have new data and current is empty or different
           if (mergedData.gender) {
             const normalizedGender = mergedData.gender.toLowerCase();

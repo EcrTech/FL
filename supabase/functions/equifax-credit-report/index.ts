@@ -464,7 +464,7 @@ serve(async (req) => {
       middleName: applicant.middle_name || "",
       lastName: applicant.last_name || "",
       dob: applicant.dob || "",
-      panNumber: applicant.pan_number || "",
+      panNumber: resolvedPan,
       aadhaarNumber: applicant.aadhaar_number || "",
       mobile: applicant.mobile || "",
       gender: applicant.gender || "",

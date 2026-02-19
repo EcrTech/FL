@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { getVerifiedUCredentials } from "../_shared/verifieduCredentials.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -50,19 +51,15 @@ serve(async (req) => {
       });
     }
 
-    // Credentials: prefer request body, fall back to env vars
-    const verifieduToken = body.verifieduToken || Deno.env.get("VERIFIEDU_TOKEN");
-    const companyId = body.verifieduCompanyId || Deno.env.get("VERIFIEDU_COMPANY_ID");
-    const baseUrl = body.verifieduBaseUrl || Deno.env.get("VERIFIEDU_API_BASE_URL");
+    // Fetch credentials server-side (bypasses RLS)
+    const creds = await getVerifiedUCredentials();
 
     console.log("[verifiedu-public-aadhaar-initiate] VerifiedU credentials check:", {
-      hasToken: !!verifieduToken,
-      hasCompanyId: !!companyId,
-      hasBaseUrl: !!baseUrl,
-      baseUrl: baseUrl || "NOT SET",
+      hasCredentials: !!creds,
+      baseUrl: creds?.baseUrl || "NOT SET",
     });
 
-    if (!verifieduToken || !companyId || !baseUrl) {
+    if (!creds) {
       console.log("[verifiedu-public-aadhaar-initiate] Using MOCK mode - credentials not configured");
       const mockRequestNumber = `mock_aadhaar_${Date.now()}`;
       const mockRedirectUrl = `${surl}${surl.includes('?') ? '&' : '?'}id=${mockRequestNumber}&mock=true`;
@@ -83,18 +80,18 @@ serve(async (req) => {
     }
 
     // Call VerifiedU API
-    const apiUrl = `${baseUrl}/api/verifiedu/VerifyAadhaarViaDigilocker`;
+    const apiUrl = `${creds.baseUrl}/api/verifiedu/VerifyAadhaarViaDigilocker`;
     console.log("[verifiedu-public-aadhaar-initiate] Calling VerifiedU API:", apiUrl);
-    
+
     const apiPayload = { surl, furl };
     console.log("[verifiedu-public-aadhaar-initiate] API Payload:", JSON.stringify(apiPayload));
-    
+
     const response = await fetch(apiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "token": verifieduToken,
-        "companyid": companyId,
+        "token": creds.token,
+        "companyid": creds.companyId,
       },
       body: JSON.stringify(apiPayload),
     });

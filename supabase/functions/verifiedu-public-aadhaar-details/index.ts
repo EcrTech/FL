@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getVerifiedUCredentials } from "../_shared/verifieduCredentials.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { uniqueRequestNumber, verifieduToken: bodyToken, verifieduCompanyId: bodyCompanyId, verifieduBaseUrl: bodyBaseUrl } = await req.json();
+    const { uniqueRequestNumber } = await req.json();
 
     if (!uniqueRequestNumber) {
       return new Response(JSON.stringify({ error: "Unique request number is required" }), {
@@ -21,12 +21,10 @@ serve(async (req) => {
       });
     }
 
-    // Credentials: prefer request body, fall back to env vars
-    const verifieduToken = bodyToken || Deno.env.get("VERIFIEDU_TOKEN");
-    const companyId = bodyCompanyId || Deno.env.get("VERIFIEDU_COMPANY_ID");
-    const baseUrl = bodyBaseUrl || Deno.env.get("VERIFIEDU_API_BASE_URL");
+    // Fetch credentials server-side (bypasses RLS)
+    const creds = await getVerifiedUCredentials();
 
-    if (!verifieduToken || !companyId || !baseUrl) {
+    if (!creds) {
       console.log("[verifiedu-public-aadhaar-details] VerifiedU credentials not configured, using mock mode");
       // Mock response for testing
       const mockResponse = {
@@ -62,12 +60,12 @@ serve(async (req) => {
     // Call VerifiedU API to get Aadhaar details
     console.log("[verifiedu-public-aadhaar-details] Fetching Aadhaar details for:", uniqueRequestNumber);
     
-    const response = await fetch(`${baseUrl}/api/verifiedu/GetAadhaarDetailsById`, {
+    const response = await fetch(`${creds.baseUrl}/api/verifiedu/GetAadhaarDetailsById`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "token": verifieduToken,
-        "companyid": companyId,
+        "token": creds.token,
+        "companyid": creds.companyId,
       },
       body: JSON.stringify({
         unique_request_number: uniqueRequestNumber,

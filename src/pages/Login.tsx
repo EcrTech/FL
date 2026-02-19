@@ -159,6 +159,10 @@ export default function Login() {
       if (data.success) {
         setSessionId(data.sessionId);
         setResendCooldown(60);
+        if (data.isTestMode && data.testOtp) {
+          console.log('[Login] Test mode - OTP:', data.testOtp);
+          notify.success("Test Mode", `Use OTP: ${data.testOtp}`);
+        }
         console.log('[Login] OTP sent successfully');
       } else {
         throw new Error(data.error || 'Failed to send OTP');

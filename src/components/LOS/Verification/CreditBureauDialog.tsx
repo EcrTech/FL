@@ -99,8 +99,8 @@ export default function CreditBureauDialog({
     existingVerification?.response_data?.quick_analysis || null
   );
 
-  const applicantName = applicant ? 
-    `${applicant.first_name || ''} ${applicant.middle_name || ''} ${applicant.last_name || ''}`.trim() : 
+  const applicantName = applicant ?
+    `${applicant.first_name || ''} ${applicant.middle_name || ''} ${applicant.last_name || ''}`.trim() :
     'Unknown';
   const applicantPAN = applicant?.pan_number || '';
   // Use 'dob' field (the actual column name) - fall back to date_of_birth for compatibility

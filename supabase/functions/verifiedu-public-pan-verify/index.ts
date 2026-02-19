@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { getVerifiedUCredentials } from "../_shared/verifieduCredentials.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { panNumber, verifieduToken: bodyToken, verifieduCompanyId: bodyCompanyId, verifieduBaseUrl: bodyBaseUrl } = await req.json();
+    const { panNumber } = await req.json();
 
     if (!panNumber) {
       return new Response(JSON.stringify({ success: false, error: "PAN number is required" }), {
@@ -28,12 +29,10 @@ serve(async (req) => {
       });
     }
 
-    // Credentials: prefer request body, fall back to env vars
-    const verifieduToken = bodyToken || Deno.env.get("VERIFIEDU_TOKEN");
-    const companyId = bodyCompanyId || Deno.env.get("VERIFIEDU_COMPANY_ID");
-    const baseUrl = bodyBaseUrl || Deno.env.get("VERIFIEDU_API_BASE_URL");
+    // Fetch credentials server-side (bypasses RLS)
+    const creds = await getVerifiedUCredentials();
 
-    if (!verifieduToken || !companyId || !baseUrl) {
+    if (!creds) {
       // Mock response for testing
       return new Response(JSON.stringify({
         success: true,
@@ -42,9 +41,9 @@ serve(async (req) => {
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const response = await fetch(`${baseUrl}/api/verifiedu/VerifyPAN`, {
+    const response = await fetch(`${creds.baseUrl}/api/verifiedu/VerifyPAN`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "token": verifieduToken, "companyid": companyId },
+      headers: { "Content-Type": "application/json", "token": creds.token, "companyid": creds.companyId },
       body: JSON.stringify({ PanNumber: panNumber.toUpperCase() }),
     });
 

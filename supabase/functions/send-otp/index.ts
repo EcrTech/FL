@@ -215,17 +215,11 @@ serve(async (req) => {
             content: {
               type: "template",
               template: {
-                name: "psotp1",
-                language: { code: "en_US" },
+                name: "otp",
+                language: { code: "en" },
                 components: [
                   {
                     type: "body",
-                    parameters: [{ type: "text", text: otp }]
-                  },
-                  {
-                    type: "button",
-                    sub_type: "url",
-                    index: "0",
                     parameters: [{ type: "text", text: otp }]
                   }
                 ]

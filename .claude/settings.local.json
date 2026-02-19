@@ -26,7 +26,9 @@
       "Bash(# Find and kill the vite dev server process tasklist.exe)",
       "Bash(# Check which node process is the vite server on port 8080 netstat.exe -ano)",
       "Bash(taskkill.exe:*)",
-      "Bash(python -m json.tool:*)"
+      "Bash(python -m json.tool:*)",
+      "Bash(source:*)",
+      "Bash(wc:*)"
     ]
   }
 }

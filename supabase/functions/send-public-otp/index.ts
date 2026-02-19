@@ -55,7 +55,9 @@ serve(async (req) => {
       );
     }
 
-    const otpCode = generateOTP();
+    // Test bypass: fixed OTP for test number
+    const isTestNumber = identifier.replace(/[^\d]/g, '').endsWith('9999999999');
+    const otpCode = isTestNumber ? '123456' : generateOTP();
     const sessionId = crypto.randomUUID();
 
     // Store OTP in database
@@ -134,8 +136,12 @@ serve(async (req) => {
         .limit(1)
         .single();
       
+      // TEST MODE: Skip WhatsApp sending while Exotel ticket is pending
+      // TODO: Remove this block once Exotel delivery is confirmed working
+      const FORCE_TEST_MODE = true;
+
       let whatsappSent = false;
-      if (whatsappSettings && whatsappSettings.exotel_sid && whatsappSettings.exotel_api_key && whatsappSettings.exotel_api_token) {
+      if (!FORCE_TEST_MODE && whatsappSettings && whatsappSettings.exotel_sid && whatsappSettings.exotel_api_key && whatsappSettings.exotel_api_token) {
         const formattedPhone = identifier.replace(/^\+/, ''); // Remove leading + for Exotel
         
         // Exotel WhatsApp Template API
@@ -144,9 +150,8 @@ serve(async (req) => {
         
         const auth = btoa(`${whatsappSettings.exotel_api_key}:${whatsappSettings.exotel_api_token}`);
         
-        // Using "psotp1" authentication template for OTP delivery
-        // Template: "Your login code is {{1}}. No further action is needed..."
-        // IMPORTANT: For Copy Code buttons, use "copy_code" not "url"
+        // Using "otp" authentication template for OTP delivery
+        // Template: "*{{1}}* is your verification code. For your security, do not share this code."
         const whatsappPayload = {
           whatsapp: {
             messages: [{
@@ -155,25 +160,25 @@ serve(async (req) => {
               content: {
                 type: 'template',
                 template: {
-                  name: 'psotp1',  // Authentication template with OTP variable
+                  name: 'otp',
                   language: {
-                    code: 'en_US'  // Must match template's registered language
+                    code: 'en_US'
                   },
                   components: [
                     {
                       type: 'body',
                       parameters: [{
                         type: 'text',
-                        text: otpCode  // Dynamic OTP code for {{1}}
+                        text: otpCode
                       }]
                     },
                     {
                       type: 'button',
-                      sub_type: 'url',  // Template registered with URL button type
+                      sub_type: 'url',
                       index: '0',
                       parameters: [{
                         type: 'text',
-                        text: otpCode  // Same OTP for "Copy code" button
+                        text: otpCode
                       }]
                     }
                   ]
@@ -190,7 +195,7 @@ serve(async (req) => {
         console.log(`[send-public-otp] WhatsApp Source Number: ${whatsappSettings.whatsapp_source_number}`);
         console.log(`[send-public-otp] Target Phone: ${formattedPhone}`);
         console.log(`[send-public-otp] OTP Code: ${otpCode}`);
-        console.log(`[send-public-otp] Template Name: psotp1`);
+        console.log(`[send-public-otp] Template Name: otp`);
         console.log(`[send-public-otp] Full Payload:`, JSON.stringify(whatsappPayload, null, 2));
         
         const whatsappResponse = await fetch(exotelUrl, {
@@ -232,18 +237,18 @@ serve(async (req) => {
           console.log(`[send-public-otp] Message SID: ${messageStatus?.data?.sid || 'N/A'}`);
         }
 
-        // Always return Exotel details for now (debugging)
-        return new Response(
-          JSON.stringify({
-            success: whatsappSent,
-            sessionId,
-            message: whatsappSent ? 'OTP sent to your phone' : 'WhatsApp delivery failed',
-            exotelHttpStatus: whatsappResponse.status,
-            exotelResponse: responseData,
-            ...(whatsappSent ? {} : { testOtp: otpCode }),
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        if (!whatsappSent) {
+          return new Response(
+            JSON.stringify({
+              success: true,
+              sessionId,
+              message: 'WhatsApp delivery failed - falling back to test mode',
+              isTestMode: true,
+              testOtp: otpCode,
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
       } else {
         console.warn('[send-public-otp] WhatsApp settings not configured:');
         console.warn(`  - exotel_sid: ${!!whatsappSettings?.exotel_sid}`);
