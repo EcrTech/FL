@@ -97,7 +97,7 @@ export function DPDPConsentStep({ orgId, userIdentifier, onConsent }: DPDPConsen
 
             <h3 className="font-semibold mt-4">Data Protection Officer</h3>
             <p>
-              Contact: <a href="mailto:dpo@yourcompany.com" className="text-primary underline">dpo@yourcompany.com</a>
+              Contact: <a href="mailto:dpo@in-sync.co.in" className="text-primary underline">dpo@in-sync.co.in</a>
             </p>
           </div>
         </ScrollArea>

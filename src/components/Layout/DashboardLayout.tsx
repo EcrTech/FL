@@ -422,7 +422,29 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
                       <span>Exotel Settings</span>
                     </Link>
                   )}
-                  
+
+                  {isAdmin && (
+                    <Link
+                      to="/email-settings"
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
+                      onClick={() => setSidebarOpen(false)}
+                    >
+                      <Mail size={18} />
+                      <span>Email Settings</span>
+                    </Link>
+                  )}
+
+                  {isAdmin && (
+                    <Link
+                      to="/whatsapp-settings"
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-accent hover:text-accent-foreground transition-all duration-200 text-sm"
+                      onClick={() => setSidebarOpen(false)}
+                    >
+                      <MessageSquare size={18} />
+                      <span>WhatsApp Settings</span>
+                    </Link>
+                  )}
+
                 </>
               )}
             </nav>

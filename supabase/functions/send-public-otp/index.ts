@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
+import { getSupabaseClient } from "../_shared/supabaseClient.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -32,9 +32,7 @@ serve(async (req) => {
       );
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const db = getSupabaseClient();
 
     // Get client IP for rate limiting
     const clientIP = req.headers.get('x-forwarded-for')?.split(',')[0] || 
@@ -43,7 +41,7 @@ serve(async (req) => {
 
     // Check rate limiting - max 5 OTPs per identifier per hour
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { count } = await supabase
+    const { count } = await db
       .from('public_otp_verifications')
       .select('*', { count: 'exact', head: true })
       .eq('identifier', identifier)
@@ -61,7 +59,7 @@ serve(async (req) => {
     const sessionId = crypto.randomUUID();
 
     // Store OTP in database
-    const { error: insertError } = await supabase
+    const { error: insertError } = await db
       .from('public_otp_verifications')
       .insert({
         identifier,
@@ -100,7 +98,7 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: 'LoanFlow <info@loanflow.com>',
+          from: 'LoanFlow <info@in-sync.co.in>',
           to: identifier,
           subject: 'Your OTP for Loan Application',
           html: `
@@ -129,7 +127,7 @@ serve(async (req) => {
     } else if (identifierType === 'phone') {
       // Send WhatsApp OTP using template
       // Fetch WhatsApp settings from the first active org (system-level config for public forms)
-      const { data: whatsappSettings } = await supabase
+      const { data: whatsappSettings } = await db
         .from('whatsapp_settings')
         .select('*')
         .eq('is_active', true)
@@ -233,6 +231,19 @@ serve(async (req) => {
           console.log(`[send-public-otp] ✅ WhatsApp OTP sent successfully!`);
           console.log(`[send-public-otp] Message SID: ${messageStatus?.data?.sid || 'N/A'}`);
         }
+
+        // Always return Exotel details for now (debugging)
+        return new Response(
+          JSON.stringify({
+            success: whatsappSent,
+            sessionId,
+            message: whatsappSent ? 'OTP sent to your phone' : 'WhatsApp delivery failed',
+            exotelHttpStatus: whatsappResponse.status,
+            exotelResponse: responseData,
+            ...(whatsappSent ? {} : { testOtp: otpCode }),
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       } else {
         console.warn('[send-public-otp] WhatsApp settings not configured:');
         console.warn(`  - exotel_sid: ${!!whatsappSettings?.exotel_sid}`);
@@ -260,10 +271,10 @@ serve(async (req) => {
     console.log(`[send-public-otp] OTP sent to ${identifierType}: ${identifier.substring(0, 3)}***`);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         sessionId,
-        message: `OTP sent to your ${identifierType}` 
+        message: `OTP sent to your ${identifierType}`,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

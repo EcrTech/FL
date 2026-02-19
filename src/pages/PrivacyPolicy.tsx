@@ -23,7 +23,7 @@ export default function PrivacyPolicy() {
               <p>
                 This platform is operated by the organization registered on the system (the "Data Fiduciary").
                 For questions regarding data protection, contact our Data Protection Officer at{" "}
-                <a href="mailto:dpo@yourcompany.com" className="text-primary underline">dpo@yourcompany.com</a>.
+                <a href="mailto:dpo@in-sync.co.in" className="text-primary underline">dpo@in-sync.co.in</a>.
               </p>
             </section>
 
@@ -116,7 +116,7 @@ export default function PrivacyPolicy() {
               <h2 className="text-xl font-semibold mt-6 mb-3">9. Contact Information</h2>
               <p>
                 <strong>Data Protection Officer:</strong>{" "}
-                <a href="mailto:dpo@yourcompany.com" className="text-primary underline">dpo@yourcompany.com</a>
+                <a href="mailto:dpo@in-sync.co.in" className="text-primary underline">dpo@in-sync.co.in</a>
               </p>
               <p className="mt-2">
                 If you are not satisfied with our response to your grievance, you may escalate your complaint

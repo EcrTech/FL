@@ -6,6 +6,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
+const jsonResponse = (body: Record<string, unknown>) =>
+  new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -16,10 +22,7 @@ serve(async (req) => {
     const { orgId } = await req.json();
 
     if (!orgId) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Organization ID is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return jsonResponse({ success: false, error: 'Organization ID is required' });
     }
 
     // Initialize Supabase client
@@ -36,44 +39,37 @@ serve(async (req) => {
 
     if (settingsError || !settings) {
       console.error('Settings error:', settingsError);
-      return new Response(
-        JSON.stringify({ success: false, error: 'WhatsApp settings not configured' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return jsonResponse({ success: false, error: 'WhatsApp settings not configured' });
     }
 
     if (!settings.exotel_api_key || !settings.exotel_api_token || !settings.exotel_subdomain || !settings.exotel_sid || !settings.waba_id) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Missing WhatsApp credentials. Please configure API Key, Token, Subdomain, SID, and WABA ID in WhatsApp Settings.' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return jsonResponse({ success: false, error: 'Missing WhatsApp credentials. Please configure API Key, Token, Subdomain, SID, and WABA ID in WhatsApp Settings.' });
     }
 
     // Build Exotel API URL to fetch templates
-    const exotelUrl = `https://${settings.exotel_api_key}:${settings.exotel_api_token}@${settings.exotel_subdomain}/v2/accounts/${settings.exotel_sid}/templates?waba_id=${settings.waba_id}`;
+    const exotelUrl = `https://${settings.exotel_subdomain}/v2/accounts/${settings.exotel_sid}/templates?waba_id=${settings.waba_id}`;
+    const basicAuth = btoa(`${settings.exotel_api_key}:${settings.exotel_api_token}`);
 
-    console.info('Fetching templates from Exotel:', exotelUrl.replace(settings.exotel_api_token, '***'));
+    console.info('Fetching templates from Exotel:', exotelUrl);
 
     // Fetch templates from Exotel
     const exotelResponse = await fetch(exotelUrl, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Basic ${basicAuth}`,
       },
     });
 
     const exotelData = await exotelResponse.json();
-    console.info('Exotel response:', JSON.stringify(exotelData));
+    console.info('Exotel response status:', exotelResponse.status, 'body:', JSON.stringify(exotelData));
 
     if (!exotelResponse.ok) {
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: exotelData.message || 'Failed to fetch templates from Exotel',
-          details: exotelData
-        }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return jsonResponse({
+        success: false,
+        error: `Exotel API error (${exotelResponse.status}): ${exotelData.message || JSON.stringify(exotelData)}`,
+        details: exotelData,
+      });
     }
 
     // Extract templates from response
@@ -100,13 +96,13 @@ serve(async (req) => {
         mappedStatus = 'pending';
       }
 
-      // Check if template exists in our database
+      // Check if template exists in our database — use maybeSingle to handle duplicates
       const { data: existingTemplate, error: fetchError } = await supabase
         .from('communication_templates')
         .select('id, status')
         .eq('org_id', orgId)
         .eq('template_name', templateName)
-        .single();
+        .maybeSingle();
 
       if (existingTemplate) {
         // Update existing template
@@ -127,7 +123,7 @@ serve(async (req) => {
           console.info(`Updated template: ${templateName} -> ${mappedStatus}`);
         }
       } else {
-        // Optionally add new templates from Exotel
+        // Add new template from Exotel
         const { error: insertError } = await supabase
           .from('communication_templates')
           .insert({
@@ -153,22 +149,16 @@ serve(async (req) => {
       }
     }
 
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: `Synced ${updatedCount} templates, added ${addedCount} new templates`,
-        updatedCount,
-        addedCount,
-        totalFromExotel: templates.length
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return jsonResponse({
+      success: true,
+      message: `Synced ${updatedCount} templates, added ${addedCount} new templates`,
+      updatedCount,
+      addedCount,
+      totalFromExotel: templates.length,
+    });
   } catch (error: unknown) {
     console.error('Error in sync-whatsapp-templates:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    return new Response(
-      JSON.stringify({ success: false, error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return jsonResponse({ success: false, error: errorMessage });
   }
 });

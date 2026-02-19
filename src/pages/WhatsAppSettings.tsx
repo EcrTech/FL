@@ -253,7 +253,7 @@ const WhatsAppSettings = () => {
                 <Label>Webhook URL</Label>
                 <div className="flex gap-2">
                   <Input
-                    value={`https://xopuasvbypkiszcqgdwm.supabase.co/functions/v1/whatsapp-webhook`}
+                    value={`https://awebwitdoywxlaulrvsf.supabase.co/functions/v1/whatsapp-webhook`}
                     readOnly
                     className="font-mono text-sm"
                   />
@@ -261,7 +261,7 @@ const WhatsAppSettings = () => {
                     type="button"
                     variant="outline"
                     onClick={() => {
-                      navigator.clipboard.writeText(`https://xopuasvbypkiszcqgdwm.supabase.co/functions/v1/whatsapp-webhook`);
+                      navigator.clipboard.writeText(`https://awebwitdoywxlaulrvsf.supabase.co/functions/v1/whatsapp-webhook`);
                       notify.success("Copied!", "Webhook URL copied to clipboard");
                     }}
                   >

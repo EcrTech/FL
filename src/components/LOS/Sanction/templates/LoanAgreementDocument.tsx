@@ -84,7 +84,7 @@ export default function LoanAgreementDocument(props: LoanAgreementDocumentProps)
         <h3 className="text-base font-bold mb-3">Witnesseth</h3>
         <div className="text-sm space-y-3">
           <p>
-            Whereas, loanflow.com is an online loan origination platform of LOANFLOW FINTECH PVT LTD that markets personal loan product to borrowers. The Service Provider has entered into a Service Agreement with the Lender to originate and process loan applications received from various borrowers.
+            Whereas, lf.in-sync.co.in is an online loan origination platform of LOANFLOW FINTECH PVT LTD that markets personal loan product to borrowers. The Service Provider has entered into a Service Agreement with the Lender to originate and process loan applications received from various borrowers.
           </p>
           <p>
             Whereas, the Lender is a Non-Banking Financial Company, engaged in the business to provide loans to individual and business customers in India;
@@ -118,7 +118,7 @@ export default function LoanAgreementDocument(props: LoanAgreementDocumentProps)
         <p className="text-sm mb-2">Borrower hereby acknowledges and confirms following;</p>
         <ol className="list-decimal list-inside space-y-2 text-sm">
           <li>I have personally applied for the Loan on the website after confirming acceptance of the terms and conditions of Use and Privacy Policies listed on the App.</li>
-          <li>I acknowledge that my Name, details of Permanent Account Number (PAN), Aadhaar Card or of any other Address and Identity proof are obtained by the Service provider and Lender from the materials I have submitted in the website loanflow.com as part of my profile and loan application for review with my consent.</li>
+          <li>I acknowledge that my Name, details of Permanent Account Number (PAN), Aadhaar Card or of any other Address and Identity proof are obtained by the Service provider and Lender from the materials I have submitted in the website lf.in-sync.co.in as part of my profile and loan application for review with my consent.</li>
           <li>I understand the terms of the loan (&quot;Loan&quot;) to be provided to me by the Lender are approved as per the internal policies and credit underwriting Process I further acknowledge, understand and agree that Lender has adopted risk-based pricing, which is arrived by taking into account, broad parameters like the customers financial and credit profile and information and data obtained from various permissions granted by me to the App.</li>
           <li>I understand all the terms listed above and hereby make a drawdown request of the Loan from the Lender and instruct the Lender to transfer the Loan amount to my bank account.</li>
         </ol>

@@ -244,7 +244,7 @@ serve(async (req) => {
       // Use org's verified domain if available, otherwise use global verified domain
       const effectiveEmailSettings = emailSettings?.sending_domain 
         ? emailSettings 
-        : { sending_domain: "loanflow.com", from_name: "LoanFlow E-Sign" };
+        : { sending_domain: "in-sync.co.in", from_name: "LoanFlow E-Sign" };
 
       const emailResult = await sendEmailNotification(
         signer_email,

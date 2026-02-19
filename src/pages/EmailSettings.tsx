@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useNotification } from "@/hooks/useNotification";
 import { LoadingState } from "@/components/common/LoadingState";
+import { ORGANIZATION_ID } from "@/config/organization";
 import { Loader2, CheckCircle2, AlertCircle, Copy, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import DashboardLayout from "@/components/Layout/DashboardLayout";
@@ -45,12 +46,15 @@ const EmailSettings = () => {
   const { data: settings, isLoading } = useQuery({
     queryKey: ['email-settings'],
     queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke('manage-resend-domain', {
-        body: { action: 'get-domain' },
-      });
+      // Read directly from DB — avoids edge function RLS issues
+      const { data, error } = await supabase
+        .from('email_settings')
+        .select('*')
+        .eq('org_id', ORGANIZATION_ID)
+        .maybeSingle();
 
       if (error) throw error;
-      return data as EmailSettings;
+      return data as EmailSettings | null;
     },
   });
 

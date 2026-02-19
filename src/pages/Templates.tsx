@@ -154,8 +154,14 @@ const Templates = () => {
         }
       );
 
+      console.log('Sync response - data:', data, 'error:', error);
       if (error) {
-        notify.error("Sync Failed", error.message || "Failed to sync templates from Exotel");
+        const ctx = error.context;
+        let detail = error.message;
+        if (ctx && typeof ctx.json === 'function') {
+          try { const body = await ctx.json(); detail = body?.error || body?.message || detail; console.error('Sync error body:', body); } catch {}
+        }
+        notify.error("Sync Failed", detail || "Failed to sync templates from Exotel");
         return;
       }
 
@@ -167,7 +173,7 @@ const Templates = () => {
         notify.error("Sync Failed", data?.error || "Failed to sync templates");
       }
     } catch (error: any) {
-      console.error('Error syncing templates:', error);
+      console.error('Error syncing templates (catch):', error);
       notify.error("Error", error.message || "Failed to sync templates");
     } finally {
       setSyncing(false);
@@ -189,8 +195,14 @@ const Templates = () => {
         }
       );
 
+      console.log('Submit response - data:', data, 'error:', error);
       if (error) {
-        notify.error("Submission Failed", error.message || "Failed to submit template to Exotel");
+        const ctx = error.context;
+        let detail = error.message;
+        if (ctx && typeof ctx.json === 'function') {
+          try { const body = await ctx.json(); detail = body?.error || body?.message || detail; console.error('Submit error body:', body); } catch {}
+        }
+        notify.error("Submission Failed", detail || "Failed to submit template to Exotel");
         return;
       }
 
@@ -202,7 +214,7 @@ const Templates = () => {
         notify.error("Submission Failed", data?.error || "Failed to submit template. Check WhatsApp Settings.");
       }
     } catch (error: any) {
-      console.error('Error submitting template:', error);
+      console.error('Error submitting template (catch):', error);
       notify.error("Error", error.message || "Failed to submit template");
     } finally {
       setSubmittingTemplateId(null);

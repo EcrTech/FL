@@ -21,7 +21,12 @@
       "Bash(pip install:*)",
       "Bash(node -e \"\nconst { Client } = require\\(''pg''\\);\n\nconst client = new Client\\({\n  host: ''db.awebwitdoywxlaulrvsf.supabase.co'',\n  port: 5432,\n  user: ''cli_login_postgres'',\n  password: ''yxuMZtOOXXytoiAlVXULtUtNfmHcjhEq'',\n  database: ''postgres'',\n  ssl: { rejectUnauthorized: false }\n}\\);\n\nasync function run\\(\\) {\n  await client.connect\\(\\);\n  \n  // Run the UPDATE\n  const updateResult = await client.query\\(\\\\`\n    UPDATE organizations\n    SET settings = COALESCE\\(settings, ''{}''::jsonb\\) || jsonb_build_object\\(\n      ''verifiedu_token'', ''VgBFAFIASQBGAEkARQBEAFUAVABFAFMAVABJAE4ARwBKAFUATgBPAE8ATgAtADEANAAtAEoAYQBuAC0AMgAwADIANgA='',\n      ''verifiedu_company_id'', ''VUTJ'',\n      ''verifiedu_api_base_url'', ''http://localdev.earlywages.in''\n    \\)\n    WHERE id = ''a31a6056-72c8-458a-9bd8-1c43e8360095''\n  \\\\`\\);\n  \n  console.log\\(''UPDATE result:'', updateResult.rowCount, ''row\\(s\\) affected''\\);\n  \n  // Verify\n  const verifyResult = await client.query\\(\\\\`\n    SELECT id,\n           settings->''verifiedu_token'' AS token,\n           settings->''verifiedu_company_id'' AS company_id,\n           settings->''verifiedu_api_base_url'' AS base_url\n    FROM organizations\n    WHERE id = ''a31a6056-72c8-458a-9bd8-1c43e8360095''\n  \\\\`\\);\n  \n  console.log\\(''Verification:'', JSON.stringify\\(verifyResult.rows[0], null, 2\\)\\);\n  \n  await client.end\\(\\);\n}\n\nrun\\(\\).catch\\(err => { console.error\\(''Error:'', err.message\\); process.exit\\(1\\); }\\);\n\")",
       "Bash(node:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(ls:*)",
+      "Bash(# Find and kill the vite dev server process tasklist.exe)",
+      "Bash(# Check which node process is the vite server on port 8080 netstat.exe -ano)",
+      "Bash(taskkill.exe:*)",
+      "Bash(python -m json.tool:*)"
     ]
   }
 }

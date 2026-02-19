@@ -25,7 +25,7 @@ export function BreachNotificationPanel({ orgId }: BreachNotificationPanelProps)
     description: "",
     impact: "",
     remedial_steps: "",
-    contact_info: "dpo@yourcompany.com",
+    contact_info: "dpo@in-sync.co.in",
     affected_count: 0,
     notified_board: false,
   });
@@ -43,7 +43,7 @@ export function BreachNotificationPanel({ orgId }: BreachNotificationPanelProps)
       description: "",
       impact: "",
       remedial_steps: "",
-      contact_info: "dpo@yourcompany.com",
+      contact_info: "dpo@in-sync.co.in",
       affected_count: 0,
       notified_board: false,
     });

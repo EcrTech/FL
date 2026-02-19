@@ -352,8 +352,8 @@ export function LoanRequirementsScreen({
                 />
       <span className="text-[13px] text-muted-foreground leading-relaxed">
         I agree to{' '}
-        <a href="https://loanflow.com/terms" className="text-primary underline" target="_blank" rel="noopener noreferrer">Terms</a>,{' '}
-        <a href="https://loanflow.com/privacy" className="text-primary underline" target="_blank" rel="noopener noreferrer">Privacy Policy</a>{' '}
+        <a href="https://lf.in-sync.co.in/terms" className="text-primary underline" target="_blank" rel="noopener noreferrer">Terms</a>,{' '}
+        <a href="https://lf.in-sync.co.in/privacy" className="text-primary underline" target="_blank" rel="noopener noreferrer">Privacy Policy</a>{' '}
         & Gradation of Risk
       </span>
               </label>

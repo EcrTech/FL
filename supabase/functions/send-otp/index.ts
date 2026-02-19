@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 import { Resend } from "https://esm.sh/resend@2.0.0";
+import { getSupabaseClient } from "../_shared/supabaseClient.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,11 +18,6 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
-
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "No authorization header" }), {
@@ -30,13 +26,13 @@ serve(async (req) => {
       });
     }
 
-    // Get user from auth header
+    // Authenticate user via anon-key client with JWT
     const userClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? "",
       { global: { headers: { Authorization: authHeader } } }
     );
-    
+
     const { data: { user } } = await userClient.auth.getUser();
     if (!user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -45,8 +41,10 @@ serve(async (req) => {
       });
     }
 
+    // Service-role client for DB operations (bypasses RLS)
+    const db = getSupabaseClient();
+
     const { type, target, contactId, orgId } = await req.json();
-    console.log("Send OTP request:", { type, target: target ? "***" : "missing", contactId });
 
     if (!type || !target || !orgId) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
@@ -67,7 +65,7 @@ serve(async (req) => {
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     // Invalidate any existing OTPs for this target
-    await supabaseClient
+    await db
       .from("otp_verifications")
       .update({ expires_at: new Date().toISOString() })
       .eq("target", target)
@@ -75,7 +73,7 @@ serve(async (req) => {
       .is("verified_at", null);
 
     // Create OTP record
-    const { data: otpRecord, error: otpError } = await supabaseClient
+    const { data: otpRecord, error: otpError } = await db
       .from("otp_verifications")
       .insert({
         org_id: orgId,
@@ -100,21 +98,19 @@ serve(async (req) => {
     // Send OTP based on type
     if (type === "email") {
       const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
-      
+
       // Get org's email settings for verified domain
-      const { data: emailSettings } = await supabaseClient
+      const { data: emailSettings } = await db
         .from("email_settings")
         .select("sending_domain, verification_status")
         .eq("org_id", orgId)
         .single();
-      
+
       // Use org's verified domain if available, otherwise use global verified domain
       const fromEmail = emailSettings?.verification_status === "verified" && emailSettings?.sending_domain
         ? `LoanFlow <info@${emailSettings.sending_domain}>`
-        : "LoanFlow <info@loanflow.com>";
-      
-      console.log("Sending email from:", fromEmail, "to:", target);
-      
+        : "LoanFlow <info@in-sync.co.in>";
+
       const emailResponse = await resend.emails.send({
         from: fromEmail,
         to: [target],
@@ -126,20 +122,20 @@ serve(async (req) => {
               <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 600;">LoanFlow</h1>
               <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 14px;">Secure Verification</p>
             </div>
-            
+
             <!-- Main Content -->
             <div style="background-color: white; padding: 40px 30px;">
               <h2 style="color: #1f2937; margin: 0 0 10px 0; font-size: 24px; font-weight: 600;">Verify Your Email Address</h2>
               <p style="color: #6b7280; margin: 0 0 30px 0; font-size: 16px; line-height: 1.6;">
                 Please use the verification code below to confirm your email address. This helps us keep your account secure.
               </p>
-              
+
               <!-- OTP Code Box -->
-              <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); 
+              <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
                           border-radius: 16px; padding: 35px; text-align: center; margin: 25px 0;
                           border: 2px dashed #cbd5e1;">
                 <p style="color: #64748b; font-size: 14px; margin: 0 0 15px 0; text-transform: uppercase; letter-spacing: 1px;">Your verification code</p>
-                <div style="font-size: 44px; font-weight: bold; letter-spacing: 14px; 
+                <div style="font-size: 44px; font-weight: bold; letter-spacing: 14px;
                             color: #1e293b; font-family: 'Courier New', Courier, monospace;
                             background: linear-gradient(135deg, #E84C3D 0%, #C0392B 100%);
                             -webkit-background-clip: text;
@@ -148,26 +144,26 @@ serve(async (req) => {
                   ${otp}
                 </div>
               </div>
-              
+
               <!-- Timer Notice -->
               <div style="text-align: center; margin: 30px 0;">
-                <span style="background-color: #fef3c7; color: #92400e; padding: 10px 20px; 
+                <span style="background-color: #fef3c7; color: #92400e; padding: 10px 20px;
                              border-radius: 25px; font-size: 14px; font-weight: 500;
                              display: inline-block;">
                   ⏱️ Code expires in 10 minutes
                 </span>
               </div>
-              
+
               <!-- Security Notice -->
-              <div style="background-color: #eff6ff; border-left: 4px solid #E84C3D; 
+              <div style="background-color: #eff6ff; border-left: 4px solid #E84C3D;
                           padding: 16px 20px; margin-top: 30px; border-radius: 0 8px 8px 0;">
                 <p style="color: #881337; margin: 0; font-size: 14px; line-height: 1.5;">
-                  🔒 <strong>Security Notice:</strong> Never share this code with anyone. 
+                  🔒 <strong>Security Notice:</strong> Never share this code with anyone.
                   Our team will never ask for your verification code via phone or email.
                 </p>
               </div>
             </div>
-            
+
             <!-- Footer -->
             <div style="background-color: #f8fafc; padding: 25px 30px; text-align: center; border-top: 1px solid #e2e8f0;">
               <p style="color: #94a3b8; font-size: 13px; margin: 0 0 8px 0;">
@@ -181,64 +177,89 @@ serve(async (req) => {
         `,
       });
 
-      console.log("Email OTP sent:", emailResponse);
+      if (emailResponse.error) {
+        console.error("Email send error:", emailResponse.error);
+      }
     } else if (type === "mobile") {
-      // Send SMS via Exotel
-      const { data: exotelSettings } = await supabaseClient
-        .from("exotel_settings")
+      // Send OTP via WhatsApp using Exotel WhatsApp API
+      const { data: whatsappSettings } = await db
+        .from("whatsapp_settings")
         .select("*")
         .eq("org_id", orgId)
         .eq("is_active", true)
         .single();
 
-      if (!exotelSettings) {
-        // Still create the OTP record but return warning
-        console.warn("Exotel not configured, OTP created but not sent via SMS");
+      if (!whatsappSettings || !whatsappSettings.exotel_sid || !whatsappSettings.exotel_api_key || !whatsappSettings.exotel_api_token) {
+        console.warn("WhatsApp settings not configured for OTP");
         return new Response(
           JSON.stringify({
             success: true,
             otpId: otpRecord.id,
-            message: "OTP created. SMS sending not configured - OTP: " + otp, // Remove in production
-            warning: "SMS provider not configured",
+            message: "OTP created but WhatsApp not configured",
+            warning: "WhatsApp provider not configured",
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Exotel SMS API
-      const exotelSmsUrl = `https://${exotelSettings.subdomain}/v1/Accounts/${exotelSettings.account_sid}/Sms/send.json`;
-      const auth = btoa(`${exotelSettings.api_key}:${exotelSettings.api_token}`);
+      const formattedPhone = target.replace(/^\+/, "");
+      const exotelSubdomain = whatsappSettings.exotel_subdomain || "api.exotel.com";
+      const exotelUrl = `https://${exotelSubdomain}/v2/accounts/${whatsappSettings.exotel_sid}/messages`;
+      const auth = btoa(`${whatsappSettings.exotel_api_key}:${whatsappSettings.exotel_api_token}`);
 
-      const smsParams = new URLSearchParams({
-        From: exotelSettings.caller_id,
-        To: target,
-        Body: `Your verification code is: ${otp}. Valid for 10 minutes.`,
-      });
+      const whatsappPayload = {
+        whatsapp: {
+          messages: [{
+            from: whatsappSettings.whatsapp_source_number,
+            to: formattedPhone,
+            content: {
+              type: "template",
+              template: {
+                name: "psotp1",
+                language: { code: "en_US" },
+                components: [
+                  {
+                    type: "body",
+                    parameters: [{ type: "text", text: otp }]
+                  },
+                  {
+                    type: "button",
+                    sub_type: "url",
+                    index: "0",
+                    parameters: [{ type: "text", text: otp }]
+                  }
+                ]
+              }
+            }
+          }]
+        }
+      };
 
-      const smsResponse = await fetch(exotelSmsUrl, {
+      console.log(`[send-otp] Sending WhatsApp OTP to ${formattedPhone}`);
+
+      const waResponse = await fetch(exotelUrl, {
         method: "POST",
         headers: {
-          Authorization: `Basic ${auth}`,
-          "Content-Type": "application/x-www-form-urlencoded",
+          "Authorization": `Basic ${auth}`,
+          "Content-Type": "application/json",
         },
-        body: smsParams,
+        body: JSON.stringify(whatsappPayload),
       });
 
-      if (!smsResponse.ok) {
-        const errorText = await smsResponse.text();
-        console.error("Exotel SMS error:", errorText);
-        // Return success with warning - OTP is still valid
+      const waResult = await waResponse.text();
+      console.log(`[send-otp] WhatsApp response: ${waResponse.status} - ${waResult}`);
+
+      if (!waResponse.ok) {
+        console.error("WhatsApp OTP send error:", waResult);
         return new Response(
           JSON.stringify({
             success: true,
             otpId: otpRecord.id,
-            warning: "SMS delivery may have failed",
+            warning: "WhatsApp delivery may have failed",
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-
-      console.log("SMS OTP sent successfully");
     }
 
     return new Response(

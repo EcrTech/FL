@@ -17,7 +17,7 @@ const sendEmail = async (to: string, subject: string, html: string, fromEmail: s
     subject: subject,
     html: html,
   };
-  
+
   // Add reply_to if provided and different from sender
   if (replyToEmail && replyToEmail !== fromEmail) {
     emailPayload.reply_to = [replyToEmail];
@@ -66,28 +66,16 @@ serve(async (req) => {
   }
 
   try {
-    console.log('=== send-email Request Started ===');
-    console.log('Request method:', req.method);
-    console.log('Timestamp:', new Date().toISOString());
-
     // Check for Authorization header
     const authHeader = req.headers.get("Authorization");
-    console.log('Auth Header Status:', {
-      present: !!authHeader,
-      preview: authHeader ? `${authHeader.substring(0, 20)}...` : 'MISSING',
-      length: authHeader?.length || 0
-    });
-
     if (!authHeader) {
       throw new Error('No Authorization header provided');
     }
 
     // Extract JWT token (remove "Bearer " prefix)
     const token = authHeader.replace('Bearer ', '');
-    console.log('Extracted JWT token (length):', token.length);
 
-    // Create Supabase client
-    console.log('Creating Supabase client with ANON_KEY...');
+    // Create anon client solely for authentication
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? "",
@@ -100,27 +88,14 @@ serve(async (req) => {
         },
       }
     );
-    console.log('✓ Supabase client created successfully');
 
-    // Authenticate user by passing token directly to getUser()
-    console.log('Attempting user authentication with JWT token...');
+    // Authenticate user
     const {
       data: { user },
       error: authError,
     } = await supabaseClient.auth.getUser(token);
 
-    console.log('User Auth Result:', {
-      success: !!user,
-      userId: user?.id || 'N/A',
-      userEmail: user?.email || 'N/A',
-      hasError: !!authError,
-      errorCode: authError?.code || 'N/A',
-      errorMessage: authError?.message || 'N/A',
-      errorStatus: authError?.status || 'N/A',
-    });
-
     if (authError) {
-      console.error('Auth Error Details:', JSON.stringify(authError, null, 2));
       throw new Error(`Authentication failed: ${authError.message}`);
     }
 
@@ -128,17 +103,20 @@ serve(async (req) => {
       throw new Error('No user found in session');
     }
 
-    console.log('✓ User authenticated:', user.email);
+    console.log('[send-email] User authenticated:', user.email);
 
-    const { 
-      to, 
-      subject, 
-      htmlContent, 
-      html, 
-      contactId, 
+    // Service role client for all DB operations (bypasses RLS)
+    const db = getSupabaseClient();
+
+    const {
+      to,
+      subject,
+      htmlContent,
+      html,
+      contactId,
       conversationId,
       trackingPixelId,
-      unsubscribeToken 
+      unsubscribeToken
     }: SendEmailRequest = await req.json();
 
     const emailHtml = htmlContent || html || '';
@@ -148,22 +126,14 @@ serve(async (req) => {
     }
 
     // Fetch user profile and org_id
-    console.log('Fetching user profile and org_id...');
-    const { data: profile, error: profileError } = await supabaseClient
+    const { data: profile, error: profileError } = await db
       .from("profiles")
       .select("org_id, first_name, last_name")
       .eq("id", user.id)
       .single();
 
-    console.log('Profile Lookup Result:', {
-      found: !!profile,
-      orgId: profile?.org_id || 'N/A',
-      hasError: !!profileError,
-      errorMessage: profileError?.message || 'N/A'
-    });
-
     if (profileError) {
-      console.error('Profile Error:', profileError);
+      console.error('[send-email] Profile error:', profileError.message);
       throw new Error(`Failed to fetch user profile: ${profileError.message}`);
     }
 
@@ -171,10 +141,8 @@ serve(async (req) => {
       throw new Error("User organization not found");
     }
 
-    console.log('✓ Organization verified:', profile.org_id);
-
     // Get email settings and verify domain - with fallback for orgs without custom domain
-    const { data: emailSettings, error: settingsError } = await supabaseClient
+    const { data: emailSettings } = await db
       .from("email_settings")
       .select("sending_domain, verification_status, is_active, resend_domain_id")
       .eq("org_id", profile.org_id)
@@ -186,9 +154,8 @@ serve(async (req) => {
     if (emailSettings?.is_active && emailSettings.verification_status === 'verified') {
       // Use organization's verified domain
       sendingDomain = emailSettings.sending_domain;
-      
+
       // Double-check domain status with Resend API to avoid stale data issues
-      console.log('Checking domain status with Resend API...');
       const domainCheckResponse = await fetch(
         `https://api.resend.com/domains/${emailSettings.resend_domain_id}`,
         {
@@ -200,36 +167,35 @@ serve(async (req) => {
 
       if (domainCheckResponse.ok) {
         const domainStatus = await domainCheckResponse.json();
-        console.log('Current Resend domain status:', domainStatus.status);
-        
+
         if (domainStatus.status !== 'verified') {
           // Update database with actual status
-          await supabaseClient
+          await db
             .from('email_settings')
             .update({ verification_status: 'pending' })
             .eq('org_id', profile.org_id);
-          
+
           // Fall back to default domain instead of failing
-          console.log('Domain verification incomplete, falling back to default domain');
-          sendingDomain = 'loanflow.com';
+          console.log('[send-email] Domain verification incomplete, falling back to default domain');
+          sendingDomain = 'in-sync.co.in';
           skipDomainVerification = true;
         }
       }
     } else {
       // Fallback: Use verified platform domain (same pattern as E-Sign notifications)
-      console.log('No custom email settings found, using platform default domain: loanflow.com');
-      sendingDomain = 'loanflow.com';
+      console.log('[send-email] No custom email settings, using platform default domain');
+      sendingDomain = 'in-sync.co.in';
       skipDomainVerification = true;
     }
 
     // Use verified domain as sender, user's email as reply-to
     const fromEmail = `info@${sendingDomain}`;
     const replyToEmail = user.email || fromEmail;
-    const fromName = profile.first_name 
+    const fromName = profile.first_name
       ? `${profile.first_name} ${profile.last_name || ''}`.trim()
       : (user.email || "User");
 
-    console.log("Sending email to:", to, "from:", fromEmail, "reply-to:", replyToEmail);
+    console.log("[send-email] Sending to:", to, "from:", fromEmail, "reply-to:", replyToEmail);
 
     // Generate unsubscribe token if not provided
     const unsubToken = unsubscribeToken || crypto.randomUUID();
@@ -245,38 +211,32 @@ serve(async (req) => {
         </p>
       </div>
     `;
-    const finalHtml = emailHtml.includes('</body>') 
+    const finalHtml = emailHtml.includes('</body>')
       ? emailHtml.replace('</body>', `${unsubscribeFooter}</body>`)
       : emailHtml + unsubscribeFooter;
 
     // Send email via Resend
     const emailData = await sendEmail(to, subject, finalHtml, fromEmail, fromName, replyToEmail, unsubscribeUrl);
 
-    console.log("Email sent successfully:", emailData);
+    console.log("[send-email] Email sent successfully:", emailData?.id);
 
-    // Use shared service role client for wallet deduction
-    const supabaseServiceClient = getSupabaseClient();
-
-    // Deduct email cost from wallet
-    const { data: deductResult, error: deductError } = await supabaseServiceClient.rpc('deduct_from_wallet', {
+    // Deduct email cost from wallet (uses same service role client)
+    const { data: deductResult, error: deductError } = await db.rpc('deduct_from_wallet', {
       _org_id: profile.org_id,
-      _amount: 0.10, // Get from pricing
+      _amount: 0.10,
       _service_type: 'email',
-      _reference_id: null, // Will be updated after logging
+      _reference_id: null,
       _quantity: 1,
       _unit_cost: 0.10,
       _user_id: user.id
     });
 
     if (deductError || !deductResult?.success) {
-      console.warn('Wallet deduction failed:', deductError || deductResult);
+      console.warn('[send-email] Wallet deduction failed:', deductError || deductResult);
       // Email was sent, but wallet deduction failed - log but don't fail the request
     }
 
     // Log email to email_conversations table
-    console.log('[send-email] Logging email to database...');
-    
-    // Build insert object - only include contact_id if provided and valid
     const emailLogData: Record<string, any> = {
       org_id: profile.org_id,
       conversation_id: conversationId || emailData?.id || crypto.randomUUID(),
@@ -294,33 +254,30 @@ serve(async (req) => {
       tracking_pixel_id: trackingPixelId,
       unsubscribe_token: unsubToken,
     };
-    
+
     // Only add contact_id if provided - it may be an applicant ID not a contact ID
     if (contactId) {
       // Verify contactId exists in contacts table before adding
-      const { data: contactExists } = await supabaseClient
+      const { data: contactExists } = await db
         .from('contacts')
         .select('id')
         .eq('id', contactId)
         .maybeSingle();
-      
+
       if (contactExists) {
         emailLogData.contact_id = contactId;
       } else {
         console.log('[send-email] contact_id not found in contacts table, skipping foreign key');
       }
     }
-    
-    const { error: logError } = await supabaseClient
+
+    const { error: logError } = await db
       .from("email_conversations")
       .insert(emailLogData);
 
     if (logError) {
-      console.error('[send-email] Error logging email to email_conversations:', logError);
-      console.error('[send-email] Email was sent but database logging failed');
+      console.error('[send-email] Error logging email:', logError.message);
       // Don't throw - email was sent successfully
-    } else {
-      console.log('[send-email] Email logged successfully to database');
     }
 
     return new Response(
@@ -330,14 +287,10 @@ serve(async (req) => {
       }
     );
   } catch (error: any) {
-    console.error('=== send-email Error ===');
-    console.error('Error Type:', error.constructor.name);
-    console.error('Error Message:', error.message);
-    console.error('Error Stack:', error.stack);
-    console.error('Timestamp:', new Date().toISOString());
-    
+    console.error('[send-email] Error:', error.message);
+
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: error.message,
         timestamp: new Date().toISOString()
       }),

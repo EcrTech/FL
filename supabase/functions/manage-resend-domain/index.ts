@@ -19,163 +19,136 @@ serve(async (req) => {
   }
 
   try {
-    console.log('=== manage-resend-domain Request Started ===');
-    console.log('Request method:', req.method);
-    console.log('Timestamp:', new Date().toISOString());
-
-    // Check for Authorization header
+    // Authenticate user via JWT
     const authHeader = req.headers.get('Authorization');
-    console.log('Auth Header Status:', {
-      present: !!authHeader,
-      preview: authHeader ? `${authHeader.substring(0, 20)}...` : 'MISSING',
-      length: authHeader?.length || 0
-    });
-
     if (!authHeader) {
       throw new Error('No Authorization header provided');
     }
 
-    // Extract JWT token (remove "Bearer " prefix)
     const token = authHeader.replace('Bearer ', '');
-    console.log('Extracted JWT token (length):', token.length);
 
-    // Create client with anon key
-    console.log('Creating Supabase client with ANON_KEY...');
-    const supabaseClient = createClient(
+    // Anon client only for auth verification
+    const anonClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: authHeader },
-        },
-        auth: {
-          persistSession: false,
-        },
-      }
+      { auth: { persistSession: false } }
     );
-    console.log('✓ Supabase client created successfully');
 
-    // Authenticate user by passing token directly to getUser()
-    console.log('Attempting user authentication with JWT token...');
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
-
-    console.log('User Auth Result:', {
-      success: !!user,
-      userId: user?.id || 'N/A',
-      userEmail: user?.email || 'N/A',
-      hasError: !!userError,
-      errorCode: userError?.code || 'N/A',
-      errorMessage: userError?.message || 'N/A',
-      errorStatus: userError?.status || 'N/A',
-    });
-
-    if (userError) {
-      console.error('Auth Error Details:', JSON.stringify(userError, null, 2));
-      throw new Error(`Authentication failed: ${userError.message}`);
+    const { data: { user }, error: userError } = await anonClient.auth.getUser(token);
+    if (userError || !user) {
+      throw new Error(`Authentication failed: ${userError?.message || 'No user'}`);
     }
 
-    if (!user) {
-      throw new Error('No user found in session');
-    }
+    // Service role client for all DB operations (bypasses RLS)
+    const db = getSupabaseClient();
 
-    console.log('✓ User authenticated:', user.email);
-
-    // Fetch user profile and org_id
-    console.log('Fetching user profile and org_id...');
-    const { data: profile, error: profileError } = await supabaseClient
+    // Get user profile and org_id
+    const { data: profile, error: profileError } = await db
       .from('profiles')
       .select('org_id')
       .eq('id', user.id)
       .single();
 
-    console.log('Profile Lookup Result:', {
-      found: !!profile,
-      orgId: profile?.org_id || 'N/A',
-      hasError: !!profileError,
-      errorMessage: profileError?.message || 'N/A'
-    });
-
-    if (profileError) {
-      console.error('Profile Error:', profileError);
-      throw new Error(`Failed to fetch user profile: ${profileError.message}`);
+    if (profileError || !profile?.org_id) {
+      throw new Error(`Failed to fetch user profile: ${profileError?.message || 'No org_id'}`);
     }
 
-    if (!profile?.org_id) {
-      throw new Error('User organization not found');
-    }
+    const orgId = profile.org_id;
 
-    console.log('✓ Organization verified:', profile.org_id);
+    // Verify user is admin
+    const { data: roles } = await db
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('org_id', orgId)
+      .in('role', ['admin', 'super_admin']);
+
+    if (!roles || roles.length === 0) {
+      throw new Error('Unauthorized: admin role required');
+    }
 
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
     if (!resendApiKey) {
       throw new Error('Resend API key not configured');
     }
 
-    const { action, domain, domainId }: DomainRequest = await req.json();
-    console.log('Processing action:', action, 'for org:', profile.org_id);
+    const { action, domain }: DomainRequest = await req.json();
+    console.log('Action:', action, 'Org:', orgId);
 
     let result;
 
     switch (action) {
       case 'create-domain': {
-        if (!domain) {
-          throw new Error('Domain is required');
-        }
+        if (!domain) throw new Error('Domain is required');
 
-        console.log('Creating domain in Resend:', domain);
+        // Try creating domain on Resend
         const createResponse = await fetch('https://api.resend.com/domains', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${resendApiKey}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ 
-            name: domain,
-            region: 'us-east-1'
-          }),
+          body: JSON.stringify({ name: domain, region: 'us-east-1' }),
         });
 
+        let resendData;
+
         if (!createResponse.ok) {
-          const error = await createResponse.text();
-          console.error('Resend API error:', error);
-          throw new Error(`Failed to create domain: ${error}`);
+          // Domain may already exist — find it
+          const listResponse = await fetch('https://api.resend.com/domains', {
+            headers: { 'Authorization': `Bearer ${resendApiKey}` },
+          });
+
+          if (!listResponse.ok) {
+            const errorText = await createResponse.text();
+            throw new Error(`Failed to create domain: ${errorText}`);
+          }
+
+          const listData = await listResponse.json();
+          const existing = (listData.data || []).find((d: any) => d.name === domain);
+
+          if (!existing) {
+            const errorText = await createResponse.text();
+            throw new Error(`Failed to create domain: ${errorText}`);
+          }
+
+          // Get full details
+          const detailResp = await fetch(`https://api.resend.com/domains/${existing.id}`, {
+            headers: { 'Authorization': `Bearer ${resendApiKey}` },
+          });
+          resendData = detailResp.ok ? await detailResp.json() : existing;
+        } else {
+          resendData = await createResponse.json();
         }
 
-        const resendData = await createResponse.json();
-        console.log('Domain created in Resend:', resendData);
+        const status = resendData.status === 'verified' ? 'verified' : 'pending';
 
-        // Store in database
-        const { data: existingSettings } = await supabaseClient
+        // Upsert into email_settings
+        const { data: existingSettings } = await db
           .from('email_settings')
           .select('id')
-          .eq('org_id', profile.org_id)
+          .eq('org_id', orgId)
           .maybeSingle();
 
+        const settingsPayload = {
+          sending_domain: domain,
+          resend_domain_id: resendData.id,
+          verification_status: status,
+          dns_records: resendData.records || [],
+          verified_at: status === 'verified' ? new Date().toISOString() : null,
+        };
+
         if (existingSettings) {
-          const { error: updateError } = await supabaseClient
+          const { error } = await db
             .from('email_settings')
-            .update({
-              sending_domain: domain,
-              resend_domain_id: resendData.id,
-              verification_status: 'pending',
-              dns_records: resendData.records || {},
-              verified_at: null,
-            })
-            .eq('org_id', profile.org_id);
-
-          if (updateError) throw updateError;
+            .update(settingsPayload)
+            .eq('org_id', orgId);
+          if (error) throw error;
         } else {
-          const { error: insertError } = await supabaseClient
+          const { error } = await db
             .from('email_settings')
-            .insert({
-              org_id: profile.org_id,
-              sending_domain: domain,
-              resend_domain_id: resendData.id,
-              verification_status: 'pending',
-              dns_records: resendData.records || {},
-            });
-
-          if (insertError) throw insertError;
+            .insert({ org_id: orgId, ...settingsPayload });
+          if (error) throw error;
         }
 
         result = resendData;
@@ -183,17 +156,14 @@ serve(async (req) => {
       }
 
       case 'verify-domain': {
-        const { data: settings } = await supabaseClient
+        const { data: settings } = await db
           .from('email_settings')
           .select('resend_domain_id')
-          .eq('org_id', profile.org_id)
+          .eq('org_id', orgId)
           .single();
 
-        if (!settings?.resend_domain_id) {
-          throw new Error('No domain configured');
-        }
+        if (!settings?.resend_domain_id) throw new Error('No domain configured');
 
-        console.log('Verifying domain:', settings.resend_domain_id);
         const verifyResponse = await fetch(
           `https://api.resend.com/domains/${settings.resend_domain_id}/verify`,
           {
@@ -207,37 +177,30 @@ serve(async (req) => {
 
         if (!verifyResponse.ok) {
           const error = await verifyResponse.text();
-          console.error('Resend verify error:', error);
           throw new Error(`Failed to verify domain: ${error}`);
         }
 
         const verifyData = await verifyResponse.json();
-        console.log('Verification result:', verifyData);
-
-        // Update status in database
         const newStatus = verifyData.status === 'verified' ? 'verified' : 'pending';
-        const { error: updateError } = await supabaseClient
+
+        await db
           .from('email_settings')
           .update({
             verification_status: newStatus,
             verified_at: newStatus === 'verified' ? new Date().toISOString() : null,
           })
-          .eq('org_id', profile.org_id);
-
-        if (updateError) throw updateError;
-
-        // Note: Inbound routing is currently in private alpha and must be configured manually via Resend Dashboard
+          .eq('org_id', orgId);
 
         result = verifyData;
         break;
       }
 
       case 'get-domain': {
-        const { data: settings } = await supabaseClient
+        const { data: settings } = await db
           .from('email_settings')
           .select('*')
-          .eq('org_id', profile.org_id)
-          .single();
+          .eq('org_id', orgId)
+          .maybeSingle();
 
         if (!settings?.resend_domain_id) {
           return new Response(
@@ -246,33 +209,28 @@ serve(async (req) => {
           );
         }
 
-        console.log('Fetching domain details:', settings.resend_domain_id);
         const getResponse = await fetch(
           `https://api.resend.com/domains/${settings.resend_domain_id}`,
-          {
-            headers: {
-              'Authorization': `Bearer ${resendApiKey}`,
-            },
-          }
+          { headers: { 'Authorization': `Bearer ${resendApiKey}` } }
         );
 
         if (!getResponse.ok) {
-          const error = await getResponse.text();
-          console.error('Resend get domain error:', error);
-          throw new Error(`Failed to fetch domain: ${error}`);
+          // Return DB data even if Resend API fails
+          result = settings;
+          break;
         }
 
         const domainData = await getResponse.json();
-        
-        // Update DNS records in database if they've changed
+
+        // Sync latest status from Resend
         if (domainData.records) {
-          await supabaseClient
+          await db
             .from('email_settings')
             .update({
               dns_records: domainData.records,
               verification_status: domainData.status || settings.verification_status,
             })
-            .eq('org_id', profile.org_id);
+            .eq('org_id', orgId);
         }
 
         result = { ...settings, resendData: domainData };
@@ -280,41 +238,28 @@ serve(async (req) => {
       }
 
       case 'delete-domain': {
-        const { data: settings } = await supabaseClient
+        const { data: settings } = await db
           .from('email_settings')
           .select('resend_domain_id')
-          .eq('org_id', profile.org_id)
+          .eq('org_id', orgId)
           .single();
 
-        if (!settings?.resend_domain_id) {
-          throw new Error('No domain configured');
-        }
+        if (!settings?.resend_domain_id) throw new Error('No domain configured');
 
-        console.log('Deleting domain:', settings.resend_domain_id);
-        const deleteResponse = await fetch(
+        await fetch(
           `https://api.resend.com/domains/${settings.resend_domain_id}`,
           {
             method: 'DELETE',
-            headers: {
-              'Authorization': `Bearer ${resendApiKey}`,
-            },
+            headers: { 'Authorization': `Bearer ${resendApiKey}` },
           }
         );
 
-        if (!deleteResponse.ok) {
-          const error = await deleteResponse.text();
-          console.error('Resend delete error:', error);
-          throw new Error(`Failed to delete domain: ${error}`);
-        }
-
-        // Delete from database
-        const { error: deleteError } = await supabaseClient
+        const { error: deleteError } = await db
           .from('email_settings')
           .delete()
-          .eq('org_id', profile.org_id);
+          .eq('org_id', orgId);
 
         if (deleteError) throw deleteError;
-
         result = { success: true };
         break;
       }
@@ -325,27 +270,16 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify(result),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
   } catch (error) {
     const err = error as Error;
-    console.error('=== manage-resend-domain Error ===');
-    console.error('Error Type:', err.constructor.name);
-    console.error('Error Message:', err.message);
-    console.error('Error Stack:', err.stack);
-    console.error('Timestamp:', new Date().toISOString());
-    
+    console.error('manage-resend-domain error:', err.message);
     return new Response(
-      JSON.stringify({ 
-        error: err.message,
-        timestamp: new Date().toISOString()
-      }),
+      JSON.stringify({ error: err.message }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: err.message.includes('Unauthorized') || err.message.includes('Authentication') ? 401 : 400,
+        status: err.message.includes('Authentication') || err.message.includes('Unauthorized') ? 401 : 400,
       }
     );
   }

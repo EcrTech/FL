@@ -112,7 +112,7 @@ serve(async (req) => {
 
     // Build the frontend redirect URL
     // If returnUrl is provided, use the origin from it; otherwise fall back to FRONTEND_URL
-    let frontendUrl = Deno.env.get("FRONTEND_URL") || "https://loanflow.com";
+    let frontendUrl = Deno.env.get("FRONTEND_URL") || "https://lf.in-sync.co.in";
     
     if (returnUrl) {
       try {
@@ -152,7 +152,7 @@ serve(async (req) => {
     console.error("[digilocker-callback] Stack:", error instanceof Error ? error.stack : "N/A");
 
     // On error, redirect to failure page
-    const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://loanflow.com";
+    const frontendUrl = Deno.env.get("FRONTEND_URL") || "https://lf.in-sync.co.in";
     const errorRedirect = `${frontendUrl}/digilocker/failure?error=callback_failed`;
     
     return new Response(null, {

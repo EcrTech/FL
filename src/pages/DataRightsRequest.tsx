@@ -72,7 +72,7 @@ export default function DataRightsRequest() {
             </p>
             <p className="text-sm text-muted-foreground">
               For questions, contact our DPO at{" "}
-              <a href="mailto:dpo@yourcompany.com" className="text-primary underline">dpo@yourcompany.com</a>
+              <a href="mailto:dpo@in-sync.co.in" className="text-primary underline">dpo@in-sync.co.in</a>
             </p>
           </CardContent>
         </Card>

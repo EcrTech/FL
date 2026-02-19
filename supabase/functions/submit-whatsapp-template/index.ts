@@ -29,6 +29,12 @@ interface ExotelComponent {
   buttons?: TemplateButton[];
 }
 
+const jsonResponse = (body: Record<string, unknown>) =>
+  new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -43,7 +49,7 @@ serve(async (req) => {
     const { templateId, orgId } = await req.json();
 
     if (!templateId || !orgId) {
-      throw new Error('Template ID and Organization ID are required');
+      return jsonResponse({ success: false, error: 'Template ID and Organization ID are required' });
     }
 
     // Fetch template data
@@ -55,7 +61,7 @@ serve(async (req) => {
       .single();
 
     if (templateError || !template) {
-      throw new Error(`Template not found: ${templateError?.message}`);
+      return jsonResponse({ success: false, error: `Template not found: ${templateError?.message}` });
     }
 
     // Fetch WhatsApp settings for Exotel credentials
@@ -66,15 +72,15 @@ serve(async (req) => {
       .single();
 
     if (settingsError || !settings) {
-      throw new Error(`WhatsApp settings not found: ${settingsError?.message}`);
+      return jsonResponse({ success: false, error: `WhatsApp settings not found: ${settingsError?.message}` });
     }
 
     if (!settings.exotel_sid || !settings.exotel_api_key || !settings.exotel_api_token || !settings.exotel_subdomain) {
-      throw new Error('Exotel credentials are not configured. Please update WhatsApp Settings.');
+      return jsonResponse({ success: false, error: 'Exotel credentials are not configured. Please update WhatsApp Settings.' });
     }
 
     if (!settings.waba_id) {
-      throw new Error('WABA ID is not configured. Please update WhatsApp Settings with your WhatsApp Business Account ID.');
+      return jsonResponse({ success: false, error: 'WABA ID is not configured. Please update WhatsApp Settings with your WhatsApp Business Account ID.' });
     }
 
     // Build Exotel template components
@@ -89,7 +95,6 @@ serve(async (req) => {
 
       if (template.header_type === 'text') {
         headerComponent.text = template.header_content;
-        // Extract variables from header
         const headerVars = template.header_content.match(/\{\{(\d+)\}\}/g);
         if (headerVars && template.sample_values?.header) {
           headerComponent.example = {
@@ -97,7 +102,6 @@ serve(async (req) => {
           };
         }
       } else {
-        // For media headers, we need a handle (URL)
         headerComponent.example = {
           header_handle: [template.header_content]
         };
@@ -112,7 +116,6 @@ serve(async (req) => {
       text: template.content,
     };
 
-    // Extract variables from body and add examples
     const bodyVars = template.content.match(/\{\{(\d+)\}\}/g);
     if (bodyVars && template.sample_values?.body && template.sample_values.body.length > 0) {
       bodyComponent.example = {
@@ -139,7 +142,6 @@ serve(async (req) => {
 
         if (btn.type === 'url' || btn.type === 'URL') {
           button.url = btn.url;
-          // If URL has a variable, add example
           if (btn.url?.includes('{{')) {
             button.example = [btn.url.replace(/\{\{\d+\}\}/g, 'example-value')];
           }
@@ -181,35 +183,38 @@ serve(async (req) => {
     console.log('Submitting template to Exotel:', JSON.stringify(exotelPayload, null, 2));
 
     // Make the API call to Exotel
-    const exotelUrl = `https://${settings.exotel_api_key}:${settings.exotel_api_token}@${settings.exotel_subdomain}/v2/accounts/${settings.exotel_sid}/templates?waba_id=${settings.waba_id}`;
+    const exotelUrl = `https://${settings.exotel_subdomain}/v2/accounts/${settings.exotel_sid}/templates?waba_id=${settings.waba_id}`;
+    const basicAuth = btoa(`${settings.exotel_api_key}:${settings.exotel_api_token}`);
 
     const exotelResponse = await fetch(exotelUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Basic ${basicAuth}`,
       },
       body: JSON.stringify(exotelPayload),
     });
 
     const exotelResult = await exotelResponse.json();
-    console.log('Exotel response:', JSON.stringify(exotelResult, null, 2));
+    console.log('Exotel response status:', exotelResponse.status, 'body:', JSON.stringify(exotelResult, null, 2));
 
     if (!exotelResponse.ok) {
+      const errMsg = exotelResult.message || exotelResult.error || JSON.stringify(exotelResult);
       // Update template with error status
       await supabaseClient
         .from('communication_templates')
         .update({
           submission_status: 'rejected',
-          rejection_reason: exotelResult.message || exotelResult.error || JSON.stringify(exotelResult),
+          rejection_reason: errMsg,
           submitted_at: new Date().toISOString(),
         })
         .eq('id', templateId);
 
-      throw new Error(exotelResult.message || exotelResult.error || 'Failed to submit template to Exotel');
+      return jsonResponse({ success: false, error: `Exotel API error (${exotelResponse.status}): ${errMsg}` });
     }
 
     // Extract template ID from Exotel response
-    const exotelTemplateId = exotelResult?.whatsapp?.templates?.[0]?.template?.id || 
+    const exotelTemplateId = exotelResult?.whatsapp?.templates?.[0]?.template?.id ||
                              exotelResult?.response?.templates?.[0]?.id ||
                              null;
     const exotelStatus = exotelResult?.whatsapp?.templates?.[0]?.template?.status || 'PENDING';
@@ -230,30 +235,15 @@ serve(async (req) => {
       console.error('Failed to update template status:', updateError);
     }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: 'Template submitted to Exotel for approval',
-        exotelResponse: exotelResult,
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200 
-      }
-    );
+    return jsonResponse({
+      success: true,
+      message: 'Template submitted to Exotel for approval',
+      exotelResponse: exotelResult,
+    });
 
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     console.error('Error submitting template:', error);
-    return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: errorMessage 
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400 
-      }
-    );
+    return jsonResponse({ success: false, error: errorMessage });
   }
 });

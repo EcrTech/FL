@@ -205,7 +205,13 @@ const App = () => {
                 <WhatsAppSettings />
               </ProtectedRoute>
             } />
-            
+
+            <Route path="/email-settings" element={
+              <ProtectedRoute requiredRole="admin">
+                <EmailSettings />
+              </ProtectedRoute>
+            } />
+
             <Route path="/templates" element={
               <ProtectedRoute>
                 <Templates />

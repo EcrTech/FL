@@ -654,8 +654,8 @@ export function BasicInfoStep({
             />
       <Label htmlFor="termsAndConditions" className="text-sm text-muted-foreground font-body leading-relaxed cursor-pointer">
         I have read and agreed to the{' '}
-        <a href="https://loanflow.com/terms" className="text-primary font-semibold hover:underline" target="_blank" rel="noopener noreferrer">Terms and Conditions</a>,{' '}
-        <a href="https://loanflow.com/privacy" className="text-primary font-semibold hover:underline" target="_blank" rel="noopener noreferrer">Privacy Policy</a> and{' '}
+        <a href="https://lf.in-sync.co.in/terms" className="text-primary font-semibold hover:underline" target="_blank" rel="noopener noreferrer">Terms and Conditions</a>,{' '}
+        <a href="https://lf.in-sync.co.in/privacy" className="text-primary font-semibold hover:underline" target="_blank" rel="noopener noreferrer">Privacy Policy</a> and{' '}
         <a href="/risk" className="text-primary font-semibold hover:underline" target="_blank">Gradation of Risk</a>
       </Label>
           </div>
