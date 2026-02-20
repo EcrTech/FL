@@ -22,7 +22,7 @@ export function useUnreadWhatsApp(phoneNumber: string | undefined) {
         .select("id", { count: "exact", head: true })
         .eq("phone_number", formattedPhone)
         .eq("direction", "inbound")
-        .eq("is_read", false);
+        .is("read_at", null);
 
       if (error) throw error;
       return count || 0;

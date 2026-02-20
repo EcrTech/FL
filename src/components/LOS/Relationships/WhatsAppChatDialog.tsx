@@ -126,12 +126,12 @@ export function WhatsAppChatDialog({
 
       // Mark all inbound messages as read
       const unreadIds = (data || [])
-        .filter(m => m.direction === 'inbound')
+        .filter(m => m.direction === 'inbound' && !m.read_at)
         .map(m => m.id);
       if (unreadIds.length > 0) {
         await supabase
           .from('whatsapp_messages')
-          .update({ is_read: true } as any)
+          .update({ read_at: new Date().toISOString() } as any)
           .in('id', unreadIds);
       }
 
