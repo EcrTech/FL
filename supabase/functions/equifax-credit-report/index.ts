@@ -122,6 +122,7 @@ function getStateCode(state: string, pincode?: string): string {
 
 function formatDate(dateStr: string): string {
   if (!dateStr) return "";
+  // Equifax IDCR expects YYYY-MM-DD format (same as database)
   return dateStr;
 }
 
@@ -132,23 +133,21 @@ function parseDPDFromPaymentHistory(history: string): number {
 }
 
 /**
- * Build the 7 IDDetails slots required by PCS format.
- * PAN=T, Passport=P, Voter=V, DL=D, Aadhaar=M, Ration=R, Other=O
+ * Build IDDetails for IDCR JSON format.
+ * Order per IDCR spec: PAN=T, Aadhaar=M, Voter=V, Passport=P, DL=D
  */
 function buildIDDetails(panNumber: string, aadhaarNumber: string): any[] {
   return [
-    { seq: "1", IDType: "T", IDValue: panNumber || "", Source: "Inquiry" },
-    { seq: "2", IDType: "P", IDValue: "", Source: "Inquiry" },
-    { seq: "3", IDType: "V", IDValue: "", Source: "Inquiry" },
-    { seq: "4", IDType: "D", IDValue: "", Source: "Inquiry" },
-    { seq: "5", IDType: "M", IDValue: aadhaarNumber ? aadhaarNumber.replace(/\s/g, "") : "", Source: "Inquiry" },
-    { seq: "6", IDType: "R", IDValue: "", Source: "Inquiry" },
-    { seq: "7", IDType: "O", IDValue: "", Source: "Inquiry" },
+    { seq: "1", IDType: "T", IDValue: panNumber || "" },
+    { seq: "2", IDType: "M", IDValue: aadhaarNumber ? aadhaarNumber.replace(/\s/g, "") : "" },
+    { seq: "3", IDType: "V", IDValue: "" },
+    { seq: "4", IDType: "P", IDValue: "" },
+    { seq: "5", IDType: "D", IDValue: "" },
   ];
 }
 
 /**
- * Parse PCS CIR 360 JSON response from Equifax
+ * Parse IDCR (Individual Detailed Credit Report) JSON response from Equifax
  */
 function parseEquifaxResponse(response: any): any {
   try {
@@ -163,7 +162,7 @@ function parseEquifaxResponse(response: any): any {
     let scoreDetails: any = {};
 
     if (ccrResponse?.CIRReportDataLst?.[0]) {
-      console.log("[EQUIFAX-PARSE] Using CCRResponse path (PCS CIR 360)");
+      console.log("[EQUIFAX-PARSE] Using CCRResponse path (IDCR JSON)");
       inquiryResponse = ccrResponse.CIRReportDataLst[0];
       header = inquiryResponse.InquiryResponseHeader || response.InquiryResponseHeader || {};
 
@@ -224,16 +223,17 @@ function parseEquifaxResponse(response: any): any {
       const history48MonthsRaw = acc.History48Months;
       const paymentHistory: any[] = [];
 
-      // CIR 360 JSON: array of objects; Legacy: string
+      // IDCR JSON: array of objects with PaymentStatus, SuitFiledStatus, AssetClassificationStatus
       if (Array.isArray(history48MonthsRaw)) {
-        const recentHistory = history48MonthsRaw.slice(0, 12);
-        recentHistory.forEach((item: any) => {
+        history48MonthsRaw.forEach((item: any) => {
           const status = item.PaymentStatus || "*";
           paymentHistory.push({
             month: item.key || "",
             status,
             label: PAYMENT_STATUS[status]?.label || status,
             severity: PAYMENT_STATUS[status]?.severity || "current",
+            suitFiledStatus: item.SuitFiledStatus || "*",
+            assetClassificationStatus: item.AssetClassificationStatus || "*",
           });
         });
       } else if (typeof history48MonthsRaw === "string" && history48MonthsRaw.length > 0) {
@@ -245,16 +245,18 @@ function parseEquifaxResponse(response: any): any {
             status,
             label: PAYMENT_STATUS[status]?.label || status,
             severity: PAYMENT_STATUS[status]?.severity || "current",
+            suitFiledStatus: "*",
+            assetClassificationStatus: "*",
           });
         }
       }
 
-      // Institution name: check multiple field names
-      const institutionName = acc.SubscriberName
+      // Institution name: IDCR uses "Institution" as primary field
+      const institutionName = acc.Institution
+        || acc.SubscriberName
         || acc.InstitutionName
         || acc.ReportingMemberShortName
         || acc.MemberShortName
-        || acc.Institution
         || "Unknown";
 
       // Determine account status: use Open field ("Yes"/"No") alongside AccountStatus
@@ -272,13 +274,17 @@ function parseEquifaxResponse(response: any): any {
         sanctionAmount: parseFloat(acc.SanctionAmount) || 0,
         currentBalance: parseFloat(acc.Balance || acc.CurrentBalance) || 0,
         pastDueAmount: parseFloat(acc.PastDueAmount || acc.AmountPastDue) || 0,
+        lastPayment: parseFloat(acc.LastPayment) || 0,
         emiAmount: parseFloat(acc.InstallmentAmount) || 0,
         highCredit: parseFloat(acc.HighCredit) || 0,
         creditLimit: parseFloat(acc.CreditLimit) || 0,
         interestRate: parseFloat(acc.InterestRate) || 0,
+        repaymentTenure: acc.RepaymentTenure || "",
+        termFrequency: acc.TermFrequency || "",
         collateralValue: parseFloat(acc.CollateralValue) || 0,
         collateralType: acc.CollateralType || "",
         assetClassification: acc.AssetClassification || "",
+        source: acc.source || "",
         dateOpened: acc.DateOpened || "",
         dateClosed: acc.DateClosed || "",
         dateReported: acc.DateReported || "",
@@ -301,25 +307,43 @@ function parseEquifaxResponse(response: any): any {
       a.status === "Written Off" || a.status === "WOF"
     );
 
-    // Enquiries
+    // Enquiries - IDCR uses RequestPurpose (not Purpose) and has Time field
     const parsedEnquiries = enquiries.map((enq: any) => ({
       date: enq.Date || "",
+      time: enq.Time || "",
       institution: enq.Institution || "",
-      purpose: enq.Purpose || "",
-      amount: parseFloat(enq.Amount) || 0,
+      purpose: enq.RequestPurpose || enq.Purpose || "",
     }));
 
-    const now = new Date();
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-    const enquiries30Days = parsedEnquiries.filter((e: any) => new Date(e.date) >= thirtyDaysAgo).length;
-    const enquiries90Days = parsedEnquiries.filter((e: any) => new Date(e.date) >= ninetyDaysAgo).length;
+    // Use EnquirySummary from IDCR response if available, fallback to manual calculation
+    const enquirySummaryData = enquirySummary || {};
+    const enquiries30Days = parseInt(enquirySummaryData.Past30Days) ||
+      parsedEnquiries.filter((e: any) => {
+        const d = new Date(e.date);
+        return d >= new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      }).length;
+    const enquiries12Months = parseInt(enquirySummaryData.Past12Months) ||
+      parsedEnquiries.filter((e: any) => {
+        const d = new Date(e.date);
+        return d >= new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+      }).length;
+    const enquiries24Months = parseInt(enquirySummaryData.Past24Months) ||
+      parsedEnquiries.filter((e: any) => {
+        const d = new Date(e.date);
+        return d >= new Date(Date.now() - 730 * 24 * 60 * 60 * 1000);
+      }).length;
 
     // Credit score - multiple locations
     const creditScore = parseInt(scoreDetails.Score) || parseInt(scoreDetails.Value)
       || parseInt(cirReportData.ScoreCard?.Score) || parseInt(cirReportData.Scores?.[0]?.Value) || 0;
 
+    // Score reasoning elements
+    const scoringElements = scoreDetails.ScoringElements || [];
+
     console.log("[EQUIFAX-PARSE] Final credit score:", creditScore);
+
+    // OtherKeyInd section (IDCR-specific)
+    const otherKeyInd = cirReportData.OtherKeyInd || {};
 
     return {
       reportOrderNo: header.ReportOrderNO || "",
@@ -327,19 +351,29 @@ function parseEquifaxResponse(response: any): any {
       creditScore,
       scoreType: scoreDetails.Type || "ERS",
       scoreVersion: scoreDetails.Version || "4.0",
+      scoreName: scoreDetails.Name || "",
+      scoringElements,
       hitCode: header.HitCode || "10",
       hitDescription: HIT_CODES[header.HitCode] || "Unknown",
       summary: {
-        totalAccounts: accounts.length,
-        activeAccounts: activeAccounts.length,
+        // Use IDCR RetailAccountsSummary fields directly
+        totalAccounts: parseInt(retailAccountsSummary.NoOfAccounts) || accounts.length,
+        activeAccounts: parseInt(retailAccountsSummary.NoOfActiveAccounts) || activeAccounts.length,
         closedAccounts: closedAccounts.length,
-        writeOffAccounts: writeOffAccounts.length,
-        totalOutstanding: parseFloat(retailAccountsSummary.TotalBalanceAmount || retailAccountsSummary.CurrentBalance) ||
+        writeOffAccounts: parseInt(retailAccountsSummary.NoOfWriteOffs) || writeOffAccounts.length,
+        totalOutstanding: parseFloat(retailAccountsSummary.TotalBalanceAmount) ||
           accounts.reduce((sum: number, a: any) => sum + a.currentBalance, 0),
-        totalPastDue: parseFloat(retailAccountsSummary.TotalPastDue || retailAccountsSummary.AmountPastDue) ||
+        totalPastDue: parseFloat(retailAccountsSummary.TotalPastDue) ||
           accounts.reduce((sum: number, a: any) => sum + a.pastDueAmount, 0),
-        totalSanctioned: parseFloat(retailAccountsSummary.TotalSanctionAmount || retailAccountsSummary.SanctionAmount) ||
+        totalSanctioned: parseFloat(retailAccountsSummary.TotalSanctionAmount) ||
           accounts.reduce((sum: number, a: any) => sum + a.sanctionAmount, 0),
+        singleHighestCredit: parseFloat(retailAccountsSummary.SingleHighestCredit) || 0,
+        singleHighestSanctionAmount: parseFloat(retailAccountsSummary.SingleHighestSanctionAmount) || 0,
+        totalHighCredit: parseFloat(retailAccountsSummary.TotalHighCredit) || 0,
+        averageOpenBalance: parseFloat(retailAccountsSummary.AverageOpenBalance) || 0,
+        singleHighestBalance: parseFloat(retailAccountsSummary.SingleHighestBalance) || 0,
+        noOfPastDueAccounts: parseInt(retailAccountsSummary.NoOfPastDueAccounts) || 0,
+        noOfZeroBalanceAccounts: parseInt(retailAccountsSummary.NoOfZeroBalanceAccounts) || 0,
         oldestAccountDate: retailAccountsSummary.OldestAccount || "",
         recentAccountDate: retailAccountsSummary.RecentAccount || "",
         totalCreditLimit: parseFloat(retailAccountsSummary.TotalCreditLimit) || 0,
@@ -348,21 +382,45 @@ function parseEquifaxResponse(response: any): any {
       accounts,
       enquiries: {
         total30Days: enquiries30Days,
-        total90Days: enquiries90Days,
-        totalAll: parsedEnquiries.length,
+        total12Months: enquiries12Months,
+        total24Months: enquiries24Months,
+        totalAll: parseInt(enquirySummaryData.Total) || parsedEnquiries.length,
+        recentEnquiryDate: enquirySummaryData.Recent || "",
         list: parsedEnquiries,
+      },
+      otherKeyIndicators: {
+        ageOfOldestTrade: otherKeyInd.AgeOfOldestTrade || "",
+        numberOfOpenTrades: otherKeyInd.NumberOfOpenTrades || "",
+        allLinesEVER90: otherKeyInd.AllLinesEVER90 || "",
+        allLinesSEVERE: otherKeyInd.AllLinesSEVERE || "",
       },
       personalInfo: {
         name: fullName.trim(),
         dob: personalInfo.DateOfBirth || "",
+        age: personalInfo.Age?.Age || "",
         pan: idAndContactInfo.IdentityInfo?.PANId?.[0]?.IdNumber
           || idAndContactInfo.PANId?.[0]?.IdNumber || "",
+        voterId: idAndContactInfo.IdentityInfo?.VoterID?.[0]?.IdNumber || "",
+        nationalId: idAndContactInfo.IdentityInfo?.NationalIDCard?.[0]?.IdNumber || "",
         gender: personalInfo.Gender || "",
         totalIncome: personalInfo.TotalIncome || "",
-        addresses: (idAndContactInfo.AddressInfo || []).map((addr: any) =>
-          [addr.Address, addr.City, addr.State, addr.Postal].filter(Boolean).join(", ")
-        ),
-        phones: (idAndContactInfo.PhoneInfo || []).map((phone: any) => phone.Number),
+        occupation: personalInfo.Occupation || "",
+        addresses: (idAndContactInfo.AddressInfo || []).map((addr: any) => ({
+          address: addr.Address || "",
+          state: addr.State || "",
+          postal: addr.Postal || "",
+          type: addr.Type || "",
+          reportedDate: addr.ReportedDate || "",
+        })),
+        phones: (idAndContactInfo.PhoneInfo || []).map((phone: any) => ({
+          number: phone.Number || "",
+          type: phone.typeCode || "",
+          reportedDate: phone.ReportedDate || "",
+        })),
+        emails: (idAndContactInfo.EmailAddressInfo || []).map((email: any) => ({
+          email: email.EmailAddress || "",
+          reportedDate: email.ReportedDate || "",
+        })),
       },
     };
   } catch (error) {
@@ -484,6 +542,7 @@ serve(async (req) => {
       panNumber: applicant.pan_number || "",
       aadhaarNumber: applicant.aadhaar_number || "",
       mobile: applicant.mobile || "",
+      email: applicant.email || "",
       gender: applicant.gender || "",
       address: {
         line1: addressLine1,
@@ -522,19 +581,26 @@ serve(async (req) => {
       throw new Error(`Missing Equifax credentials: ${missing.join(", ")}. Please configure them in settings.`);
     }
 
-    // Build request - PCS CIR 360 JSON format
+    // Build request - IDCR (Individual Detailed Credit Report) JSON format
     const stateCode = getStateCode(applicantData.address.state, applicantData.address.postal);
     console.log("[EQUIFAX] State code:", stateCode);
 
-    // Build RequestBody - only include MiddleName/LastName if non-empty
+    // Build RequestBody per IDCR spec
     const requestBody: any = {
       InquiryPurpose: "00",
+      TransactionAmount: "0",
       FirstName: applicantData.firstName,
+      MiddleName: applicantData.middleName || "",
+      LastName: applicantData.lastName || "",
       DOB: formatDate(applicantData.dob),
+      Gender: applicantData.gender === "Female" ? "F" : "M",
       InquiryAddresses: [{
         seq: "1",
         AddressType: ["H"],
         AddressLine1: applicantData.address.line1,
+        AddressLine2: "",
+        Locality: applicantData.address.city,
+        City: applicantData.address.city,
         State: stateCode,
         Postal: applicantData.address.postal,
       }],
@@ -543,16 +609,16 @@ serve(async (req) => {
         PhoneType: ["M"],
         Number: applicantData.mobile,
       }],
+      EmailAddresses: [{
+        seq: "1",
+        Email: applicantData.email || "",
+        EmailType: ["O"],
+      }],
       IDDetails: buildIDDetails(applicantData.panNumber, applicantData.aadhaarNumber),
+      CustomFields: [
+        { key: "EmbeddedPdf", value: "Y" },
+      ],
     };
-
-    // Only include MiddleName and LastName if they have values
-    if (applicantData.middleName) {
-      requestBody.MiddleName = applicantData.middleName;
-    }
-    if (applicantData.lastName) {
-      requestBody.LastName = applicantData.lastName;
-    }
 
     const equifaxRequest = {
       RequestHeader: {
@@ -562,7 +628,7 @@ serve(async (req) => {
         MemberNumber: memberNumber,
         SecurityCode: securityCode,
         CustRefField: applicationId,
-        ProductCode: ["PCS"],
+        ProductCode: ["IDCR"],
       },
       RequestBody: requestBody,
       Score: [{ Type: "ERS", Version: "4.0" }],
@@ -572,16 +638,16 @@ serve(async (req) => {
     let rawApiResponse: any = null;
 
     try {
-      console.log("[EQUIFAX] ========== SENDING PCS JSON REQUEST ==========");
+      console.log("[EQUIFAX] ========== SENDING IDCR JSON REQUEST ==========");
 
       const redactedBody = JSON.stringify(equifaxRequest)
         .replace(/"Password":"[^"]*"/g, '"Password":"***REDACTED***"')
         .replace(/"SecurityCode":"[^"]*"/g, '"SecurityCode":"***REDACTED***"');
       console.log("[EQUIFAX] Request (redacted):", redactedBody);
 
-      // 25-second timeout
+      // 300-second timeout (reports can be very large)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 25000);
+      const timeoutId = setTimeout(() => controller.abort(), 300000);
 
       let response: Response;
       try {
@@ -604,9 +670,14 @@ serve(async (req) => {
       }
 
       console.log("[EQUIFAX] Response Status:", response.status, response.statusText);
+      console.log("[EQUIFAX] Response Content-Type:", response.headers.get("content-type"));
 
-      const responseText = await response.text();
+      let responseText = await response.text();
       console.log("[EQUIFAX] Response length:", responseText.length);
+
+      // Strip UTF-8 BOM and leading/trailing whitespace
+      responseText = responseText.replace(/^\uFEFF/, "").trim();
+      console.log("[EQUIFAX] Response preview:", responseText.substring(0, 500));
 
       if (!response.ok) {
         throw new Error(`API returned ${response.status}: ${responseText.substring(0, 500)}`);
@@ -616,7 +687,9 @@ serve(async (req) => {
         rawApiResponse = JSON.parse(responseText);
         console.log("[EQUIFAX] Response keys:", Object.keys(rawApiResponse));
       } catch (parseError: any) {
-        throw new Error(`Failed to parse Equifax response as JSON: ${parseError.message}`);
+        console.error("[EQUIFAX] Raw response (first 500 chars):", responseText.substring(0, 500));
+        console.error("[EQUIFAX] First 20 char codes:", [...responseText.substring(0, 20)].map(c => c.charCodeAt(0)));
+        throw new Error(`Failed to parse Equifax response as JSON. Response: ${responseText.substring(0, 300)}`);
       }
 
       // Check for API error response
@@ -629,7 +702,7 @@ serve(async (req) => {
 
       reportData = parseEquifaxResponse(rawApiResponse);
       reportData.rawResponse = rawApiResponse;
-      reportData.requestFormat = "json";
+      reportData.requestFormat = "idcr_json";
       console.log("[EQUIFAX] Credit Score:", reportData.creditScore, "Hit Code:", reportData.hitCode);
 
     } catch (apiError: any) {
@@ -637,7 +710,7 @@ serve(async (req) => {
       throw new Error(`Failed to fetch credit report: ${apiError.message}`);
     }
 
-    // Build redacted request for storage - matches actual request structure
+    // Build redacted request for storage - matches actual IDCR request structure
     const redactedRequestForStorage = {
       RequestHeader: {
         CustomerId: customerId,
@@ -646,18 +719,22 @@ serve(async (req) => {
         MemberNumber: memberNumber,
         SecurityCode: "***REDACTED***",
         CustRefField: applicationId,
-        ProductCode: ["PCS"],
+        ProductCode: ["IDCR"],
       },
       RequestBody: {
         InquiryPurpose: "00",
+        TransactionAmount: "0",
         FirstName: applicantData.firstName,
-        ...(applicantData.middleName ? { MiddleName: applicantData.middleName } : {}),
-        ...(applicantData.lastName ? { LastName: applicantData.lastName } : {}),
+        MiddleName: applicantData.middleName || "",
+        LastName: applicantData.lastName || "",
         DOB: formatDate(applicantData.dob),
+        Gender: applicantData.gender === "Female" ? "F" : "M",
         InquiryAddresses: [{
           seq: "1",
           AddressType: ["H"],
           AddressLine1: applicantData.address.line1,
+          Locality: applicantData.address.city,
+          City: applicantData.address.city,
           State: stateCode,
           Postal: applicantData.address.postal,
         }],
@@ -684,17 +761,21 @@ serve(async (req) => {
       status: (reportData.hitCode === "10" || reportData.hitCode === "01") ? "success" : "failed",
       request_data: {
         bureau_type: "equifax",
+        product_code: "IDCR",
         pan_number: applicantData.panNumber,
         request_timestamp: new Date().toISOString(),
         full_request: redactedRequestForStorage,
         api_url_used: apiUrl,
-        request_format: "pcs_json",
+        request_format: "idcr_json",
       },
       response_data: {
         bureau_type: "equifax",
+        product_code: "IDCR",
         credit_score: reportData.creditScore,
         score_type: reportData.scoreType,
         score_version: reportData.scoreVersion,
+        score_name: reportData.scoreName,
+        scoring_elements: reportData.scoringElements,
         hit_code: reportData.hitCode,
         hit_description: reportData.hitDescription,
         report_order_no: reportData.reportOrderNo,
@@ -702,12 +783,14 @@ serve(async (req) => {
         summary: reportData.summary,
         accounts: reportData.accounts,
         enquiries: reportData.enquiries,
+        other_key_indicators: reportData.otherKeyIndicators,
         personal_info: reportData.personalInfo,
         active_accounts: reportData.summary.activeAccounts,
         total_outstanding: reportData.summary.totalOutstanding,
         total_overdue: reportData.summary.totalPastDue,
         enquiry_count_30d: reportData.enquiries.total30Days,
-        enquiry_count_90d: reportData.enquiries.total90Days,
+        enquiry_count_12m: reportData.enquiries.total12Months,
+        enquiry_count_24m: reportData.enquiries.total24Months,
         name_on_report: reportData.personalInfo.name,
         pan_on_report: reportData.personalInfo.pan,
         is_live_fetch: true,
@@ -719,7 +802,7 @@ serve(async (req) => {
         },
         debug_info: {
           response_timestamp: new Date().toISOString(),
-          response_format: "pcs_json",
+          response_format: "idcr_json",
         }
       },
       remarks: (reportData.hitCode === "10" || reportData.hitCode === "01")
